@@ -1,0 +1,37 @@
+{
+  "device": "BUSA-1M-001",
+  "mode": "manual",
+  "volume_l": 20,
+  "level_mm": 160,
+  "temperature_count": 4,
+  "temperatures": [
+    {
+      "channel": 1,
+      "name": "Вода",
+      "ok": true,
+      "celsius": 22.5,
+      "address": "28FF000000000001"
+    },
+    {
+      "channel": 2,
+      "name": "Колонна",
+      "ok": true,
+      "celsius": 25.1,
+      "address": "28FF000000000002"
+    },
+    {
+      "channel": 3,
+      "name": "Куб",
+      "ok": true,
+      "celsius": 24.7,
+      "address": "28FF000000000003"
+    },
+    {
+      "channel": 4,
+      "name": "Верхняя точка колонны",
+      "ok": true,
+      "celsius": 23.2,
+      "address": "28FF000000000004"
+    }
+  ]
+}
