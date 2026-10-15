@@ -1,15 +1,175 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101827"><title>БУСА-Монитор №001</title><link rel="manifest" href="./manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><style>
 :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b1220;color:#edf4ff}*{box-sizing:border-box}body{margin:0}header{padding:26px 18px 16px;background:#122139}h1{font-size:25px;margin:0 0 7px}small,.muted{color:#9db1c9}main{max-width:640px;margin:auto;padding:16px 15px 105px}.notice{padding:12px;background:#3a2e21;border:1px solid #88643d;border-radius:12px;font-size:13px;margin-bottom:14px;color:#ffe0b1}.card{background:#18283f;border:1px solid #314761;border-radius:17px;padding:17px;margin-bottom:14px}.card h2{font-size:17px;margin:0 0 15px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.tile{padding:14px;border-radius:13px;background:#233854}.tile b{font-size:27px;display:block;margin:8px 0}.tile small{font-size:12px}.line{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #344c68;font-size:14px}.line:last-child{border:0}.line b{text-align:right}.hidden{display:none!important}nav{position:fixed;bottom:0;left:0;right:0;display:flex;overflow-x:auto;background:#111e31;border-top:1px solid #39506b;padding:8px 5px max(10px,env(safe-area-inset-bottom))}nav button{flex:0 0 auto;min-width:85px;background:transparent;color:#a6bad2;border:0;padding:12px 4px;font-size:13px}nav button.active{color:#80c2ff;font-weight:bold}button.action{padding:12px 15px;border:1px solid #527391;border-radius:10px;background:#2b527c;color:white;font-size:14px;margin:8px 7px 0 0}input{width:100%;background:#101e30;color:white;border:1px solid #526a84;padding:12px;border-radius:10px;margin-top:10px;font-size:16px}.state{color:#ffc27a}.tag{display:inline-block;border:1px solid #5b7797;border-radius:20px;padding:5px 10px;font-size:12px;color:#c7d7eb;margin-top:7px}.history{font-size:13px;max-height:240px;overflow:auto}.history div{padding:8px;border-bottom:1px solid #354b66}
-</style></head><body><header><h1>БУСА-Монитор</h1><small>БУСА-1М №001 · приложение для iPhone · v0.6.1</small><div class="tag" id="badge">Демонстрационный режим</div></header><main><div class="notice" id="notice">Демо-данные условные. Управление оборудованием недоступно.</div>
+</style></head><body><header><h1>БУСА-Монитор</h1><small>БУСА-1М №001 · приложение для iPhone · v0.6.2</small><div class="tag" id="badge">Демонстрационный режим</div></header><main><div class="notice" id="notice">Демо-данные условные. Управление оборудованием недоступно.</div>
 <section id="overview"><div class="card"><h2>Состояние системы</h2><div class="line"><span>ESP32-S3</span><b id="dev">Нет подключения</b></div><div class="line"><span>Модуль DS2482S-800</span><b id="bridge">—</b></div><div class="line"><span>Клавиатура PCF8575</span><b id="keypad">—</b></div><div class="line"><span>Выходы управления</span><b>Отключены</b></div></div><div class="card"><h2>Четыре температуры</h2><div class="grid" id="summary"></div></div><div class="card"><h2>Клавиатура · последняя команда</h2><div class="line"><span>Клавиша</span><b id="lastkey">—</b></div><div class="line"><span>Номер события</span><b id="keyseq">—</b></div></div></section>
 <section id="temperatures" class="hidden"><div class="card"><h2>Температурные каналы</h2><div id="channels"></div></div><div class="card"><small>Четыре независимых канала DS18B20 через DS2482S-800. Датчик уровня жидкости исключён из прошивки.</small></div></section>
-<section id="keys" class="hidden"><div class="card"><h2>Клавиатура 5×4</h2><div class="line"><span>Модуль</span><b>PCF8575</b></div><div class="line"><span>Последняя клавиша</span><b id="key2">—</b></div><div class="line"><span>Событий в журнале</span><b id="keycount">—</b></div><h2 style="margin-top:18px">Журнал нажатий</h2><div class="history" id="keyhistory">Нет данных</div></div></section>
-<section id="connection" class="hidden"><div class="card"><h2>Подключение к ESP32-S3</h2><small>Подключитесь к Wi-Fi контроллера BUSA-1M-001. Для чтения данных прошивка использует GET /api/telemetry, /api/capabilities и /api/keys.</small><input id="url" value="http://192.168.4.1" autocapitalize="off" spellcheck="false"><button class="action" id="connect">Подключиться</button><button class="action" id="demo">Демо</button><p class="muted" id="connection-status">Нет подключения</p></div><div class="card"><h2>Совместимость</h2><div class="line"><span>Прошивка</span><b>v0.6.1</b></div><div class="line"><span>Контроллер</span><b>ESP32-S3 N16R8</b></div><div class="line"><span>Датчики</span><b>4 × DS18B20</b></div><div class="line"><span>Режим API</span><b>Только чтение</b></div><p class="muted">Важное ограничение Safari: сайт GitHub Pages использует HTTPS, поэтому запросы к HTTP-адресу ESP32 могут блокироваться браузером. Реальную телеметрию следует просматривать через локальную страницу контроллера или после настройки безопасного HTTPS-доступа.</p><button class="action" id="local">Открыть локальный адрес</button></div></section>
-<section id="automation" class="hidden"><div class="card"><h2>Автоматика · проект</h2><div class="line"><span>Реле K1–K3</span><b>Не реализованы</b></div><div class="line"><span>Аварийная блокировка</span><b>Не реализована</b></div><div class="line"><span>Светодиоды PCA9685</span><b>Не реализованы</b></div><div class="line"><span>Экран TFT</span><b>Не реализован</b></div><p class="muted">Раздел сохранён для дальнейшей разработки. Дистанционное управление отсутствует.</p></div></section>
+<section id="keys" class="hidden"><div class="card"><h2 id="keyboard-title">Клавиатура</h2><div class="line"><span>Модуль</span><b>PCF8575</b></div><div class="line"><span>Последняя клавиша</span><b id="key2">—</b></div><div class="line"><span>Событий в журнале</span><b id="keycount">—</b></div><h2 style="margin-top:18px">Журнал нажатий</h2><div class="history" id="keyhistory">Нет данных</div></div></section>
+<section id="connection" class="hidden"><div class="card"><h2>Подключение к ESP32-S3</h2><small>Подключитесь к Wi-Fi контроллера BUSA-1M-001. Для чтения данных прошивка использует GET /api/telemetry, /api/capabilities и /api/keys.</small><input id="url" value="http://192.168.4.1" autocapitalize="off" spellcheck="false"><button class="action" id="connect">Подключиться</button><button class="action" id="demo">Демо</button><p class="muted" id="connection-status">Нет подключения</p></div><div class="card"><h2>Совместимость</h2><div class="line"><span>Прошивка</span><b id="firmware-version">Не подключена</b></div><div class="line"><span>Контроллер</span><b>ESP32-S3 N16R8</b></div><div class="line"><span>Датчики</span><b>4 × DS18B20</b></div><div class="line"><span>Режим API</span><b>Только чтение</b></div><p class="muted">Важное ограничение Safari: сайт GitHub Pages использует HTTPS, поэтому запросы к HTTP-адресу ESP32 могут блокироваться браузером. Реальную телеметрию следует просматривать через локальную страницу контроллера или после настройки безопасного HTTPS-доступа.</p><button class="action" id="local">Открыть локальный адрес</button></div></section>
+<section id="automation" class="hidden"><div class="card"><h2>Автоматика · проект</h2><div class="line"><span>Реле K1–K3</span><b>Не реализованы</b></div><div class="line"><span>Аварийная блокировка</span><b>Не реализована</b></div><div class="line"><span>Светодиоды PCA9685</span><b>Не реализованы</b></div><div class="line"><span>Экран TFT</span><b id="display-state">Нет подключения</b></div><p class="muted">Раздел сохранён для дальнейшей разработки. Дистанционное управление отсутствует.</p></div></section>
 <section id="calculator" class="hidden"><div class="card"><h2>Калькулятор · разработка приостановлена</h2><div class="notice">По нашему решению работа над калькулятором временно приостановлена. Раздел не удалён и будет продолжен позже.</div><div class="line"><span>Раздел 1</span><b>В ожидании</b></div><div class="line"><span>Раздел 2</span><b>В ожидании</b></div><div class="line"><span>Раздел 3</span><b>В ожидании</b></div><div class="line"><span>Раздел 4</span><b>В ожидании</b></div><div class="line"><span>Раздел 5</span><b>В ожидании</b></div><div class="line"><span>Раздел 6</span><b>В ожидании</b></div><div class="line"><span>Раздел 7</span><b>В ожидании</b></div><p class="muted">Непроверенные расчёты не выполняются. Точные формулы и ранее утверждённые настройки требуется восстановить из архива проекта перед возобновлением.</p></div></section>
 <section id="safety" class="hidden"><div class="card"><h2>Аварийное отключение</h2><p class="state">Функция пока не реализована в прошивке.</p><p class="muted">Приложение не может останавливать оборудование. Аппаратная защита должна работать независимо от ESP32 и Wi-Fi.</p></div></section></main>
 <nav><button data-tab="overview" class="active">Главная</button><button data-tab="temperatures">Температуры</button><button data-tab="keys">Клавиатура</button><button data-tab="connection">Связь</button><button data-tab="automation">Автоматика</button><button data-tab="calculator">Калькулятор</button><button data-tab="safety">Защита</button></nav>
-<script>(()=>{'use strict';const $=id=>document.getElementById(id);const names=['Вода','Колонна','Куб','Верхняя точка'];let timer=null,demo=true,n=0;function draw(d){$('summary').innerHTML=names.map((name,i)=>{const val=d.temperatures?.[i],valid=d.channels?.[i]?.valid;return '<div class="tile"><small>T'+(i+1)+' · '+name+'</small><b>'+(typeof val==='number'&&Number.isFinite(val)&&valid!==false?val.toFixed(1)+' °C':'—')+'</b><small>'+(demo?'Демо':valid?'Измерение':'Нет достоверных данных')+'</small></div>'}).join('');$('channels').innerHTML=names.map((name,i)=>'<div class="line"><span>T'+(i+1)+' · '+name+'</span><b>'+(d.channels?.[i]?.valid===false?'Ошибка':typeof d.temperatures?.[i]==='number'?d.temperatures[i].toFixed(2)+' °C':'Нет данных')+'</b></div>').join('');$('dev').textContent=demo?'Демо':d.device||'ESP32-S3';$('bridge').textContent=demo?'Демо':d.bridge_online?'На связи':'Нет связи';$('keypad').textContent=demo?'Демо':d.keypad_online?'На связи':'Нет связи';$('lastkey').textContent=$('key2').textContent=d.last_key||'—';$('keyseq').textContent=d.key_seq??'—';}
-function sample(){n++;return{temperatures:[22.1,35.7,38.3,34.6].map((v,i)=>v+.3*Math.sin(n/7+i)),channels:[{valid:true},{valid:true},{valid:true},{valid:true}],last_key:'',key_seq:0}}function reset(){if(timer)clearInterval(timer);timer=null;}function setDemo(){reset();demo=true;$('badge').textContent='Демонстрационный режим';$('notice').textContent='Демо-данные условные. Управление оборудованием недоступно.';$('connection-status').textContent='Демонстрация без ESP32';draw(sample());timer=setInterval(()=>draw(sample()),2000);}
-async function poll(){if(demo)return;const base=$('url').value.trim().replace(/\/+$/,'');try{const r=await fetch(base+'/api/telemetry',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const d=await r.json();if(d.device!=='BUSA-1M-001')throw Error('Неизвестный контроллер');draw(d);$('badge').textContent='Реальные данные';$('connection-status').textContent='Телеметрия получена · '+(d.version||'версия не указана');$('notice').textContent='Мониторинг без управления оборудованием.';try{const kr=await fetch(base+'/api/keys',{cache:'no-store'});if(kr.ok){const k=await kr.json();const events=Array.isArray(k.events)?k.events:[];$('keycount').textContent=String(events.length);$('keyhistory').textContent=JSON.stringify(events,null,2);}}catch(_){$('keyhistory').textContent='Журнал клавиатуры недоступен';}}catch(e){$('badge').textContent='Нет связи';$('connection-status').textContent='Ошибка связи: '+e.message;$('notice').textContent='Реальные показания недоступны; демонстрационные данные не выдаются за измерения.';draw({temperatures:[],channels:[]});}}
-$('connect').onclick=()=>{reset();demo=false;poll();timer=setInterval(poll,3000)};$('demo').onclick=setDemo;$('local').onclick=()=>{location.href=$('url').value.trim()};document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden'));$(b.dataset.tab).classList.remove('hidden');document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x===b));});setDemo();})();</script></body></html>
+<script>(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const names = ['Вода', 'Колонна', 'Куб', 'Верхняя точка'];
+  const POLL_MS = 3000, TIMEOUT_MS = 4000, STALE_MS = 7000;
+  let generation = 0, mode = 'demo', timer = null, watchdog = null;
+  let pending = new Set(), lastGood = 0, counter = 0, caps = null;
+  const text = (id, value) => { $(id).textContent = value; };
+  function clearKeys(message = 'Нет данных') {
+    text('lastkey', '—'); text('key2', '—'); text('keyseq', '—');
+    text('keycount', '0'); text('keyhistory', message);
+  }
+  function clearReadings(label = 'Нет подключения') {
+    draw({temperatures: [], channels: []}, false);
+    text('dev', label); text('bridge', 'Нет данных'); text('keypad', 'Нет данных');
+    clearKeys();
+  }
+  function draw(d, isDemo) {
+    const value = i => Number.isFinite(d.temperatures?.[i]) &&
+      d.channels?.[i]?.valid === true ? d.temperatures[i] : null;
+    $('summary').innerHTML = names.map((name, i) => {
+      const v = value(i);
+      return '<div class="tile"><small>T' + (i+1) + ' · ' + name +
+        '</small><b>' + (v === null ? '—' : v.toFixed(1) + ' °C') +
+        '</b><small>' + (isDemo ? 'Демо' : v === null ? 'Нет достоверных данных' : 'Измерение') + '</small></div>';
+    }).join('');
+    $('channels').innerHTML = names.map((name, i) => '<div class="line"><span>T' +
+      (i+1) + ' · ' + name + '</span><b>' + (value(i) === null ? 'Нет данных' : value(i).toFixed(2) + ' °C') + '</b></div>').join('');
+    text('dev', isDemo ? 'Демо' : d.device || 'Нет подключения');
+    text('bridge', isDemo ? 'Демо' : d.bridge_online === true ? 'На связи' : 'Нет связи');
+    text('keypad', isDemo ? 'Демо' : d.keypad_online === true ? 'На связи' : 'Нет связи');
+    text('lastkey', d.last_key || '—'); text('key2', d.last_key || '—');
+    text('keyseq', d.key_seq ?? '—');
+  }
+  function stop() {
+    generation++; clearTimeout(timer); clearInterval(watchdog);
+    timer = watchdog = null;
+    for (const controller of pending) controller.abort();
+    pending.clear(); lastGood = 0; caps = null;
+  }
+  function baseURL() {
+    const u = new URL($('url').value.trim());
+    if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.search || u.hash)
+      throw Error('Нужен адрес http:// или https:// без пароля, параметров и #');
+    if (u.pathname !== '/' && u.pathname !== '') throw Error('Укажите адрес контроллера без пути');
+    return u.origin;
+  }
+  async function getJSON(base, path, token) {
+    const controller = new AbortController(); pending.add(controller);
+    let timeout;
+    try {
+      // Promise.race bounds the whole operation, including a stalled response body.
+      return await Promise.race([
+        (async () => {
+          const r = await fetch(base + path, {cache: 'no-store', signal: controller.signal});
+          if (!r.ok) throw Error('HTTP ' + r.status);
+          const value = await r.json();
+          if (token !== generation) throw Error('Устаревший запрос');
+          return value;
+        })(),
+        new Promise((_, reject) => {
+          timeout = setTimeout(() => { controller.abort(); reject(Error('Тайм-аут связи')); }, TIMEOUT_MS);
+        })
+      ]);
+    } finally { clearTimeout(timeout); pending.delete(controller); }
+  }
+  function checkCaps(c) {
+    if (c?.device !== 'BUSA-1M-001' || c.api_read_only !== true ||
+        c.physical_outputs !== false || c.temperature_channels !== 4 ||
+        !['5x4 PCF8575', '4x4 PCF8575'].includes(c.keyboard))
+      throw Error('Несовместимые возможности прошивки');
+  }
+  function checkTelemetry(d) {
+    if (d?.device !== 'BUSA-1M-001' || d.mode !== 'MONITOR_ONLY' || d.outputs_enabled !== false ||
+        !Array.isArray(d.temperatures) || d.temperatures.length !== 4 ||
+        !Array.isArray(d.channels) || d.channels.length !== 4 ||
+        typeof d.bridge_online !== 'boolean' || typeof d.keypad_online !== 'boolean')
+      throw Error('Неверный формат телеметрии');
+    d.channels.forEach((c, i) => {
+      if (typeof c?.valid !== 'boolean') throw Error('Нет признака достоверности канала');
+      if (c.valid && (!Number.isFinite(d.temperatures[i]) || d.temperatures[i] < -55 || d.temperatures[i] > 125 ||
+          !Number.isFinite(c.age_ms) || c.age_ms < 0 || c.age_ms > 3000 || !d.bridge_online))
+        throw Error('Недостоверное измерение');
+    });
+  }
+  function offline(message) {
+    lastGood = 0; clearReadings('Нет связи');
+    text('badge', 'Нет связи'); text('connection-status', message);
+    text('notice', 'Свежих измерений нет. Управление оборудованием недоступно.');
+  }
+  async function poll(base, token) {
+    if (token !== generation || mode !== 'real') return;
+    try {
+      // Read capabilities each cycle: detect a changed firmware after a reboot.
+      const c = await getJSON(base, '/api/capabilities', token); checkCaps(c);
+      const d = await getJSON(base, '/api/telemetry', token); checkTelemetry(d);
+      if (token !== generation) return;
+      if (d.version !== c.version) throw Error('Прошивка сменилась во время чтения');
+      caps = c; lastGood = Date.now(); draw(d, false);
+      text('keyboard-title', 'Клавиатура ' + c.keyboard.replace(' PCF8575', '').replace('x','×'));
+      text('firmware-version', c.version || '—');
+      text('display-state', c.display === true ? 'Испытательный профиль' : 'Выключен / отсутствует');
+      text('badge', 'Реальные данные'); text('connection-status', 'Телеметрия получена · ' + c.version);
+      text('notice', 'Мониторинг без управления оборудованием.');
+      try {
+        const k = await getJSON(base, '/api/keys', token);
+        if (token !== generation || !lastGood) return;
+        if (typeof k.stream_id !== 'string' || k.stream_id !== d.key_stream_id ||
+            !Array.isArray(k.events) || k.events.length > 64 ||
+            !k.events.every(e => Number.isInteger(e.seq) && e.seq > 0 && typeof e.key === 'string'))
+          throw Error('Неверный журнал или перезапуск контроллера');
+        text('keycount', String(k.events.length));
+        text('keyhistory', k.events.length ? k.events.map(e => e.seq + ': ' + e.key).join('\n') : 'Нет нажатий');
+      } catch (e) {
+        if (token !== generation) return;
+        text('keycount', '0'); text('keyhistory', 'Журнал недоступен: ' + e.message);
+      }
+    } catch (e) {
+      if (token !== generation) return;
+      caps = null; offline('Ошибка связи: ' + e.message);
+    } finally {
+      if (token === generation && mode === 'real') timer = setTimeout(() => poll(base, token), POLL_MS);
+    }
+  }
+  function sample() {
+    counter++;
+    draw({temperatures: [22.1,35.7,38.3,34.6].map((v,i) => v + .3*Math.sin(counter/7+i)),
+      channels: names.map(() => ({valid:true}))}, true);
+    timer = setTimeout(sample, 2000);
+  }
+  function setDemo() {
+    stop(); mode = 'demo'; clearKeys('В демо журнал реальных кнопок отключён');
+    text('badge', 'Демонстрационный режим'); text('connection-status', 'Демонстрация без ESP32');
+    text('notice', 'Демо-данные условные. Управление оборудованием недоступно.');
+    text('firmware-version', 'Не подключена'); text('keyboard-title', 'Клавиатура · демо'); sample();
+    text('display-state', 'Нет подключения');
+  }
+  $('connect').onclick = () => {
+    stop(); mode = 'real'; clearReadings('Подключение…'); text('firmware-version', 'Проверка…');
+    text('badge', 'Подключение…'); text('connection-status', 'Проверка возможностей контроллера…');
+    try {
+      const base = baseURL();
+      if (location.protocol === 'https:' && base.startsWith('http:'))
+        throw Error('HTTPS-сайт не подключается к HTTP ESP. Откройте локальную страницу контроллера');
+      const token = generation;
+      watchdog = setInterval(() => {
+        if (token === generation && lastGood && Date.now() - lastGood > STALE_MS)
+          offline('Показания устарели; ожидается новый ответ');
+      }, 500);
+      poll(base, token);
+    } catch (e) { offline(e.message); }
+  };
+  $('demo').onclick = setDemo;
+  $('local').onclick = () => { try { location.href = baseURL(); } catch (e) { text('connection-status', e.message); } };
+  document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
+    $(b.dataset.tab).classList.remove('hidden');
+    document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
+  });
+  if (['http:', 'https:'].includes(location.protocol) && location.hostname !== 'e62815667-gif.github.io')
+    $('url').value = location.origin;
+  setDemo();
+})();
+</script></body></html>
