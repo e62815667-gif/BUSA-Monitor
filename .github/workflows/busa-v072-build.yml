@@ -1,11 +1,6 @@
 name: BUSA v0.7.2 ESP-IDF build (source guarded)
 on:
   workflow_dispatch:
-  push:
-    branches: [busa-firmware-v0.7.2-build]
-    paths:
-      - 'firmware/v0.7.2/**'
-      - '.github/workflows/busa-v072-build.yml'
 jobs:
   build:
     runs-on: ubuntu-latest

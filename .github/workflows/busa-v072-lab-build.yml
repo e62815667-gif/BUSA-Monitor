@@ -5,6 +5,10 @@ on:
     branches: [busa-firmware-v0.7.2-build]
     paths:
       - 'firmware/v0.7.2/**'
+      - 'index.html'
+      - 'lab-*.js'
+      - 'tools/embed_ui.py'
+      - 'tests/lab/**'
       - '.github/workflows/busa-v072-lab-build.yml'
 jobs:
   build:
@@ -15,6 +19,16 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Host regression tests
+        run: |
+          python3 -m unittest discover -s tests -v
+          python3 -m unittest discover -s simulation/v0.7.2 -v
+          node --test tests/lab/*.test.cjs
+          g++ -std=c++17 -Itests/lab/stubs tests/lab/driver_test.cpp -o /tmp/driver-test
+          /tmp/driver-test
       - name: Compile lab firmware for ESP32-S3
         working-directory: firmware/v0.7.2
         run: |
@@ -29,10 +43,16 @@ jobs:
           . /opt/esp/idf/export.sh
           python -m esptool --chip esp32s3 merge_bin -o BUSA-1M-001-v0.7.2-LAB-merged.bin --flash_mode dio --flash_freq 80m --flash_size 16MB 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/busa_v072.bin
           sha256sum BUSA-1M-001-v0.7.2-LAB-merged.bin > BUSA-1M-001-v0.7.2-LAB-merged.bin.sha256
+          sha256sum -c BUSA-1M-001-v0.7.2-LAB-merged.bin.sha256
+          python -m esptool --chip esp32s3 image_info build/busa_v072.bin
+          git rev-parse HEAD > BUILD_COMMIT.txt
       - uses: actions/upload-artifact@v4
         with:
           name: BUSA-1M-001-v0.7.2-LAB-ESP32S3-UNVERIFIED
           path: |
             firmware/v0.7.2/BUSA-1M-001-v0.7.2-LAB-merged.bin
             firmware/v0.7.2/BUSA-1M-001-v0.7.2-LAB-merged.bin.sha256
+            firmware/v0.7.2/BUILD_COMMIT.txt
+            firmware/v0.7.2/build/flash_args
+            firmware/v0.7.2/sdkconfig
           if-no-files-found: error

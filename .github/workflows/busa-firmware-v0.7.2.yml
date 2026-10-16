@@ -1,9 +1,6 @@
 name: BUSA ESP32-S3 v0.7.2 firmware
 on:
   workflow_dispatch:
-  push:
-    branches: [busa-firmware-v0.7.2-build]
-    paths: ['firmware/v0.7.2/**', '.github/workflows/busa-firmware-v0.7.2.yml']
 jobs:
   build:
     runs-on: ubuntu-latest

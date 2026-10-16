@@ -1,1 +1,12 @@
-const CACHE="busa-monitor-v1.4";const ASSETS=["./","./index.html","./manifest.webmanifest"];self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()))});self.addEventListener("activate",event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith("busa-monitor-")&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});self.addEventListener("fetch",event=>{const req=event.request;if(req.method!=="GET")return;const url=new URL(req.url);if(url.origin!==self.location.origin)return;event.respondWith(fetch(req).then(response=>{if(response.ok){const copy=response.clone();event.waitUntil(caches.open(CACHE).then(cache=>cache.put(req,copy)))}return response}).catch(async()=>{const cached=await caches.match(req);if(cached)return cached;if(req.mode==="navigate"){const page=await caches.match("./index.html");if(page)return page}return Response.error()}))});
+const CACHE='busa-monitor-v072-lab1';
+const ASSETS=['./','./index.html','./lab-core.js','./lab-app.js','./manifest.webmanifest'];
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('busa-monitor-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener('fetch',e=>{
+ const u=new URL(e.request.url);
+ // Never cache or synthesize any API response, including errors.
+ if(e.request.method!=='GET'||u.origin!==self.location.origin||u.pathname.includes('/api/'))return;
+ if(!ASSETS.some(p=>new URL(p,self.location.href).href===u.href))return;
+ e.respondWith(fetch(e.request).then(r=>{if(r.ok){const copy=r.clone();e.waitUntil(caches.open(CACHE).then(c=>c.put(e.request,copy)));}return r;}).catch(()=>caches.match(e.request).then(r=>r||Response.error())));
+});
+
