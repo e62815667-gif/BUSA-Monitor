@@ -1,0 +1,22 @@
+name: BUSA LAB browser regression
+on:
+  workflow_dispatch:
+  push:
+    branches: [busa-firmware-v0.7.2-build]
+    paths: ['index.html', 'lab-*.js', 'sw.js', 'tests/lab/**', '.github/workflows/busa-lab-ui.yml']
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned browser test runner
+        run: |
+          npm install --prefix /tmp/busa-ui playwright@1.56.1
+          node /tmp/busa-ui/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Check mobile-size UI against local mock API
+        env:
+          NODE_PATH: /tmp/busa-ui/node_modules
+        run: node tests/lab/browser_check.cjs

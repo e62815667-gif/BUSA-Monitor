@@ -71,7 +71,8 @@ void telemetry(){
  ",\"keypad_online\":false,\"last_key\":null,\"key_seq\":0,\"key_stream_id\":"+quote(streamId)+",\"temperatures\":[";
  for(int i=0;i<4;i++){if(i)j+=",";j+=bridgeFound&&fresh(sensors[i],now,3000)?num(sensors[i].value):String("null");}j+="],\"channels\":[";
  for(int i=0;i<4;i++){
- if(i)j+=",";auto &s=sensors[i];bool valid=bridgeFound&&fresh(s,now,3000);String rom;
+ if(i){j+=",";}
+ auto &s=sensors[i];bool valid=bridgeFound&&fresh(s,now,3000);String rom;
  for(uint8_t v:s.rom){char b[3];snprintf(b,3,"%02X",v);rom+=b;}
  auto cmp=[&](float f){return !valid||!isfinite(f)?String("null"):String(s.value>=f?"true":"false");};
  j+="{\"id\":"+quote(s.id)+",\"name\":"+quote(s.name)+",\"rom\":"+quote(rom)+",\"valid\":"+String(valid?"true":"false")+
@@ -101,7 +102,7 @@ void command(const String &line){
  busReady=Wire.begin(8,7,100000);Wire.setTimeOut(20);armed=busReady;Serial0.println(busReady?"OK sensors armed for this boot":"ERR I2C init");
  }else Serial0.println("ERR confirm wiring and address 24..31");
  }else if(cmd=="sensors_off"){armed=false;bridgeOffline("hardware_not_armed");if(busReady)Wire.end();busReady=false;Serial0.println("OK sensors off");
- }else if(cmd=="status"){Serial0.printf("IP=%s sensors=%d bridge=%d flash=%u psram=%u\n",WiFi.localIP().toString().c_str(),armed,bridgeFound,ESP.getFlashChipSize(),ESP.getPsramSize());
+ }else if(cmd=="status"){Serial0.printf("IP=%s sensors=%d bridge=%d flash=%lu psram=%lu\n",WiFi.localIP().toString().c_str(),armed,bridgeFound,(unsigned long)ESP.getFlashChipSize(),(unsigned long)ESP.getPsramSize());
  }else Serial0.println("ERR unknown command");cJSON_Delete(r);
 }
 void serialPoll(){

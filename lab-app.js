@@ -3,7 +3,7 @@
  const C=window.BusaCore,$=id=>document.getElementById(id),text=(id,v)=>{$(id).textContent=v;};
  let generation=0,mode='offline',timer=null,watchdog=null,lastGood=0,current=null,settingsRevision=null,base='',caps=null;
  const pending=new Set();let history=[];
- try{const h=JSON.parse(localStorage.getItem('busa-real-history')||'[]');if(Array.isArray(h))history=h.slice(-1000);}catch{}
+ try{const h=JSON.parse(localStorage.getItem('busa-real-history')||'[]');if(Array.isArray(h))history=h.filter(x=>x&&typeof x.time==='string'&&Array.isArray(x.temperatures)&&x.temperatures.length===4&&x.temperatures.every(v=>v===null||(typeof v==='number'&&Number.isFinite(v)&&v>=-55&&v<=125))).slice(-1000);}catch{}
  function storeHistory(){try{localStorage.setItem('busa-real-history',JSON.stringify(history));}catch{text('history-status','Хранилище недоступно: история только до закрытия страницы');}}
  function showHistory(){
   text('history-log',history.slice(-100).reverse().map(h=>h.time+' · '+h.temperatures.map(v=>Number.isFinite(v)?v.toFixed(1):'—').join(' / ')+' °C').join('\n')||'История пуста');
