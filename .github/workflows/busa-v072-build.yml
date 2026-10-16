@@ -1,0 +1,44 @@
+name: BUSA v0.7.2 ESP-IDF build
+on:
+  workflow_dispatch:
+  push:
+    branches: [busa-firmware-v0.7.2-build]
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/busa-v072-build.yml'
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: espressif/idf:v5.3.2
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required sources
+        run: |
+          set -euo pipefail
+          for f in firmware/CMakeLists.txt firmware/main/CMakeLists.txt firmware/main/idf_component.yml firmware/main/main.cpp; do
+            test -f "$f" || { echo "::error::Missing $f; refusing to substitute placeholder firmware"; exit 1; }
+          done
+      - name: Build ESP32-S3 with ESP-IDF and Arduino component
+        working-directory: firmware
+        run: |
+          set -euo pipefail
+          . /opt/esp/idf/export.sh
+          idf.py set-target esp32s3
+          idf.py build
+      - name: Merge flash image
+        working-directory: firmware
+        run: |
+          set -euo pipefail
+          . /opt/esp/idf/export.sh
+          python -m esptool --chip esp32s3 merge_bin -o BUSA-1M-001-v0.7.2-merged.bin --flash_mode dio --flash_freq 80m --flash_size 16MB 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0x10000 build/*.bin
+          sha256sum BUSA-1M-001-v0.7.2-merged.bin > BUSA-1M-001-v0.7.2-merged.bin.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA-1M-001-v0.7.2-ESP32S3-N16R8
+          path: |
+            firmware/BUSA-1M-001-v0.7.2-merged.bin
+            firmware/BUSA-1M-001-v0.7.2-merged.bin.sha256
+          if-no-files-found: error
