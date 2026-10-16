@@ -1,0 +1,19 @@
+name: BUSA v0.7.2 read-only simulation tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [busa-firmware-v0.7.2-build]
+    paths:
+      - 'simulation/v0.7.2/**'
+      - '.github/workflows/busa-v072-simulation.yml'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run fail-closed monitoring regression tests
+        working-directory: simulation/v0.7.2
+        run: python -m unittest -v test_monitor.py
