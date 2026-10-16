@@ -1,0 +1,23 @@
+name: BUSA v0.7.2 source preflight
+on:
+  workflow_dispatch:
+  push:
+    branches: [busa-firmware-v0.7.2-build]
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect firmware inputs without modifying firmware
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Branch: ${GITHUB_REF_NAME}"
+          echo "Commit: ${GITHUB_SHA}"
+          find . -maxdepth 5 -type f -not -path './.git/*' | sort
+          echo "Checking ESP-IDF project and Arduino component..."
+          test -f firmware/CMakeLists.txt || { echo "::error::Missing firmware/CMakeLists.txt (ESP-IDF project)"; exit 1; }
+          test -f firmware/main/CMakeLists.txt || { echo "::error::Missing firmware/main/CMakeLists.txt"; exit 1; }
+          test -f firmware/main/idf_component.yml || { echo "::error::Missing Arduino Core component manifest"; exit 1; }
+          test -f firmware/main/main.cpp || { echo "::error::Missing firmware/main/main.cpp"; exit 1; }
+          echo "Source structure is present; compilation workflow can be enabled after source review."
