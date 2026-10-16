@@ -45,7 +45,7 @@ jobs:
           sha256sum BUSA-1M-001-v0.7.2-LAB-merged.bin > BUSA-1M-001-v0.7.2-LAB-merged.bin.sha256
           sha256sum -c BUSA-1M-001-v0.7.2-LAB-merged.bin.sha256
           python -m esptool --chip esp32s3 image_info build/busa_v072.bin
-          git rev-parse HEAD > BUILD_COMMIT.txt
+          printf '%s\n' "$GITHUB_SHA" > BUILD_COMMIT.txt
       - uses: actions/upload-artifact@v4
         with:
           name: BUSA-1M-001-v0.7.2-LAB-ESP32S3-UNVERIFIED
