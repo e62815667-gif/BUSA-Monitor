@@ -7,11 +7,13 @@
 #include <nvs_flash.h>
 #include <cJSON.h>
 #include "TemperatureBus.h"
+#include "LabPanelStatus.h"
 #include "LabPage.h"
 constexpr bool PHYSICAL_OUTPUTS=false;
 static_assert(!PHYSICAL_OUTPUTS,"Actuators forbidden");
 const char *VERSION="v0.7.2-lab.1";
 WebServer web(80); Preferences prefs;
+PanelStatus panel; bool pcaPresent=false; uint32_t lastPcaProbe=0;
 String streamId,token,ssid,password;
 bool armed=false,storage=false;
 uint32_t sequence=0,revision=0,lastReconnect=0;
@@ -68,7 +70,7 @@ void telemetry(){
  ",\"mode\":\"MONITOR_ONLY\",\"outputs_enabled\":false,\"simulation\":false,\"uptime_ms\":"+String(now)+
  ",\"sequence\":"+String(++sequence)+",\"bridge_online\":"+String(bridgeFound?"true":"false")+
  ",\"sensors_enabled\":"+String(armed?"true":"false")+",\"bridge_address\":"+String(DS2482_ADDR)+
- ",\"keypad_online\":false,\"last_key\":null,\"key_seq\":0,\"key_stream_id\":"+quote(streamId)+",\"temperatures\":[";
+   ,\"keypad_online\":false,\"last_key\":null,\"key_seq\":0,\"key_stream_id\":"+quote(streamId)+",\"pca9685_seen_readonly\":"+String(pcaPresent?"true":"false")+",\"panel_lamps_virtual\":"+panel.json()+",\"temperatures\":[";
  for(int i=0;i<4;i++){if(i)j+=",";j+=bridgeFound&&fresh(sensors[i],now,3000)?num(sensors[i].value):String("null");}j+="],\"channels\":[";
  for(int i=0;i<4;i++){
  if(i){j+=",";}
@@ -139,7 +141,7 @@ extern "C" void app_main(){
  uint32_t lastLog=0;
  while(true){
  serialPoll();web.handleClient();
- if(armed){if(!bridgeFound&&uint32_t(millis()-lastBridgeAttempt)>=2000){lastBridgeAttempt=millis();initBridge();}pollSensors();}
+ if(uint32_t(millis()-lastPcaProbe)>5000){lastPcaProbe=millis();pcaPresent=false;if(busReady){Wire.beginTransmission(0x40);pcaPresent=Wire.endTransmission()==0;}}\n bool vld[4];uint32_t tnow=millis();for(int i=0;i<4;i++)vld[i]=bridgeFound&&fresh(sensors[i],tnow,3000);panel.update(vld,WiFi.status()==WL_CONNECTED||WiFi.softAPIP().toString()!="0.0.0.0");\n if(armed){if(!bridgeFound&&uint32_t(millis()-lastBridgeAttempt)>=2000){lastBridgeAttempt=millis();initBridge();}pollSensors();}
  if(ssid.length()&&WiFi.status()!=WL_CONNECTED&&uint32_t(millis()-lastReconnect)>30000){lastReconnect=millis();WiFi.disconnect(false,false);WiFi.begin(ssid.c_str(),password.c_str());}
  if(uint32_t(millis()-lastLog)>10000){lastLog=millis();Serial0.printf("STA=%s IP=%s bridge=%d\n",WiFi.status()==WL_CONNECTED?"connected":"offline",WiFi.localIP().toString().c_str(),bridgeFound);}
  delay(2);
