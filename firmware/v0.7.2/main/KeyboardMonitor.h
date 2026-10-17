@@ -1,6 +1,6 @@
 #pragma once
 // BUSA-1M-001 low-voltage PCF8575 4x4 keypad monitor. Not a relay interface.
-// Matrix map is provisional: P00..P03 rows, P05..P07 and P10 columns.
+// Matrix map is provisional: P00..P03 rows, P04..P07 columns.
 // Wire levels/pin order MUST be confirmed before arming.
 #include <Arduino.h>
 #include <Wire.h>
@@ -66,4 +66,4 @@ struct KeyboardMonitor {
   }
 };
 inline const uint8_t KeyboardMonitor::ROW[4]={0,1,2,3};
-inline const uint8_t KeyboardMonitor::COL[4]={5,6,7,8};
+inline const uint8_t KeyboardMonitor::COL[4]={4,5,6,7};
