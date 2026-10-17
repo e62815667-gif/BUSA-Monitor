@@ -70,7 +70,7 @@ void telemetry(){
  ",\"mode\":\"MONITOR_ONLY\",\"outputs_enabled\":false,\"simulation\":false,\"uptime_ms\":"+String(now)+
  ",\"sequence\":"+String(++sequence)+",\"bridge_online\":"+String(bridgeFound?"true":"false")+
  ",\"sensors_enabled\":"+String(armed?"true":"false")+",\"bridge_address\":"+String(DS2482_ADDR)+
-   ,\"keypad_online\":false,\"last_key\":null,\"key_seq\":0,\"key_stream_id\":"+quote(streamId)+",\"pca9685_seen_readonly\":"+String(pcaPresent?"true":"false")+",\"panel_lamps_virtual\":"+panel.json()+",\"temperatures\":[";
+ + ",\"keypad_online\":false,\"last_key\":null,\"key_seq\":0,\"key_stream_id\":"+quote(streamId)+",\"pca9685_seen_readonly\":"+String(pcaPresent?"true":"false")+",\"panel_lamps_virtual\":"+panel.json()+",\"temperatures\":[";
  for(int i=0;i<4;i++){if(i)j+=",";j+=bridgeFound&&fresh(sensors[i],now,3000)?num(sensors[i].value):String("null");}j+="],\"channels\":[";
  for(int i=0;i<4;i++){
  if(i){j+=",";}
