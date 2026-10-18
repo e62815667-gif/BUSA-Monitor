@@ -32,7 +32,8 @@ void pollKeypad() {if(keypad.armed && busReady)keypad.poll();}
 void keys(){
  String j="{\"stream_id\":"+quote(streamId)+",\"events\":[";
  for(uint8_t i=0;i<keypad.history.count;i++){
-  if(i)j+=",";const auto &e=keypad.history.at(i);
+  if(i) { j+=","; }
+  const auto &e=keypad.history.at(i);
   j+="{\"seq\":"+String(e.seq)+",\"time\":"+String(e.time)+",\"key\":"+quote(KeyboardMonitor::keyText(e.key))+"}";
  }
  j+="]}";json(200,j);
