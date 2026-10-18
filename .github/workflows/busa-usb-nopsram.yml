@@ -1,0 +1,34 @@
+name: ESP32-S3 USB no-PSRAM diagnostic BIN
+on:
+  workflow_dispatch:
+  push:
+    branches: [lab/esp32s3-usb-nopsram]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install Arduino ESP32 2.0.17
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+      - name: Build without PSRAM with native USB CDC
+        run: |
+          arduino-cli compile --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PSRAM=disabled,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio' --output-dir build firmware/BUSA_USB_NO_PSRAM_DIAG_001
+      - name: Merge flash image
+        run: |
+          SDK="$HOME/.arduino15/packages/esp32"
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build/BUSA_USB_NO_PSRAM_DIAG_001_merged.bin 0x0 build/BUSA_USB_NO_PSRAM_DIAG_001.ino.bootloader.bin 0x8000 build/BUSA_USB_NO_PSRAM_DIAG_001.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build/BUSA_USB_NO_PSRAM_DIAG_001.ino.bin
+          test -s build/BUSA_USB_NO_PSRAM_DIAG_001_merged.bin
+          sha256sum build/BUSA_USB_NO_PSRAM_DIAG_001_merged.bin > build/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_USB_NO_PSRAM_DIAG_001
+          path: |
+            build/BUSA_USB_NO_PSRAM_DIAG_001_merged.bin
+            build/SHA256SUMS.txt
