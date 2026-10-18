@@ -1,4 +1,4 @@
-// Real monitoring only. NO relay, keypad, PCA9685 or TFT output writes.
+// Real temperature + USB-armed 5x4 PCF8575 keyboard monitor. NO relay, PCA9685 or TFT output writes.
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
@@ -7,13 +7,15 @@
 #include <nvs_flash.h>
 #include <cJSON.h>
 #include "TemperatureBus.h"
+#include "KeyboardMonitor.h"
 #include "LabPanelStatus.h"
 #include "LabPage.h"
 constexpr bool PHYSICAL_OUTPUTS=false;
 static_assert(!PHYSICAL_OUTPUTS,"Actuators forbidden");
-const char *VERSION="v0.7.2-lab.1";
+const char *VERSION="v0.7.3-keypad-lab.1";
 WebServer web(80); Preferences prefs;
-PanelStatus panel; bool pcaPresent=false; uint32_t lastPcaProbe=0;
+PanelStatus panel; KeyboardMonitor keypad; bool pcaPresent=false; uint32_t lastPcaProbe=0;
+
 String streamId,token,ssid,password;
 bool armed=false,storage=false;
 uint32_t sequence=0,revision=0,lastReconnect=0;
@@ -25,6 +27,17 @@ String quote(const String &s){
 }
 String num(float f){return isfinite(f)?String(f,2):String("null");}
 void json(int code,const String &s){web.sendHeader("Cache-Control","no-store");web.sendHeader("X-Content-Type-Options","nosniff");web.send(code,"application/json; charset=utf-8",s);}
+bool ensureI2C() {if(busReady)return true;busReady=Wire.begin(8,7,100000);if(busReady)Wire.setTimeOut(20);return busReady;}
+void pollKeypad() {if(keypad.armed && busReady)keypad.poll();}
+void keys(){
+ String j="{\"stream_id\":"+quote(streamId)+",\"events\":[";
+ for(uint8_t i=0;i<keypad.history.count;i++){
+  if(i)j+=",";const auto &e=keypad.history.at(i);
+  j+="{\"seq\":"+String(e.seq)+",\"time\":"+String(e.time)+",\"key\":"+quote(KeyboardMonitor::keyText(e.key))+"}";
+ }
+ j+="]}";json(200,j);
+}
+
 String settings(){
  String j="{\"revision\":"+String(revision)+",\"warning\":[";
  for(int i=0;i<4;i++){if(i)j+=",";j+=num(warnings[i]);}j+="],\"automation\":[";
@@ -62,7 +75,7 @@ void saveSettings(){
 void capabilities(){
  json(200,"{\"device\":\"BUSA-1M-001\",\"version\":"+quote(VERSION)+
  ",\"api_read_only\":true,\"settings_write\":true,\"physical_outputs\":false,\"temperature_channels\":4,"
- "\"keyboard\":\"4x4 PCF8575\",\"keyboard_enabled\":false,\"display\":false,\"pca9685_enabled\":false,"
+ "\"keyboard\":\"5x4 PCF8575\",\"keyboard_enabled\":"+String(keypad.armed?"true":"false")+",\"display\":false,\"pca9685_enabled\":false,"
  "\"automation_implemented\":false,\"level_mode\":\"manual\",\"simulation\":false}");
 }
 void telemetry(){
@@ -70,7 +83,7 @@ void telemetry(){
  ",\"mode\":\"MONITOR_ONLY\",\"outputs_enabled\":false,\"simulation\":false,\"uptime_ms\":"+String(now)+
  ",\"sequence\":"+String(++sequence)+",\"bridge_online\":"+String(bridgeFound?"true":"false")+
  ",\"sensors_enabled\":"+String(armed?"true":"false")+",\"bridge_address\":"+String(DS2482_ADDR)+
- ",\"keypad_online\":false,\"last_key\":null,\"key_seq\":0,\"key_stream_id\":"+quote(streamId)+",\"pca9685_seen_readonly\":"+String(pcaPresent?"true":"false")+",\"panel_lamps_virtual\":"+panel.json()+",\"temperatures\":[";
+ ",\"keypad_online\":"+String(keypad.armed&&keypad.online?"true":"false")+",\"last_key\":"+(keypad.history.count?quote(KeyboardMonitor::keyText(keypad.history.at(keypad.history.count-1).key)):String("null"))+",\"key_seq\":"+String(keypad.history.sequence)+",\"key_stream_id\":"+quote(streamId)+",\"pca9685_seen_readonly\":"+String(pcaPresent?"true":"false")+",\"panel_lamps_virtual\":"+panel.json()+",\"temperatures\":[";
  for(int i=0;i<4;i++){if(i)j+=",";j+=bridgeFound&&fresh(sensors[i],now,3000)?num(sensors[i].value):String("null");}j+="],\"channels\":[";
  for(int i=0;i<4;i++){
  if(i){j+=",";}
@@ -101,9 +114,33 @@ void command(const String &line){
  auto *a=cJSON_GetObjectItemCaseSensitive(r,"address"),*confirm=cJSON_GetObjectItemCaseSensitive(r,"confirm");
  if(cJSON_IsTrue(confirm)&&cJSON_IsNumber(a)&&a->valuedouble>=24&&a->valuedouble<=31&&floor(a->valuedouble)==a->valuedouble){
  bridgeOffline("restart");if(busReady)Wire.end();DS2482_ADDR=a->valueint;
- busReady=Wire.begin(8,7,100000);Wire.setTimeOut(20);armed=busReady;Serial0.println(busReady?"OK sensors armed for this boot":"ERR I2C init");
+ armed=ensureI2C();Serial0.println(busReady?"OK sensors armed for this boot":"ERR I2C init");
  }else Serial0.println("ERR confirm wiring and address 24..31");
- }else if(cmd=="sensors_off"){armed=false;bridgeOffline("hardware_not_armed");if(busReady)Wire.end();busReady=false;Serial0.println("OK sensors off");
+ }else if(cmd=="sensors_off"){
+ armed=false;bridgeOffline("hardware_not_armed");
+ if(!keypad.armed&&busReady){Wire.end();busReady=false;}
+ Serial0.println("OK sensors off");
+ }else if(cmd=="i2c"){
+ auto *confirm=cJSON_GetObjectItemCaseSensitive(r,"confirm");
+ if(!cJSON_IsTrue(confirm)){Serial0.println("ERR confirm wiring");}
+ else if(!ensureI2C()){Serial0.println("ERR I2C init");}
+ else {
+  Serial0.print("I2C found:");
+  for(uint8_t address=0x08;address<=0x77;address++){
+   Wire.beginTransmission(address);if(Wire.endTransmission()==0)Serial0.printf(" 0x%02X",address);
+  }
+  Serial0.println();
+ }
+ }else if(cmd=="keypad"){
+ auto *a=cJSON_GetObjectItemCaseSensitive(r,"address"),*confirm=cJSON_GetObjectItemCaseSensitive(r,"confirm");
+ if(!cJSON_IsTrue(confirm)||!cJSON_IsNumber(a)||floor(a->valuedouble)!=a->valuedouble||a->valuedouble<32||a->valuedouble>39){
+  Serial0.println("ERR confirm 9 ribbon lines, PCF8575 power and address 32..39");
+ }else if(!ensureI2C()){Serial0.println("ERR I2C init");}
+ else Serial0.println(keypad.start((uint8_t)a->valueint)?"OK keypad armed 5x4 monitor":"ERR keypad I2C check");
+ }else if(cmd=="keypad_off"){
+ keypad.disarm();
+ if(!armed&&busReady){Wire.end();busReady=false;}
+ Serial0.println("OK keypad off");
  }else if(cmd=="status"){Serial0.printf("IP=%s sensors=%d bridge=%d flash=%lu psram=%lu\n",WiFi.localIP().toString().c_str(),armed,bridgeFound,(unsigned long)ESP.getFlashChipSize(),(unsigned long)ESP.getPsramSize());
  }else Serial0.println("ERR unknown command");cJSON_Delete(r);
 }
@@ -125,7 +162,8 @@ extern "C" void app_main(){
  }
  WiFi.persistent(false);WiFi.mode(WIFI_AP_STA);String apPassword=randomHex().substring(0,16);
  bool ap=WiFi.softAP("BUSA-1M-001",apPassword.c_str());
- Serial0.println("\nBUSA v0.7.2-lab.1 NO ACTUATOR OUTPUTS");
+ Serial0.println("\nBUSA v0.7.3-keypad-lab.1 NO ACTUATOR OUTPUTS");
+ Serial0.println("Keypad DISARMED. After continuity and I2C check: {\\\"cmd\\\":\\\"keypad\\\",\\\"address\\\":32,\\\"confirm\\\":true}");
  if(ap){Serial0.print("AP password (this boot): ");Serial0.println(apPassword);Serial0.print("URL http://");Serial0.println(WiFi.softAPIP());}
  else Serial0.println("ERR AP start");
  Serial0.print("Settings token (this boot): ");Serial0.println(token);
@@ -135,17 +173,17 @@ extern "C" void app_main(){
  web.on("/",HTTP_GET,[]{web.sendHeader("Cache-Control","no-cache");web.send_P(200,"text/html; charset=utf-8",LAB_PAGE);});
  web.on("/index.html",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",LAB_PAGE);});
  web.on("/api/capabilities",HTTP_GET,capabilities);web.on("/api/telemetry",HTTP_GET,telemetry);
- web.on("/api/keys",HTTP_GET,[]{json(200,"{\"stream_id\":"+quote(streamId)+",\"events\":[]}");});
+ web.on("/api/keys",HTTP_GET,keys);
  web.on("/api/settings",HTTP_GET,[]{json(200,settings());});web.on("/api/settings",HTTP_POST,saveSettings);
  web.onNotFound([]{json(404,"{\"error\":\"not_found\"}");});web.begin();
  uint32_t lastLog=0;
  while(true){
- serialPoll();web.handleClient();
+ serialPoll();web.handleClient();pollKeypad();
  if(uint32_t(millis()-lastPcaProbe)>5000){lastPcaProbe=millis();pcaPresent=false;if(busReady){Wire.beginTransmission(0x40);pcaPresent=Wire.endTransmission()==0;}}
  bool vld[4];uint32_t tnow=millis();for(int i=0;i<4;i++)vld[i]=bridgeFound&&fresh(sensors[i],tnow,3000);panel.update(vld,WiFi.status()==WL_CONNECTED||WiFi.softAPIP().toString()!="0.0.0.0");
  if(armed){if(!bridgeFound&&uint32_t(millis()-lastBridgeAttempt)>=2000){lastBridgeAttempt=millis();initBridge();}pollSensors();}
  if(ssid.length()&&WiFi.status()!=WL_CONNECTED&&uint32_t(millis()-lastReconnect)>30000){lastReconnect=millis();WiFi.disconnect(false,false);WiFi.begin(ssid.c_str(),password.c_str());}
- if(uint32_t(millis()-lastLog)>10000){lastLog=millis();Serial0.printf("STA=%s IP=%s bridge=%d\n",WiFi.status()==WL_CONNECTED?"connected":"offline",WiFi.localIP().toString().c_str(),bridgeFound);}
+ if(uint32_t(millis()-lastLog)>10000){lastLog=millis();Serial0.printf("STA=%s IP=%s bridge=%d keypad=%d\n",WiFi.status()==WL_CONNECTED?"connected":"offline",WiFi.localIP().toString().c_str(),bridgeFound,keypad.armed&&keypad.online);}
  delay(2);
  }
 }
