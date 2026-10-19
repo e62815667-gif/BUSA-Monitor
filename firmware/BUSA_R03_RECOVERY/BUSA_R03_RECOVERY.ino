@@ -23,7 +23,7 @@ constexpr uint8_t TFT_CS=10,TFT_MOSI=11,TFT_SCK=12,TFT_DC=13,TFT_RST=14;
 static_assert(TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"Pin map changed");
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Outputs must be disabled");
-static const char* VERSION="R03-RECOVERY.5";
+static const char* VERSION="R03-RECOVERY.6";
 OneWire ow1(38),ow2(39),ow3(40),ow4(41);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
 DallasTemperature* ds[4]={&ds1,&ds2,&ds3,&ds4};
@@ -37,7 +37,7 @@ uint8_t displayMode=1; // default ST7789; 2=ILI9341
 WebServer web(80);
 Preferences wifiPrefs;
 String stationSsid="iPhone 12",stationPassword="123456789";
-uint32_t lastStationRetry=0;
+uint32_t lastStationRetry=0,lastUartLog=0;
 float t[4]={NAN,NAN,NAN,NAN};
 bool sensorFound[4]={false,false,false,false};
 uint32_t updated[4]={0,0,0,0};
@@ -340,7 +340,15 @@ void readUsb(){
   }
 }
 void setup(){
-  Serial.begin(115200);delay(1600);
+  // CH343 left USB ("COM") uses UART0. The default Serial is native USB CDC.
+  // Always produce boot diagnostics on UART0 so COM4 works when CDC vanishes.
+  Serial0.begin(115200);
+  Serial0.println();
+  Serial0.println("BUSA-1M R03-RECOVERY.6 UART0 BOOT: firmware starting");
+  Serial0.flush();
+  Serial.begin(115200);
+  delay(1600);
+  Serial0.println("BUSA UART0: starting WiFi AP+STA...");
   // Automatic low-voltage display and read-only temperature monitoring.
   displayMode=1;
   temperatureArmed=true;
@@ -354,8 +362,10 @@ void setup(){
   // This password is NOT suitable for a public or permanent deployment.
   apPass="123456789";
   bool wifi=WiFi.softAP("BUSA-1M-001-R03",apPass.c_str());
+  Serial0.printf("BUSA UART0: AP started=%d IP=%s\n",wifi?1:0,WiFi.softAPIP().toString().c_str());
   WiFi.setAutoReconnect(true);
   WiFi.begin(stationSsid.c_str(),stationPassword.c_str());
+  Serial0.printf("BUSA UART0: station requested, SSID=%s\n",stationSsid.c_str());
   lastStationRetry=millis();
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",PAGE);});
   web.on("/api/status",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",statusJson());});
@@ -397,12 +407,19 @@ void setup(){
     lastStationRetry=millis();
   });
   web.begin();
+  Serial0.println("BUSA UART0: web server started");
   // TFT init uses approved GPIO10-14; relay GPIO7/6/5/4 are never configured.
+  Serial0.printf("BUSA UART0: BEFORE TFT init, profile=%d\n",(int)displayMode);
+  Serial0.flush();
   tftStart(displayMode);
+  Serial0.printf("BUSA UART0: AFTER TFT init, profile=%s\n",displayProfile.c_str());
   // PCF8575 and PCA9685 probing: ACK-only, no output/register writes.
+  Serial0.println("BUSA UART0: BEFORE I2C probe");
   busArmed=Wire.begin(BUS_SDA,BUS_SCL,100000);
   if(busArmed){Wire.setTimeOut(25);probe();}
-  Serial.println("\nBUSA-1M-001 R03-RECOVERY.5 — outputs ALWAYS OFF");
+  Serial0.printf("BUSA UART0: AFTER I2C probe PCF=%d PCA=%d\n",pcfFound?1:0,pcaFound?1:0);
+  Serial.println("\nBUSA-1M-001 R03-RECOVERY.6 — outputs ALWAYS OFF");
+  Serial0.println("BUSA UART0: BOOT COMPLETE. K1-K4 AND PCA OUTPUTS LOCKED");
   Serial.printf("WiFi AP %s. SSID BUSA-1M-001-R03, password: %s, http://%s/\n",
     wifi?"started":"failed",apPass.c_str(),WiFi.softAPIP().toString().c_str());
   Serial.println("TFT and TEMP automatic. I2C probes are read-only. KEY/RELAY/PWM outputs OFF.");
@@ -410,6 +427,12 @@ void setup(){
 }
 void loop(){
   uint32_t now=millis();readUsb();web.handleClient();
+  if(due(now,lastUartLog,5000)){
+    lastUartLog=now;
+    Serial0.printf("BUSA UART0: HEARTBEAT %lu ms, AP clients=%d, STA=%d, TFT=%s, PCF=%d, PCA=%d, heap=%u\n",
+      (unsigned long)now,WiFi.softAPgetStationNum(),WiFi.status()==WL_CONNECTED,
+      displayProfile.c_str(),pcfFound,pcaFound,(unsigned int)ESP.getFreeHeap());
+  }
   if(busArmed&&due(now,lastProbe,5000))probe();
   pollTemperature(now);pollKeyboard(now);tftDraw(now);
   if(WiFi.status()!=WL_CONNECTED&&due(now,lastStationRetry,30000)){
