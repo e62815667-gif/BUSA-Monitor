@@ -9,6 +9,7 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <Preferences.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <Adafruit_GFX.h>
@@ -22,7 +23,7 @@ constexpr uint8_t TFT_CS=10,TFT_MOSI=11,TFT_SCK=12,TFT_DC=13,TFT_RST=14;
 static_assert(TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"Pin map changed");
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Outputs must be disabled");
-static const char* VERSION="R03-RECOVERY.3";
+static const char* VERSION="R03-RECOVERY.4";
 OneWire ow1(38),ow2(39),ow3(40),ow4(41);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
 DallasTemperature* ds[4]={&ds1,&ds2,&ds3,&ds4};
@@ -32,6 +33,9 @@ Adafruit_ILI9341 tftIli(TFT_CS,TFT_DC,TFT_MOSI,TFT_SCK,TFT_RST);
 Adafruit_GFX* display=nullptr;
 String displayProfile="DISARMED";
 WebServer web(80);
+Preferences wifiPrefs;
+String stationSsid="iPhone 12",stationPassword="123456789";
+uint32_t lastStationRetry=0;
 float t[4]={NAN,NAN,NAN,NAN};
 bool sensorFound[4]={false,false,false,false};
 uint32_t updated[4]={0,0,0,0};
@@ -127,6 +131,18 @@ String virtualLeds(){
   for(int i=0;i<11;i++){if(i)j+=",";j+=yes(channels[i]);}
   return j+"]";
 }
+String jsonQuoted(const String& value){
+  String o="\"";
+  for(size_t i=0;i<value.length();i++){
+    char c=value[i];
+    if(c=='"'||c=='\\'){o+='\\';o+=c;}
+    else if(c=='\n')o+="\\n";
+    else if(c=='\r')o+="\\r";
+    else if((unsigned char)c<32)o+=' ';
+    else o+=c;
+  }
+  return o+"\"";
+}
 String statusJson(){
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_DIAGNOSTIC\",\"uptime_ms\":"+String(millis());
@@ -146,7 +162,12 @@ String statusJson(){
   s+="],\"keypad\":{\"last\":\""+lastKey+"\",\"events\":"+String(keyEvents)+"}";
   s+=",\"display_profile\":\""+displayProfile+"\",\"led_channels_virtual\":"+virtualLeds();
   s+=",\"relays_physical_enabled\":false,\"leds_physical_enabled\":false,\"relay_contacts\":null";
-  s+=",\"ssid\":\"BUSA-1M-001-R03\",\"ip\":\""+WiFi.softAPIP().toString()+"\"}";
+  s+=",\"ssid\":\"BUSA-1M-001-R03\",\"ip\":\""+WiFi.softAPIP().toString()+"\"";
+  s+=",\"station\":{\"ssid\":"+jsonQuoted(stationSsid);
+  s+=",\"connected\":"+yes(WiFi.status()==WL_CONNECTED);
+  s+=",\"ip\":"+jsonQuoted(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():String(""));
+  s+=",\"rssi\":"+String(WiFi.status()==WL_CONNECTED?WiFi.RSSI():0);
+  s+="}}";
   return s;
 }
 const char PAGE[] PROGMEM=R"BUSAHTML(<!doctype html><html lang="ru"><head>
@@ -154,11 +175,20 @@ const char PAGE[] PROGMEM=R"BUSAHTML(<!doctype html><html lang="ru"><head>
 <title>БУСА-1М №001 — R03</title><style>
 body{font:16px system-ui;background:#101b28;color:#eef5fa;margin:0;padding:16px}
 main{max-width:640px;margin:auto}section{background:#243746;padding:14px;border-radius:12px;margin:12px 0}
-h1{font-size:22px}small{color:#bbd1e1}pre{white-space:pre-wrap;overflow-wrap:anywhere}
+h1{font-size:22px}h2{font-size:18px}small{color:#bbd1e1}pre{white-space:pre-wrap;overflow-wrap:anywhere}button,input,select{font:inherit;max-width:100%;padding:7px;margin:5px 0}input{box-sizing:border-box}button{cursor:pointer}
 </style></head><body><main><h1>БУСА-1М №001</h1>
 <small>R03 RECOVERY • Мониторинг 3,3 В • Физические выходы K1–K4 и LED отключены</small>
 <section id="temp">T1–T4: ожидание</section><section id="mods">Модули: ожидание</section>
 <section id="keys">Клавиатура: ожидание</section>
+<section><h2>Wi-Fi — интернет через iPhone 12</h2>
+<p id="station">Проверка подключения...</p>
+<p>Резервная сеть ESP32: BUSA-1M-001-R03</p>
+<button type="button" onclick="scanWifi()">Найти сети рядом</button>
+<select id="networks" onchange="document.getElementById('wifiSsid').value=this.value"><option value="">Выбрать найденную сеть</option></select>
+<div><label>Имя сети: <input id="wifiSsid" value="iPhone 12" autocomplete="off"></label></div>
+<div><label>Пароль: <input id="wifiPassword" type="password" value="123456789" autocomplete="off"></label></div>
+<button type="button" onclick="connectWifi()">Подключить</button><p id="wifiMessage"></p>
+<small>Для интернета включите точку доступа на iPhone 12. Сеть самой БУСА остаётся доступна.</small></section>
 <section><small>Проверка модулей разрешается только после сверки электропитания и проводки.
 Команды через USB: BUS ON, TEMP ON, KEY ON, TFT ST7789 / TFT ILI9341.
 Контроллер GMT028-05 не установлен: выбираем профиль после сверки маркировки.
@@ -170,8 +200,25 @@ let s=await (await fetch('/api/status',{cache:'no-store'})).json();
 document.getElementById('temp').textContent=s.temperatures.map(x=>'T'+x.id+': '+(x.valid?x.value_c+' °C':'Нет данных')).join(' | ');
 document.getElementById('mods').textContent='PCF8575: '+s.modules.pcf8575_detected+'; PCA9685: '+s.modules.pca9685_detected_read_only+'; TFT: '+s.modules.tft_armed;
 document.getElementById('keys').textContent='Клавиатура: '+s.keypad.last+' ('+s.keypad.events+' нажатий)';
+document.getElementById('station').textContent=s.station.connected?
+  ('Подключено: '+s.station.ssid+' • IP '+s.station.ip):
+  ('Не подключено: '+s.station.ssid+' (проверьте имя сети iPhone)');
 document.getElementById('raw').textContent=JSON.stringify(s,null,2);
 }catch(e){document.getElementById('raw').textContent='Нет связи: '+e;}}
+async function scanWifi(){let m=document.getElementById('wifiMessage');
+m.textContent='Поиск сетей...';
+try{let r=await (await fetch('/wifi/scan')).json();let el=document.getElementById('networks');
+el.textContent='';let p=document.createElement('option');p.value='';p.textContent='Выбрать сеть';el.appendChild(p);
+for(let x of r.networks){let o=document.createElement('option');o.value=x.ssid;o.textContent=x.ssid+' ('+x.rssi+' dBm)';el.appendChild(o)}
+m.textContent='Найдено сетей: '+r.networks.length;}catch(e){m.textContent='Ошибка поиска: '+e}}
+async function connectWifi(){let m=document.getElementById('wifiMessage');
+let ssid=document.getElementById('wifiSsid').value,pass=document.getElementById('wifiPassword').value;
+if(!ssid||pass.length<8){m.textContent='Введите имя сети и пароль (от 8 символов)';return}
+m.textContent='Подключение...';
+try{let form=new URLSearchParams({ssid:ssid,pass:pass});
+let r=await fetch('/wifi/connect',{method:'POST',body:form});
+m.textContent=(await r.json()).message||'Проверьте статус сети через 15 секунд';
+}catch(e){m.textContent='Ошибка подключения: '+e}}
 setInterval(read,1800);read();</script></main></body></html>)BUSAHTML";
 void tftStart(uint8_t which){
   // GMT028-05 V1.1 controller IC not confirmed; selection is explicit.
@@ -247,15 +294,47 @@ void readUsb(){
 }
 void setup(){
   Serial.begin(115200);delay(1600);
-  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP_STA);
+  wifiPrefs.begin("busa-wifi",false);
+  stationSsid=wifiPrefs.getString("ssid","iPhone 12");
+  stationPassword=wifiPrefs.getString("pass","123456789");
   // Fixed password requested for isolated low-voltage lab verification.
   // This password is NOT suitable for a public or permanent deployment.
   apPass="123456789";
   bool wifi=WiFi.softAP("BUSA-1M-001-R03",apPass.c_str());
+  WiFi.setAutoReconnect(true);
+  WiFi.begin(stationSsid.c_str(),stationPassword.c_str());
+  lastStationRetry=millis();
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",PAGE);});
   web.on("/api/status",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",statusJson());});
+  web.on("/wifi/scan",HTTP_GET,[]{
+    // Wi-Fi scan may briefly interrupt AP traffic. Physical outputs untouched.
+    int found=WiFi.scanNetworks(false,true);
+    String output="{\"networks\":[";
+    for(int i=0;i<found;i++){
+      if(i)output+=",";
+      output+="{\"ssid\":"+jsonQuoted(WiFi.SSID(i))+",\"rssi\":"+String(WiFi.RSSI(i))+"}";
+    }
+    output+="]}";
+    WiFi.scanDelete();
+    web.send(200,"application/json; charset=utf-8",output);
+  });
+  web.on("/wifi/connect",HTTP_POST,[]{
+    String requested=web.arg("ssid"),password=web.arg("pass");
+    if(requested.length()==0||requested.length()>32||password.length()<8||password.length()>63){
+      web.send(400,"application/json","{\"message\":\"Неверные имя сети или пароль\"}");
+      return;
+    }
+    stationSsid=requested;stationPassword=password;
+    wifiPrefs.putString("ssid",stationSsid);
+    wifiPrefs.putString("pass",stationPassword);
+    web.send(200,"application/json","{\"message\":\"Настройки сохранены. Проверьте статус через 15 секунд.\"}");
+    WiFi.disconnect();
+    WiFi.begin(stationSsid.c_str(),stationPassword.c_str());
+    lastStationRetry=millis();
+  });
   web.begin();
-  Serial.println("\nBUSA-1M-001 R03-RECOVERY.3 — outputs ALWAYS OFF");
+  Serial.println("\nBUSA-1M-001 R03-RECOVERY.4 — outputs ALWAYS OFF");
   Serial.printf("WiFi AP %s. SSID BUSA-1M-001-R03, password: %s, http://%s/\n",
     wifi?"started":"failed",apPass.c_str(),WiFi.softAPIP().toString().c_str());
   Serial.println("BUS, TEMP, KEY and TFT tests are DISARMED.");
@@ -265,5 +344,10 @@ void loop(){
   uint32_t now=millis();readUsb();web.handleClient();
   if(busArmed&&due(now,lastProbe,5000))probe();
   pollTemperature(now);pollKeyboard(now);tftDraw(now);
+  if(WiFi.status()!=WL_CONNECTED&&due(now,lastStationRetry,30000)){
+    lastStationRetry=now;
+    WiFi.disconnect();
+    WiFi.begin(stationSsid.c_str(),stationPassword.c_str());
+  }
   delay(2);
 }
