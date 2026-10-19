@@ -23,7 +23,7 @@ constexpr uint8_t TFT_CS=10,TFT_MOSI=11,TFT_SCK=12,TFT_DC=13,TFT_RST=14;
 static_assert(TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"Pin map changed");
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Outputs must be disabled");
-static const char* VERSION="R03-RECOVERY.4";
+static const char* VERSION="R03-RECOVERY.5";
 OneWire ow1(38),ow2(39),ow3(40),ow4(41);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
 DallasTemperature* ds[4]={&ds1,&ds2,&ds3,&ds4};
@@ -32,6 +32,8 @@ Adafruit_ST7789 tftSt(TFT_CS,TFT_DC,TFT_MOSI,TFT_SCK,TFT_RST);
 Adafruit_ILI9341 tftIli(TFT_CS,TFT_DC,TFT_MOSI,TFT_SCK,TFT_RST);
 Adafruit_GFX* display=nullptr;
 String displayProfile="DISARMED";
+uint8_t displayMode=1; // default ST7789; 2=ILI9341
+
 WebServer web(80);
 Preferences wifiPrefs;
 String stationSsid="iPhone 12",stationPassword="123456789";
@@ -180,6 +182,13 @@ h1{font-size:22px}h2{font-size:18px}small{color:#bbd1e1}pre{white-space:pre-wrap
 <small>R03 RECOVERY • Мониторинг 3,3 В • Физические выходы K1–K4 и LED отключены</small>
 <section id="temp">T1–T4: ожидание</section><section id="mods">Модули: ожидание</section>
 <section id="keys">Клавиатура: ожидание</section>
+<section><h2>Дисплей GMT028-05 V1.1</h2>
+<p>Экран автоматически показывает T1–T4, Wi-Fi и состояние модулей.</p>
+<label>Драйвер:
+<select id="tftDriver"><option value="1">ST7789 (основной)</option><option value="2">ILI9341 (альтернативный)</option></select></label>
+<button type="button" onclick="selectScreen()">Применить и перезапустить экран</button>
+<p id="tftMessage">Если экран белый, выберите другой драйвер.</p>
+<small>Изменение драйвера перезапустит ESP32, но не включит реле.</small></section>
 <section><h2>Wi-Fi — интернет через iPhone 12</h2>
 <p id="station">Проверка подключения...</p>
 <p>Резервная сеть ESP32: BUSA-1M-001-R03</p>
@@ -200,11 +209,21 @@ let s=await (await fetch('/api/status',{cache:'no-store'})).json();
 document.getElementById('temp').textContent=s.temperatures.map(x=>'T'+x.id+': '+(x.valid?x.value_c+' °C':'Нет данных')).join(' | ');
 document.getElementById('mods').textContent='PCF8575: '+s.modules.pcf8575_detected+'; PCA9685: '+s.modules.pca9685_detected_read_only+'; TFT: '+s.modules.tft_armed;
 document.getElementById('keys').textContent='Клавиатура: '+s.keypad.last+' ('+s.keypad.events+' нажатий)';
+document.getElementById('tftDriver').value=s.display_profile==='ILI9341'?'2':'1';
 document.getElementById('station').textContent=s.station.connected?
   ('Подключено: '+s.station.ssid+' • IP '+s.station.ip):
   ('Не подключено: '+s.station.ssid+' (проверьте имя сети iPhone)');
 document.getElementById('raw').textContent=JSON.stringify(s,null,2);
 }catch(e){document.getElementById('raw').textContent='Нет связи: '+e;}}
+async function selectScreen(){
+  let m=document.getElementById('tftMessage');
+  const profile=document.getElementById('tftDriver').value;
+  m.textContent='Сохраняю драйвер экрана...';
+  try{
+    const r=await fetch('/display/select',{method:'POST',body:new URLSearchParams({profile})});
+    m.textContent=(await r.json()).message||'Проверьте экран после перезапуска';
+  }catch(e){m.textContent='Переподключитесь к сети БУСА через 15 секунд';}
+}
 async function scanWifi(){let m=document.getElementById('wifiMessage');
 m.textContent='Поиск сетей...';
 try{let r=await (await fetch('/wifi/scan')).json();let el=document.getElementById('networks');
@@ -220,33 +239,59 @@ let r=await fetch('/wifi/connect',{method:'POST',body:form});
 m.textContent=(await r.json()).message||'Проверьте статус сети через 15 секунд';
 }catch(e){m.textContent='Ошибка подключения: '+e}}
 setInterval(read,1800);read();</script></main></body></html>)BUSAHTML";
+// The SPI display does not provide a verified readable controller ID.
+// Select a driver explicitly and persist the preference between reboots.
 void tftStart(uint8_t which){
-  // GMT028-05 V1.1 controller IC not confirmed; selection is explicit.
-  if(which==1){tftSt.init(240,320);display=&tftSt;displayProfile="ST7789";}
-  else {tftIli.begin();display=&tftIli;displayProfile="ILI9341";}
-  display->setRotation(0);display->fillScreen(0x0000);
-  display->setTextSize(2);display->setTextColor(0xffff);
-  display->setCursor(5,10);display->print("BUSA-1M R03");
+  displayMode=(which==2)?2:1;
+  if(displayMode==1){
+    tftSt.init(240,320);display=&tftSt;displayProfile="ST7789";
+  }else{
+    tftIli.begin();display=&tftIli;displayProfile="ILI9341";
+  }
+  display->setRotation(1); // 320x240 landscape, matching actual screen orientation
+  display->fillScreen(0x0841);
   tftArmed=true;lastTft=0;
 }
 void tftDraw(uint32_t now){
-  if(!tftArmed||!display||(lastTft&&!due(now,lastTft,1800)))return;
-  lastTft=now;display->fillRect(0,42,240,274,0x0000);
+  if(!tftArmed||!display||(lastTft&&!due(now,lastTft,1500)))return;
+  lastTft=now;
+  const uint16_t BG=0x0841,PANEL=0x1082,WHITE=0xffff,GOOD=0x07e0,
+                 BAD=0xf800,CYAN=0x07ff,WARN=0xffe0,GRAY=0xbdf7;
+  display->fillScreen(BG);
+  display->setTextWrap(false);
+  display->setTextColor(WHITE);
   display->setTextSize(2);
+  display->setCursor(5,5);display->print("BUSA-1M #001");
+  display->setTextSize(1);display->setTextColor(CYAN);
+  display->setCursor(5,25);display->print("R03.5 LIVE DIAGNOSTICS");
+  // Built-in Adafruit GFX font is ASCII: English labels, Russian names in web UI.
+  const char* labels[4]={"WATER","COLUMN","TANK","TOP"};
   for(int i=0;i<4;i++){
-    display->setCursor(5,50+i*42);
-    bool valid=updated[i]&&isfinite(t[i]);
-    display->setTextColor(valid?0x07e0:0xf800);
-    if(valid)display->printf("T%d: %.1f C",i+1,t[i]);
-    else display->printf("T%d: NO DATA",i+1);
+    const int x=4+(i%2)*159, y=38+(i/2)*68;
+    display->fillRoundRect(x,y,152,64,6,PANEL);
+    display->drawRoundRect(x,y,152,64,6,GRAY);
+    display->setTextSize(1);
+    display->setTextColor(CYAN);
+    display->setCursor(x+6,y+7);display->print(labels[i]);
+    const bool valid=temperatureArmed&&updated[i]&&isfinite(t[i])&&!due(now,updated[i],6500);
+    display->setTextSize(2);
+    display->setTextColor(valid?GOOD:WARN);
+    display->setCursor(x+7,y+30);
+    if(valid)display->printf("%.1f C",t[i]);
+    else display->print("NO DATA");
   }
-  display->setTextSize(1);display->setTextColor(0x07ff);
-  display->setCursor(5,227);display->printf("PCF8575:%s PCA9685:%s",pcfFound?"ACK":"NO",pcaFound?"ACK":"NO");
-  display->setCursor(5,243);display->printf("KEY: %s",lastKey.c_str());
-  display->setCursor(5,258);display->printf("WIFI AP: %s",WiFi.softAPIP().toString().c_str());
-  display->setTextColor(0xffe0);display->setCursor(5,275);
-  display->print("LED: VIRTUAL ONLY");
-  display->setCursor(5,293);display->print("K1-K4: OFF");
+  display->setTextSize(1);
+  display->setCursor(5,179);display->setTextColor(WHITE);
+  display->printf("PCF8575:%s  PCA9685:%s  KEYS:%s",
+    pcfFound?"OK":"--",pcaFound?"OK":"--",keyboardArmed?"ON":"OFF");
+  display->setCursor(5,193);display->setTextColor(CYAN);
+  if(WiFi.status()==WL_CONNECTED)
+    display->printf("iPhone WiFi OK  IP:%s",WiFi.localIP().toString().c_str());
+  else display->print("iPhone WiFi: NO LINK / AP ACTIVE");
+  display->setCursor(5,207);display->setTextColor(GRAY);
+  display->printf("AP: %s",WiFi.softAPIP().toString().c_str());
+  display->setCursor(5,223);display->setTextColor(BAD);
+  display->print("K1-K4: OFF  OUTPUTS LOCKED");
 }
 void help(){
   Serial.println("Commands: STATUS | BUS ON/OFF | SCAN | TEMP ON/OFF | KEY ON/OFF | TFT ST7789 / TFT ILI9341");
@@ -280,9 +325,11 @@ void cmd(String s){
     keyboardArmed=false;if(busArmed&&pcfFound)keypadWrite(0xffff);
     Serial.println("Keypad off");
   }else if(s=="TFT ST7789"){
-    if(!tftArmed){Serial.println("Test profile ST7789: voltage/controller must be verified");tftStart(1);}
+    wifiPrefs.putUChar("tft",1);
+    Serial.println("ST7789 saved. Reboot to select driver.");
   }else if(s=="TFT ILI9341"){
-    if(!tftArmed){Serial.println("Test profile ILI9341: voltage/controller must be verified");tftStart(2);}
+    wifiPrefs.putUChar("tft",2);
+    Serial.println("ILI9341 saved. Reboot to select driver.");
   }else help();
 }
 void readUsb(){
@@ -294,10 +341,15 @@ void readUsb(){
 }
 void setup(){
   Serial.begin(115200);delay(1600);
+  // Automatic low-voltage display and read-only temperature monitoring.
+  displayMode=1;
+  temperatureArmed=true;
   WiFi.mode(WIFI_AP_STA);
   wifiPrefs.begin("busa-wifi",false);
   stationSsid=wifiPrefs.getString("ssid","iPhone 12");
   stationPassword=wifiPrefs.getString("pass","123456789");
+  displayMode=wifiPrefs.getUChar("tft",1);
+  if(displayMode!=2)displayMode=1;
   // Fixed password requested for isolated low-voltage lab verification.
   // This password is NOT suitable for a public or permanent deployment.
   apPass="123456789";
@@ -307,6 +359,17 @@ void setup(){
   lastStationRetry=millis();
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",PAGE);});
   web.on("/api/status",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",statusJson());});
+  web.on("/display/select",HTTP_POST,[]{
+    uint8_t newDriver=(uint8_t)web.arg("profile").toInt();
+    if(newDriver!=1&&newDriver!=2){
+      web.send(400,"application/json","{\"message\":\"Неизвестный драйвер\"}");
+      return;
+    }
+    wifiPrefs.putUChar("tft",newDriver);
+    web.send(200,"application/json","{\"message\":\"Драйвер сохранён. Перезапуск через 1 секунду.\"}");
+    delay(1000);
+    ESP.restart();
+  });
   web.on("/wifi/scan",HTTP_GET,[]{
     // Wi-Fi scan may briefly interrupt AP traffic. Physical outputs untouched.
     int found=WiFi.scanNetworks(false,true);
@@ -334,10 +397,15 @@ void setup(){
     lastStationRetry=millis();
   });
   web.begin();
-  Serial.println("\nBUSA-1M-001 R03-RECOVERY.4 — outputs ALWAYS OFF");
+  // TFT init uses approved GPIO10-14; relay GPIO7/6/5/4 are never configured.
+  tftStart(displayMode);
+  // PCF8575 and PCA9685 probing: ACK-only, no output/register writes.
+  busArmed=Wire.begin(BUS_SDA,BUS_SCL,100000);
+  if(busArmed){Wire.setTimeOut(25);probe();}
+  Serial.println("\nBUSA-1M-001 R03-RECOVERY.5 — outputs ALWAYS OFF");
   Serial.printf("WiFi AP %s. SSID BUSA-1M-001-R03, password: %s, http://%s/\n",
     wifi?"started":"failed",apPass.c_str(),WiFi.softAPIP().toString().c_str());
-  Serial.println("BUS, TEMP, KEY and TFT tests are DISARMED.");
+  Serial.println("TFT and TEMP automatic. I2C probes are read-only. KEY/RELAY/PWM outputs OFF.");
   help();
 }
 void loop(){
