@@ -22,7 +22,7 @@ constexpr uint8_t TFT_CS=10,TFT_MOSI=11,TFT_SCK=12,TFT_DC=13,TFT_RST=14;
 static_assert(TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"Pin map changed");
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Outputs must be disabled");
-static const char* VERSION="R03-RECOVERY.2";
+static const char* VERSION="R03-RECOVERY.3";
 OneWire ow1(38),ow2(39),ow3(40),ow4(41);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
 DallasTemperature* ds[4]={&ds1,&ds2,&ds3,&ds4};
@@ -248,15 +248,14 @@ void readUsb(){
 void setup(){
   Serial.begin(115200);delay(1600);
   WiFi.mode(WIFI_AP);
-  char pwd[15];
-  snprintf(pwd,sizeof(pwd),"%08lX%04lX",
-     (unsigned long)esp_random(),(unsigned long)(esp_random()&0xffff));
-  apPass=pwd;
+  // Fixed password requested for isolated low-voltage lab verification.
+  // This password is NOT suitable for a public or permanent deployment.
+  apPass="123456789";
   bool wifi=WiFi.softAP("BUSA-1M-001-R03",apPass.c_str());
   web.on("/",HTTP_GET,[]{web.send_P(200,"text/html; charset=utf-8",PAGE);});
   web.on("/api/status",HTTP_GET,[]{web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",statusJson());});
   web.begin();
-  Serial.println("\nBUSA-1M-001 R03-RECOVERY.1 — outputs ALWAYS OFF");
+  Serial.println("\nBUSA-1M-001 R03-RECOVERY.3 — outputs ALWAYS OFF");
   Serial.printf("WiFi AP %s. SSID BUSA-1M-001-R03, password: %s, http://%s/\n",
     wifi?"started":"failed",apPass.c_str(),WiFi.softAPIP().toString().c_str());
   Serial.println("BUS, TEMP, KEY and TFT tests are DISARMED.");
