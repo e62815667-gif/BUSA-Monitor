@@ -27,6 +27,7 @@ jobs:
           arduino-cli lib install "Adafruit GFX Library"
           arduino-cli lib install "Adafruit ST7735 and ST7789 Library"
           arduino-cli lib install "Adafruit ILI9341"
+          arduino-cli lib install "U8g2_for_Adafruit_GFX"
       - name: Approved pins and output interlock
         run: |
           python3 - <<'PY'
