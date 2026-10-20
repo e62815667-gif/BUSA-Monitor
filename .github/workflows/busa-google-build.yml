@@ -1,0 +1,43 @@
+name: BUSA Google Build
+on:
+  push:
+    branches: [lab/busa-r03-recovery-monitor]
+    paths:
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+      - '.github/workflows/busa-google-build.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+      - run: |
+          arduino-cli lib install "OneWire"
+          arduino-cli lib install "DallasTemperature"
+          arduino-cli lib install "Adafruit GFX Library"
+          arduino-cli lib install "Adafruit ST7735 and ST7789 Library"
+          arduino-cli lib install "Adafruit ILI9341"
+          arduino-cli lib install "U8g2_for_Adafruit_GFX"
+      - run: |
+          cp /etc/ssl/certs/GTS_Root_R1.pem tmp_gts_r1.pem
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tmp_gts_r1.pem').read_text()
+          Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h').write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+p+'\n)GOOGLECERT";\n')
+          PY
+      - run: |
+          mkdir -p build
+          arduino-cli compile --fqbn 'esp32:esp32:esp32s3:FlashSize=8M,PartitionScheme=default_8MB,PSRAM=disabled,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio' --output-dir build firmware/BUSA_1M_WIFI_3v_GOOGLE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_GOOGLE_3V_COMPILATION
+          path: |
+            build/
