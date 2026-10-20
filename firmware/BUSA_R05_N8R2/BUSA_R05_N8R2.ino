@@ -317,12 +317,18 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 body{margin:0;padding:12px;background:#061323;color:#b7e5f3;font:15px system-ui}
 main{max-width:440px;margin:auto}.box{border:1px solid #1475ce;border-radius:12px;padding:13px;margin:10px 0;background:#09213a}
 h1,h2{margin:5px 0 12px}strong{color:#65e899}.warn{color:#f7d766}
-button{background:#124878;color:#fff;border:1px solid #2599e6;border-radius:7px;padding:11px;margin:3px}
+button{background:#124878;color:#fff;border:1px solid #2599e6;border-radius:7px;padding:11px;margin:3px}input{background:#102f4f;color:white;padding:9px;border:1px solid #3881bb;border-radius:5px;margin:6px 0}
 </style><main><h1>БУСА-1М №001</h1>
 <div class="box">Мониторинг низкого напряжения. <span class="warn">Реле заблокированы.</span></div>
 <div class="box"><h2>Температуры</h2><div id="temps">Ожидание...</div></div>
 <div class="box"><h2>Вода охлаждения</h2><div id="water">Ожидание...</div></div>
-<div class="box"><h2>Wi-Fi — iPhone 12</h2><div id="sta">Ожидание...</div><small>При доступности точки доступа подключение происходит автоматически; локальная сеть БУСА остаётся активна.</small></div>
+<div class="box"><h2>Wi-Fi — iPhone 12</h2><div id="sta">Ожидание...</div><small>При доступности точки доступа подключение происходит автоматически; локальная сеть БУСА остаётся активна.</small>
+<p>Первоначальная настройка (только при подключении к защищённой Wi-Fi сети БУСА):</p>
+<form id="wifiForm" onsubmit="saveWifi(event)">
+<label>Имя сети <input id="wssid" value="iPhone 12" maxlength="32" autocomplete="off" required></label><br>
+<label>Пароль сети <input id="wpass" type="password" minlength="8" maxlength="63" required autocomplete="new-password"></label><br>
+<button type="submit">Сохранить и подключить</button>
+</form><div id="wsave"></div></div>
 <div class="box"><h2>Отбор</h2>Датчик отсутствует. Значения не имитируются.</div>
 <div class="box"><h2>Экран 240×320</h2>
 <button onclick="page(1)">Главная</button><button onclick="page(2)">Температуры</button>
@@ -332,6 +338,19 @@ button{background:#124878;color:#fff;border:1px solid #2599e6;border-radius:7px;
 <div class="box warn">Измерения воды требуют калибровки, отсутствие импульсов не подтверждает наличие охлаждения. Силовые цепи не подключать.</div>
 <script>
 async function page(n){try{await fetch('/api/page?n='+n)}catch(e){}}
+async function saveWifi(event){
+ event.preventDefault();
+ const out=document.querySelector('#wsave');
+ const ssid=document.querySelector('#wssid').value;
+ const pass=document.querySelector('#wpass').value;
+ if(pass.length<8){out.textContent='Пароль должен содержать минимум 8 символов';return}
+ const body=new URLSearchParams({ssid,pass});
+ try{
+  const response=await fetch('/api/wifi',{method:'POST',body,cache:'no-store'});
+  out.textContent=await response.text();
+  if(response.ok)document.querySelector('#wpass').value='';
+ }catch(e){out.textContent='Ошибка сохранения: '+e;}
+}
 async function read(){
  try{
  const s=await (await fetch('/api/status',{cache:'no-store'})).json();
@@ -396,6 +415,24 @@ void setup(){
   server.on("/api/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",statusJSON());
+  });
+  server.on("/api/wifi",HTTP_POST,[]{
+    // Credentials may only be provisioned while connected to the protected local AP.
+    if(server.client().localIP()!=WiFi.softAPIP()){
+      server.send(403,"text/plain; charset=utf-8","Настройка Wi-Fi доступна только через сеть БУСА.");return;
+    }
+    String ssid=server.arg("ssid"),pass=server.arg("pass");
+    ssid.trim();
+    if(ssid.isEmpty()||ssid.length()>32||pass.length()<8||pass.length()>63){
+      server.send(400,"text/plain; charset=utf-8","Недопустимое имя сети или длина пароля (8–63).");return;
+    }
+    // NVS is encrypted only if board flash encryption is enabled; keep local AP secure.
+    bool ok=(prefs.putString("ssid",ssid)>0 && prefs.putString("pass",pass)>0);
+    if(!ok){server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;}
+    stationSsid=ssid;stationPass=pass;
+    WiFi.disconnect();WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    lastStationCheck=millis();
+    server.send(200,"text/plain; charset=utf-8","Wi-Fi сохранён. Подключение к сети запущено.");
   });
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
