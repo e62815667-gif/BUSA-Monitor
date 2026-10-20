@@ -14,6 +14,7 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
+#include <BLESecurity.h>
 #include <Wire.h>
 #include <Preferences.h>
 #include <OneWire.h>
@@ -291,25 +292,44 @@ BLEServer* bleServer=nullptr;
 BLECharacteristic* bleValues[8]={};
 bool bleOn=false,bleDesired=true;
 volatile bool bleConnected=false;
+volatile bool bleAuthenticated=false;
 uint32_t bleLast=0;
 uint8_t bleSlot=0;
 class BusaBleCallbacks:public BLEServerCallbacks{
-  void onConnect(BLEServer*) override {bleConnected=true;}
+  void onConnect(BLEServer*) override {bleConnected=true;bleAuthenticated=false;}
   void onDisconnect(BLEServer*) override {
-    bleConnected=false;
+    bleConnected=false;bleAuthenticated=false;
     // Keep discoverable after mobile client disconnects.
     BLEDevice::startAdvertising();
+  }
+};
+class BusaBleSecurityCallbacks : public BLESecurityCallbacks{
+  uint32_t onPassKeyRequest() override {return 123456;}
+  void onPassKeyNotify(uint32_t) override {}
+  bool onSecurityRequest() override {return true;}
+  bool onConfirmPIN(uint32_t pin) override {return pin==123456;}
+  void onAuthenticationComplete(esp_ble_auth_cmpl_t result) override {
+    bleAuthenticated=result.success && result.auth_mode>=ESP_LE_AUTH_REQ_MITM;
+    Serial0.printf("BLE bonding authenticated=%d\\n",(int)bleAuthenticated);
   }
 };
 void bleStart(){
   if(bleOn)return;
   BLEDevice::init(BLE_NAME);
+  BLEDevice::setSecurityCallbacks(new BusaBleSecurityCallbacks());
+  BLESecurity* sec=new BLESecurity();
+  sec->setStaticPIN(123456); // Six-digit lab passkey agreed by owner
+  sec->setAuthenticationMode(ESP_LE_AUTH_REQ_SC_MITM_BOND);
+  sec->setCapability(ESP_IO_CAP_OUT);
+  sec->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK|ESP_BLE_ID_KEY_MASK);
+  sec->setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK|ESP_BLE_ID_KEY_MASK);
   bleServer=BLEDevice::createServer();
   bleServer->setCallbacks(new BusaBleCallbacks());
   BLEService* svc=bleServer->createService(BLE_SVC);
   for(int i=0;i<8;i++){
     bleValues[i]=svc->createCharacteristic(BLE_CHARS[i],
       BLECharacteristic::PROPERTY_READ|BLECharacteristic::PROPERTY_NOTIFY);
+    bleValues[i]->setAccessPermissions(ESP_GATT_PERM_READ_ENC_MITM);
     bleValues[i]->addDescriptor(new BLE2902());
     bleValues[i]->setValue("-");
   }
@@ -319,7 +339,7 @@ void bleStart(){
   ad->setScanResponse(true);
   BLEDevice::startAdvertising();
   bleOn=true;
-  bleLast=0;bleSlot=0;bleConnected=false;
+  bleLast=0;bleSlot=0;bleConnected=false;bleAuthenticated=false;
   Serial0.println("BLE BUSA 1M advertising: read-only telemetry, Wi-Fi remains on");
 }
 void bleStop(){
@@ -328,7 +348,7 @@ void bleStop(){
   BLEDevice::deinit(true);
   bleServer=nullptr;
   for(int i=0;i<8;i++)bleValues[i]=nullptr;
-  bleOn=false;bleConnected=false;
+  bleOn=false;bleConnected=false;bleAuthenticated=false;
   Serial0.println("BLE disabled by local user, Wi-Fi remains on");
 }
 void publishBle(uint32_t now){
@@ -343,7 +363,7 @@ void publishBle(uint32_t now){
   else if(n==6)value=WiFi.status()==WL_CONNECTED?"ONLINE":"OFFLINE";
   else if(n==7)value=VERSION;
   bleValues[n]->setValue(value.c_str());
-  if(bleConnected)bleValues[n]->notify();
+  if(bleConnected && bleAuthenticated)bleValues[n]->notify();
 }
 
 WebServer server(80);
@@ -387,6 +407,7 @@ String statusJSON(){
   s+=",\"ip\":"+quoteJson(WiFi.softAPIP().toString())+"}";
   s+=",\"ble\":{\"enabled\":"+(bleOn?String("true"):String("false"));
   s+=",\"connected\":"+(bleConnected?String("true"):String("false"));
+  s+=",\"authenticated\":"+(bleAuthenticated?String("true"):String("false"));
   s+=",\"name\":"+quoteJson(String(BLE_NAME))+"}";
   s+=",\"cloud\":{\"configured\":false,\"connected\":false}";
   s+=",\"station\":{\"ssid\":"+quoteJson(stationSsid);
@@ -428,7 +449,7 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <p class="hint">Wi-Fi и Bluetooth работают одновременно. Кнопка управляет только BLE.
 Для BLE-показаний используйте совместимый iOS BLE-клиент (например, nRF Connect).
 Safari на iPhone не поддерживает прямое подключение Web Bluetooth.
-Данные BLE доступны поблизости в режиме тестирования без сопряжения;
+Для чтения BLE-показаний требуется защищённое сопряжение с PIN, установленным на контроллере;
 пароли Wi-Fi через BLE не передаются. Удалённый мониторинг заработает после подключения защищённого облака.</p></div>
 <div class="card"><h2>Диагностика</h2><div class="row">Прошивка <b id="ver">—</b></div><div class="row">Время работы <b id="uptime">—</b></div><div class="row">PCF8575 <b id="pcf">—</b></div><div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div></div></section>
 <footer class="hint">БУСА-1М №001 · диагностический режим · реле заблокированы</footer></main>
@@ -450,7 +471,7 @@ if(s.station.connected&&s.station.ssid){
  if(!select.value)select.value=s.station.ssid;
 }
 bleEnabledUI=!!(s.ble&&s.ble.enabled);
-get('bleStatus').textContent=!bleEnabledUI?'ОТКЛЮЧЁН':s.ble.connected?'ПОДКЛЮЧЁН':'ВКЛЮЧЁН · ожидание iPhone';
+get('bleStatus').textContent=!bleEnabledUI?'ОТКЛЮЧЁН':s.ble.authenticated?'ЗАЩИЩЁННОЕ СОЕДИНЕНИЕ':s.ble.connected?'СОПРЯЖЕНИЕ...':'ВКЛЮЧЁН · ожидание iPhone';
 get('bleToggle').textContent=bleEnabledUI?'Отключить Bluetooth':'Включить Bluetooth';
 get('cloudStatus').textContent=(s.cloud&&s.cloud.connected)?'ПОДКЛЮЧЕНО':'НЕ НАСТРОЕН';
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?'Инициализирован':'Не подтверждён';if(active===3)graphs();
