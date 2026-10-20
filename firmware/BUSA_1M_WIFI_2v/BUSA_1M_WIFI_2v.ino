@@ -169,6 +169,9 @@ bool tftStarted=false;
 const uint16_t BG=0x080f,PANEL=0x10a3,BLUE=0x1c9f,GREEN=0x07e0,WHITE=0xffff,
                YELLOW=0xffe0,GRAY=0xbdf7;
 const char* pages[6]={"Главная","Температуры","Отбор","Графики","События","Настройки"};
+// Defined below with the web server; needed by the TFT renderer.
+extern String stationSsid,otaMessage,nearbyNames[5];
+extern uint8_t nearbyCount;
 void ruText(const String &v,int x,int y,uint16_t color=WHITE){
   ru.setForegroundColor(color);
   ru.setCursor(x,y);
