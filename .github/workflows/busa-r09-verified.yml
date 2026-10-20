@@ -69,8 +69,16 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           part=Path("build/BUSA_R09_N8R2.ino.partitions.bin").read_bytes()
-          assert b"ota_0" in part and b"ota_1" in part, "8MB OTA-capable partition table missing"
-          print("8MB dual OTA slots present (OTA code remains disabled)")
+          # ESP-IDF binary partition entries are 32 bytes; verify app type=0x00,
+          # OTA subtypes 0x10 and 0x11; labels are commonly app0/app1, not ota_0/ota_1.
+          slots=set()
+          for i in range(0,len(part)-31,32):
+              entry=part[i:i+32]
+              if entry[:2] != b"\\xaa\\x50": continue
+              if entry[2]==0 and entry[3] in (0x10,0x11):
+                  slots.add(entry[3])
+          assert slots == {0x10,0x11}, f"OTA slots missing: {slots}"
+          print("8MB dual OTA partitions verified (OTA code remains disabled)")
           PY
           (cd build && sha256sum BUSA_R09_N8R2_8MB_merged.bin > SHA256SUMS_GENERIC.txt && sha256sum -c SHA256SUMS_GENERIC.txt)
       - uses: actions/upload-artifact@v4
