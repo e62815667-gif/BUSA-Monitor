@@ -4,9 +4,9 @@
 #include <WebServer.h>
 #include <Wire.h>
 #include <Arduino_GFX_Library.h>
-constexpr uint8_t CS=10,MOSI=11,SCK=12,DC=13,RST=14,SDA=8,SCL=9;
-Arduino_DataBus* bus=new Arduino_ESP32SPI(DC,CS,SCK,MOSI,GFX_NOT_DEFINED);
-Arduino_GFX* lcd=new Arduino_ST7796(bus,RST,1,true);
+constexpr uint8_t LCD_CS=10,LCD_MOSI=11,LCD_SCK=12,LCD_DC=13,LCD_RST=14,BUS_SDA=8,BUS_SCL=9;
+Arduino_DataBus* bus=new Arduino_ESP32SPI(LCD_DC,LCD_CS,LCD_SCK,LCD_MOSI,GFX_NOT_DEFINED);
+Arduino_GFX* lcd=new Arduino_ST7796(bus,LCD_RST,1,true);
 WebServer web(80);
 bool lcdOk=false,touchOk=false,down=false;
 uint16_t tx=0,ty=0; uint32_t hits=0,lastDraw=0;
@@ -52,7 +52,7 @@ void setup(){
   web.sendHeader("Cache-Control","no-store");web.send(200,"application/json",a);
  });
  web.begin();
- Wire.begin(SDA,SCL,100000);Wire.setTimeOut(25);
+ Wire.begin(BUS_SDA,BUS_SCL,100000);Wire.setTimeOut(25);
  Wire.beginTransmission(0x38);touchOk=Wire.endTransmission()==0;
  lcdOk=lcd->begin(27000000);if(lcdOk){lcd->setRotation(1);draw();}
  Serial0.printf("ST7796U=%d FT6336U=%d; NO OUTPUTS ENABLED\n",lcdOk,touchOk);
