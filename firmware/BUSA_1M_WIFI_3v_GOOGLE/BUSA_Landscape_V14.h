@@ -7,10 +7,37 @@ extern volatile bool googleEnabled;
 extern volatile int googleState;
 static const uint8_t v14Order[6]={0,1,2,5,3,4};
 static const char* const v14Tabs[6]={"Глав","Т","Отбор","Настр","Граф","Событ"};
-static const uint16_t V14_TEXT=0x2104,V14_MUTED=0x632c,V14_WARN=0xa800,
+// V14 palette is software-defined. DO NOT use ST7789 invertDisplay(): it
+// inverts every accent and destroys the colored illustration.
+static uint16_t V14_TEXT=0x2104,V14_MUTED=0x632c,V14_WARN=0xa800,
  V14_GREEN=0x2644,V14_BLUE=0x0338,V14_ORANGE=0xfc60,V14_SEA=0x0578,
  V14_CARD=0xffff,V14_PALE=0xffdf,V14_RULE=0xd69a;
-static const uint16_t v14SeriesColors[4]={0x037b,0xd980,0xb500,0x3685};
+static uint16_t v14SeriesColors[4]={0x037b,0xd980,0xb500,0x3685};
+static void v14ApplyPalette(bool dark){
+ if(dark){
+   // Charcoal surfaces, cream text, blue/teal water, orange highlights;
+   // all series and metallic hardware retain real contrasting colors.
+   HQ_NAVY=0x088f;HQ_DEEP=0x18f2;HQ_GLOW=0xfbe0;
+   HQ_AZURE=0x43f7;HQ_SKY=0x8dff;HQ_CYAN=0x5edf;HQ_LIGHT=0xf7be;
+   HQ_LIME=0x5e88;HQ_AQUA=0x2cfa;HQ_GLASS=0x31b4;HQ_STEEL=0x5b18;
+   HQ_SILVER=0xdefb;HQ_METAL=0x9cf6;HQ_DARKMETAL=0x424e;
+   V14_TEXT=0xf7be;V14_MUTED=0xb5b6;V14_WARN=0xfd60;
+   V14_GREEN=0x66ce;V14_BLUE=0x5ddf;V14_ORANGE=0xfc60;
+   V14_SEA=0x2d3a;V14_CARD=0x18f2;V14_PALE=0x088f;V14_RULE=0x5b18;
+   v14SeriesColors[0]=0x5ddf;v14SeriesColors[1]=0xfd60;
+   v14SeriesColors[2]=0xf3aa;v14SeriesColors[3]=0x76ce;
+ }else{
+   HQ_NAVY=0xffdf;HQ_DEEP=0xffff;HQ_GLOW=0xfca0;
+   HQ_AZURE=0xd4a5;HQ_SKY=0x234c;HQ_CYAN=0x0519;HQ_LIGHT=0x2104;
+   HQ_LIME=0x2664;HQ_AQUA=0x767c;HQ_GLASS=0xf638;HQ_STEEL=0xad55;
+   HQ_SILVER=0xe73c;HQ_METAL=0xb5b6;HQ_DARKMETAL=0x6b4d;
+   V14_TEXT=0x2104;V14_MUTED=0x632c;V14_WARN=0xa800;
+   V14_GREEN=0x2644;V14_BLUE=0x0338;V14_ORANGE=0xfc60;
+   V14_SEA=0x0578;V14_CARD=0xffff;V14_PALE=0xffdf;V14_RULE=0xd69a;
+   v14SeriesColors[0]=0x037b;v14SeriesColors[1]=0xd980;
+   v14SeriesColors[2]=0xb500;v14SeriesColors[3]=0x3685;
+ }
+}
 static void v14Print(const String& txt,int x,int y,uint16_t col=V14_TEXT){
   ru.setFont(u8g2_font_6x13_t_cyrillic);
   ruText(txt,x,y,col);
@@ -273,6 +300,7 @@ static void v14Settings(bool layout){
   }
 }
 void renderLandscape(uint32_t now){
+  v14ApplyPalette(tftThemeDark);
   // Repaint every frame from scratch: fixes stale cached dark-field rectangles,
   // clipped text remnants and displaced selection graphics in the previous V14.
   v13Collect(now);
