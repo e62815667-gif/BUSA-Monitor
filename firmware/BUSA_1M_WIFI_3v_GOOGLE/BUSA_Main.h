@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 6v-CLOCK-DIAG";
+const char VERSION[]="БУСА 1М WiFi 7v-KEYBOARD-CAL";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -118,7 +118,7 @@ float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
 uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
 uint32_t keyCount=0,lastKeyScan=0,pendingAt=0;
-int pendingKey=-1;bool keyHeld=false;
+int pendingPair=-1;bool keyHeld=false;
 String keyMessage="NO DATA";
 Preferences prefs;
 // Wall clock: phone supplies UTC epoch and local UTC offset via protected AP;
@@ -170,6 +170,7 @@ float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
 int selectedTemp=0,selectedField=0;
 bool editingTemp=false;
 String editTempBuffer="";
+uint8_t editCursor=0;
 bool storeTempReference(int sensor,int field,float value){
   if(sensor<0||sensor>3||field<0||field>1||!isfinite(value)||value<0||value>125)return false;
   String key=String(field?"nt":"rf")+String(sensor);
@@ -178,100 +179,153 @@ bool storeTempReference(int sensor,int field,float value){
   return true;
 }
 
-// Physical faceplate, row-major by user photo. Exact nine-wire matrix
-// connection must still be confirmed during keypad diagnostic testing.
-const char* const KEY_CAPS[20]={
- "F1","F2","#","*","1","2","3","UP","4","5","6","DOWN",
- "7","8","9","ESC","LEFT","0","RIGHT","ENT"
-};
+// Keyboard faceplate layout confirmed by photo. Wiring is learned, not guessed.
+const char* const KEY_CAPS[20]={"F1","F2","#","*","1","2","3","UP",
+ "4","5","6","DOWN","7","8","9","ESC","LEFT","0","RIGHT","ENT"};
+uint8_t keyPairs[20],newPairs[20];
+uint8_t learnStep=0;
+bool keypadReady=false,keypadLearning=false;
+String keypadMessage="Обучение не выполнено",rawPair="—";
+bool validKeymap(const uint8_t *m){
+  uint8_t counts[16]={0};
+  for(int i=0;i<20;i++){
+    uint8_t a=m[i]>>4,b=m[i]&15;
+    if(m[i]==255||a>=b)return false;
+    for(int j=0;j<i;j++)if(m[i]==m[j])return false;
+    counts[a]++;counts[b]++;
+  }
+  int r=0,c=0;
+  for(int i=0;i<16;i++){
+    if(counts[i]==4)r++;
+    else if(counts[i]==5)c++;
+    else if(counts[i])return false;
+  }
+  return r==5&&c==4;
+}
+void loadKeymap(){
+  memset(keyPairs,255,sizeof(keyPairs));
+  memset(newPairs,255,sizeof(newPairs));
+  keypadReady=(prefs.getBytesLength("keys20")==sizeof(keyPairs) &&
+      prefs.getBytes("keys20",keyPairs,sizeof(keyPairs))==sizeof(keyPairs) &&
+      validKeymap(keyPairs));
+  if(!keypadReady)memset(keyPairs,255,sizeof(keyPairs));
+  keypadMessage=keypadReady?"Раскладка загружена":"Нужно обучить 20 клавиш";
+}
+// Detect a single closed physical pair on any two PCF8575 P0..P15.
+int scanKeyPair(){
+  if(!pcfDetected)return -1;
+  int found=-1;bool ambiguous=false;
+  for(int a=0;a<16;a++){
+    if(!pcfWrite((uint16_t)(65535u & ~(1u<<a)))){ambiguous=true;break;}
+    delayMicroseconds(160);
+    uint16_t v;
+    if(!pcfRead(v)){ambiguous=true;break;}
+    uint16_t lows=(uint16_t)(~v) & (uint16_t)~(1u<<a);
+    if(!lows)continue;
+    if(lows&(lows-1)){ambiguous=true;break;}
+    int b=0;while(b<16 && !(lows&(1u<<b)))b++;
+    if(b>=16)continue;
+    int p=(min(a,b)<<4)|max(a,b);
+    if(found>=0 && found!=p){ambiguous=true;break;}
+    found=p;
+  }
+  pcfWrite(65535);
+  return ambiguous?-2:found;
+}
+String pairName(int p){
+  if(p==-2)return "НЕСКОЛЬКО КНОПОК";
+  if(p<0)return "НЕТ";
+  return "P"+String(p>>4)+"-P"+String(p&15);
+}
+void startKeyLearning(){
+  keypadLearning=true;learnStep=0;
+  memset(newPairs,255,sizeof(newPairs));
+  pendingPair=-1;keyHeld=false;pendingAt=millis();
+  keypadMessage="Нажми F1, затем отпусти";
+  currentPage=4;tftView=0;tftDirty=true;
+}
 void keypadAction(int k){
   if(editingTemp){
-    if(k==0){if(editTempBuffer.length())editTempBuffer.remove(editTempBuffer.length()-1);} // F1 delete
-    else if(k==1){if(editTempBuffer.indexOf('.')<0)editTempBuffer+='.';} // F2 decimal point
-    else if(k==15){editingTemp=false;editTempBuffer="";} // Esc cancel
-    else if(k==19){ // Ent save informational value
-      if(editTempBuffer.length() && storeTempReference(selectedTemp,selectedField,editTempBuffer.toFloat())){
+    if(k==0){if(editCursor){editTempBuffer.remove(editCursor-1,1);editCursor--;}}
+    else if(k==16){if(editCursor)editCursor--;}
+    else if(k==18){if(editCursor<editTempBuffer.length())editCursor++;}
+    else if(k==15){editingTemp=false;editTempBuffer="";}
+    else if(k==19){
+      if(editTempBuffer.length()&&storeTempReference(selectedTemp,selectedField,editTempBuffer.toFloat())){
         editingTemp=false;editTempBuffer="";
       }else keyMessage="Проверь значение 0..125";
     }else{
-      int digit=-1;
       const int digitKey[10]={17,4,5,6,8,9,10,12,13,14};
-      for(int d=0;d<10;d++)if(k==digitKey[d])digit=d;
-      if(digit>=0 && editTempBuffer.length()<7)editTempBuffer+=String(digit);
+      String ins="";
+      for(int d=0;d<10;d++)if(k==digitKey[d])ins=String(d);
+      if(k==1&&editTempBuffer.indexOf('.')<0)ins=".";
+      if(ins.length()&&editTempBuffer.length()<7){
+        editTempBuffer=editTempBuffer.substring(0,editCursor)+ins+editTempBuffer.substring(editCursor);
+        editCursor++;
+      }
     }
     tftDirty=true;return;
   }
-  if(currentPage==1){ // Temperatures page: choose sensor/field, Ent edits
-    if(k==7)selectedTemp=(selectedTemp+3)%4;
-    else if(k==11)selectedTemp=(selectedTemp+1)%4;
-    else if(k==2||k==16)selectedField=0; // # = reference
-    else if(k==3||k==18)selectedField=1; // * = notice
-    else if(k==19){
-      editingTemp=true;
-      float v=selectedField?noticeTemp[selectedTemp]:refTemp[selectedTemp];
-      editTempBuffer=isfinite(v)?String(v,1):String("");
-    }
-    else if(k==15){currentPage=0;tftView=0;}
-    else if(k==1){currentPage=4;tftView=0;} // F2 diagnostics
-    else if(k==0){} // F1 = delete, no input outside editing
-    else if(k==4||k==17){currentPage=0;tftView=0;}
-    else if(k==6){currentPage=2;tftView=0;}
-    else if(k==8){currentPage=3;tftView=0;}
-    else if(k==9){currentPage=4;tftView=0;}
-    else if(k==10){currentPage=5;tftView=0;}
-    else if(k==12){currentPage=5;settingsSubTab=0;tftView=0;}
-    else if(k==13){currentPage=5;settingsSubTab=1;tftView=0;}
-    else if(k==14){currentPage=4;tftView=0;}
-    tftDirty=true;return;
-  }
-  if(k==7){tftView=0;} // Up
-  else if(k==11){tftView=1;} // Down: secondary view
-  else if(k==2||k==16){ // # or LEFT
-    if(currentPage==5)settingsSubTab=(settingsSubTab+3)%4;
-    else currentPage=(currentPage+5)%6;
-    tftView=0;
-  }else if(k==3||k==18){ // * or RIGHT
-    if(currentPage==5)settingsSubTab=(settingsSubTab+1)%4;
-    else currentPage=(currentPage+1)%6;
-    tftView=0;
-  }else if(k==15){currentPage=0;tftView=0;} // Esc
-  else if(k==19){if(currentPage==5)settingsSubTab=(settingsSubTab+1)%4;tftView=0;} // Ent
-  else if(k==1){currentPage=4;tftView=0;} // F2 diagnostics
-  else if(k==17||k==4){currentPage=0;tftView=0;} // 0, 1 Home
-  else if(k==5){currentPage=1;selectedTemp=0;tftView=0;} // 2
-  else if(k==6){currentPage=2;tftView=0;} // 3
-  else if(k==8){currentPage=3;tftView=0;} // 4
-  else if(k==9){currentPage=4;tftView=0;} // 5
-  else if(k==10){currentPage=5;tftView=0;} // 6
-  else if(k==12){currentPage=5;settingsSubTab=0;tftView=0;} // 7
-  else if(k==13){currentPage=5;settingsSubTab=1;tftView=0;} // 8
-  else if(k==14){currentPage=4;tftView=0;} // 9
-  // F1 is Delete only when editing a number.
+  // #/* change main screen. Separate physical LEFT/RIGHT change selection.
+  if(k==2||k==3){currentPage=(currentPage+(k==2?5:1))%6;tftView=0;}
+  else if(currentPage==1 && (k==7||k==11))selectedTemp=(selectedTemp+(k==7?3:1))%4;
+  else if(currentPage==1 && (k==16||k==18))selectedField=k==16?0:1;
+  else if(currentPage==1 && k==19){
+    editingTemp=true;
+    float v=selectedField?noticeTemp[selectedTemp]:refTemp[selectedTemp];
+    editTempBuffer=isfinite(v)?String(v,1):String("");
+    editCursor=editTempBuffer.length();
+  }else if(k==7)tftView=0;
+  else if(k==11)tftView=1;
+  else if(currentPage==5&&(k==16||k==18))settingsSubTab=(settingsSubTab+(k==16?3:1))%4;
+  else if(k==15){currentPage=0;tftView=0;}
+  else if(k==19){if(currentPage==5)settingsSubTab=(settingsSubTab+1)%4;}
+  else if(k==1){currentPage=4;tftView=0;}
+  else if(k==17||k==4){currentPage=0;tftView=0;}
+  else if(k==5){currentPage=1;selectedTemp=0;tftView=0;}
+  else if(k==6){currentPage=2;tftView=0;}
+  else if(k==8){currentPage=3;tftView=0;}
+  else if(k==9){currentPage=4;tftView=0;}
+  else if(k==10){currentPage=5;tftView=0;}
+  else if(k==12){currentPage=5;settingsSubTab=0;tftView=0;}
+  else if(k==13){currentPage=5;settingsSubTab=1;tftView=0;}
+  else if(k==14){currentPage=4;tftView=0;}
+  // F1 deletes only while editing a value.
   tftDirty=true;
 }
-
 void pollKeys(uint32_t now){
-  if(!pcfDetected||!elapsed(now,lastKeyScan,70))return;
+  if(!pcfDetected||!elapsed(now,lastKeyScan,60))return;
   lastKeyScan=now;
-  // Hardware 5 rows P0..P4, 4 columns P5..P8 is provisional.
-  int pressed=-1;
-  for(uint8_t row=0;row<5;row++){
-    if(!pcfWrite((uint16_t)(0xffffu & ~(1u<<row))))return;
-    delayMicroseconds(150);
-    uint16_t data=0xffff;
-    if(!pcfRead(data))return;
-    for(uint8_t c=0;c<4;c++){
-      if(!(data & (1u<<(5+c))))pressed=(pressed==-1)?(row*4+c):-2;
+  int pair=scanKeyPair();
+  if(pair!=pendingPair){pendingPair=pair;pendingAt=now;keyHeld=false;}
+  if(pair<0||keyHeld||!elapsed(now,pendingAt,80))return;
+  keyHeld=true;keyCount++;rawPair=pairName(pair);
+  if(keypadLearning){
+    for(int i=0;i<learnStep;i++)if(newPairs[i]==pair){
+      keypadMessage="Контакт уже назначен! Повторите "+String(KEY_CAPS[learnStep]);
+      keyMessage=keypadMessage;tftDirty=true;return;
     }
+    newPairs[learnStep]=pair;
+    keyMessage=String(KEY_CAPS[learnStep])+" = "+rawPair;
+    learnStep++;
+    if(learnStep==20){
+      if(validKeymap(newPairs) &&
+         prefs.putBytes("keys20",newPairs,sizeof(newPairs))==sizeof(newPairs)){
+        memcpy(keyPairs,newPairs,sizeof(keyPairs));
+        keypadReady=true;keypadLearning=false;
+        keypadMessage="Все 20 клавиш сохранены";
+      }else{
+        learnStep=19;newPairs[19]=255;
+        keypadMessage="Проверка матрицы не пройдена. Повторите Ent";
+      }
+    }else keypadMessage="Нажми "+String(KEY_CAPS[learnStep])+", затем отпусти";
+  }else{
+    int k=-1;
+    if(keypadReady)for(int i=0;i<20;i++)if(keyPairs[i]==pair){k=i;break;}
+    if(k<0)keyMessage="Не назначено: "+rawPair;
+    else{keyMessage=String(KEY_CAPS[k])+" ("+rawPair+")";keypadAction(k);}
   }
-  pcfWrite(0xffff);
-  if(pressed!=pendingKey){pendingKey=pressed;pendingAt=now;keyHeld=false;}
-  if(pressed>=0 && !keyHeld && elapsed(now,pendingAt,65)){
-    keyMessage=String(KEY_CAPS[pressed])+" (R"+String(pressed/4+1)+
-      " C"+String(pressed%4+1)+")";
-    ++keyCount;keyHeld=true;
-    keypadAction(pressed);
-  }
+  tftDirty=true;
 }
 
 Adafruit_ST7789 screenSt(TFT_CS,TFT_DC,TFT_RST);
@@ -404,9 +458,12 @@ void renderScreen(uint32_t now){
   }else if(currentPage==4){
     screenField(String("PCF8575: ")+(pcfDetected?"НАЙДЕН":"НЕТ"),12,84,292,pcfDetected?GREEN:YELLOW);
     screenField(String("PCA9685: ")+(pcaDetected?"НАЙДЕН":"НЕТ"),12,107,292,pcaDetected?GREEN:YELLOW);
-    screenField(String("Нажатий: ")+String(keyCount),12,130,292,GRAY);
-    screenField(String("Последняя: ")+keyMessage,12,154,292,GRAY);
-    screenField(String("Аптайм: ")+String(now/1000)+" сек",12,181,292,GRAY);
+    screenField(String("Нажатий: ")+String(keyCount)+(keypadReady?"  Клавиши: OK":"  Не обучены"),12,130,292,GRAY);
+    screenField(keypadLearning?(String("Нажми ")+String(KEY_CAPS[learnStep])+
+      " ("+String(learnStep+1)+"/20)"):String("Последняя: ")+keyMessage,
+      12,154,292,keypadLearning?YELLOW:GRAY);
+    screenField(keypadLearning?keypadMessage:
+      String("Аптайм: ")+String(now/1000)+" сек",12,181,292,GRAY);
   }else if(settingsSubTab==0){
     screenField(String("STA: ")+(WiFi.status()==WL_CONNECTED?"ПОДКЛЮЧЕНО":"ЛОКАЛЬНО"),12,88,295,GREEN);
     screenField(String("SSID: ")+stationSsid.substring(0,29),12,113,295,GRAY);
@@ -484,6 +541,12 @@ String statusJSON(){
   s+=",\"pca9685_ack_only\":"+(pcaDetected?String("true"):String("false"));
   s+=",\"tft_attempted\":"+(tftStarted?String("true"):String("false"));
   s+=",\"last_key\":"+quoteJson(keyMessage)+"}";
+  s+=",\"keypad\":{\"ready\":"+(keypadReady?String("true"):String("false"));
+  s+=",\"learning\":"+(keypadLearning?String("true"):String("false"));
+  s+=",\"step\":"+String(learnStep);
+  s+=",\"expected\":"+quoteJson(keypadLearning&&learnStep<20?String(KEY_CAPS[learnStep]):String(""));
+  s+=",\"raw_pair\":"+quoteJson(rawPair);
+  s+=",\"message\":"+quoteJson(keypadMessage)+"}";
   s+=",\"ap\":{\"enabled\":"+(wifiRunning?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.softAPIP().toString())+"}";
   s+=",\"ota\":"+otaJSON();
@@ -592,7 +655,19 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <input type="file" accept=".bin" id="firmwareFile">
 <button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
 <p id="updateResult" role="status">Ожидание подтверждения</p>
-</div><div class="card settingCard" data-stab="3" hidden><h2>Диагностика</h2><div class="row">Прошивка <b id="ver">—</b></div><div class="row">Время работы <b id="uptime">—</b></div><div class="row">PCF8575 <b id="pcf">—</b></div><div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div></div></section>
+</div><div class="card settingCard" data-stab="3" hidden><h2>Диагностика</h2>
+<div class="row">Прошивка <b id="ver">—</b></div>
+<div class="row">Время работы <b id="uptime">—</b></div>
+<div class="row">PCF8575 <b id="pcf">—</b></div>
+<div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div>
+<h2>Калибровка клавиатуры 5×4</h2>
+<p class="hint">Не переставляй провода. После запуска нажимай кнопки последовательно слева направо, сверху вниз по фотографии. Полностью отпускай клавишу между нажатиями. Карта сохраняется в ESP32.</p>
+<div class="row">Состояние <b id="keyState">—</b></div>
+<div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
+<div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
+<button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
+<div class="grid"><button type="button" id="keyUndo">Назад на шаг</button>
+<button type="button" id="keyCancel">Отмена</button></div></div></section>
 <footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];
@@ -618,6 +693,15 @@ function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.s
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
 get('tftUp').onclick=()=>fetch('/api/tft/scroll?dir=up').catch(()=>{});
 get('tftDown').onclick=()=>fetch('/api/tft/scroll?dir=down').catch(()=>{});
+async function keyCommand(action){
+ try{
+   let r=await fetch('/api/keypad/'+action,{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+   get('keyInfo').textContent=await r.text();
+ }catch(e){get('keyInfo').textContent='Ошибка: '+e.message}
+}
+get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
+get('keyUndo').onclick=()=>keyCommand('undo');
+get('keyCancel').onclick=()=>keyCommand('cancel');
 get('refsSave').onclick=async()=>{
  let body=new URLSearchParams();
  for(let i=0;i<4;i++){
@@ -655,6 +739,13 @@ const cs=s.google;
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent;
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
+if(s.keypad){
+ get('keyState').textContent=s.keypad.learning?
+   ('Обучение '+s.keypad.step+'/20'):(s.keypad.ready?'Сохранена':'НЕТ');
+ get('keyExpected').textContent=s.keypad.expected||'—';
+ get('keyRaw').textContent=s.keypad.raw_pair||'—';
+ if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
+}
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?'Инициализирован':'Не подтверждён';if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false}finally{pollBusy=false}}
 get('googleSave').onclick=async()=>{
@@ -740,6 +831,7 @@ void setup(){
   if(tftProfile!=2)tftProfile=1;
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
+  loadKeymap();
   clockZoneKnown=prefs.getBool("clkZone",false);
   clockUtcOffsetMinutes=prefs.getInt("clkTz",0);
   if(clockUtcOffsetMinutes<(-12*60)||clockUtcOffsetMinutes>14*60)clockZoneKnown=false;
@@ -861,6 +953,28 @@ void setup(){
     if(n<1||n>6){server.send(400,"application/json","{\"error\":\"page 1..6\"}");return;}
     currentPage=(uint8_t)(n-1);editingTemp=false;tftView=0;tftDirty=true;lastRender=0;
     server.send(200,"application/json","{\"ok\":true}");
+  });
+  server.on("/api/keypad/start",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
+    if(!pcfDetected){server.send(409,"text/plain","PCF8575 not found");return;}
+    startKeyLearning();
+    server.send(200,"text/plain; charset=utf-8","Обучение: нажми F1 и отпусти");
+  });
+  server.on("/api/keypad/undo",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
+    if(!keypadLearning||learnStep==0){server.send(409,"text/plain","No previous step");return;}
+    learnStep--;newPairs[learnStep]=255;
+    pendingPair=-1;keyHeld=false;
+    keypadMessage="Повтори "+String(KEY_CAPS[learnStep]);
+    tftDirty=true;
+    server.send(200,"text/plain; charset=utf-8",keypadMessage);
+  });
+  server.on("/api/keypad/cancel",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
+    keypadLearning=false;learnStep=0;
+    keypadMessage=keypadReady?"Сохранённая раскладка сохранена":"Обучение отменено";
+    tftDirty=true;
+    server.send(200,"text/plain; charset=utf-8",keypadMessage);
   });
   server.on("/api/display-refs",HTTP_POST,[]{
     if(!apClient()){server.send(403,"text/plain; charset=utf-8","Нужна локальная точка доступа БУСА");return;}
