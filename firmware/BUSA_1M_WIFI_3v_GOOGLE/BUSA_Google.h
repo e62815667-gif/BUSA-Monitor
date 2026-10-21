@@ -7,10 +7,11 @@
 // Generated from Google Trust Services root CA certificates in the verified CI build.
 #include "BUSA_GoogleCA.h"
 
-volatile bool googleEnabled=false,googleRestart=false;
+volatile bool googleEnabled=false,googleRestart=false,googleTestRequested=false;
 volatile uint32_t googleRestartAt=0,googleSent=0;
 volatile int googleHttp=0,googleState=0;
 String googleEndpoint,googleSecret;
+// Sending is one-way HTTPS. No remote command endpoint is ever accepted.
 bool googleURLValid(const String &s){
   const String prefix="https://script.google.com/macros/s/";
   if(!s.startsWith(prefix)||!s.endsWith("/exec")||s.length()>255)return false;
@@ -49,20 +50,17 @@ void googleWorker(void* unused){
     if(WiFi.status()!=WL_CONNECTED){googleState=1;continue;}
     if(time(nullptr)<1700000000){googleState=2;continue;}
     const uint32_t now=millis();
-    if((uint32_t)(now-last)<30000)continue;
+    if(!googleTestRequested && (uint32_t)(now-last)<30000)continue;
+    googleTestRequested=false;
     last=now;
     googleState=3;
-    String packet=String("{\"version\":2,\"kind\":\"monitor\",\"device_id\":\"BUSA-1M-001\",\"firmware\":")
-      +quoteJson(String(VERSION))
-      +",\"uptime_ms\":"+String(now)
-      +",\"wifi_rssi_dbm\":"+String(WiFi.RSSI())
-      +",\"free_heap_bytes\":"+String(ESP.getFreeHeap())
-      +",\"temperatures\":[";
-    for(int i=0;i<4;i++){if(i)packet+=",";packet+=hasTemp(i,now)?String(temperature[i],2):String("null");}
-    packet+="],\"cooling_lpm\":";
-    packet+=(flowSeen&&flowReady)?String(flowLpm,3):String("null");
-    packet+=",\"cooling_pulses\":"+String(flowPulses());
-    packet+=",\"relays_enabled\":false,\"token\":"+quoteJson(googleSecret)+"}";
+    // The full read-only status object includes every OneWire diagnostic error,
+    // keypad scan_error, I2C, PCA9685, YF-S401 pulse counts and Wi-Fi state.
+    // Never save the authentication token inside telemetry/raw sheet rows.
+    String packet=String("{\"version\":3,\"kind\":\"monitor_diagnostics\",\"device_id\":\"BUSA-1M-001\",\"sent_epoch\":")
+      +String((uint32_t)time(nullptr))
+      +",\"telemetry\":"+statusJSON()
+      +",\"token\":"+quoteJson(googleSecret)+"}";
     WiFiClientSecure secure;
     secure.setCACert(GOOGLE_TRUST_ANCHOR);
     secure.setTimeout(10000);
@@ -99,11 +97,22 @@ void addGoogleRoutes(){
     googleRestart=true;googleRestartAt=millis();
     server.send(200,"text/plain","Настройка сохранена; перезапуск БУСА для применения");
   });
+  server.on("/api/google/test",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain; charset=utf-8","Проверка доступна только в сети БУСА");return;
+    }
+    if(!googleEnabled){
+      server.send(409,"text/plain; charset=utf-8","Сначала укажи Apps Script и токен");return;
+    }
+    googleTestRequested=true;
+    server.send(200,"text/plain; charset=utf-8","Запрос отправки принят. Статус появится после попытки HTTPS.");
+  });
   server.on("/api/google/off",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){
       server.send(403,"text/plain","Подтвердите локально");return;
     }
     googleEnabled=false;
+    googleTestRequested=false;
     prefs.remove("g-token");
     googleRestart=true;googleRestartAt=millis();
     server.send(200,"text/plain","Отправка отключена; БУСА перезапускается");
