@@ -599,9 +599,86 @@ void startScreen(){
   drawBootSplash(6000); // splash stays until diagnostic cycle also completes
   Serial0.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
 }
+// Portrait-specific layout prevents 320px-wide landscape cards from clipping at 240px.
+void renderPortrait(uint32_t now){
+  static uint8_t oldPage=255,oldView=255,oldTab=255;
+  const bool layout=tftDirty||oldPage!=currentPage||oldView!=tftView||oldTab!=settingsSubTab;
+  if(layout){
+    tftFieldCount=0;
+    screen->fillScreen(BG);
+    oldPage=currentPage;oldView=tftView;oldTab=settingsSubTab;tftDirty=false;
+    panelAt(3,3,234,30);
+    ruText("BUSA 1M AI",12,22,WHITE);
+    if(currentPage<=1 && tftView==0){
+      const char* names[]={"T1 Вода","T2 Колонна","T3 Куб","T4 Верх колонны"};
+      for(int i=0;i<4;i++){
+        const int y=41+i*61;
+        panelAt(4,y,232,55);
+        ruText(names[i],14,y+18,GRAY);
+      }
+    }else{
+      panelAt(4,40,232,236);
+      ruText(pages[currentPage],13,61,WHITE);
+    }
+    screen->drawFastHLine(0,288,240,BLUE);
+    ruText("V12   BUSA 1M AI",8,305,GRAY);
+  }
+  if(currentPage<=1 && tftView==0){
+    for(int i=0;i<4;i++){
+      const int y=41+i*61;
+      const bool ok=hasTemp(i,now);
+      screenField(ok?String(temperature[i],1)+" C":"НЕТ ДАННЫХ",14,y+40,126,ok?GREEN:YELLOW);
+      if(currentPage==1){
+        const float v=selectedField?noticeTemp[i]:refTemp[i];
+        screenField((selectedField?"П:":"З:")+(isfinite(v)?String(v,1):String("--")),
+                    157,y+39,71,GRAY);
+      }
+    }
+  }else if(currentPage<=1){
+    for(int i=0;i<4;i++){
+      screenField(String("T")+String(i+1)+" GPIO"+String(TPIN[i])+": "+
+            (tempPresent[i]?"НАЙДЕН":"НЕТ ДАТЧИКА"),14,88+i*43,208,
+            tempPresent[i]?GREEN:YELLOW);
+    }
+  }else if(currentPage==2){
+    screenField("Режим: только наблюдение",13,96,210,GRAY);
+    screenField(String("Вода: ")+(flowReady?String(flowLpm,2)+" л/мин":"--"),
+      13,136,210,flowReady?GREEN:YELLOW);
+    screenField(String("Импульсы: ")+String(flowPulses()),13,175,210,GRAY);
+    screenField("Отбор: вручную",13,214,210,GRAY);
+  }else if(currentPage==3){
+    screenField("История расхода воды",13,95,210,GRAY);
+    screen->fillRect(14,109,209,116,PANEL);
+    screen->drawFastHLine(14,225,209,GRAY);
+    for(uint8_t i=1;i<40;i++){
+      const uint8_t a=(flowTraceHead+i-1)%40,b=(flowTraceHead+i)%40;
+      const int x1=16+(i-1)*5,x2=16+i*5;
+      const int y1=220-(int)fminf(100.0f,flowTrace[a]*19.0f);
+      const int y2=220-(int)fminf(100.0f,flowTrace[b]*19.0f);
+      screen->drawLine(x1,y1,x2,y2,GREEN);
+    }
+    screenField("Не для защиты",13,262,210,YELLOW);
+  }else if(currentPage==4){
+    screenField(String("PCF8575: ")+(pcfDetected?"OK":"НЕТ"),13,100,205,
+       pcfDetected?GREEN:YELLOW);
+    screenField(String("PCA9685: ")+(pcaDetected?"OK":"НЕТ"),13,136,205,
+       pcaDetected?GREEN:YELLOW);
+    screenField(String("Нажатий: ")+String(keyCount),13,172,205,GRAY);
+    screenField(String("Клавиатура: ")+(keypadReady?"OK":"НЕ ОБУЧЕНА"),
+                13,208,205,GRAY);
+    screenField("T1-T4: смотри iPhone",13,250,205,GRAY);
+  }else{
+    const char* tabs[]={"Wi-Fi","Google","Обновление","Модули"};
+    screenField(String("Раздел: ")+tabs[settingsSubTab],13,99,205,WHITE);
+    screenField("Управление через iPhone",13,138,205,GRAY);
+    screenField("Реле: отключены",13,177,205,YELLOW);
+    screenField("Диагностика: веб",13,216,205,GRAY);
+  }
+}
 void renderScreen(uint32_t now){
   if(!tftStarted||!screen)return;
   if(!bootSplashComplete || !elapsed(now,splashStartedAt,splashHoldMs))return;
+  if(screen->width()<300){renderPortrait(now);return;}
   static uint8_t drawnPage=255,drawnTab=255,drawnView=255;
   bool layout=tftDirty||drawnPage!=currentPage||
      drawnTab!=settingsSubTab||drawnView!=tftView;
@@ -936,6 +1013,13 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <p class="hint">Белый TFT может означать неверный контроллер дисплея или проблему SPI. Профиль выбирается вручную: ESP32 не умеет подтвердить, что пиксели действительно видны.</p>
 <label for="tftDriver">Драйвер TFT</label>
 <select id="tftDriver"><option value="1">ST7789 · 240×320</option><option value="2">ILI9341 · 240×320</option></select>
+<label for="tftRotation">Ориентация экрана</label>
+<select id="tftRotation">
+<option value="0">0 · Вертикально</option>
+<option value="1">1 · Горизонтально</option>
+<option value="2">2 · Вертикально (разворот 180°)</option>
+<option value="3">3 · Горизонтально (разворот 180°)</option>
+</select>
 <button type="button" id="tftSave" class="full">Сохранить профиль и перезапустить ESP32</button>
 <button type="button" id="tftTest" class="full">Тест TFT: чёрный фон, BUSA 1M AI · 5 секунд</button>
 <p id="tftProfileStatus" class="hint">После теста проверь результат на самом дисплее. При неудаче можно выбрать второй драйвер.</p>
@@ -982,7 +1066,7 @@ get('keyNext').onclick=()=>keyCommand('next');
 get('tftSave').onclick=async()=>{
  if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Реле остаются отключены.'))return;
  try{
-  const r=await fetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value})});
+  const r=await fetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value,rotation:get('tftRotation').value})});
   get('tftProfileStatus').textContent=await r.text();
  }catch(e){get('tftProfileStatus').textContent='Ошибка: '+e.message}
 };
@@ -1054,7 +1138,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);tftProfileLoaded=true}if(active===3)graphs();
+get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false}finally{pollBusy=false}}
 get('googleSave').onclick=async()=>{
 const url=get('googleUrl').value.trim(),token=get('googleToken').value.trim();
@@ -1277,8 +1361,13 @@ void setup(){
     if(profile!="1"&&profile!="2"){
       server.send(400,"text/plain; charset=utf-8","Неверный профиль");return;
     }
-    if(prefs.putUChar("tft",(uint8_t)profile.toInt())!=1){
-      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить TFT");return;
+    String rotation=server.arg("rotation");
+    if(rotation!="0" && rotation!="1" && rotation!="2" && rotation!="3"){
+      server.send(400,"text/plain; charset=utf-8","Укажи ориентацию 0..3");return;
+    }
+    if(prefs.putUChar("tft",(uint8_t)profile.toInt())!=1 ||
+       prefs.putUChar("tftRotate",(uint8_t)rotation.toInt())!=1){
+      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить настройки TFT");return;
     }
     server.send(200,"text/plain; charset=utf-8","Профиль сохранён. ESP32 перезагрузится через 3 секунды.");
     tftRebootPending=true;tftRebootAt=millis();
