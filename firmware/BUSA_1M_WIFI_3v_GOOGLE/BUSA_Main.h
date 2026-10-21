@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v4-MANUAL-SCREEN-APP";
+const char VERSION[]="БУСА 1М WiFi 14v5-IPHONE-LAYOUT";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -956,11 +956,69 @@ a{color:#0a709a}
 :root[data-theme="dark"] a{color:#85d4ff}
 :root[data-theme="dark"] #clockDisplay{color:#b3ceda!important}
 :root[data-theme="dark"] canvas{background:#183044;border-color:#416b83}
+
+/* V14.5 PHONE LAYOUT: mobile app shell, no horizontal clipping */
+html,body{width:100%;max-width:100%;overflow-x:clip}
+body{padding:0!important;padding-bottom:90px!important;-webkit-text-size-adjust:100%;background:var(--paper)}
+.appHeader{position:sticky;top:0;z-index:9;padding:10px 12px 8px!important;box-shadow:0 2px 10px #25384b12}
+.headerRow{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:620px;margin:auto}
+.brandSmall{font-size:10px;letter-spacing:1px;font-weight:700;color:#ce8238}
+.headerRow h1{margin:1px 0 5px;font-size:20px}
+.brandSub{font-size:13px;font-weight:500;color:var(--muted)}
+.readOnlyLabel{font-size:10px;color:#20866c;font-weight:700;flex-shrink:0}
+.clockBar{max-width:620px;margin:auto;font-size:12px!important;color:var(--muted)!important;padding:0!important}
+.appTabs{position:fixed;bottom:0;left:0;right:0;z-index:15;display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px!important;overflow:visible!important;background:var(--surface);border-top:2px solid var(--orange);padding:6px 5px max(7px,env(safe-area-inset-bottom));box-shadow:0 -4px 15px #2f485c18}
+.appTabs button{min-width:0!important;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:7px 0!important;border:1px solid transparent;border-radius:9px;font-size:clamp(9px,2.55vw,12px)!important;line-height:1.15;white-space:nowrap}
+.appTabs .on{background:#f7c58f;color:#3c342a;border-color:#e4a064}
+.tabIcon{font-family:system-ui,sans-serif;font-size:18px;line-height:19px;color:var(--sea)}
+.appTabs .on .tabIcon{color:#82551f}
+main{width:100%;max-width:620px;padding:0 11px 23px;margin:0 auto!important;min-width:0}
+main>*{max-width:100%;min-width:0}
+.card{overflow-wrap:anywhere;min-width:0;padding:13px}
+.homeHero{padding:15px;margin-top:12px}
+.homeHero h2{font-size:22px}
+.grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid>*{min-width:0}
+.tile{min-width:0;overflow:hidden;display:flex;flex-direction:column;justify-content:center}
+.tile small{font-size:12px;white-space:normal;line-height:1.3}
+.tile strong{font-size:clamp(14px,4.4vw,22px);line-height:1.15;overflow-wrap:anywhere}
+.rigCard{overflow:hidden;width:100%}
+.rigViewport{width:100%;max-width:430px;aspect-ratio:360 / 225;max-height:269px;margin:8px auto;overflow:hidden;position:relative}
+.rigViewport svg{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;overflow:hidden}
+.rigCard p{clear:both;position:relative}
+.homeMini>.card{padding:10px}
+.homeMini>.card h2{font-size:14px}
+.relayGrid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.settingsOverview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}
+.settingsOverview button{min-width:0;min-height:52px;padding:8px 6px;white-space:normal;text-align:left;display:flex;align-items:center;gap:7px;font-size:12px}
+.settingsOverview .miniIcon{font-size:19px;color:var(--sea)}
+.settingsTools{margin:15px 0 8px}
+.settingsTools h2{font-size:15px}
+.settingsTabs button{min-width:0;font-size:12px}
+.eventFilters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
+.eventFilters button{min-width:0;padding:9px 3px;font-size:11px}
+.eventFilters button.on{background:#f7c58f;border-color:#e4a064}
+#events{white-space:pre-line;overflow-wrap:anywhere;line-height:1.6}
+:root[data-theme="dark"] .appTabs{background:#112436}
+:root[data-theme="dark"] .readOnlyLabel{color:#78e9bf}
+:root[data-theme="dark"] .appTabs .on{background:#e18b3d}
+:root[data-theme="dark"] .appTabs .tabIcon{color:#60c8ef}
+:root[data-theme="dark"] .appTabs .on .tabIcon{color:#1c3c4b}
+@media(min-width:650px){.appTabs{max-width:620px;margin:auto;border-left:1px solid var(--line);border-right:1px solid var(--line)}}
+@media(max-width:350px){.appTabs button{font-size:9px!important}.tabIcon{font-size:16px}.card{padding:10px}}
 </style></head><body>
-<header><h1>БУСА-1М №001 <span style="font-size:11px;color:#738896;font-weight:500">iPhone Monitor</span></h1><nav>
-<button data-page="0" class="on">Главная</button><button data-page="1">Температуры</button>
-<button data-page="2">Отбор</button><button data-page="5">Настройки</button><button data-page="3">Графики</button><button data-page="4">События</button>
-</nav><div id="clockDisplay" style="padding:7px 0 2px;color:#a5dfff;font-size:13px" aria-live="off">Дата и время: синхронизация…</div><div style="display:flex;gap:7px;padding-top:8px"><button type="button" id="tftUp" style="flex:1">TFT ↑</button><button type="button" id="tftDown" style="flex:1">TFT ↓</button></div></header><main>
+<header class="appHeader"><div class="headerRow"><div>
+<div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
+<span class="readOnlyLabel">● МОНИТОРИНГ</span></div>
+<div id="clockDisplay" class="clockBar" aria-live="off">Время синхронизируется…</div>
+<nav class="appTabs" aria-label="Разделы">
+<button data-page="0" class="on"><span class="tabIcon">⌂</span><span>Главная</span></button>
+<button data-page="1"><span class="tabIcon">♨</span><span>Температуры</span></button>
+<button data-page="2"><span class="tabIcon">♧</span><span>Отбор</span></button>
+<button data-page="3"><span class="tabIcon">⌁</span><span>Графики</span></button>
+<button data-page="4"><span class="tabIcon">▤</span><span>События</span></button>
+<button data-page="5"><span class="tabIcon">⚙</span><span>Настройки</span></button>
+</nav></header><main>
 <section class="page" data-section="0">
   <div class="homeHero"><div class="heroEyebrow">БУСА-1М №001 · ПАНЕЛЬ МОНИТОРИНГА</div>
   <h2>Главная</h2><div class="heroStatus"><span>● Только показания</span><span id="mainwifi">Wi-Fi: ожидание</span></div></div>
@@ -970,8 +1028,8 @@ a{color:#0a709a}
     <div class="tile"><small><span class="tempDot t3"></span>T3 · Куб</small><strong id="t2">Н/Д</strong></div>
     <div class="tile"><small><span class="tempDot t4"></span>T4 · Верх колонны</small><strong id="t3">Н/Д</strong></div>
   </div></div>
-  <div class="card rigCard"><h2>Схема установки</h2>
-  <svg viewBox="0 0 360 225" role="img" aria-label="Схема установки БУСА с датчиком YF-S401 на линии охлаждающей воды" style="width:100%;height:auto;max-height:260px">
+  <div class="card rigCard"><h2>Схема установки</h2><div class="rigViewport">
+  <svg viewBox="0 0 360 225" role="img" aria-label="Схема установки БУСА с датчиком YF-S401 на линии охлаждающей воды" preserveAspectRatio="xMidYMid meet">
 <defs><linearGradient id="steel" x1="0" x2="1"><stop stop-color="#71899a"/><stop offset=".45" stop-color="#e6f0f3"/><stop offset="1" stop-color="#768b9b"/></linearGradient><linearGradient id="water" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#31b6e8"/><stop offset="1" stop-color="#087eae"/></linearGradient></defs>
 <rect width="360" height="225" rx="14" fill="#f8fbfd"/>
 <path d="M88 179 V93 Q88 85 96 85 H164" fill="none" stroke="#738c9b" stroke-width="7"/>
@@ -995,7 +1053,7 @@ a{color:#0a709a}
 <rect x="315" y="199" width="26" height="13" rx="3" fill="#b4e4ed"/>
 <text x="95" y="217" text-anchor="middle" font-size="11" fill="#526779">Мониторинг температур T1–T4</text>
 <text x="254" y="41" text-anchor="middle" font-size="10" fill="#526779">Охлаждение</text>
-</svg>
+</svg></div>
   <p class="hint">Схема условная. YF-S401 показан на линии <b>охлаждающей воды</b>, а не на линии отбора.</p></div>
   <div class="grid homeMini">
    <div class="card"><h2>Охлаждающая вода</h2><div class="row">YF-S401 <b>GPIO15</b></div>
@@ -1030,8 +1088,26 @@ a{color:#0a709a}
  <div class="graphPanel" data-graph-panel="1" hidden><h3>YF-S401 · вода охлаждения</h3><canvas id="graphF" width="600" height="200"></canvas><p class="hint">Показаны реальные импульсы опроса, не литры: датчик не откалиброван.</p></div>
  <div class="graphPanel" data-graph-panel="2" hidden><h3>График отбора</h3><p class="warn">Нет датчика отбора. График без выдуманных данных.</p></div>
  </div></section>
-<section class="page" data-section="4" hidden><div class="card"><h2>События</h2><div id="events">Ожидание...</div><p class="hint">Журнал текущей сессии приложения</p></div></section>
-<section class="page" data-section="5" hidden><div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
+<section class="page" data-section="4" hidden><div class="card"><h2>Журнал событий</h2>
+<div class="eventFilters">
+<button type="button" class="on" data-event="all">Все</button>
+<button type="button" data-event="warn">Предупр.</button>
+<button type="button" data-event="alarm">Аварии</button>
+<button type="button" data-event="system">Система</button></div>
+<div id="events">Ожидание...</div><p class="hint">Только события текущей сессии. Записи без подтверждения не создаются.</p></div></section>
+<section class="page" data-section="5" hidden><div class="card">
+<h2>Настройки</h2><div class="settingsOverview">
+<button type="button" data-settings-link="temp"><span class="miniIcon">♨</span>Температуры</button>
+<button type="button" data-settings-link="collection"><span class="miniIcon">♧</span>Отбор жидкости</button>
+<button type="button" data-settings-link="wifi"><span class="miniIcon">⌁</span>Wi-Fi</button>
+<button type="button" data-settings-link="display"><span class="miniIcon">▣</span>Экран и звук</button>
+<button type="button" data-settings-link="system"><span class="miniIcon">⚙</span>Система</button>
+<button type="button" data-settings-link="about"><span class="miniIcon">ⓘ</span>О системе</button>
+</div><p class="hint">Режим мониторинга: исполнительные выходы не включаются.</p></div>
+<div class="card settingsTools"><h2>Технические разделы</h2><div class="row">Экран TFT <b>ST7789 · 320×240</b></div>
+<div class="grid"><button type="button" id="tftUp">TFT ↑</button><button type="button" id="tftDown">TFT ↓</button></div>
+<p class="hint">Управление видом TFT; физические выходы не затрагиваются.</p></div>
+<div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select><p class="hint">Если нужной сети нет, включите на телефоне раздачу интернета и повторите поиск.</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
@@ -1105,6 +1181,7 @@ a{color:#0a709a}
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let lastWaterPulse=null,themeInitialized=false;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
+let eventCategory="all",eventRecords=[];
 let lastDiagnosticReport='';
 function showPhoneClock(){
   get('clockDisplay').textContent='Дата и время: '+
@@ -1121,7 +1198,28 @@ async function syncClock(){
     if(r.ok)lastClockPush=Date.now();
   }catch(e){}
 }
-function message(s){logs.unshift(new Date().toLocaleTimeString('ru-RU')+' · '+s);logs.splice(12);get('events').textContent=logs.join('\n')}
+function drawEvents(){
+ const filtered=eventRecords.filter(e=>eventCategory==='all'||e.kind===eventCategory);
+ get('events').textContent=filtered.length?filtered.map(e=>e.text).join('\n'):'Событий выбранного типа нет';
+}
+function message(s,kind='system'){
+ const text=new Date().toLocaleTimeString('ru-RU')+' · '+s;
+ logs.unshift(text);logs.splice(12);
+ eventRecords.unshift({text,kind});eventRecords.splice(0,40);drawEvents();
+}
+document.querySelectorAll('[data-event]').forEach(b=>b.onclick=()=>{
+ eventCategory=b.dataset.event;
+ document.querySelectorAll('[data-event]').forEach(x=>x.classList.toggle('on',x===b));
+ drawEvents();
+});
+document.querySelectorAll('[data-settings-link]').forEach(b=>b.onclick=()=>{
+ const action=b.dataset.settingsLink;
+ if(action==='temp'){page(1);return;}
+ if(action==='collection'){page(2);return;}
+ settingsTab(action==='wifi'?0:action==='display'||action==='system'||action==='about'?3:1);
+ const top=get('settingsTabs').getBoundingClientRect().top+window.scrollY-115;
+ window.scrollTo({top:Math.max(0,top),behavior:'smooth'});
+});
 function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
 function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
