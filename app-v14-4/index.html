@@ -229,5 +229,197 @@ document.querySelectorAll('[data-chart]').forEach(b=>b.addEventListener('click',
  document.querySelectorAll('[data-chart]').forEach(t=>t.classList.toggle('on',t===b));
  document.querySelectorAll('[data-chart-panel]').forEach(p=>p.hidden=p.dataset.chartPanel!==b.dataset.chart);
 }));
+
+// Read-only remote feed: user-owned Google Apps Script with separate VIEW token.
+// No cloud settings are hard-coded and the app never sends control commands.
+const byId=id=>document.getElementById(id);
+const remoteStorePrefix='busa-v14-5-view-';
+let remoteEnabled=false,remoteTimer=null,remoteRequest=null,remoteTimeout=null;
+let remoteLastSample=null,remoteHistory=[],remoteErrors=[],eventFilter='all';
+let configUrl='',configToken='';
+function remoteStatus(msg){
+ byId('statusText').textContent=msg;
+ byId('viewState').textContent=msg;
+}
+function clearRemoteNumbers(){
+ for(let i=0;i<4;i++){
+  byId('remoteT'+i).textContent='Н/Д';
+  byId('detailT'+i).textContent='Н/Д';
+  byId('errorT'+i).textContent='Нет данных';
+ }
+ byId('waterLive').textContent='Нет показаний';
+ byId('heroStatus').textContent='● Нет подтверждённых измерений';
+ byId('remoteEvents').textContent='Нет диагностических данных';
+}
+function fmtTemp(v){return typeof v==='number'&&Number.isFinite(v)?v.toFixed(1)+' °C':'Н/Д'}
+function asFinite(v){return typeof v==='number'&&Number.isFinite(v)?v:null}
+function stampRussian(ms){return Number.isFinite(ms)?new Date(ms).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'medium'}):'—'}
+function renderRemoteEvents(){
+ const items=remoteErrors.filter(e=>eventFilter==='all'||e.kind===eventFilter);
+ byId('remoteEvents').textContent=items.length?items.map(e=>e.text).join('\n'):'Событий выбранного типа нет';
+}
+function renderRemote(d,history,receivedAt){
+ const age=Date.now()-receivedAt;
+ const fresh=age>=0&&age<150000;
+ const diag=d.diagnostics||{},one=Array.isArray(diag.onewire)?diag.onewire:[];
+ const temperatures=Array.isArray(d.temperatures)?d.temperatures:[];
+ for(let i=0;i<4;i++){
+  const t=temperatures[i]||{},probe=one[i]||{};
+  const val=fresh?fmtTemp(asFinite(t.c)):'Н/Д';
+  byId('remoteT'+i).textContent=val;
+  byId('detailT'+i).textContent=val;
+  byId('errorT'+i).textContent=probe.result||'Нет диагностических данных';
+ }
+ byId('waterLive').textContent=fresh&&d.water&&typeof d.water.pulses==='number'?
+   d.water.pulses+' имп. (не откалибровано)':'Нет свежих показаний';
+ byId('heroStatus').textContent=fresh?'● Последняя запись '+stampRussian(receivedAt):
+    '● Запись устарела: '+stampRussian(receivedAt);
+ remoteStatus(fresh?'Google · получено '+new Date(receivedAt).toLocaleTimeString('ru-RU'):
+               'Данные устарели');
+ remoteErrors=[];
+ for(let i=0;i<4;i++){
+  const p=one[i]||{};
+  if(p.result&&p.result!=='OK'){
+   remoteErrors.push({kind:'warn',text:'T'+(i+1)+' · '+p.result});
+  }
+ }
+ const keyboard=diag.keyboard||{};
+ if(Number(keyboard.scan_error||0)!==0)
+  remoteErrors.push({kind:'warn',text:'Клавиатура PCF8575 · scan_error='+keyboard.scan_error});
+ if(d.modules&&d.modules.pcf8575===false)
+  remoteErrors.push({kind:'warn',text:'PCF8575 · нет подключения'});
+ if(d.station&&d.station.connected===false)
+  remoteErrors.push({kind:'system',text:'Wi-Fi STA · внешняя сеть не подключена'});
+ remoteErrors.push({kind:'system',text:'Последняя запись: '+stampRussian(receivedAt)});
+ renderRemoteEvents();
+ remoteHistory=Array.isArray(history)?history:[];
+ drawRemoteCharts();
+}
+function plotSeries(canvasId,series,kind){
+ const c=byId(canvasId),ctx=c.getContext('2d'),W=c.width,H=c.height;
+ ctx.clearRect(0,0,W,H);
+ const dark=document.documentElement.dataset.theme==='dark';
+ ctx.fillStyle=dark?'#183247':'#ffffff';ctx.fillRect(0,0,W,H);
+ ctx.strokeStyle=dark?'#496479':'#d7e3e9';ctx.lineWidth=1;
+ for(let j=0;j<=4;j++){
+  const y=20+j*(H-38)/4;ctx.beginPath();ctx.moveTo(32,y);ctx.lineTo(W-8,y);ctx.stroke();
+ }
+ const colors=['#078fbe','#df8744','#d65446','#3b9f74'];
+ const flat=series.flatMap(v=>v.values).filter(v=>v!==null&&Number.isFinite(v));
+ if(flat.length<2){
+   ctx.fillStyle=dark?'#d4e6ef':'#657e8a';ctx.font='19px sans-serif';
+   ctx.fillText('Недостаточно данных для графика',62,H/2);return;
+ }
+ let ymin=Math.min(...flat),ymax=Math.max(...flat);
+ if(ymax-ymin<0.1){ymin-=1;ymax+=1}else{const pad=(ymax-ymin)*.12;ymin-=pad;ymax+=pad}
+ ctx.font='12px sans-serif';
+ series.forEach((ser,k)=>{
+  ctx.strokeStyle=colors[k%colors.length];ctx.lineWidth=3;ctx.beginPath();let moved=false;
+  ser.values.forEach((value,i)=>{
+    if(value===null||!Number.isFinite(value)){moved=false;return;}
+    const x=32+(W-45)*(ser.values.length<=1?0:i/(ser.values.length-1));
+    const y=20+(H-38)*(1-(value-ymin)/(ymax-ymin));
+    if(!moved){ctx.moveTo(x,y);moved=true}else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+ });
+}
+function drawRemoteCharts(){
+ const rows=remoteHistory.slice(-30);
+ const tempSeries=[0,1,2,3].map(i=>({values:rows.map(r=>asFinite(r.temperatures&&r.temperatures[i]))}));
+ plotSeries('remoteGraphT',tempSeries,'temp');
+ let prev=null;
+ const pulses=rows.map(r=>{
+  const v=asFinite(r.pulses),delta=prev===null||v===null||v<prev?null:v-prev;
+  prev=v;return delta;
+ });
+ plotSeries('remoteGraphW',[{values:pulses}],'water');
+}
+window.busaViewReceive=function(data){
+ if(!remoteEnabled)return;
+ clearTimeout(remoteTimeout);
+ if(!data||data.ok!==true){
+  remoteStatus('Ошибка Google: '+String(data&&data.error||'нет ответа'));return;
+ }
+ if(!data.latest||!data.latest.telemetry){
+   remoteStatus('Таблица пока пуста');clearRemoteNumbers();return;
+ }
+ const sample=data.latest,at=Number(sample.at);
+ if(sample.telemetry.device!=='BUSA-1M-001'||!Number.isFinite(at)){
+  remoteStatus('Некорректная телеметрия');return;
+ }
+ remoteLastSample=sample;
+ renderRemote(sample.telemetry,data.history||[],at);
+};
+function loadGoogleLatest(){
+ if(!remoteEnabled||!configUrl||!configToken)return;
+ if(remoteRequest){remoteRequest.remove();remoteRequest=null}
+ const script=document.createElement('script');
+ const join=configUrl.includes('?')?'&':'?';
+ script.src=configUrl+join+'mode=latest&callback=busaViewReceive&readToken='+
+  encodeURIComponent(configToken)+'&t='+Date.now();
+ script.onerror=()=>{if(remoteEnabled)remoteStatus('Ошибка загрузки из Google')};
+ remoteRequest=script;document.head.appendChild(script);
+ clearTimeout(remoteTimeout);
+ remoteTimeout=setTimeout(()=>{if(remoteEnabled)remoteStatus('Нет ответа Google (проверь развёртывание)')},18000);
+}
+function stopRemote(){
+ remoteEnabled=false;clearInterval(remoteTimer);clearTimeout(remoteTimeout);
+ if(remoteRequest){remoteRequest.remove();remoteRequest=null}
+ remoteTimer=null;
+}
+function connectRemote(url,token,persist=true){
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/.test(url)){
+  remoteStatus('Нужен адрес Apps Script /exec');return false;
+ }
+ if(!/^[A-Fa-f0-9]{64}$/.test(token)){
+  remoteStatus('Укажи BUSA_VIEW_TOKEN: 64 символа');return false;
+ }
+ stopRemote();configUrl=url;configToken=token;remoteEnabled=true;
+ if(persist)try{
+  localStorage.setItem(remoteStorePrefix+'url',url);
+  localStorage.setItem(remoteStorePrefix+'token',token);
+ }catch(ignore){}
+ remoteStatus('Подключение к Google…');
+ loadGoogleLatest();
+ remoteTimer=setInterval(loadGoogleLatest,30000);
+ return true;
+}
+byId('viewConnect').addEventListener('click',()=>{
+ connectRemote(byId('viewUrl').value.trim(),byId('viewToken').value.trim());
+});
+byId('viewClear').addEventListener('click',()=>{
+ stopRemote();configUrl='';configToken='';remoteHistory=[];remoteLastSample=null;
+ byId('viewUrl').value='';byId('viewToken').value='';
+ try{localStorage.removeItem(remoteStorePrefix+'url');
+ localStorage.removeItem(remoteStorePrefix+'token')}catch(ignore){}
+ clearRemoteNumbers();remoteStatus('Подключение отключено');
+ drawRemoteCharts();
+});
+document.querySelectorAll('[data-settings-page]').forEach(b=>b.addEventListener('click',()=>{
+ const target=byId(b.dataset.settingsPage);
+ if(target){target.hidden=false;document.querySelectorAll('main section[id]').forEach(x=>x.hidden=x!==target)}
+ document.querySelectorAll('.appTabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===b.dataset.settingsPage));
+ window.scrollTo(0,0);
+}));
+document.querySelectorAll('[data-event-filter]').forEach(b=>b.addEventListener('click',()=>{
+ eventFilter=b.dataset.eventFilter;
+ document.querySelectorAll('[data-event-filter]').forEach(x=>x.classList.toggle('on',x===b));
+ renderRemoteEvents();
+}));
+function clockNow(){
+ byId('clockDisplay').textContent=new Date().toLocaleString('ru-RU',{
+  day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false
+ });
+}
+clockNow();setInterval(clockNow,1000);
+try{
+ const savedUrl=localStorage.getItem(remoteStorePrefix+'url')||'';
+ const savedToken=localStorage.getItem(remoteStorePrefix+'token')||'';
+ byId('viewUrl').value=savedUrl;byId('viewToken').value=savedToken;
+ if(savedUrl&&savedToken)connectRemote(savedUrl,savedToken,false);
+}catch(ignore){}
+drawRemoteCharts();
+
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 </script></body></html>
