@@ -3,7 +3,8 @@
 // This header is included after V13 shared UI helpers in BUSA_Main.h.
 // No GPIO, relay, LED or physical output functions are used here.
 static const uint8_t v14Order[6]={0,1,2,5,3,4};
-static const char* const v14Tabs[6]={"Главная","T","Отбор","Настройки","Графики","События"};
+// Tab identity maps to original internal page IDs without altering persistence.
+static const char* const v14Tabs[6]={"Глав","Т","Отбор","Настр","График","Событ"};
 static void v14Tiny(const String &s,int x,int y,uint16_t color=WHITE){
   ru.setFont(u8g2_font_5x7_t_cyrillic);
   ruText(s,x,y,color);
@@ -17,50 +18,44 @@ static void v14FootArrow(int x,int dir,uint16_t color){
   if(dir==3)screen->fillTriangle(cx+6,cy,cx-4,cy-6,cx-4,cy+6,color);
 }
 static void v14Frame(uint32_t now){
-  screen->fillScreen(BG);
-  screen->fillRect(0,0,320,22,PANEL);
-  screen->drawFastHLine(0,21,320,BLUE);
-  v14Tiny("БУСА-1М с ИИ №001",7,14,WHITE);
-  v14Tiny(deviceClockValid()?clockStamp(true):"--:--",270,14,GRAY);
-  screen->fillCircle(257,11,4,WiFi.getMode()!=WIFI_OFF?GREEN:V13_RED);
-  for(int i=0;i<6;i++){
-    const int x=i*53;
-    bool selected=(v14Order[i]==currentPage);
-    screen->fillRoundRect(x+1,25,51,22,4,selected?BLUE:PANEL);
-    screen->drawRoundRect(x+1,25,51,22,4,selected?V13_CYAN:BLUE);
-    String label=String(v14Tabs[i]);
-    int n=0;for(size_t p=0;p<label.length();p++)if((label[p]&0xc0)!=0x80)n++;
-    v14Tiny(label,x+max(2,(53-n*5)/2),40,selected?WHITE:GRAY);
-  }
-  // Permanent six-button physical-key legend at bottom of screen.
-  screen->fillRect(0,211,320,29,PANEL);
-  screen->drawFastHLine(0,210,320,BLUE);
-  static const char* const labels[]={"Влево","Вверх","Вниз","Право","OK","Назад"};
+  // Rendering system is styled after six approved PNG reference screens.
+  hqBackground();
+  screen->fillRect(0,0,320,22,HQ_NAVY);
+  screen->drawFastHLine(0,21,320,HQ_GLOW);
+  v14Tiny("БУСА-1М №001",5,14,HQ_LIGHT);
+  v14Tiny(deviceClockValid()?clockStamp(true):"--:--",271,14,HQ_LIGHT);
+  hqBulb(255,10,3,WiFi.getMode()!=WIFI_OFF?HQ_LIME:V13_RED);
   for(int i=0;i<6;i++){
     int x=i*53+1;
-    screen->drawRoundRect(x,214,51,23,3,i==4?V13_CYAN:BLUE);
-    if(i<4)v14FootArrow(x,i,V13_CYAN);
-    else if(i==4)screen->drawCircle(x+10,224,6,GREEN);
-    else screen->drawLine(x+5,224,x+15,224,YELLOW);
-    v14Tiny(labels[i],x+(i<4?17:17),227,WHITE);
+    bool selected=(v14Order[i]==currentPage);
+    screen->fillRoundRect(x,25,51,22,4,selected?HQ_AZURE:HQ_NAVY);
+    screen->drawRoundRect(x,25,51,22,4,selected?HQ_SKY:HQ_GLASS);
+    if(selected){
+      screen->fillRoundRect(x+3,28,45,3,2,HQ_GLOW);
+      screen->drawFastHLine(x+7,45,37,HQ_CYAN);
+    }
+    const String title=v14Tabs[i];
+    // Use font metrics for actual Unicode glyph coverage; no UTF-8 slicing.
+    ru.setFont(u8g2_font_6x13_t_cyrillic);
+    int width=ru.getUTF8Width(title.c_str());
+    v13Text(title,x+max(2,(51-width)/2),41,selected?WHITE:HQ_SKY);
+  }
+  screen->fillRect(0,211,320,29,HQ_NAVY);
+  screen->drawFastHLine(0,210,320,HQ_GLOW);
+  static const char* const labels[]={"Влево","Вверх","Вниз","Вправо","OK","Назад"};
+  for(int i=0;i<6;i++){
+    int x=i*53+1;
+    screen->fillRoundRect(x+1,214,49,23,4,HQ_DEEP);
+    screen->drawRoundRect(x+1,214,49,23,4,i==4?HQ_CYAN:HQ_AZURE);
+    if(i<4)v14FootArrow(x,i,HQ_CYAN);
+    else if(i==4)hqBulb(x+11,225,3,HQ_LIME);
+    else screen->drawLine(x+5,225,x+16,225,HQ_SKY);
+    v14Tiny(labels[i],x+18,227,HQ_LIGHT);
   }
 }
 static void v14MiniRig(){
-  // Visualized illustration of a monitoring installation; no actual control.
-  v13Panel(123,52,113,141);
-  screen->drawRoundRect(139,112,43,60,8,GRAY);
-  screen->fillRect(143,146,35,22,0x02d0);
-  screen->drawRoundRect(171,66,12,60,2,GRAY);
-  for(int i=0;i<5;i++){
-    screen->drawFastHLine(174,71+i*10,6,i%2?V13_CYAN:BLUE);
-  }
-  screen->drawLine(160,112,160,72,GRAY);
-  screen->drawLine(160,72,177,72,GRAY);
-  screen->drawLine(183,75,211,75,V13_CYAN);
-  screen->drawLine(211,75,211,152,V13_CYAN);
-  screen->drawRect(201,153,22,20,WHITE);
-  screen->fillRect(204,165,16,5,BLUE);
-  v14Tiny("УСТАНОВКА",153,185,V13_CYAN);
+  hqRig(123,52,113,141); // detailed approved-style illustration
+  v14Tiny("МОНИТОР",147,188,HQ_CYAN);
 }
 static void v14Home(uint32_t now,bool layout){
   static const char* const names[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -69,18 +64,19 @@ static void v14Home(uint32_t now,bool layout){
     v14MiniRig();
     for(int i=0;i<4;i++){
       int y=52+i*36;
-      v13Panel(3,y,116,34);
-      screen->fillCircle(12,y+9,3,palette[i]);
+      hqPanel(3,y,116,34);
+      hqSymbol(i==0?2:(i==1?1:(i==2?0:1)),11,y+12,7,HQ_CYAN);
+      screen->drawFastVLine(4,y+5,23,palette[i]);
       v14Tiny(names[i],20,y+12,GRAY);
     }
-    v13Panel(240,52,77,66);
+    hqPanel(240,52,77,66);
     v14Tiny("ОТБОР",246,64,V13_CYAN);
     v14Tiny("Расход",246,86,GRAY);
     v14Tiny("мл/мин",246,108,GRAY);
-    v13Panel(240,124,77,69);
+    hqPanel(240,124,77,69);
     v14Tiny("СОБРАНО",246,138,V13_CYAN);
     v14Tiny("мл",246,172,GRAY);
-    v13Panel(3,198,314,11);
+    screen->drawRoundRect(3,198,314,11,4,HQ_GLASS);
   }
   for(int i=0;i<4;i++){
     int y=52+i*36;
@@ -96,11 +92,12 @@ static void v14Temperature(uint32_t now,bool layout){
   for(int i=0;i<4;i++){
     int x=4+(i%2)*158,y=52+(i/2)*77;
     if(layout){
-      v13Panel(x,y,154,73);
+      hqPanel(x,y,154,73);
+      hqSymbol(i%2?1:2,x+134,y+15,8,HQ_CYAN);
       v14Tiny(names[i],x+11,y+13,GRAY);
     }
     // Active temperature is drawn every refresh so highlighting follows 5x4 keys.
-    screen->fillRect(x+3,y+3,4,67,i==selectedTemp?V13_CYAN:PANEL);
+    screen->fillRect(x+3,y+3,4,67,i==selectedTemp?HQ_GLOW:HQ_DEEP);
     screenField(v13Temp(i,now),x+12,y+34,133,hasTemp(i,now)?GREEN:YELLOW);
     screenField("Зад:"+v13Ref(refTemp[i]),x+10,y+48,135,GRAY);
     screenField("Пред:"+v13Ref(noticeTemp[i]),x+10,y+66,135,GRAY);
@@ -115,11 +112,13 @@ static void v14Temperature(uint32_t now,bool layout){
 }
 static void v14Collection(bool layout){
   if(layout){
-    v13Panel(4,52,150,64);
-    v13Panel(161,52,155,64);
+    hqPanel(4,52,150,64);
+    hqSymbol(3,129,68,8,HQ_CYAN);
+    hqPanel(161,52,155,64);
+    hqSymbol(2,289,68,8,HQ_CYAN);
     v14Tiny("Расход отбора, мл/мин",10,68,V13_CYAN);
     v14Tiny("Объём отбора, мл",167,68,V13_CYAN);
-    v13Panel(4,121,312,86);
+    hqPanel(4,121,312,86);
     v14Tiny("ГРАФИК ОТБОРА",13,135,WHITE);
     v14Tiny("Датчик отбора не подключён",13,170,YELLOW);
     v14Tiny("YF-S401 измеряет только охлаждающую воду",13,191,GRAY);
@@ -129,7 +128,7 @@ static void v14Collection(bool layout){
 }
 static void v14Graphs(bool layout){
   if(layout){
-    v13Panel(4,52,312,154);
+    hqPanel(4,52,312,154);
     v14Tiny("ГРАФИКИ T1–T4 · реальные измерения",12,65,V13_CYAN);
   }
   bool has=false;
@@ -144,7 +143,7 @@ static void v14Graphs(bool layout){
 }
 static void v14Events(bool layout){
   if(layout){
-    v13Panel(4,52,312,155);
+    hqPanel(4,52,312,155);
     v14Tiny("ЖУРНАЛ СОБЫТИЙ",14,66,V13_CYAN);
   }
   screen->fillRect(11,73,298,128,PANEL);
@@ -162,10 +161,10 @@ static void v14Settings(bool layout){
   static const char* const names[]={"Температуры","Отбор жидкости","Wi-Fi","Экран и звук","Система","О системе"};
   for(int i=0;i<6;i++){
     int x=4+(i%2)*158,y=52+(i/2)*53;
-    if(layout)v13Panel(x,y,154,49);
-    screen->fillRect(x+4,y+4,4,40,i==approvedSettingsItem?V13_CYAN:PANEL);
-    v14Tiny(names[i],x+15,y+27,WHITE);
-    v14Tiny(">",x+139,y+27,V13_CYAN);
+    if(layout){hqPanel(x,y,154,49);hqSymbol(i==0?1:i==1?2:i==2?0:i==3?4:i==4?3:5,x+19,y+22,10,HQ_CYAN);}
+    screen->fillRect(x+4,y+4,4,40,i==approvedSettingsItem?HQ_CYAN:HQ_DEEP);
+    v14Tiny(names[i],x+34,y+27,HQ_LIGHT);
+    v14Tiny(">",x+139,y+27,HQ_SKY);
   }
   if(tftView){
     screen->fillRoundRect(54,77,215,99,6,PANEL);
@@ -206,6 +205,6 @@ void renderLandscape(uint32_t now){
     case 5:v14Settings(layout);break;
     default:break;
   }
-  screen->fillRect(270,4,46,15,PANEL);
-  v14Tiny(deviceClockValid()?clockStamp(true):"--:--",272,14,WHITE);
+  screen->fillRect(270,3,46,15,HQ_NAVY);
+  v14Tiny(deviceClockValid()?clockStamp(true):"--:--",272,14,HQ_LIGHT);
 }
