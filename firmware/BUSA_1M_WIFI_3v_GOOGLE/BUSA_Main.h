@@ -881,7 +881,12 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 </div><button id="refsSave" type="button" class="full">Сохранить значения отображения</button>
 <p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div></section>
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор · ручной режим</h2><p class="hint">Блок 220 В и электропривод крана исключены. ESP32 не управляет ими.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
-<section class="page" data-section="3" hidden><div class="card"><h2>Графики текущей сессии</h2><p>Вода, °C</p><canvas id="graphT" width="600" height="200"></canvas><p>Вода охлаждения, л/мин</p><canvas id="graphF" width="600" height="200"></canvas><p class="hint">Только реальные данные с момента открытия приложения.</p></div></section>
+<section class="page" data-section="3" hidden><div class="card"><h2>Графики · реальная телеметрия</h2>
+<div class="settingsTabs"><button type="button" data-graph-tft="0">Т1–Т4</button><button type="button" data-graph-tft="1">Вода</button><button type="button" data-graph-tft="2">Отбор</button></div>
+<h3>Т1–Т4 · четыре температурных канала, °C</h3><canvas id="graphT" width="600" height="200"></canvas>
+<h3>Охлаждающая вода YF-S401 · импульсы за интервал опроса</h3><canvas id="graphF" width="600" height="200"></canvas>
+<h3>Отбор жидкости</h3><p class="warn">Датчик отбора отсутствует. График не формируется.</p>
+<p class="hint">Только реальные показания. Импульсы воды не откалиброваны в литры и не означают наличие или отсутствие охлаждения.</p></div></section>
 <section class="page" data-section="4" hidden><div class="card"><h2>События</h2><div id="events">Ожидание...</div><p class="hint">Журнал текущей сессии приложения</p></div></section>
 <section class="page" data-section="5" hidden><div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
@@ -949,7 +954,8 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <button type="button" id="keyCancel">Отмена</button></div></div></section>
 <footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer></main>
 <script>
-const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];
+const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
+let lastWaterPulse=null;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
 let lastDiagnosticReport='';
 function showPhoneClock(){
@@ -971,6 +977,10 @@ function message(s){logs.unshift(new Date().toLocaleTimeString('ru-RU')+' · '+s
 function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
 function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
+document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=async()=>{
+  document.querySelectorAll('[data-graph-tft]').forEach(c=>c.classList.toggle('on',c===b));
+  await fetch('/api/graph-view?view='+b.dataset.graphTft).catch(()=>{});
+});
 get('tftUp').onclick=()=>fetch('/api/tft/scroll?dir=up').catch(()=>{});
 get('tftDown').onclick=()=>fetch('/api/tft/scroll?dir=down').catch(()=>{});
 async function keyCommand(action){
@@ -1034,16 +1044,46 @@ get('refsSave').onclick=async()=>{
 
 document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.dataset.page)));
 function plot(id,values){const c=get(id),x=c.getContext('2d');x.fillStyle='#061b2c';x.fillRect(0,0,600,200);const a=values.filter(v=>v!==null);if(!a.length){x.fillStyle='#d9bd75';x.fillText('НЕТ ДАННЫХ',24,60);return}let lo=Math.min(...a),hi=Math.max(...a);if(hi-lo<.1)hi=lo+.1;x.strokeStyle='#70e99b';x.beginPath();values.forEach((v,i)=>{if(v===null)return;let xx=10+i*580/80,yy=185-(v-lo)/(hi-lo)*165;if(i===0||values[i-1]===null)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke()}
-function graphs(){plot('graphT',tlog);plot('graphF',flog)}
+function graphAllTemperatures(){
+ const c=get('graphT'),x=c.getContext('2d'),colors=['#048abe','#d46237','#a83c23','#38a878'];
+ x.fillStyle='#fffdf3';x.fillRect(0,0,600,200);
+ x.strokeStyle='#d4d6d6';
+ for(let j=0;j<=4;j++){x.beginPath();x.moveTo(30,20+j*40);x.lineTo(595,20+j*40);x.stroke()}
+ x.font='13px sans-serif';
+ for(let k=0;k<4;k++){
+  x.fillStyle=colors[k];x.fillText(['T1 Вода','T2 Колонна','T3 Куб','T4 Верх'][k],33+k*139,13);
+  x.strokeStyle=colors[k];x.lineWidth=2;x.beginPath();
+  let began=false,arr=tlog4[k];
+  for(let i=0;i<arr.length;i++){
+   const v=arr[i],px=30+i*7,py=180-(v===null?0:Math.max(0,Math.min(v,125))*160/125);
+   if(v===null){began=false;continue}
+   if(!began){x.moveTo(px,py);began=true}else x.lineTo(px,py);
+  }
+  x.stroke();
+ }
+ if(!tlog4.some(a=>a.some(v=>v!==null))){x.fillStyle='#a43c24';x.fillText('НЕТ ИЗМЕРЕНИЙ T1–T4',180,107)}
+}
+function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
 async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;if(Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
-s.temperatures.forEach((t,i)=>{get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';if(i===0){tlog.push(t.c===null?null:Number(t.c));if(tlog.length>80)tlog.shift()}});
+s.temperatures.forEach((t,i)=>{
+ get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';
+ const a=tlog4[i];a.push(t.c===null?null:Number(t.c));if(a.length>80)a.shift();
+ if(i===0){tlog.push(t.c===null?null:Number(t.c));if(tlog.length>80)tlog.shift();}
+});
 get('temperatures').textContent=names.map((v,i)=>v+': '+get('t'+i).textContent).join(' | ');
 if(!refsInit && Array.isArray(s.display_references)){
   s.display_references.forEach((r,i)=>{get('ref'+i).value=r.target===null?'':r.target;get('nt'+i).value=r.notice===null?'':r.notice});
   refsInit=true;
 }
 let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'НЕТ ДАННЫХ':f.toFixed(2);get('flow2').textContent=get('flow').textContent;get('pulses').textContent=s.water.pulses;get('total').textContent=Number(s.water.total_l_estimate).toFixed(3);
-flog.push(f);if(flog.length>80)flog.shift();let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
+flog.push(f);if(flog.length>80)flog.shift();
+const currentPulse=Number(s.water.pulses);
+if(Number.isFinite(currentPulse)){
+ let delta=lastWaterPulse===null?null:Math.max(0,currentPulse-lastWaterPulse);
+ lastWaterPulse=currentPulse;waterPulseLog.push(delta);
+ if(waterPulseLog.length>80)waterPulseLog.shift();
+}
+let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
 if(s.station.connected&&s.station.ssid){
  let select=get('net'),found=Array.from(select.options).some(o=>o.value===s.station.ssid);
  if(!found)select.add(new Option(s.station.ssid+' (подключена)',s.station.ssid));
