@@ -425,6 +425,7 @@ Adafruit_GFX* screen=nullptr;
 U8G2_FOR_ADAFRUIT_GFX ru;
 uint8_t tftProfile=1;
 bool tftStarted=false;
+bool tftInverted=false; // Reversible display controller color inversion
 uint32_t splashStartedAt=0;
 const uint16_t BG=0x080f,PANEL=0x10a3,BLUE=0x1c9f,GREEN=0x07e0,WHITE=0xffff,
                YELLOW=0xffe0,GRAY=0xbdf7;
@@ -453,6 +454,7 @@ void startScreen(){
   if(tftProfile==2){screenIli.begin();screen=&screenIli;}
   else{screenSt.init(240,320);screen=&screenSt;}
   screen->setRotation(1); // 320x240 landscape, both supported profiles
+  screen->invertDisplay(tftInverted);
   screen->fillScreen(BG);
   ru.begin(*screen);
   ru.setFont(u8g2_font_6x13_t_cyrillic);
@@ -646,6 +648,7 @@ String statusJSON(){
   s+=",\"pca9685_ack_only\":"+(pcaDetected?String("true"):String("false"));
   s+=",\"tft_attempted\":"+(tftStarted?String("true"):String("false"));
   s+=",\"last_key\":"+quoteJson(keyMessage)+"}";
+  s+=",\"tft_theme_inverted\":"+(tftInverted?String("true"):String("false"));
   s+=",\"keypad\":{\"ready\":"+(keypadReady?String("true"):String("false"));
   s+=",\"learning\":"+(keypadLearning?String("true"):String("false"));
   s+=",\"step\":"+String(learnStep);
@@ -771,6 +774,10 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
 <div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
 <p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
+<h2>Экран TFT</h2>
+<p class="hint">Если TFT показывает светлый фон вместо тёмного макета, переключи аппаратную инверсию цветов. Настройка сохраняется, при необходимости можно вернуть обратно.</p>
+<button type="button" id="tftTheme" class="full">Переключить светлый / тёмный TFT</button>
+<p id="tftThemeStatus" class="hint">—</p>
 <button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
 <div class="grid"><button type="button" id="keyUndo">Назад на шаг</button>
@@ -808,6 +815,12 @@ async function keyCommand(action){
 }
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
 get('keyNext').onclick=()=>keyCommand('next');
+get('tftTheme').onclick=async()=>{
+ try{
+   const r=await fetch('/api/tft/theme',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+   get('tftThemeStatus').textContent=await r.text();
+ }catch(e){get('tftThemeStatus').textContent='Ошибка: '+e.message}
+};
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
 get('refsSave').onclick=async()=>{
@@ -935,6 +948,7 @@ void setup(){
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   prefs.begin("busa-r04",false);
   tftProfile=prefs.getUChar("tft",1);
+  tftInverted=prefs.getBool("tftInvert",false);
   startedAt=millis();
   if(tftProfile!=2)tftProfile=1;
   stationSsid=prefs.getString("ssid","");
@@ -1061,6 +1075,17 @@ void setup(){
     if(n<1||n>6){server.send(400,"application/json","{\"error\":\"page 1..6\"}");return;}
     navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;
     server.send(200,"application/json","{\"ok\":true}");
+  });
+  server.on("/api/tft/theme",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;
+    }
+    tftInverted=!tftInverted;
+    prefs.putBool("tftInvert",tftInverted);
+    if(tftStarted&&screen)screen->invertDisplay(tftInverted);
+    tftDirty=true;lastRender=0;
+    server.send(200,"text/plain; charset=utf-8",
+      tftInverted?"Инверсия TFT: ВКЛ — сравни оформление":"Инверсия TFT: ВЫКЛ — исходные цвета");
   });
   server.on("/api/keypad/start",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
