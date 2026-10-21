@@ -68,7 +68,7 @@ static void v13Frame(uint32_t now){
   screen->fillRect(0,0,240,28,PANEL);
   v13Line(0,27,240);
   v13Text("БУСА-1М №001",6,18,WHITE);
-  screen->fillCircle(229,11,5,wifiRunning?GREEN:V13_RED);
+  screen->fillCircle(229,11,5,WiFi.getMode()!=WIFI_OFF?GREEN:V13_RED);
   // Local STA status and clock; never infer that the AP is connected to the Internet.
   v13Text(deviceClockValid()?clockStamp(true):"--:--",165,18,GRAY);
   const char* tab[]={"Глав","Темп","Отбор","Граф","Событ","Настр"};
@@ -136,7 +136,7 @@ static void v13Home(uint32_t now,bool layout){
   }
   screenField(v13Flow()+" мл/мин",134,218,96,flowSeen?GREEN:YELLOW);
   screenField(v13Total()+" мл",134,248,96,flowSeen?GREEN:YELLOW);
-  screenField(String("Wi-Fi ")+(wifiRunning?"AP OK":"НЕТ")+"   Реле ВЫКЛ",12,267,216,GREEN);
+  screenField(String("Wi-Fi ")+(WiFi.getMode()!=WIFI_OFF?"AP OK":"НЕТ")+"   Реле ВЫКЛ",12,267,216,GREEN);
 }
 static void v13Temperatures(uint32_t now,bool layout){
   static const char* labels[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -223,7 +223,9 @@ static void v13Graphs(bool layout){
     v13Panel(5,242,230,30);
     v13Text("Без имитации значений",13,261,YELLOW);
   }
-  if(v13HistoryCount<2){
+  bool haveRealGraph=false;
+  for(int k=0;k<4;k++)for(int j=0;j<v13HistoryCount;j++)if(isfinite(v13History[k][j]))haveRealGraph=true;
+  if(v13HistoryCount<2||!haveRealGraph){
     screen->fillRect(12,118,216,107,PANEL);
     v13Text("Нет истории измерений",18,168,YELLOW);
   }else{
@@ -238,7 +240,7 @@ static void v13EventsPage(bool layout){
     screen->fillCircle(19,y-5,3,i==0?V13_CYAN:GREEN);
     String txt=v13Events[i];
     // Keep rows readable and leave previous events searchable in browser diagnostics.
-    if(txt.length()>43)txt=txt.substring(0,43);
+    // Event text is short enough for this panel; do not split UTF-8 glyphs.
     v13Text(txt,28,y,WHITE);
     if(i<6)v13Line(12,y+6,217,GRAY);
   }
