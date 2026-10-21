@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 10v-DIAG";
+const char VERSION[]="БУСА 1М WiFi 11v-TFT-DIAG";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -485,7 +485,10 @@ U8G2_FOR_ADAFRUIT_GFX ru;
 uint8_t tftProfile=1;
 bool tftStarted=false;
 bool tftInverted=false; // Reversible display controller color inversion
-uint32_t splashStartedAt=0;
+uint32_t splashStartedAt=0,splashHoldMs=1700;
+bool tftRebootPending=false;
+uint32_t tftRebootAt=0;
+const char* tftProfileName(){return tftProfile==2?"ILI9341":"ST7789";}
 const uint16_t BG=0x080f,PANEL=0x10a3,BLUE=0x1c9f,GREEN=0x07e0,WHITE=0xffff,
                YELLOW=0xffe0,GRAY=0xbdf7;
 const char* pages[6]={"Главная","Температуры","Отбор","Графики","События","Настройки"};
@@ -502,9 +505,52 @@ void panelAt(int x,int y,int w,int h){
   screen->fillRoundRect(x,y,w,h,5,PANEL);
   screen->drawRoundRect(x,y,w,h,5,BLUE);
 }
+// Cache 24 small fields so unchanged values are not erased and redrawn.
+struct TftField {
+  int16_t x=0,y=0,w=0;
+  uint16_t color=0;
+  String value;
+};
+TftField tftFields[24];
+uint8_t tftFieldCount=0;
 void screenField(const String &v,int x,int y,int w,uint16_t color=WHITE){
+  int found=-1;
+  for(int i=0;i<tftFieldCount;i++){
+    if(tftFields[i].x==x && tftFields[i].y==y && tftFields[i].w==w){
+      found=i;break;
+    }
+  }
+  if(found>=0){
+    if(tftFields[found].value==v && tftFields[found].color==color)return;
+  }else if(tftFieldCount<24){
+    found=tftFieldCount++;
+    tftFields[found].x=x;
+    tftFields[found].y=y;
+    tftFields[found].w=w;
+  }
+  if(found>=0){
+    tftFields[found].value=v;
+    tftFields[found].color=color;
+  }
   screen->fillRect(x,y-13,w,16,PANEL);
   ruText(v,x,y,color);
+}
+void drawBootSplash(uint32_t holdMs){
+  if(!screen)return;
+  screen->fillScreen(0x0000); // pure black
+  screen->setTextColor(0xffff); // pure white
+  screen->setTextWrap(false);
+  screen->setTextSize(3);
+  screen->setCursor(70,83);
+  screen->print("BUSA 1M AI");
+  screen->setTextSize(2);
+  screen->setCursor(136,139);
+  screen->print("001");
+  screen->setTextSize(1);
+  splashHoldMs=holdMs;
+  splashStartedAt=millis();
+  tftDirty=true;
+  tftFieldCount=0;
 }
 void startScreen(){
   Serial0.println("TFT: HW SPI landscape; controller model unverified");
@@ -514,32 +560,21 @@ void startScreen(){
   else{screenSt.init(240,320);screen=&screenSt;}
   screen->setRotation(1); // 320x240 landscape, both supported profiles
   screen->invertDisplay(tftInverted);
-  screen->fillScreen(BG);
   ru.begin(*screen);
   ru.setFont(u8g2_font_6x13_t_cyrillic);
   ru.setFontMode(1);
-  // Startup splash. The diagnostic UI draws only after a short delay.
-  screen->fillScreen(BG);
-  screen->drawRoundRect(12,26,296,187,12,BLUE);
-  screen->setTextColor(WHITE);
-  screen->setTextSize(3);
-  screen->setCursor(41,82);
-  screen->print("BUSA 1M AI");
-  screen->setTextSize(2);
-  screen->setCursor(120,135);
-  screen->print("001");
-  screen->setTextSize(1);
-  splashStartedAt=millis();
-  tftStarted=true;tftDirty=true;
-  Serial0.println("TFT: splash BUSA 1M AI; landscape init done");
+  drawBootSplash(2500);
+  tftStarted=true;
+  Serial0.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
 }
 void renderScreen(uint32_t now){
   if(!tftStarted||!screen)return;
-  if(!elapsed(now,splashStartedAt,1700))return;
+  if(!elapsed(now,splashStartedAt,splashHoldMs))return;
   static uint8_t drawnPage=255,drawnTab=255,drawnView=255;
   bool layout=tftDirty||drawnPage!=currentPage||
      drawnTab!=settingsSubTab||drawnView!=tftView;
   if(layout){
+    tftFieldCount=0;
     screen->fillScreen(BG); // ONLY on real navigation, not on timed updates
     panelAt(3,2,314,28);
     ruText(String("БУСА №001  ·  ")+pages[currentPage],9,21,BLUE);
@@ -706,6 +741,9 @@ String statusJSON(){
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
   s+=",\"pca9685_ack_only\":"+(pcaDetected?String("true"):String("false"));
   s+=",\"tft_attempted\":"+(tftStarted?String("true"):String("false"));
+  s+=",\"tft_profile_id\":"+String(tftProfile);
+  s+=",\"tft_profile\":"+quoteJson(tftProfileName());
+  s+=",\"tft_physical_pixels_confirmed\":false";
   s+=",\"last_key\":"+quoteJson(keyMessage)+"}";
   s+=",\"tft_theme_inverted\":"+(tftInverted?String("true"):String("false"));
   s+=",\"keypad\":{\"ready\":"+(keypadReady?String("true"):String("false"));
@@ -853,11 +891,17 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
 <div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
-<h2>Диагностика V10 · реальные входы</h2><pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса 1-Wire...</pre>
+<h2>Диагностика V11 · реальные входы</h2><pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса 1-Wire...</pre>
 <pre id="diagKeyboard" style="white-space:pre-wrap;word-break:break-word">Ожидание PCF8575...</pre>
 <p class="hint">Ошибки: NO_PRESENCE — нет ответа на сброс 1-Wire; NO_ROM — не найден адрес; ROM_CRC_BAD — ошибка CRC; NO_VALID_READING — адрес найден, температура недоступна. Для клавиатуры: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
 <p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
-<h2>Экран TFT</h2>
+<h2>Экран TFT · V11</h2>
+<p class="hint">Белый TFT может означать неверный контроллер дисплея или проблему SPI. Профиль выбирается вручную: ESP32 не умеет подтвердить, что пиксели действительно видны.</p>
+<label for="tftDriver">Драйвер TFT</label>
+<select id="tftDriver"><option value="1">ST7789 · 240×320</option><option value="2">ILI9341 · 240×320</option></select>
+<button type="button" id="tftSave" class="full">Сохранить профиль и перезапустить ESP32</button>
+<button type="button" id="tftTest" class="full">Тест TFT: чёрный фон, BUSA 1M AI · 5 секунд</button>
+<p id="tftProfileStatus" class="hint">После теста проверь результат на самом дисплее. При неудаче можно выбрать второй драйвер.</p>
 <p class="hint">Если TFT показывает светлый фон вместо тёмного макета, переключи аппаратную инверсию цветов. Настройка сохраняется, при необходимости можно вернуть обратно.</p>
 <button type="button" id="tftTheme" class="full">Переключить светлый / тёмный TFT</button>
 <p id="tftThemeStatus" class="hint">—</p>
@@ -868,7 +912,7 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];
-let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0;
+let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
 function showPhoneClock(){
   get('clockDisplay').textContent='Дата и время: '+
     new Date().toLocaleString('ru-RU',{year:'numeric',month:'2-digit',day:'2-digit',
@@ -898,6 +942,19 @@ async function keyCommand(action){
 }
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
 get('keyNext').onclick=()=>keyCommand('next');
+get('tftSave').onclick=async()=>{
+ if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Реле остаются отключены.'))return;
+ try{
+  const r=await fetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value})});
+  get('tftProfileStatus').textContent=await r.text();
+ }catch(e){get('tftProfileStatus').textContent='Ошибка: '+e.message}
+};
+get('tftTest').onclick=async()=>{
+ try{
+  const r=await fetch('/api/tft/test',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+  get('tftProfileStatus').textContent=await r.text();
+ }catch(e){get('tftProfileStatus').textContent='Ошибка: '+e.message}
+};
 get('tftTheme').onclick=async()=>{
  try{
    const r=await fetch('/api/tft/theme',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
@@ -959,7 +1016,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?'Инициализирован':'Не подтверждён';if(active===3)graphs();
+get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Команда запуска: '+s.modules.tft_profile+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false}finally{pollBusy=false}}
 get('googleSave').onclick=async()=>{
 const url=get('googleUrl').value.trim(),token=get('googleToken').value.trim();
@@ -1032,7 +1089,7 @@ void readConsole(){
 }
 void setup(){
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi 4v LANDSCAPE DIAG BOOT; physical outputs LOCKED");
+  Serial0.println("\nBUSA 1M WiFi V11 TFT DIAG BOOT; physical outputs LOCKED");
   Serial.begin(115200);
   delay(400);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
@@ -1168,6 +1225,32 @@ void setup(){
     navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;
     server.send(200,"application/json","{\"ok\":true}");
   });
+  server.on("/api/tft/profile",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная Wi-Fi сеть БУСА");return;
+    }
+    String profile=server.arg("profile");
+    if(profile!="1"&&profile!="2"){
+      server.send(400,"text/plain; charset=utf-8","Неверный профиль");return;
+    }
+    if(prefs.putUChar("tft",(uint8_t)profile.toInt())!=1){
+      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить TFT");return;
+    }
+    server.send(200,"text/plain; charset=utf-8","Профиль сохранён. ESP32 перезагрузится через 3 секунды.");
+    tftRebootPending=true;tftRebootAt=millis();
+  });
+  server.on("/api/tft/test",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная Wi-Fi сеть БУСА");return;
+    }
+    if(!tftStarted||!screen){
+      server.send(409,"text/plain; charset=utf-8","Дисплей ещё не запускался");return;
+    }
+    drawBootSplash(5000);
+    lastRender=0;
+    server.send(200,"text/plain; charset=utf-8",
+      "Тест отправлен: 5 секунд чёрного фона и белой надписи BUSA 1M AI.");
+  });
   server.on("/api/tft/theme",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){
       server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;
@@ -1282,6 +1365,7 @@ void loop(){
   }
   readConsole();
   if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
+  if(tftRebootPending && elapsed(now,tftRebootAt,3000))ESP.restart();
   if(googleRestart && elapsed(now,googleRestartAt,3500))ESP.restart();
   if(!screenAttempted && elapsed(now,startedAt,8000)){
     screenAttempted=true;startScreen();
