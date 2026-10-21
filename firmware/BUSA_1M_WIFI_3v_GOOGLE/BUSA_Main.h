@@ -534,7 +534,7 @@ uint8_t tftProfile=1;
 bool tftStarted=false;
 bool tftInverted=false; // Reversible display controller color inversion
 uint32_t splashStartedAt=0,splashHoldMs=1700;
-uint8_t tftRotation=1; // 0/2 portrait, 1/3 landscape
+uint8_t tftRotation=0; // V13 approved default: 240x320 portrait; rotation 2 is upside-down
 uint8_t bootStage=0; // 0 TFT, 1 WiFi, 2 modules, 3 1-Wire, 4 ready
 bool bootSplashComplete=false;
 bool tftRebootPending=false;
@@ -1272,8 +1272,15 @@ void setup(){
   prefs.begin("busa-r04",false);
   tftProfile=prefs.getUChar("tft",1);
   tftInverted=prefs.getBool("tftInvert",false);
-  tftRotation=prefs.getUChar("tftRotate",1);
-  if(tftRotation>3)tftRotation=1;
+  // One-time V13 migration of V12 landscape preference to approved portrait.
+  // After migration user may still tune hardware orientation via iPhone.
+  tftRotation=prefs.getUChar("tftRotate",0);
+  if(tftRotation>3)tftRotation=0;
+  if(!prefs.getBool("v13portrait",false)){
+    if(tftRotation==1||tftRotation==3)tftRotation=0;
+    prefs.putUChar("tftRotate",tftRotation);
+    prefs.putBool("v13portrait",true);
+  }
   startedAt=millis();
   if(tftProfile!=2)tftProfile=1;
   // Initialize TFT first so splash actually covers Wi-Fi and sensor initialization.
