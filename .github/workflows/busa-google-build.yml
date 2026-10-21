@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -68,6 +68,12 @@ jobs:
                       assert ref in art, ref
                   for unsafe in ('digitalWrite(', 'pinMode(', 'ledcWrite(', 'relay', 'HTTPClient'):
                       assert unsafe not in art, unsafe
+              if '14v-LIGHT-WATER-UI-FIX' in a:
+                  for term in ('graphSubView=0','waterPulseHistory[40]','waterPulseDelta','startKeyLearning','tftProfile=1;tftRotation=1;tftInverted=false'):
+                      assert term in a, term
+                  for term in ('v14GraphTabs','v14Graphs','YF-S401','ВОДА YF','К1-К4'):
+                      assert term in land, term
+                  assert 'tftProfile=1' in a and '0x000000' not in land
               for forbidden in ('digitalWrite(', 'pinMode(KPIN','ledcWrite(', 'WiFiClientSecure::setInsecure'):
                   assert forbidden not in land, forbidden
           print('Passive GPIO only; output relays remain locked')
