@@ -2,6 +2,9 @@
 // БУСА-1М №001 — V14.1: six approved-style screens, light horizontal ST7789 320×240.
 // THIS CODE ONLY DRAWS DATA. NO RELAY/POWER/PWM CONTROL.
 // No placeholder readings: water flow raw pulses only until calibrated.
+// Google transport is implemented later in BUSA_Google.h; TFT displays status only.
+extern volatile bool googleEnabled;
+extern volatile int googleState;
 static const uint8_t v14Order[6]={0,1,2,5,3,4};
 static const char* const v14Tabs[6]={"Глав","Т","Отбор","Настр","Граф","Событ"};
 static const uint16_t V14_TEXT=0x2104,V14_MUTED=0x632c,V14_WARN=0xa800,
@@ -214,15 +217,15 @@ static void v14Events(bool layout){
   }
 }
 static void v14Settings(bool layout){
-  static const char* names[]={"Температуры","Отбор","Wi-Fi","Экран","Система","К1-К4"};
-  for(int i=0;i<6;i++){
-    int x=4+(i%2)*158,y=52+(i/2)*52;
-    hqPanel(x,y,153,48);
+  static const char* names[]={"Температуры","Отбор","Wi-Fi","Экран","Система","Google","К1-К4"};
+  for(int i=0;i<7;i++){
+    int x=4+(i%2)*158,y=52+(i/2)*38;
+    hqPanel(x,y,153,35);
     hqSymbol(i==0?1:i==1?2:i==2?0:i==3?4:i==4?3:5,
-             x+20,y+24,10,V14_BLUE);
-    if(i==approvedSettingsItem)screen->fillRoundRect(x+3,y+5,4,38,2,V14_ORANGE);
-    v14Print(names[i],x+36,y+29,V14_TEXT);
-    v14Print(">",x+139,y+28,V14_MUTED);
+             x+19,y+18,8,V14_BLUE);
+    if(i==approvedSettingsItem)screen->fillRoundRect(x+3,y+4,4,27,2,V14_ORANGE);
+    v14Print(names[i],x+35,y+22,V14_TEXT);
+    v14Print(">",x+138,y+22,V14_MUTED);
   }
   if(tftView){
     hqPanel(37,72,247,126);
@@ -248,6 +251,15 @@ static void v14Settings(bool layout){
                   "Обучение через iPhone",48,145,V14_BLUE);
         v14Tiny(String("PCF: ")+(pcfDetected?"есть":"нет")+
                   "  scan="+String(pcfScanError),48,167,V14_WARN);break;
+      case 5:
+        v14Print(googleEnabled?"Google настроен":"Google: НЕТ НАСТРОЕК",48,124,V14_TEXT);
+        v14Tiny(String("Канал: ")+(googleState==5?"ПОДТВЕРЖДЕНО":
+                    googleState==4?"ОТПРАВЛЕНО":
+                    googleState==3?"ОТПРАВКА":
+                    googleState==1?"НЕТ ИНТЕРНЕТА":"ПРОВЕРЬ СТАТУС"),
+                   48,146,V14_BLUE);
+        v14Tiny("Настройка: iPhone / Google",48,167,V14_MUTED);
+        break;
       default:
         v14Print("К1–К4: БЛОК",48,126,V14_WARN);
         for(int i=0;i<4;i++){
