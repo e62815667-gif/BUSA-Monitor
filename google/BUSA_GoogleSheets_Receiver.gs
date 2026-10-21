@@ -29,6 +29,13 @@ function setupBusaSheet() {
                   Utilities.getUuid().replace(/-/g, '');
     cfg.setProperty('BUSA_TOKEN', token);
   }
+  // READ-only key is different from the device's WRITE key. Never embed
+  // either key into the public GitHub Pages HTML.
+  if (!cfg.getProperty('BUSA_VIEW_TOKEN')) {
+    const token = Utilities.getUuid().replace(/-/g, '') +
+                  Utilities.getUuid().replace(/-/g, '');
+    cfg.setProperty('BUSA_VIEW_TOKEN', token);
+  }
   const tab = sheet.getSheetByName(BUSA_TAB) || sheet.insertSheet(BUSA_TAB);
   if (tab.getLastRow() === 0) {
     tab.appendRow(BUSA_HEADERS);
@@ -105,4 +112,70 @@ function doPost(e) {
 function busaJson_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+/**
+ * Read-only live mobile dashboard feed. JSONP is used because an HTTPS GitHub
+ * Pages website cannot directly contact the local HTTP ESP32, while Google
+ * Apps Script ContentService cross-origin fetch does not reliably return CORS
+ * headers. Scripts are loaded only from a user-entered script.google.com URL.
+ *
+ * Auth: SECOND, read-only BUSA_VIEW_TOKEN. NEVER use BUSA_TOKEN in the app.
+ * Endpoint: GET /exec?mode=latest&readToken=<64 hex chars>&callback=busaViewReceive
+ * Optional: callback is ALWAYS fixed; arbitrary JavaScript is forbidden.
+ */
+function doGet(e) {
+  const callback = 'busaViewReceive';
+  try {
+    const q = (e && e.parameter) || {};
+    const expected = PropertiesService.getScriptProperties().getProperty('BUSA_VIEW_TOKEN');
+    if (!expected || typeof q.readToken !== 'string' ||
+        !/^[a-fA-F0-9]{64}$/.test(q.readToken) ||
+        q.readToken !== expected || q.mode !== 'latest' ||
+        (q.callback && q.callback !== callback)) {
+      return busaScript_({ok:false,error:'Доступ к телеметрии не разрешён'});
+    }
+    const id = PropertiesService.getScriptProperties().getProperty('BUSA_SPREADSHEET_ID');
+    if (!id) return busaScript_({ok:false,error:'Таблица не настроена'});
+    const sheet=SpreadsheetApp.openById(id).getSheetByName(BUSA_TAB);
+    if (!sheet || sheet.getLastRow()<2) {
+      return busaScript_({ok:true,latest:null,history:[],message:'Ещё нет записей'});
+    }
+    // Fetch a short time-bounded sample only, never an entire archive.
+    const end = sheet.getLastRow();
+    const start = Math.max(2,end-29);
+    const rows = sheet.getRange(start,1,end-start+1,BUSA_HEADERS.length).getValues();
+    const sample = [];
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i];
+      const raw=row[21]; // detailed telemetry is stored in column 22
+      if (typeof raw !== 'string' || raw.length>10000) continue;
+      try{
+        const packet=JSON.parse(raw);
+        if (!packet || packet.device!=='BUSA-1M-001') continue;
+        const stamp=row[0] instanceof Date?row[0].getTime():null;
+        sample.push({at:stamp,telemetry:packet});
+      }catch(ignore){}
+    }
+    return busaScript_({
+      ok:true,
+      latest:sample.length?sample[sample.length-1]:null,
+      history:sample.map(v=>({
+        at:v.at,
+        temperatures:(Array.isArray(v.telemetry.temperatures)?
+           v.telemetry.temperatures.map(t=>typeof t.c==='number'?t.c:null):[null,null,null,null]),
+        pulses:v.telemetry.water && typeof v.telemetry.water.pulses==='number'?
+           v.telemetry.water.pulses:null
+      }))
+    });
+  } catch(err) {
+    return busaScript_({ok:false,error:'Не удалось прочитать таблицу'});
+  }
+}
+function busaScript_(data) {
+  // Fixed callback prevents script injection through callback parameters.
+  const js='busaViewReceive('+JSON.stringify(data)+');';
+  return ContentService.createTextOutput(js)
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
