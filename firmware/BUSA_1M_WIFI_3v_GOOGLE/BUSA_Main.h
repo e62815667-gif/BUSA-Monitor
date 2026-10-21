@@ -116,6 +116,7 @@ uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
 uint32_t keyCount=0,lastKeyScan=0,pendingAt=0;
 int pendingKey=-1;bool keyHeld=false;
 String keyMessage="NO DATA";
+Preferences prefs;
 bool ack(uint8_t address){
   Wire.beginTransmission(address);return Wire.endTransmission()==0;
 }
@@ -253,7 +254,6 @@ Adafruit_ST7789 screenSt(TFT_CS,TFT_DC,TFT_RST);
 Adafruit_ILI9341 screenIli(TFT_CS,TFT_DC,TFT_RST);
 Adafruit_GFX* screen=nullptr;
 U8G2_FOR_ADAFRUIT_GFX ru;
-Preferences prefs;
 uint8_t tftProfile=1;
 bool tftStarted=false;
 const uint16_t BG=0x080f,PANEL=0x10a3,BLUE=0x1c9f,GREEN=0x07e0,WHITE=0xffff,
