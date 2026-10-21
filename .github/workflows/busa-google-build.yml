@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -100,8 +100,13 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v4-MANUAL-SCREEN-APP' in main
+          assert '14v5-IPHONE-LAYOUT' in main
           assert 'TFT_DISPLAY_IDLE_MS' not in main
+          assert 'class="appTabs"' in main
+          assert '<div class="rigViewport">' in main
+          assert 'data-settings-link="wifi"' in main
+          assert 'data-event="warn"' in main
+          assert '<button type="button" id="tftUp">' in main
           assert 'tftThemeDark=prefs.getBool("tftDarkColor",false)' in main
           assert 'ru.drawUTF8(x,y,v.c_str())' in main
           assert 'invertDisplay(tftInverted)' in main and 'tftInverted=false' in main
