@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f6f1"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>БУСА-Монитор №001</title><link rel="manifest" href="./manifest.webmanifest">
+<style>
+:root{color-scheme:light;--ink:#273f50;--muted:#667e8b;--paper:#faf9f4;--border:#dce6e9;--orange:#dfa05a;--teal:#007fa9;--warn:#ae452f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}
+*{box-sizing:border-box}body{margin:0}header{position:sticky;top:0;z-index:3;background:#fff;border-bottom:2px solid var(--orange);padding:14px 16px 10px;box-shadow:0 3px 12px #283e4f0b}
+h1{font-size:21px;margin:0 0 5px}header small{color:#647c89}main{max-width:660px;margin:auto;padding:13px 14px 108px}
+.card{background:#fff;border:1px solid var(--border);border-radius:15px;margin-bottom:13px;padding:16px;box-shadow:0 4px 12px #2448610a}
+.card h2{font-size:17px;margin:0 0 14px}.hero{background:linear-gradient(126deg,#fff4df,#ebf8fd);border:1px solid #ebd9be;border-radius:15px;padding:17px;margin-bottom:13px}
+.hero small{font-size:10px;letter-spacing:1.3px;font-weight:bold;color:#925829}.hero h2{font-size:27px;margin:7px 0}
+.status{display:inline-block;color:#965c1e;background:#fff5e5;border:1px solid #eacaa1;border-radius:30px;padding:6px 11px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.tile{padding:13px 11px;background:#f7fafb;border:1px solid #e0e9ed;border-radius:11px}.tile small{font-size:12px;color:#4c6c7b}.tile strong{display:block;margin:9px 0 1px;color:#207b6d;font-size:20px}
+.point{display:inline-block;border-radius:50%;width:9px;height:9px;margin-right:6px}.p1{background:#1297c5}.p2{background:#d5813f}.p3{background:#c5503c}.p4{background:#3d9d70}
+.row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #e9eff1;padding:10px 0;font-size:14px}.row:last-child{border-bottom:0}.row b{text-align:right}
+.muted{color:#667e8b;font-size:12px;line-height:1.5}.warn{color:var(--warn)}
+a.btn,button.btn{display:inline-flex;text-decoration:none;justify-content:center;align-items:center;padding:11px 15px;background:#f4d3a7;border:1px solid #d5a978;border-radius:9px;color:#3e413e;font-size:14px;font-weight:600;min-height:44px}
+a.btn.secondary{background:#eef7fa;border-color:#a8cfdf;color:#155e82}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0 4px}.actions a{flex:1 1 200px}
+.rigs svg{width:100%;height:auto;max-height:260px;display:block}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.chips span{background:#fff3e8;border:1px solid #edd5bd;border-radius:8px;padding:10px 3px;text-align:center;font-size:12px}.chips b{display:block;color:#a34d36;font-size:11px;margin-top:6px}
+section[hidden]{display:none!important}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:4;display:flex;overflow-x:auto;background:#fff;border-top:2px solid #efc79b;padding:6px 6px max(7px,env(safe-area-inset-bottom));box-shadow:0 -4px 14px #1d3c510e;scrollbar-width:none}
+nav button{flex:1 0 auto;min-width:72px;border:1px solid transparent;border-radius:9px;background:#fff;color:#58707e;padding:12px 6px;font:12px system-ui;cursor:pointer}
+nav button.active{background:#f7d5a9;border-color:#e8b274;color:#354b55;font-weight:bold}
+.graphTabs{display:flex;gap:7px;margin-bottom:12px}.graphTabs button{flex:1;border:1px solid #c6d5dc;background:#f5fafb;border-radius:9px;padding:11px;color:#2b5b71;font:13px system-ui}.graphTabs button.on{background:#f6cf9c;border-color:#dca767;font-weight:700}
+@media(max-width:380px){.chips{grid-template-columns:repeat(2,1fr)}.tile strong{font-size:17px}nav button{min-width:67px;padding:10px 5px}}
+
+/* Color-preserving dark palette (not CSS filter:invert). */
+:root[data-theme="dark"]{color-scheme:dark;--ink:#f1f7ff;--muted:#bbd0db;--paper:#0c1929;--border:#386279;--orange:#ffac63;--teal:#65cfff;--warn:#ff9875;background:var(--paper);color:var(--ink)}
+:root[data-theme="dark"] body{background:var(--paper);color:var(--ink)}
+:root[data-theme="dark"] header,:root[data-theme="dark"] nav{background:#152b40;border-color:#f1a661}
+:root[data-theme="dark"] header small,:root[data-theme="dark"] .muted{color:#bbd2df}
+:root[data-theme="dark"] .card{background:#192f45;border-color:#385e78;box-shadow:none}
+:root[data-theme="dark"] .hero{background:linear-gradient(115deg,#493526,#173b52);border-color:#a7794a}
+:root[data-theme="dark"] .hero small{color:#ffcd92}
+:root[data-theme="dark"] .status{background:#473322;color:#ffc98d;border-color:#d99850}
+:root[data-theme="dark"] .tile{background:#254158;border-color:#3d647e}
+:root[data-theme="dark"] .tile small{color:#bad5e2}
+:root[data-theme="dark"] .tile strong{color:#72e4ad}
+:root[data-theme="dark"] .row{border-color:#38556b}
+:root[data-theme="dark"] .warn{color:#ff9675}
+:root[data-theme="dark"] .chips span{background:#493528;color:#f7dac0;border-color:#b18a65}
+:root[data-theme="dark"] .chips b{color:#ffb283}
+:root[data-theme="dark"] nav button{color:#d0e1eb;background:#193248}
+:root[data-theme="dark"] nav button.active{background:#e2974e;color:#152636;border-color:#f9be7e}
+:root[data-theme="dark"] .graphTabs button{background:#234158;color:#cae7f3;border-color:#527c94}
+:root[data-theme="dark"] .graphTabs button.on{background:#df9147;color:#122535;border-color:#ffbf72}
+:root[data-theme="dark"] a.btn,:root[data-theme="dark"] button.btn{background:#d99652;color:#1a2f3f;border-color:#ffb56f}
+:root[data-theme="dark"] a.btn.secondary{background:#254f68;color:#e0f6ff;border-color:#66a8c8}
+:root[data-theme="dark"] .rigs svg rect:first-of-type{fill:#183046}
+#themeSwitch{margin:7px 0 1px;padding:9px 13px;border:1px solid #cda275;border-radius:9px;background:#fff0d9;color:#3b5a69;font-size:13px;font-weight:600}
+:root[data-theme="dark"] #themeSwitch{background:#3b576b;color:#e1f4ff;border-color:#75a3bc}
+</style></head><body>
+<header><h1>БУСА-1М №001</h1><small>Монитор · iPhone · две цветные темы V14.4</small><div><button type="button" id="themeSwitch">Тёмная цветная тема</button></div></header>
+<main>
+<div class="card"><div class="row"><span>Подключение</span><b id="statusText" class="warn">Не подключено</b></div>
+<p class="muted">Живые показания открываются непосредственно из локальной сети ESP32-S3. Эта страница сохранит знакомые вкладки даже без интернета.</p>
+<a class="btn" href="http://192.168.4.1/">Открыть БУСА по Wi-Fi</a></div>
+<section id="home">
+<div class="hero"><small>СИСТЕМА МОНИТОРИНГА</small><h2>Главная</h2><span class="status">● Ожидается соединение с БУСА</span></div>
+<div class="card"><h2>Четыре температуры</h2><div class="grid">
+<div class="tile"><small><i class="point p1"></i>T1 Вода</small><strong>Н/Д</strong></div>
+<div class="tile"><small><i class="point p2"></i>T2 Колонна</small><strong>Н/Д</strong></div>
+<div class="tile"><small><i class="point p3"></i>T3 Куб</small><strong>Н/Д</strong></div>
+<div class="tile"><small><i class="point p4"></i>T4 Верх колонны</small><strong>Н/Д</strong></div>
+</div></div>
+<div class="card rigs"><h2>Схема установки</h2>
+<svg viewBox="0 0 360 225" role="img" aria-label="Рисунок установки с YF-S401 на линии охлаждающей воды">
+<defs><linearGradient id="silver" x1="0" x2="1"><stop stop-color="#738b9b"/><stop offset=".42" stop-color="#e6f1f4"/><stop offset="1" stop-color="#829aa7"/></linearGradient></defs>
+<rect width="360" height="225" rx="12" fill="#f7fbfd"/>
+<path d="M96 16 H255 V49" fill="none" stroke="#7d929d" stroke-width="6"/>
+<rect x="28" y="145" width="127" height="60" rx="18" fill="url(#silver)" stroke="#697e8b" stroke-width="2"/>
+<rect x="43" y="155" width="97" height="39" rx="9" fill="#7c96a5" stroke="#597b89"/>
+<rect x="82" y="22" width="27" height="126" rx="6" fill="url(#silver)" stroke="#648092" stroke-width="2"/>
+<g stroke="#71899b" stroke-width="3"><path d="M78 42 H114 M78 58 H114 M78 74 H114 M78 90 H114 M78 106 H114 M78 122 H114"/></g>
+<rect x="229" y="49" width="58" height="80" rx="11" fill="url(#silver)" stroke="#718b9a" stroke-width="2"/>
+<path d="M240 58 Q277 67 240 73 T240 89 T240 105 T240 120" fill="none" stroke="#0c9dd0" stroke-width="4"/>
+<path d="M216 111 V140 H331" fill="none" stroke="#078ebd" stroke-width="5"/>
+<rect x="285" y="126" width="39" height="27" rx="6" fill="#d8f4fb" stroke="#0a83ad" stroke-width="3"/>
+<path d="M291 139 H317 M310 133 L317 139 L310 145" stroke="#1778a4" fill="none" stroke-width="2"/>
+<text x="305" y="121" font-size="12" fill="#166e98" font-weight="bold" text-anchor="middle">YF-S401</text>
+<text x="304" y="167" font-size="11" fill="#287895" text-anchor="middle">ВОДА</text>
+<path d="M260 129 H339 V185" fill="none" stroke="#8595a0" stroke-width="4"/>
+<rect x="312" y="183" width="31" height="33" rx="5" fill="white" stroke="#8299a7" stroke-width="2"/>
+<rect x="315" y="199" width="25" height="13" rx="2" fill="#aeddeb"/>
+<text x="94" y="218" text-anchor="middle" fill="#6f8695" font-size="11">T1–T4</text>
+</svg>
+<p class="muted">YF-S401 показан на линии охлаждающей воды, не отбора. Изображение иллюстративное.</p></div>
+<div class="grid"><div class="card"><h2>Вода YF-S401</h2><span class="warn">Нет показаний</span><p class="muted">Импульсы и калибровка доступны в локальной панели.</p></div>
+<div class="card"><h2>Отбор</h2><span class="warn">Нет датчика</span><p class="muted">Показания не имитируются.</p></div></div>
+<div class="card"><h2>К1–К4</h2><div class="chips"><span>К1<b>БЛОК</b></span><span>К2<b>БЛОК</b></span><span>К3<b>БЛОК</b></span><span>К4<b>БЛОК</b></span></div></div>
+</section>
+<section id="temps" hidden><div class="card"><h2>Температуры · T1–T4</h2>
+<div class="row"><span>Вода</span><b>Н/Д</b></div><div class="row"><span>Колонна</span><b>Н/Д</b></div><div class="row"><span>Куб</span><b>Н/Д</b></div><div class="row"><span>Верх колонны</span><b>Н/Д</b></div>
+<p class="muted">Настройка справочных порогов температуры и реальные показания доступны после открытия локальной панели БУСА.</p></div></section>
+<section id="collection" hidden><div class="card"><h2>Отбор жидкости</h2><div class="row"><span>Расход, мл/мин</span><b class="warn">НЕТ ДАТЧИКА</b></div><div class="row"><span>Собрано, мл</span><b class="warn">Н/Д</b></div><p class="muted">YF-S401 измеряет импульсы охлаждающей воды, не отбор.</p></div></section>
+<section id="settings" hidden>
+<div class="card"><h2>Настройки</h2>
+<div class="row"><span>Температуры T1–T4</span><b>Локальная панель</b></div>
+<div class="row"><span>Экран ST7789</span><b>320 × 240</b></div>
+<div class="row"><span>Гашение экрана</span><b>Только вручную</b></div>
+<div class="row"><span>К1–К4</span><b>БЛОК</b></div>
+<div class="row"><span>Wi-Fi и Google</span><b>Настроить в БУСА</b></div>
+<div class="actions"><a class="btn" href="http://192.168.4.1/">Открыть настройки БУСА</a>
+<a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/blob/lab/busa-v14-3-final-display-google/google/README_BUSA_Google_Drive.md">Инструкция Google Диск</a></div>
+<p class="muted">Переключатель темы сверху меняет оформление этого приложения. Для переключения самой TFT-матрицы открой настройки экрана в локальной панели БУСА.</p>
+<p class="muted">Google Диск на iPhone позволяет смотреть таблицу. Для передачи каждые 30 секунд БУСА требует соединения с интернетом и Apps Script-приёмника.</p>
+</div></section>
+<section id="graphs" hidden>
+<div class="card"><h2>Графики</h2><div class="graphTabs"><button class="on" data-chart="0">T1–T4</button><button data-chart="1">Вода</button><button data-chart="2">Отбор</button></div>
+<div data-chart-panel="0"><p class="muted">Четыре температурные линии появятся после подключения к БУСА.</p></div>
+<div data-chart-panel="1" hidden><p class="muted">График реальных импульсов охлаждающей воды доступен в локальной панели.</p></div>
+<div data-chart-panel="2" hidden><p class="warn">Датчик отбора отсутствует. График не формируется.</p></div>
+</div></section>
+<section id="events" hidden><div class="card"><h2>Журнал событий</h2><p class="muted">Для просмотра текущих событий и ошибок PCF8575, DS18B20, YF-S401 открой локальную панель БУСА.</p></div></section>
+</main>
+<nav aria-label="Разделы"><button data-tab="home" class="active">Главная</button><button data-tab="temps">T1–T4</button><button data-tab="collection">Отбор</button><button data-tab="settings">Настройки</button><button data-tab="graphs">Графики</button><button data-tab="events">События</button></nav>
+<script>
+// Change the standalone iPhone page's palette only; the TFT palette is
+// changed from the controller's own Settings screen.
+let darkSaved=false;
+try{darkSaved=localStorage.getItem('busa-pwa-dark')==='1';}catch(e){}
+function applyTheme(dark){
+ document.documentElement.dataset.theme=dark?'dark':'light';
+ document.getElementById('themeSwitch').textContent=
+    dark?'Светлая цветная тема':'Тёмная цветная тема';
+ try{localStorage.setItem('busa-pwa-dark',dark?'1':'0');}catch(e){}
+}
+applyTheme(darkSaved);
+document.getElementById('themeSwitch').addEventListener('click',()=>{
+ applyTheme(document.documentElement.dataset.theme!=='dark');
+});
+document.querySelectorAll('nav [data-tab]').forEach(b=>b.addEventListener('click',()=>{
+ document.querySelectorAll('main section[id]').forEach(s=>s.hidden=s.id!==b.dataset.tab);
+ document.querySelectorAll('nav [data-tab]').forEach(t=>t.classList.toggle('active',t===b));
+ window.scrollTo(0,0);
+}));
+document.querySelectorAll('[data-chart]').forEach(b=>b.addEventListener('click',()=>{
+ document.querySelectorAll('[data-chart]').forEach(t=>t.classList.toggle('on',t===b));
+ document.querySelectorAll('[data-chart-panel]').forEach(p=>p.hidden=p.dataset.chartPanel!==b.dataset.chart);
+}));
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+</script></body></html>
