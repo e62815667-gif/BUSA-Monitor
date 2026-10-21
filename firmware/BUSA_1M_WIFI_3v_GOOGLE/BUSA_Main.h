@@ -372,6 +372,7 @@ void deleteSelectedReference(){
   keyMessage=String("T")+String(selectedTemp+1)+
     (selectedField?" Пред.":" Зад.")+" - удалено";
 }
+void moveApprovedTab(int direction); // declaration required by keypad navigation
 void keypadAction(int k){
   // Confirmed user assignments:
   // UP=7, DOWN=11, LEFT=16, RIGHT=18, ENT=19, ESC=15, F1=0.
