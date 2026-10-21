@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 11v-TFT-DIAG";
+const char VERSION[]="БУСА 1М WiFi 12v-BOOT-ONEWIRE";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -51,6 +51,7 @@ bool tempConverting=false;
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
 struct OneWireProbe {
   bool presence=false,romFound=false,crcOk=false,familyOk=false,multiple=false;
+  int8_t idleLevel=-1,afterResetLevel=-1; // GPIO state; not proof of sensor health
   uint8_t rom[8]={0};
   uint32_t checkedAt=0;
 };
@@ -85,14 +86,16 @@ void sampleTemperatures(uint32_t now){
   }
 }
 void probeOneWire(uint32_t now){
-  if(tempConverting||!elapsed(now,lastWireProbe,12000))return;
+  if(tempConverting||(lastWireProbe && !elapsed(now,lastWireProbe,12000)))return;
   lastWireProbe=now;
   for(int i=0;i<4;i++){
     OneWireProbe &p=wireProbe[i];
     p=OneWireProbe();
     p.checkedAt=now;
     OneWire* bus=temperatureBuses[i];
+    p.idleLevel=digitalRead(TPIN[i]);
     p.presence=bus->reset()!=0;
+    p.afterResetLevel=digitalRead(TPIN[i]);
     bus->reset_search();
     uint8_t first[8]={0},second[8]={0};
     p.romFound=bus->search(first);
@@ -113,6 +116,7 @@ bool hasTemp(int n,uint32_t now);
 String wireError(int i,uint32_t now){
   const OneWireProbe& p=wireProbe[i];
   if(!p.checkedAt)return "WAIT_DIAG";
+  if(!p.presence && p.idleLevel==0)return "LINE_LOW";
   if(!p.presence)return "NO_PRESENCE";
   if(!p.romFound)return "NO_ROM";
   if(!p.crcOk)return "ROM_CRC_BAD";
@@ -760,6 +764,8 @@ String statusJSON(){
     s+=",\"probe_ms\":"+String(p.checkedAt);
     s+=",\"presence\":"+(p.presence?String("true"):String("false"));
     s+=",\"rom_found\":"+(p.romFound?String("true"):String("false"));
+    s+=",\"idle_gpio\":"+String(p.idleLevel);
+    s+=",\"after_reset_gpio\":"+String(p.afterResetLevel);
     s+=",\"rom_crc_ok\":"+(p.crcOk?String("true"):String("false"));
     s+=",\"family_ds18b20\":"+(p.familyOk?String("true"):String("false"));
     s+=",\"multiple_rom\":"+(p.multiple?String("true"):String("false"));
@@ -891,9 +897,10 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
 <div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
-<h2>Диагностика V11 · реальные входы</h2><pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса 1-Wire...</pre>
+<h2>Диагностика V12 · реальные входы</h2><pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса 1-Wire...</pre>
 <pre id="diagKeyboard" style="white-space:pre-wrap;word-break:break-word">Ожидание PCF8575...</pre>
-<p class="hint">Ошибки: NO_PRESENCE — нет ответа на сброс 1-Wire; NO_ROM — не найден адрес; ROM_CRC_BAD — ошибка CRC; NO_VALID_READING — адрес найден, температура недоступна. Для клавиатуры: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
+<p class="hint">Температура: T1 GPIO38, T2 GPIO39, T3 GPIO40, T4 GPIO41. IDLE=1 — линия DATA высока в покое; IDLE=0 или LINE_LOW — линия низкая. AFTER — состояние после импульса сброса. NO_PRESENCE при IDLE=1 — нет ответа датчика, но это не доказывает, что сам датчик неисправен. NO_ROM — не найден адрес; ROM_CRC_BAD — неверная CRC.</p>
+<p class="hint">Клавиатура: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
 <p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
 <h2>Экран TFT · V11</h2>
 <p class="hint">Белый TFT может означать неверный контроллер дисплея или проблему SPI. Профиль выбирается вручную: ESP32 не умеет подтвердить, что пиксели действительно видны.</p>
@@ -1007,7 +1014,8 @@ if(s.keypad){
  get('keyRaw').textContent=s.keypad.raw_pair||'—';
  if(s.diagnostics){
    get('diagOneWire').textContent=(s.diagnostics.onewire||[]).map((p,i)=>
-     'T'+(i+1)+' GPIO'+p.gpio+': '+p.result+' | RESET='+p.presence+
+     'T'+(i+1)+' GPIO'+p.gpio+': '+p.result+' | IDLE='+p.idle_gpio+
+     ' | AFTER='+p.after_reset_gpio+' | RESET='+p.presence+
      ' | ROM='+(p.rom||'—')+' | CRC='+p.rom_crc_ok).join('\n');
    const k=s.diagnostics.keyboard||{};
    get('diagKeyboard').textContent='PCF 0x'+Number(k.pcf_address||0).toString(16)+
