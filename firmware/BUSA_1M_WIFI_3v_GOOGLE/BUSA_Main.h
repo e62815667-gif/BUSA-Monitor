@@ -561,7 +561,8 @@ Adafruit_GFX* screen=nullptr;
 U8G2_FOR_ADAFRUIT_GFX ru;
 uint8_t tftProfile=1;
 bool tftStarted=false;
-bool tftInverted=false; // Reversible display controller color inversion
+bool tftInverted=false; // Hardware inversion remains DISABLED
+bool tftThemeDark=false; // Real saved software color palette
 uint32_t splashStartedAt=0,splashHoldMs=1700;
 uint8_t tftRotation=0; // V13 approved default: 240x320 portrait; rotation 2 is upside-down
 uint8_t bootStage=0; // 0 TFT, 1 WiFi, 2 modules, 3 1-Wire, 4 ready
@@ -769,6 +770,7 @@ String statusJSON(){
   s+=",\"tft_physical_pixels_confirmed\":false";
   s+=",\"last_key\":"+quoteJson(keyMessage)+"}";
   s+=",\"tft_theme_inverted\":"+(tftInverted?String("true"):String("false"));
+  s+=",\"tft_theme_dark\":"+(tftThemeDark?String("true"):String("false"));
   s+=",\"display_sleep\":"+(tftDisplayOff?String("true"):String("false"));
   s+=",\"keypad\":{\"ready\":"+(keypadReady?String("true"):String("false"));
   s+=",\"learning\":"+(keypadLearning?String("true"):String("false"));
@@ -932,6 +934,28 @@ a{color:#0a709a}
 .relayGrid b{display:block;font-size:11px;margin-top:4px;color:#ad5835}
 #clockDisplay{color:#627989!important;font-size:12px!important}
 @media(max-width:380px){.homeMini{grid-template-columns:1fr}nav button{min-width:71px;padding:9px 6px}.tile strong{font-size:18px}}
+
+/* Vibrant, explicitly colored dark mode. Never invert whole document/pixels. */
+:root[data-theme="dark"]{color-scheme:dark;--ink:#f0f7ff;--muted:#b3ceda;--paper:#0b1928;--surface:#152a3d;--line:#34546a;--sea:#61c5ee;--orange:#ffa861;--warn:#ffa27b}
+:root[data-theme="dark"] body{background:var(--paper);color:var(--ink)}
+:root[data-theme="dark"] header,:root[data-theme="dark"] nav{background:#112436;border-color:#f1a45b}
+:root[data-theme="dark"] h1,:root[data-theme="dark"] h2,:root[data-theme="dark"] h3{color:#e4f2fa}
+:root[data-theme="dark"] button{background:#264559;color:#d8f1ff;border-color:#4b7186}
+:root[data-theme="dark"] nav button.on,:root[data-theme="dark"] .settingsTabs button.on{background:#e18b3d;color:#142534;border-color:#ffbd77}
+:root[data-theme="dark"] .card{background:#172b40;border-color:#3d657a;box-shadow:none}
+:root[data-theme="dark"] .tile,:root[data-theme="dark"] pre,:root[data-theme="dark"] textarea{background:#1e3b50;color:#e4f4ff;border-color:#406982}
+:root[data-theme="dark"] .tile small,:root[data-theme="dark"] .row,:root[data-theme="dark"] .hint{color:#c0d5df}
+:root[data-theme="dark"] .tile strong,:root[data-theme="dark"] .green{color:#70e5b7}
+:root[data-theme="dark"] .warn{color:#ff9b71}
+:root[data-theme="dark"] input,:root[data-theme="dark"] select{background:#142a3e;color:#fff;border-color:#557f97}
+:root[data-theme="dark"] .homeHero{background:linear-gradient(125deg,#43301d,#17364b);border-color:#a37243}
+:root[data-theme="dark"] .heroEyebrow{color:#ffd291}
+:root[data-theme="dark"] .heroStatus{color:#7ee4cb}
+:root[data-theme="dark"] .relayGrid span{background:#463225;color:#fff0d9;border-color:#b27b51}
+:root[data-theme="dark"] .relayGrid b{color:#ffad84}
+:root[data-theme="dark"] a{color:#85d4ff}
+:root[data-theme="dark"] #clockDisplay{color:#b3ceda!important}
+:root[data-theme="dark"] canvas{background:#183044;border-color:#416b83}
 </style></head><body>
 <header><h1>БУСА-1М №001 <span style="font-size:11px;color:#738896;font-weight:500">iPhone Monitor</span></h1><nav>
 <button data-page="0" class="on">Главная</button><button data-page="1">Температуры</button>
@@ -1069,8 +1093,8 @@ a{color:#0a709a}
 <button type="button" id="tftSave" class="full">Сохранить профиль и перезапустить ESP32</button>
 <button type="button" id="tftTest" class="full">Тест TFT: чёрный фон, BUSA 1M AI · 5 секунд</button>
 <p id="tftProfileStatus" class="hint">Драйвер ST7789 закреплён. Проверка физического экрана выполняется отдельно.</p>
-<p class="hint">Утверждена светлая цветовая тема и драйвер ST7789.</p>
-<button type="button" id="tftTheme" class="full" disabled>Светлая тема · утверждена</button>
+<p class="hint">Обе темы цветные: синяя вода, разноцветные датчики, оранжевые выделения. Аппаратная инверсия выключена. Драйвер ST7789 не меняется.</p>
+<button type="button" id="tftTheme" class="full">Переключить светлую / тёмную цветную тему TFT</button>
 <p id="tftThemeStatus" class="hint">—</p>
 <button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
@@ -1079,7 +1103,7 @@ a{color:#0a709a}
 <footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
-let lastWaterPulse=null;
+let lastWaterPulse=null,themeInitialized=false;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
 let lastDiagnosticReport='';
 function showPhoneClock(){
@@ -1156,7 +1180,10 @@ get('diagCopy').onclick=async()=>{
 get('tftTheme').onclick=async()=>{
  try{
    const r=await fetch('/api/tft/theme',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
-   get('tftThemeStatus').textContent=await r.text();
+   const t=await r.text();
+   get('tftThemeStatus').textContent=t;
+   if(r.ok){document.documentElement.dataset.theme=
+     document.documentElement.dataset.theme==='dark'?'light':'dark';}
  }catch(e){get('tftThemeStatus').textContent='Ошибка: '+e.message}
 };
 get('keyUndo').onclick=()=>keyCommand('undo');
@@ -1226,6 +1253,10 @@ if(s.station.connected&&s.station.ssid){
 }
 const cs=s.google;
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
+if(!themeInitialized && typeof s.tft_theme_dark==='boolean'){
+  document.documentElement.dataset.theme=s.tft_theme_dark?'dark':'light';
+  themeInitialized=true;
+}
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent;
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
@@ -1380,6 +1411,7 @@ void setup(){
     prefs.putBool("v14lightSt",true);
   }
   tftProfile=1;tftRotation=1;tftInverted=false;
+  tftThemeDark=prefs.getBool("tftDarkColor",false);
   startedAt=millis();
   tftProfile=1; // ST7789 only
   // Initialize TFT first so splash actually covers Wi-Fi and sensor initialization.
@@ -1545,7 +1577,17 @@ void setup(){
       "Тест отправлен: 5 секунд чёрного фона и белой надписи BUSA 1M AI.");
   });
   server.on("/api/tft/theme",HTTP_POST,[]{
-    server.send(200,"text/plain; charset=utf-8","V14.1: светлая тема, инверсия отключена");
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;
+    }
+    const bool dark=!tftThemeDark;
+    if(prefs.putBool("tftDarkColor",dark)!=1){
+      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить тему");return;
+    }
+    tftThemeDark=dark;
+    tftDirty=true;lastRender=0;
+    server.send(200,"text/plain; charset=utf-8",
+      dark?"Тёмная ЦВЕТНАЯ тема включена":"Светлая ЦВЕТНАЯ тема включена");
   });
   server.on("/api/keypad/start",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
