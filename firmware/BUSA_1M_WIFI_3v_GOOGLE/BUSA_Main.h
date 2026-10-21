@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 12v-BOOT-ONEWIRE";
+const char VERSION[]="БУСА 1М WiFi 12v-DIAG-FULL";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -168,6 +168,12 @@ float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
 // I2C devices: PCF8575 keypad is monitored; PCA9685 ACK-only (never PWM).
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
 uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
+uint8_t i2cFound[24]={0},i2cFoundCount=0;
+uint16_t i2cAckCount=0;
+uint32_t i2cFullScanAt=0;
+int pcaMode1=-1,pcaMode2=-1;
+bool pcfIdleReadOk=false;
+uint16_t pcfIdleDirect=0xffff;
 uint32_t keyCount=0,lastKeyScan=0,pendingAt=0;
 int pendingPair=-1;bool keyHeld=false;
 String keyMessage="NO DATA";
@@ -198,13 +204,50 @@ String clockStamp(bool compact=false){
 bool ack(uint8_t address){
   Wire.beginTransmission(address);return Wire.endTransmission()==0;
 }
+// I2C discovery plus read-only register inspection; never modify PWM outputs.
+void scanI2cAddresses(uint32_t now){
+  if(!i2cOnline)return;
+  i2cFoundCount=0;i2cAckCount=0;
+  for(uint8_t addr=0x08;addr<=0x77;addr++){
+    if(ack(addr)){
+      i2cAckCount++;
+      if(i2cFoundCount<24)i2cFound[i2cFoundCount++]=addr;
+    }
+  }
+  i2cFullScanAt=now;
+}
+int readPcaReg(uint8_t reg){
+  if(!pcaDetected)return -1;
+  Wire.beginTransmission(0x40);
+  Wire.write(reg); // Register pointer only, NOT a PWM/output value.
+  if(Wire.endTransmission(false)!=0)return -1;
+  if(Wire.requestFrom((uint8_t)0x40,(uint8_t)1)!=(uint8_t)1)return -1;
+  return Wire.read();
+}
 void probeI2c(uint32_t now){
   if(!i2cOnline)return;
   pcfDetected=false;pcfAddr=0;
   for(uint8_t i=0x20;i<=0x27;i++)if(ack(i)){
     pcfDetected=true;pcfAddr=i;break;
   }
-  pcaDetected=ack(0x40);lastBusProbe=now;
+  pcaDetected=ack(0x40);
+  pcaMode1=readPcaReg(0x00);
+  pcaMode2=readPcaReg(0x01);
+  // PCF8575 keypad inputs: release scanning lines then sample idle state.
+  pcfIdleReadOk=false;
+  if(pcfDetected){
+    Wire.beginTransmission(pcfAddr);
+    Wire.write((uint8_t)0xff);Wire.write((uint8_t)0xff);
+    if(Wire.endTransmission()==0 &&
+       Wire.requestFrom(pcfAddr,(uint8_t)2)==(uint8_t)2){
+      const uint8_t lo=(uint8_t)Wire.read();
+      const uint8_t hi=(uint8_t)Wire.read();
+      pcfIdleDirect=(uint16_t)lo|((uint16_t)hi<<8);
+      pcfIdleReadOk=true;
+    }
+  }
+  if(!i2cFullScanAt||elapsed(now,i2cFullScanAt,15000))scanI2cAddresses(now);
+  lastBusProbe=now;
 }
 bool pcfWrite(uint16_t v){
   if(!pcfDetected)return false;
@@ -885,7 +928,40 @@ String statusJSON(){
   s+=",\"low_hex\":"+quoteJson(String(pcfObservedLow,HEX));
   s+=",\"pairs\":"+String(pcfPairCount);
   s+=",\"scan_error\":"+String(pcfScanError);
-  s+=",\"raw_pair\":"+quoteJson(rawPair)+"}}";
+  s+=",\"raw_pair\":"+quoteJson(rawPair)+"}";
+  s+=",\"i2c\":{\"sda_gpio\":8,\"scl_gpio\":9,\"controller_started\":"+(i2cOnline?String("true"):String("false"));
+  s+=",\"last_scan_ms\":"+String(i2cFullScanAt);
+  s+=",\"ack_total\":"+String(i2cAckCount)+",\"addresses\":[";
+  for(uint8_t i=0;i<i2cFoundCount;i++){if(i)s+=",";s+=String(i2cFound[i]);}
+  s+="]}";
+  s+=",\"pcf8575\":{\"expected_address\":32,\"online\":"+(pcfDetected?String("true"):String("false"));
+  s+=",\"address\":"+String(pcfAddr);
+  s+=",\"read_ok\":"+(pcfIdleReadOk?String("true"):String("false"));
+  s+=",\"idle_pins_hex\":"+quoteJson(String(pcfIdleDirect,HEX));
+  s+=",\"keyscan_error\":"+String(pcfScanError)+"}";
+  s+=",\"pca9685\":{\"expected_address\":64,\"ack\":"+(pcaDetected?String("true"):String("false"));
+  s+=",\"mode1\":"+String(pcaMode1)+",\"mode2\":"+String(pcaMode2);
+  s+=",\"outputs_enabled\":false}";
+  s+=",\"tft\":{\"spi_cs\":10,\"spi_mosi\":11,\"spi_sck\":12,\"dc\":13,\"rst\":14";
+  s+=",\"profile\":"+quoteJson(tftProfileName())+",\"rotation\":"+String(tftRotation);
+  s+=",\"init_sent\":"+(tftStarted?String("true"):String("false"));
+  s+=",\"boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
+  s+=",\"pixel_feedback_available\":false}";
+  s+=",\"water_flow\":{\"gpio\":15,\"input_level\":"+String(digitalRead(FLOW_GPIO));
+  s+=",\"pulses\":"+String(flowPulses())+",\"pulse_seen\":"+(flowSeen?String("true"):String("false"));
+  s+=",\"frequency_calibrated\":false,\"status\":"+quoteJson(flowSeen?"PULSES_SEEN":"WAITING_FOR_PULSES")+"}";
+  s+=",\"esp32\":{\"chip\":"+quoteJson(ESP.getChipModel());
+  s+=",\"free_heap_bytes\":"+String(ESP.getFreeHeap());
+  s+=",\"min_free_heap_bytes\":"+String(ESP.getMinFreeHeap());
+  s+=",\"flash_bytes\":"+String(ESP.getFlashChipSize());
+  s+=",\"reset_reason_code\":"+String((int)esp_reset_reason());
+  s+=",\"uptime_ms\":"+String(now)+"}";
+  s+=",\"wifi\":{\"ap_running\":"+(wifiRunning?String("true"):String("false"));
+  s+=",\"ap_clients\":"+String(WiFi.softAPgetStationNum());
+  s+=",\"sta_connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
+  s+=",\"sta_rssi_dbm\":"+(WiFi.status()==WL_CONNECTED?String(WiFi.RSSI()):String("null"));
+  s+=",\"station_credentials_protected\":true}";
+  s+="}";
   s+=",\"ap\":{\"enabled\":"+(wifiRunning?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.softAPIP().toString())+"}";
   s+=",\"ota\":"+otaJSON();
