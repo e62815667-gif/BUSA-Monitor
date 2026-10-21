@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 7v-KEYBOARD-CAL";
+const char VERSION[]="БУСА 1М WiFi 8v-ARROWS-OK-BACK";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -163,7 +163,7 @@ bool pcfRead(uint16_t &v){
   v=(uint8_t)Wire.read();v|=(uint16_t)((uint8_t)Wire.read())<<8;return true;
 }
 uint8_t currentPage=0; // Six approved UI pages
-uint8_t settingsSubTab=0,tftView=0;
+uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 bool tftDirty=true;
 float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
 // Informational display preferences. Never used for physical outputs.
@@ -244,55 +244,118 @@ void startKeyLearning(){
   keypadMessage="Нажми F1, затем отпусти";
   currentPage=4;tftView=0;tftDirty=true;
 }
+
+void navigatePage(uint8_t target){
+  if(target>=6||target==currentPage)return;
+  previousMainPage=currentPage;
+  currentPage=target;tftView=0;editingTemp=false;tftDirty=true;
+}
+void deleteSelectedReference(){
+  if(currentPage!=1 || selectedTemp<0 || selectedTemp>3)return;
+  // Only local informational reference field is removed; no DS18B20
+  // measurement, GPIO configuration, or protective output is touched.
+  const char* prefix=selectedField?"nt":"rf";
+  String key=String(prefix)+String(selectedTemp);
+  prefs.remove(key.c_str());
+  if(selectedField)noticeTemp[selectedTemp]=NAN;
+  else refTemp[selectedTemp]=NAN;
+  keyMessage=String("T")+String(selectedTemp+1)+
+    (selectedField?" Пред.":" Зад.")+" - удалено";
+}
 void keypadAction(int k){
+  // Confirmed user assignments:
+  // UP=7, DOWN=11, LEFT=16, RIGHT=18, ENT=19, ESC=15, F1=0.
   if(editingTemp){
-    if(k==0){if(editCursor){editTempBuffer.remove(editCursor-1,1);editCursor--;}}
-    else if(k==16){if(editCursor)editCursor--;}
-    else if(k==18){if(editCursor<editTempBuffer.length())editCursor++;}
-    else if(k==15){editingTemp=false;editTempBuffer="";}
-    else if(k==19){
-      if(editTempBuffer.length()&&storeTempReference(selectedTemp,selectedField,editTempBuffer.toFloat())){
+    if(k==0){ // F1: delete the ENTIRE entered value
+      editTempBuffer="";editCursor=0;
+      keyMessage="Ввод очищен. Ent сохранить, Esc отмена";
+    }else if(k==16){ // LEFT
+      if(editCursor)editCursor--;
+    }else if(k==18){ // RIGHT
+      if(editCursor<editTempBuffer.length())editCursor++;
+    }else if(k==7){ // UP: move caret to beginning
+      editCursor=0;
+    }else if(k==11){ // DOWN: move caret to end
+      editCursor=(uint8_t)editTempBuffer.length();
+    }else if(k==15){ // ESC: cancel and go BACK to selected reference
+      editingTemp=false;editTempBuffer="";
+    }else if(k==19){ // ENT: OK; accept 0..125 or cleared blank value
+      if(editTempBuffer.isEmpty()){
+        deleteSelectedReference();
+        editingTemp=false;
+      }else if(storeTempReference(selectedTemp,selectedField,editTempBuffer.toFloat())){
         editingTemp=false;editTempBuffer="";
+        keyMessage="Справочное значение сохранено";
       }else keyMessage="Проверь значение 0..125";
     }else{
       const int digitKey[10]={17,4,5,6,8,9,10,12,13,14};
-      String ins="";
-      for(int d=0;d<10;d++)if(k==digitKey[d])ins=String(d);
-      if(k==1&&editTempBuffer.indexOf('.')<0)ins=".";
-      if(ins.length()&&editTempBuffer.length()<7){
-        editTempBuffer=editTempBuffer.substring(0,editCursor)+ins+editTempBuffer.substring(editCursor);
-        editCursor++;
+      String insert="";
+      for(int d=0;d<10;d++)if(k==digitKey[d])insert=String(d);
+      if(k==1 && editTempBuffer.indexOf('.')<0)insert="."; // F2 decimal separator
+      if(insert.length() && editTempBuffer.length()<7){
+        editTempBuffer=editTempBuffer.substring(0,editCursor)+
+          insert+editTempBuffer.substring(editCursor);
+        editCursor=(uint8_t)(editCursor+insert.length());
       }
     }
     tftDirty=true;return;
   }
-  // #/* change main screen. Separate physical LEFT/RIGHT change selection.
-  if(k==2||k==3){currentPage=(currentPage+(k==2?5:1))%6;tftView=0;}
-  else if(currentPage==1 && (k==7||k==11))selectedTemp=(selectedTemp+(k==7?3:1))%4;
-  else if(currentPage==1 && (k==16||k==18))selectedField=k==16?0:1;
-  else if(currentPage==1 && k==19){
-    editingTemp=true;
-    float v=selectedField?noticeTemp[selectedTemp]:refTemp[selectedTemp];
-    editTempBuffer=isfinite(v)?String(v,1):String("");
-    editCursor=editTempBuffer.length();
-  }else if(k==7)tftView=0;
-  else if(k==11)tftView=1;
-  else if(currentPage==5&&(k==16||k==18))settingsSubTab=(settingsSubTab+(k==16?3:1))%4;
-  else if(k==15){currentPage=0;tftView=0;}
-  else if(k==19){if(currentPage==5)settingsSubTab=(settingsSubTab+1)%4;}
-  else if(k==1){currentPage=4;tftView=0;}
-  else if(k==17||k==4){currentPage=0;tftView=0;}
-  else if(k==5){currentPage=1;selectedTemp=0;tftView=0;}
-  else if(k==6){currentPage=2;tftView=0;}
-  else if(k==8){currentPage=3;tftView=0;}
-  else if(k==9){currentPage=4;tftView=0;}
-  else if(k==10){currentPage=5;tftView=0;}
-  else if(k==12){currentPage=5;settingsSubTab=0;tftView=0;}
-  else if(k==13){currentPage=5;settingsSubTab=1;tftView=0;}
-  else if(k==14){currentPage=4;tftView=0;}
-  // F1 deletes only while editing a value.
+
+  // Fixed main menu shortcuts, independent of the four physical arrows.
+  if(k==2 || k==3){ // # previous / * next section
+    navigatePage((uint8_t)((currentPage+(k==2?5:1))%6));
+  }else if(k==15){ // ESC: BACK (first close detail, then previous screen)
+    if(tftView){tftView=0;}
+    else if(currentPage!=previousMainPage){
+      uint8_t target=previousMainPage;
+      previousMainPage=currentPage;
+      currentPage=target;
+    }else if(currentPage!=0){navigatePage(0);}
+  }else if(k==0){ // F1: remove selected informational value
+    deleteSelectedReference();
+  }else if(k==7 || k==11){ // UP / DOWN move vertically
+    if(currentPage==1){
+      selectedTemp=(selectedTemp+(k==7?3:1))%4; // sensor row
+    }else if(currentPage==5){
+      settingsSubTab=(settingsSubTab+(k==7?3:1))%4; // setting row
+    }else{
+      tftView=k==7?0:1; // scroll between upper/lower information
+    }
+  }else if(k==16 || k==18){ // LEFT / RIGHT move horizontally
+    if(currentPage==1){
+      selectedField=k==16?0:1; // target / warning informational fields
+    }else if(currentPage==5){
+      settingsSubTab=(settingsSubTab+(k==16?3:1))%4;
+    }else{
+      navigatePage((uint8_t)((currentPage+(k==16?5:1))%6));
+    }
+  }else if(k==19){ // ENT: OK / enter selected item
+    if(currentPage==1){
+      editingTemp=true;
+      float v=selectedField?noticeTemp[selectedTemp]:refTemp[selectedTemp];
+      editTempBuffer=isfinite(v)?String(v,1):String("");
+      editCursor=(uint8_t)editTempBuffer.length();
+    }else if(currentPage==0){
+      navigatePage(1); // Open temperature cards from home
+    }else if(currentPage==5){
+      tftView=1; // Open selected settings information
+    }else{
+      tftView=1; // Open detailed read-only view
+    }
+  }else if(k==1){ // F2 outside editor: diagnostics
+    navigatePage(4);
+  }else if(k==17 || k==4){navigatePage(0);} // 0,1 Home
+  else if(k==5){navigatePage(1);selectedTemp=0;} // 2 Temperatures
+  else if(k==6){navigatePage(2);} // 3 Collection
+  else if(k==8){navigatePage(3);} // 4 Graphs
+  else if(k==9){navigatePage(4);} // 5 Events
+  else if(k==10){navigatePage(5);} // 6 Settings
+  else if(k==12){navigatePage(5);settingsSubTab=0;} // 7 Wi-Fi
+  else if(k==13){navigatePage(5);settingsSubTab=1;} // 8 Google
+  else if(k==14){navigatePage(4);} // 9 Diagnostics
   tftDirty=true;
 }
+
 void pollKeys(uint32_t now){
   if(!pcfDetected||!elapsed(now,lastKeyScan,60))return;
   lastKeyScan=now;
@@ -410,7 +473,7 @@ void renderScreen(uint32_t now){
       ruText(String("Настройки / ")+tabs[settingsSubTab],12,59,BLUE);
     }
     screen->drawFastHLine(0,217,320,BLUE);
-    ruText("# / *: вкладки   UP/DOWN: страницы",5,231,GRAY);
+    ruText("UP/DOWN: вверх-вниз  LEFT/RIGHT: выбор",5,231,GRAY);
   }
   // Clock is refreshed separately; avoid wiping the entire screen each tick.
   screenField(clockStamp(true),218,21,98,deviceClockValid()?WHITE:YELLOW);
@@ -429,7 +492,7 @@ void renderScreen(uint32_t now){
          screenField(String("РЕДАКТ T")+String(selectedTemp+1)+
            (selectedField?" Пред ":" Зад ")+editTempBuffer,11,202,300,YELLOW);
       }else if(currentPage==1){
-         screenField("T1-T4: UP/DOWN  #/\x2a: поле  Ent: ввод",11,202,300,GRAY);
+         screenField("UP/DOWN: датчик  LEFT/RIGHT: поле",11,202,300,GRAY);
       }else{
          screenField(String("Вода: ")+(flowReady?String(flowLpm,2)+" л/мин":"--"),
                     11,202,300,flowReady?GREEN:YELLOW);
@@ -660,7 +723,7 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div class="row">Время работы <b id="uptime">—</b></div>
 <div class="row">PCF8575 <b id="pcf">—</b></div>
 <div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div>
-<h2>Калибровка клавиатуры 5×4</h2>
+<h2>Калибровка клавиатуры 5×4</h2><p class="hint">Назначения: ↑ вверх, ↓ вниз, ← влево, → вправо, Ent ОК, Esc назад, F1 удалить значение.</p>
 <p class="hint">Не переставляй провода. После запуска нажимай кнопки последовательно слева направо, сверху вниз по фотографии. Полностью отпускай клавишу между нажатиями. Карта сохраняется в ESP32.</p>
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
@@ -800,7 +863,7 @@ void handleCommand(String x){
   if(x=="STATUS") {Serial0.println(statusJSON());Serial.println(statusJSON());}
   else if(x.startsWith("PAGE ")){
     int n=x.substring(5).toInt();
-    if(n>=1&&n<=6){currentPage=(uint8_t)(n-1);editingTemp=false;tftView=0;tftDirty=true;lastRender=0;Serial0.printf("PAGE=%d\n",n);}
+    if(n>=1&&n<=6){navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;Serial0.printf("PAGE=%d\n",n);}
   }
   else if(x=="TFT ST7789"||x=="TFT ILI9341"){
     tftProfile=(x=="TFT ILI9341")?2:1;
@@ -951,7 +1014,7 @@ void setup(){
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
     if(n<1||n>6){server.send(400,"application/json","{\"error\":\"page 1..6\"}");return;}
-    currentPage=(uint8_t)(n-1);editingTemp=false;tftView=0;tftDirty=true;lastRender=0;
+    navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;
     server.send(200,"application/json","{\"ok\":true}");
   });
   server.on("/api/keypad/start",HTTP_POST,[]{
