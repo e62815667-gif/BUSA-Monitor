@@ -1,7 +1,7 @@
 #pragma once
 /*
   BUSA-1M-001 БУСА 1М WiFi 3v-GOOGLE
-  ESP32-S3 N8R2 44-pin, TFT GMT028-05 V1.1 240x320 portrait.
+  ESP32-S3 N8R2 44-pin, TFT GMT028-05 V1.1 320x240 landscape, monitoring-only.
   LOW-VOLTAGE MONITORING ONLY. DO NOT DRIVE RELAYS OR POWER OUTPUTS.
   Real 4 x DS18B20 + YF-S401 cooling-water pulse readings, no simulated values.
   Hardware compatibility of TFT controller, PCF8575 keypad and pulse output 
@@ -34,7 +34,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 3v-GOOGLE";
+const char VERSION[]="БУСА 1М WiFi 4v-LANDSCAPE-DIAG";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -138,11 +138,47 @@ bool pcfRead(uint16_t &v){
   v=(uint8_t)Wire.read();v|=(uint16_t)((uint8_t)Wire.read())<<8;return true;
 }
 uint8_t currentPage=0; // Six approved UI pages
+uint8_t settingsSubTab=0,tftView=0;
+bool tftDirty=true;
+
+// Physical faceplate, row-major by user photo. Exact nine-wire matrix
+// connection must still be confirmed during keypad diagnostic testing.
+const char* const KEY_CAPS[20]={
+ "F1","F2","#","*","1","2","3","UP","4","5","6","DOWN",
+ "7","8","9","ESC","LEFT","0","RIGHT","ENT"
+};
+void keypadAction(int k){
+  uint8_t old=currentPage;
+  if(k==7) {tftView=0;} // UP: first screen of the selected section
+  else if(k==11) {tftView=1;} // DOWN: additional information
+  else if(k==2||k==16) { // # or left arrow
+    if(currentPage==5)settingsSubTab=(settingsSubTab+3)%4;
+    else currentPage=(currentPage+5)%6;
+    tftView=0;
+  }else if(k==3||k==18){ // * or right arrow
+    if(currentPage==5)settingsSubTab=(settingsSubTab+1)%4;
+    else currentPage=(currentPage+1)%6;
+    tftView=0;
+  }else if(k==15){currentPage=0;tftView=0;} // Esc: Back
+  else if(k==19){if(currentPage==5)settingsSubTab=(settingsSubTab+1)%4;tftView=0;} // Ent: OK
+  else if(k==1){currentPage=4;tftView=0;} // F2: diagnostics
+  else if(k==17||k==4){currentPage=0;tftView=0;} // 0, 1: Home
+  else if(k==5){currentPage=1;tftView=0;} // 2: Temperatures
+  else if(k==6){currentPage=2;tftView=0;} // 3: Collection display
+  else if(k==8){currentPage=3;tftView=0;} // 4: Graphs
+  else if(k==9){currentPage=4;tftView=0;} // 5: Events
+  else if(k==10){currentPage=5;tftView=0;} // 6: Settings
+  else if(k==12){currentPage=5;settingsSubTab=0;tftView=0;} // 7: Wi-Fi
+  else if(k==13){currentPage=5;settingsSubTab=1;tftView=0;} // 8: Google
+  else if(k==14){currentPage=4;tftView=0;} // 9: Diagnostics
+  // F1 (Delete) is reserved until editing-only fields are implemented.
+  // All keys are navigation-only: no relay/power operations.
+  if(old!=currentPage||k>=0)tftDirty=true;
+}
 void pollKeys(uint32_t now){
   if(!pcfDetected||!elapsed(now,lastKeyScan,70))return;
   lastKeyScan=now;
-  // PROVISIONAL mapping 5 rows -> P0..P4, 4 cols -> P5..P8;
-  // confirm physical matrix with keypad diagnostics, do not claim mapping verified.
+  // Hardware 5 rows P0..P4, 4 columns P5..P8 is provisional.
   int pressed=-1;
   for(uint8_t row=0;row<5;row++){
     if(!pcfWrite((uint16_t)(0xffffu & ~(1u<<row))))return;
@@ -156,10 +192,10 @@ void pollKeys(uint32_t now){
   pcfWrite(0xffff);
   if(pressed!=pendingKey){pendingKey=pressed;pendingAt=now;keyHeld=false;}
   if(pressed>=0 && !keyHeld && elapsed(now,pendingAt,65)){
-    keyMessage="R"+String(pressed/4+1)+" C"+String(pressed%4+1);
+    keyMessage=String(KEY_CAPS[pressed])+" (R"+String(pressed/4+1)+
+      " C"+String(pressed%4+1)+")";
     ++keyCount;keyHeld=true;
-    // Do not guess which keycap is UP, DOWN, MENU, etc.
-    // Page can be selected via USB command / local diagnostic web UI.
+    keypadAction(pressed);
   }
 }
 
@@ -181,100 +217,127 @@ void ruText(const String &v,int x,int y,uint16_t color=WHITE){
   ru.setCursor(x,y);
   ru.print(v);
 }
-void card(int y,int height){
-  screen->fillRoundRect(5,y,230,height,5,PANEL);
-  screen->drawRoundRect(5,y,230,height,5,BLUE);
+
+void panelAt(int x,int y,int w,int h){
+  screen->fillRoundRect(x,y,w,h,5,PANEL);
+  screen->drawRoundRect(x,y,w,h,5,BLUE);
+}
+void screenField(const String &v,int x,int y,int w,uint16_t color=WHITE){
+  screen->fillRect(x,y-13,w,16,PANEL);
+  ruText(v,x,y,color);
 }
 void startScreen(){
-  Serial0.println("TFT: HW SPI begin (model controller UNVERIFIED)");
-  SPI.begin(TFT_SCK,-1,TFT_MOSI,TFT_CS); // Approved GPIO12 SCK, GPIO11 MOSI, GPIO10 CS
-  if(tftProfile==2){
-    screenIli.begin();screen=&screenIli;
-  }else{
-    screenSt.init(240,320);screen=&screenSt;
-  }
-  screen->setRotation(0); // approved PORTRAIT 240x320
+  Serial0.println("TFT: HW SPI landscape; controller model unverified");
+  SPI.begin(TFT_SCK,-1,TFT_MOSI,TFT_CS);
+  SPI.setFrequency(16000000); // moderate stable starting frequency
+  if(tftProfile==2){screenIli.begin();screen=&screenIli;}
+  else{screenSt.init(240,320);screen=&screenSt;}
+  screen->setRotation(1); // 320x240 landscape, both supported profiles
   screen->fillScreen(BG);
   ru.begin(*screen);
   ru.setFont(u8g2_font_6x13_t_cyrillic);
   ru.setFontMode(1);
-  tftStarted=true;
-  Serial0.println("TFT: init done");
+  tftStarted=true;tftDirty=true;
+  Serial0.println("TFT: landscape init done");
 }
 void renderScreen(uint32_t now){
   if(!tftStarted||!screen)return;
-  screen->fillScreen(BG);
-  screen->fillRoundRect(3,2,234,29,5,PANEL);
-  ruText(String("БУСА №001 | ")+pages[currentPage],7,21,BLUE);
-  if(currentPage<=1){
-    const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
-    for(int i=0;i<4;i++){
-      int y=39+i*42;card(y,38);
-      ruText(names[i],11,y+14,GRAY);
-      ruText(hasTemp(i,now)?String(temperature[i],1)+" °C":"НЕТ ДАННЫХ",
-             115,y+27,hasTemp(i,now)?GREEN:YELLOW);
-    }
-    if(currentPage==0){
-      card(212,42);
-      ruText("Вода охлаждения",11,228,GRAY);
-      ruText(flowReady?String(flowLpm,2)+" л/мин":"НЕТ ДАННЫХ",105,246,flowReady?GREEN:YELLOW);
-      card(259,42);
-      ruText("Отбор: нет датчика",11,274,YELLOW);
-      ruText("Реле K1-K4: ВЫКЛ",11,292,YELLOW);
+  static uint8_t drawnPage=255,drawnTab=255,drawnView=255;
+  bool layout=tftDirty||drawnPage!=currentPage||
+     drawnTab!=settingsSubTab||drawnView!=tftView;
+  if(layout){
+    screen->fillScreen(BG); // ONLY on real navigation, not on timed updates
+    panelAt(3,2,314,28);
+    ruText(String("БУСА №001  ·  ")+pages[currentPage],9,21,BLUE);
+    drawnPage=currentPage;drawnTab=settingsSubTab;drawnView=tftView;
+    tftDirty=false;
+    if(currentPage==0||currentPage==1){
+      if(tftView==0){
+        const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
+        for(int i=0;i<4;i++){
+          int x=(i%2)?163:4,y=(i/2)?112:35;
+          panelAt(x,y,153,72);ruText(names[i],x+9,y+18,GRAY);
+        }
+      }else{
+        panelAt(4,36,312,162);
+        ruText("Диагностика температур DS18B20",12,56,BLUE);
+        ruText("Только реальные показания датчиков",12,169,GRAY);
+      }
+    }else if(currentPage==2){
+      panelAt(4,37,312,161);
+      ruText("Отбор: датчик не установлен",12,57,YELLOW);
+      ruText("Контроль воды YF-S401",12,94,BLUE);
+      ruText("Импульсы воды",12,145,GRAY);
+      ruText("Калибровка расхода не проведена",12,177,YELLOW);
+    }else if(currentPage==3){
+      panelAt(4,37,312,161);
+      ruText("График расхода воды (история)",12,57,BLUE);
+      screen->drawFastHLine(18,169,282,GRAY);
+    }else if(currentPage==4){
+      panelAt(4,37,312,161);
+      ruText("Диагностика входов и модулей",12,57,BLUE);
     }else{
-      card(212,84);
-      ruText("DS18B20: реальные данные",11,234,GRAY);
-      ruText("Нет датчика -> нет показаний",11,254,YELLOW);
-      ruText("Защита: выходы отключены",11,278,GRAY);
+      panelAt(4,37,312,161);
+      const char* tabs[]={"Wi-Fi","Google","Обновление","Модули"};
+      ruText(String("Настройки / ")+tabs[settingsSubTab],12,59,BLUE);
+    }
+    screen->drawFastHLine(0,217,320,BLUE);
+    ruText("# / *: вкладки   UP/DOWN: страницы",5,231,GRAY);
+  }
+  if(currentPage<=1){
+    if(tftView==0){
+      for(int i=0;i<4;i++){
+        int x=(i%2)?163:4,y=(i/2)?112:35;
+        screenField(hasTemp(i,now)?String(temperature[i],1)+" C":"НЕТ ДАННЫХ",
+             x+9,y+47,135,hasTemp(i,now)?GREEN:YELLOW);
+      }
+      screenField(String("Вода: ")+(flowReady?String(flowLpm,2)+" л/мин":"--"),
+                  11,202,300,flowReady?GREEN:YELLOW);
+    }else{
+      for(int i=0;i<4;i++){
+        screenField(String("T")+String(i+1)+" GPIO"+String(TPIN[i])+
+           (tempPresent[i]?" : НАЙДЕН":" : НЕТ ДАТЧИКА"),
+           14,83+i*21,286,tempPresent[i]?GREEN:YELLOW);
+      }
     }
   }else if(currentPage==2){
-    card(40,119);
-    ruText("Отбор (другая линия)",11,61,BLUE);
-    ruText("Нет утверждённого датчика",11,85,YELLOW);
-    ruText("Расход: -- мл/мин",11,111,GRAY);
-    ruText("Собрано: -- мл",11,137,GRAY);
-    card(164,132);
-    ruText("Охлаждающая вода YF-S401",11,186,BLUE);
-    ruText(flowReady?String(flowLpm,2)+" л/мин":"ОЖИДАНИЕ",11,213,flowReady?GREEN:YELLOW);
-    ruText(String("Импульсы: ")+flowPulses(),11,235,GRAY);
-    ruText("Калибровка не выполнена",11,259,YELLOW);
-    ruText("Не использовать как защиту",11,282,YELLOW);
+    screenField(String("Расход: ")+(flowReady?String(flowLpm,2)+" л/мин":"--"),
+                12,119,292,flowReady?GREEN:YELLOW);
+    screenField(String("Импульсы: ")+String(flowPulses()),12,161,292,GRAY);
   }else if(currentPage==3){
-    card(40,256);
-    ruText("График воды (80 сек.)",11,61,BLUE);
-    screen->drawFastHLine(16,243,205,GRAY);
+    screen->fillRect(17,68,287,100,PANEL); // repaint chart, not whole TFT
     for(uint8_t i=1;i<40;i++){
-      uint8_t prev=(flowTraceHead+i-1)%40,next=(flowTraceHead+i)%40;
-      int x1=18+(i-1)*5,x2=18+i*5;
-      int y1=243-(int)fminf(145.0f,flowTrace[prev]*30.0f);
-      int y2=243-(int)fminf(145.0f,flowTrace[next]*30.0f);
+      uint8_t a=(flowTraceHead+i-1)%40,b=(flowTraceHead+i)%40;
+      int x1=20+(i-1)*7,x2=20+i*7;
+      int y1=164-(int)fminf(88.0f,flowTrace[a]*19.0f);
+      int y2=164-(int)fminf(88.0f,flowTrace[b]*19.0f);
       screen->drawLine(x1,y1,x2,y2,GREEN);
     }
-    ruText("Только измеренные импульсы",11,266,GRAY);
-    ruText("Коэфф. требует проверки",11,285,YELLOW);
+    screenField("Только импульсы: не защита",12,187,292,YELLOW);
   }else if(currentPage==4){
-    card(40,256);
-    ruText("Диагностические события",11,62,BLUE);
-    ruText(String("Время: ")+(now/1000)+" сек",11,88,GRAY);
-    ruText(String("PCF8575: ")+(pcfDetected?"OK":"не найден"),11,114,GRAY);
-    ruText(String("PCA9685: ")+(pcaDetected?"OK":"не найден"),11,140,GRAY);
-    ruText(String("Нажатий: ")+keyCount,11,166,GREEN);
-    ruText(String("Импульсы воды: ")+flowPulses(),11,192,GRAY);
-    ruText("Аппаратная проверка нужна",11,246,YELLOW);
+    screenField(String("PCF8575: ")+(pcfDetected?"НАЙДЕН":"НЕТ"),12,84,292,pcfDetected?GREEN:YELLOW);
+    screenField(String("PCA9685: ")+(pcaDetected?"НАЙДЕН":"НЕТ"),12,107,292,pcaDetected?GREEN:YELLOW);
+    screenField(String("Нажатий: ")+String(keyCount),12,130,292,GRAY);
+    screenField(String("Последняя: ")+keyMessage,12,154,292,GRAY);
+    screenField(String("Аптайм: ")+String(now/1000)+" сек",12,181,292,GRAY);
+  }else if(settingsSubTab==0){
+    screenField(String("STA: ")+(WiFi.status()==WL_CONNECTED?"ПОДКЛЮЧЕНО":"ЛОКАЛЬНО"),12,88,295,GREEN);
+    screenField(String("SSID: ")+stationSsid.substring(0,29),12,113,295,GRAY);
+    screenField(String("IP: ")+(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():"--"),12,138,295,GRAY);
+    screenField("Подключение: веб-приложение",12,175,295,BLUE);
+  }else if(settingsSubTab==1){
+    screenField("Google: проверка в веб-приложении",12,91,295,GRAY);
+    screenField("Настройка: Настройки / Google",12,122,295,BLUE);
+    screenField("Реле заблокированы",12,161,295,YELLOW);
+  }else if(settingsSubTab==2){
+    screenField("OTA: только локальный APP BIN",12,91,295,BLUE);
+    screenField(otaMessage.substring(0,37),12,123,295,GRAY);
+    screenField("Не использовать merged.bin",12,159,295,YELLOW);
   }else{
-    card(40,256);
-    ruText(VERSION,11,62,BLUE);
-    ruText(String("Wi-Fi: ")+(WiFi.status()==WL_CONNECTED?"ПОДКЛ.":"ЛОКАЛЬНО"),11,87,GREEN);
-    ruText(String("SSID: ")+stationSsid.substring(0,19),11,111,GRAY);
-    ruText(String("IP: ")+(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():"—"),11,135,GRAY);
-    ruText("Выбор сети: веб-меню",11,163,BLUE);
-    if(nearbyCount)ruText(nearbyNames[0].substring(0,23),11,185,GRAY);
-    ruText("Обновление: через веб",11,213,BLUE);
-    ruText(otaMessage.substring(0,23),11,235,GRAY);
-    ruText("Реле: ЗАБЛОКИРОВАНЫ",11,270,YELLOW);
+    screenField(String("PCF8575: ")+(pcfDetected?"НАЙДЕН":"НЕТ"),12,91,295,pcfDetected?GREEN:YELLOW);
+    screenField(String("PCA9685: ")+(pcaDetected?"НАЙДЕН":"НЕТ"),12,118,295,pcaDetected?GREEN:YELLOW);
+    screenField("Исполнительные выходы: ВЫКЛ",12,160,295,YELLOW);
   }
-  screen->drawFastHLine(0,303,240,BLUE);
-  ruText(String(currentPage+1)+"/6  Wi-Fi: BUSA-1M-001",5,317,GRAY);
 }
 
 WebServer server(80);
@@ -306,7 +369,7 @@ String statusJSON(){
   uint32_t now=millis();
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
-  s+=",\"ui_page\":"+String(currentPage+1)+",\"uptime_ms\":"+String(now);
+  s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"temperatures\":[";
   for(int i=0;i<4;i++){
     if(i)s+=",";
@@ -378,12 +441,12 @@ void uploadOTA(){
 const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>БУСА-1М №001</title>
 <style>
-:root{color-scheme:dark}*{box-sizing:border-box}body{font:15px system-ui;margin:0;padding:0 12px 20px;background:#061323;color:#d0efff}header{position:sticky;top:0;background:#091c31;padding:14px 0 9px;border-bottom:1px solid #237fc5}h1{font-size:20px;color:#64c6ff;margin:0 0 10px}h2{font-size:16px;color:#81caff;margin:2px 0 12px}nav{display:flex;overflow-x:auto;gap:6px;padding-bottom:4px}button{font:inherit;cursor:pointer;border:1px solid #258bcc;background:#123d61;color:#fff;border-radius:8px;padding:10px}nav button{font-size:12px;white-space:nowrap}nav .on{background:#2379b1;border-color:#7dc9ff}main{max-width:680px;margin:auto}.card{background:#09233c;border:1px solid #2383c7;border-radius:12px;padding:13px;margin:11px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tile{border:1px solid #265a80;border-radius:9px;padding:9px}.tile small{display:block;color:#9fbfd0}.tile strong{display:block;color:#64f2a2;margin:5px 0;font-size:20px}.row{display:flex;justify-content:space-between;border-bottom:1px solid #204664;padding:9px 0;gap:10px}.row:last-child{border:0}.green{color:#70e99b}.warn{color:#f4cc74}.hint{color:#97b4c9;font-size:12px}.page[hidden]{display:none}input,select{width:100%;background:#102f4b;border:1px solid #2d84bd;color:#fff;font:inherit;padding:12px;border-radius:8px}label{display:block;margin:12px 0 5px}.full{width:100%;margin:12px 0}#response{color:#f3d783;white-space:pre-wrap}canvas{width:100%;height:170px;border:1px solid #28618f;border-radius:8px}
+:root{color-scheme:dark}*{box-sizing:border-box}body{font:15px system-ui;margin:0;padding:0 12px 20px;background:#061323;color:#d0efff}header{position:sticky;top:0;background:#091c31;padding:14px 0 9px;border-bottom:1px solid #237fc5}h1{font-size:20px;color:#64c6ff;margin:0 0 10px}h2{font-size:16px;color:#81caff;margin:2px 0 12px}nav{display:flex;overflow-x:auto;gap:6px;padding-bottom:4px}button{font:inherit;cursor:pointer;border:1px solid #258bcc;background:#123d61;color:#fff;border-radius:8px;padding:10px}nav button{font-size:12px;white-space:nowrap}nav .on{background:#2379b1;border-color:#7dc9ff}main{max-width:680px;margin:auto}.card{background:#09233c;border:1px solid #2383c7;border-radius:12px;padding:13px;margin:11px 0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.tile{border:1px solid #265a80;border-radius:9px;padding:9px}.tile small{display:block;color:#9fbfd0}.tile strong{display:block;color:#64f2a2;margin:5px 0;font-size:20px}.row{display:flex;justify-content:space-between;border-bottom:1px solid #204664;padding:9px 0;gap:10px}.row:last-child{border:0}.green{color:#70e99b}.warn{color:#f4cc74}.hint{color:#97b4c9;font-size:12px}.page[hidden],.settingCard[hidden]{display:none}.settingsTabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:12px 0}.settingsTabs button.on{background:#2379b1;border-color:#7dc9ff}input,select{width:100%;background:#102f4b;border:1px solid #2d84bd;color:#fff;font:inherit;padding:12px;border-radius:8px}label{display:block;margin:12px 0 5px}.full{width:100%;margin:12px 0}#response{color:#f3d783;white-space:pre-wrap}canvas{width:100%;height:170px;border:1px solid #28618f;border-radius:8px}
 </style></head><body>
 <header><h1>БУСА-1М с ИИ · №001</h1><nav>
 <button data-page="0" class="on">Главная</button><button data-page="1">Температуры</button>
 <button data-page="2">Отбор</button><button data-page="3">Графики</button><button data-page="4">События</button><button data-page="5">Настройки</button>
-</nav></header><main>
+</nav><div style="display:flex;gap:7px;padding-top:8px"><button type="button" id="tftUp" style="flex:1">TFT ↑</button><button type="button" id="tftDown" style="flex:1">TFT ↓</button></div></header><main>
 <section class="page" data-section="0"><div class="card"><h2>Температуры</h2><div class="grid">
 <div class="tile"><small>Вода</small><strong id="t0">—</strong></div><div class="tile"><small>Колонна</small><strong id="t1">—</strong></div>
 <div class="tile"><small>Куб</small><strong id="t2">—</strong></div><div class="tile"><small>Верх колонны</small><strong id="t3">—</strong></div></div></div>
@@ -395,13 +458,13 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор</h2><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden><div class="card"><h2>Графики текущей сессии</h2><p>Вода, °C</p><canvas id="graphT" width="600" height="200"></canvas><p>Вода охлаждения, л/мин</p><canvas id="graphF" width="600" height="200"></canvas><p class="hint">Только реальные данные с момента открытия приложения.</p></div></section>
 <section class="page" data-section="4" hidden><div class="card"><h2>События</h2><div id="events">Ожидание...</div><p class="hint">Журнал текущей сессии приложения</p></div></section>
-<section class="page" data-section="5" hidden><div class="card"><h2>Wi-Fi</h2>
+<section class="page" data-section="5" hidden><div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select><p class="hint">Если нужной сети нет, включите на телефоне раздачу интернета и повторите поиск.</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна при подключении к защищённой сети БУСА. Пароль остаётся на контроллере.</p></div>
-<div class="card"><h2>Google Диск · дистанционный просмотр</h2>
+<div class="card settingCard" data-stab="1" hidden><h2>Google Диск · дистанционный просмотр</h2>
 <div class="row">Канал Google <b id="googleState">НЕ НАСТРОЕН</b></div>
 <p class="hint">Передача только измерений каждые 30 секунд. Локальная сеть работает без интернета.
 Нужен опубликованный Google Apps Script и уникальный токен. Автоматического управления нет.</p>
@@ -412,23 +475,28 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <button id="googleSave" type="button" class="full">Сохранить подключение Google</button>
 <button id="googleStop" type="button" class="full">Отключить передачу в Google</button>
 <p id="googleResult" role="status" class="hint">Отправка выключена до настройки.</p>
-</div><div class="card"><h2>Обновление ПО · вручную</h2>
+</div><div class="card settingCard" data-stab="2" hidden><h2>Обновление ПО · вручную</h2>
 <p class="hint">Только через локальную сеть БУСА. Выберите APP BIN для ESP32-S3 N8R2,
 НЕ объединённый merged BIN. Только проверенные диагностические сборки.
 Перед обновлением отключите внешние исполнительные цепи.</p>
 <input type="file" accept=".bin" id="firmwareFile">
 <button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
 <p id="updateResult" role="status">Ожидание подтверждения</p>
-</div><div class="card"><h2>Диагностика</h2><div class="row">Прошивка <b id="ver">—</b></div><div class="row">Время работы <b id="uptime">—</b></div><div class="row">PCF8575 <b id="pcf">—</b></div><div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div></div></section>
+</div><div class="card settingCard" data-stab="3" hidden><h2>Диагностика</h2><div class="row">Прошивка <b id="ver">—</b></div><div class="row">Время работы <b id="uptime">—</b></div><div class="row">PCF8575 <b id="pcf">—</b></div><div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div></div></section>
 <footer class="hint">БУСА-1М №001 · диагностический режим · реле заблокированы</footer></main>
 <script>
-const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];let active=0,connected=false,pollBusy=false;
+const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0;
 function message(s){logs.unshift(new Date().toLocaleTimeString('ru-RU')+' · '+s);logs.splice(12);get('events').textContent=logs.join('\n')}
-function page(n){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));fetch('/api/page?n='+(n+1)).catch(()=>{});if(n===3)graphs()}
+function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
+function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
+document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
+get('tftUp').onclick=()=>fetch('/api/tft/scroll?dir=up').catch(()=>{});
+get('tftDown').onclick=()=>fetch('/api/tft/scroll?dir=down').catch(()=>{});
+
 document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.dataset.page)));
 function plot(id,values){const c=get(id),x=c.getContext('2d');x.fillStyle='#061b2c';x.fillRect(0,0,600,200);const a=values.filter(v=>v!==null);if(!a.length){x.fillStyle='#d9bd75';x.fillText('НЕТ ДАННЫХ',24,60);return}let lo=Math.min(...a),hi=Math.max(...a);if(hi-lo<.1)hi=lo+.1;x.strokeStyle='#70e99b';x.beginPath();values.forEach((v,i)=>{if(v===null)return;let xx=10+i*580/80,yy=185-(v-lo)/(hi-lo)*165;if(i===0||values[i-1]===null)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke()}
 function graphs(){plot('graphT',tlog);plot('graphF',flog)}
-async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;let names=['Вода','Колонна','Куб','Верх колонны'];
+async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;if(Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';if(i===0){tlog.push(t.c===null?null:Number(t.c));if(tlog.length>80)tlog.shift()}});
 get('temperatures').textContent=names.map((v,i)=>v+': '+get('t'+i).textContent).join(' | ');
 let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'НЕТ ДАННЫХ':f.toFixed(2);get('flow2').textContent=get('flow').textContent;get('pulses').textContent=s.water.pulses;get('total').textContent=Number(s.water.total_l_estimate).toFixed(3);
@@ -493,7 +561,7 @@ void handleCommand(String x){
   if(x=="STATUS") {Serial0.println(statusJSON());Serial.println(statusJSON());}
   else if(x.startsWith("PAGE ")){
     int n=x.substring(5).toInt();
-    if(n>=1&&n<=6){currentPage=(uint8_t)(n-1);lastRender=0;Serial0.printf("PAGE=%d\n",n);}
+    if(n>=1&&n<=6){currentPage=(uint8_t)(n-1);tftView=0;tftDirty=true;lastRender=0;Serial0.printf("PAGE=%d\n",n);}
   }
   else if(x=="TFT ST7789"||x=="TFT ILI9341"){
     tftProfile=(x=="TFT ILI9341")?2:1;
@@ -512,7 +580,7 @@ void readConsole(){
 }
 void setup(){
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi 2v BOOT; physical outputs LOCKED");
+  Serial0.println("\nBUSA 1M WiFi 4v LANDSCAPE DIAG BOOT; physical outputs LOCKED");
   Serial.begin(115200);
   delay(400);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
@@ -608,7 +676,19 @@ void setup(){
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
     if(n<1||n>6){server.send(400,"application/json","{\"error\":\"page 1..6\"}");return;}
-    currentPage=(uint8_t)(n-1);lastRender=0;
+    currentPage=(uint8_t)(n-1);tftView=0;tftDirty=true;lastRender=0;
+    server.send(200,"application/json","{\"ok\":true}");
+  });
+  server.on("/api/settings-tab",HTTP_GET,[]{
+    int n=server.arg("n").toInt();
+    if(n<0||n>3){server.send(400,"text/plain","bad subtab");return;}
+    settingsSubTab=(uint8_t)n;tftDirty=true;lastRender=0;
+    server.send(200,"application/json","{\"ok\":true}");
+  });
+  server.on("/api/tft/scroll",HTTP_GET,[]{
+    String dir=server.arg("dir");
+    if(dir!="up"&&dir!="down"){server.send(400,"text/plain","bad dir");return;}
+    tftView=(dir=="down")?1:0;tftDirty=true;lastRender=0;
     server.send(200,"application/json","{\"ok\":true}");
   });
   const char *headers[]={"X-Busa-Token"};
@@ -643,7 +723,7 @@ void loop(){
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
     pollKeys(now);
   }
-  if(tftStarted && !otaActive && (lastRender==0 || elapsed(now,lastRender,5000))){
+  if(tftStarted && !otaActive && (tftDirty||lastRender==0 || elapsed(now,lastRender,2500))){
     lastRender=now;
     renderScreen(now);
   }
