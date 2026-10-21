@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 8v-ARROWS-OK-BACK";
+const char VERSION[]="БУСА 1М WiFi 9v-KEY-CAPTURE";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -130,13 +130,13 @@ bool deviceClockValid(){
   return clockZoneKnown && time(nullptr)>=(time_t)1609459200;
 }
 String clockStamp(bool compact=false){
-  if(!deviceClockValid())return compact?String("--.-- --:--"):String("Время не синхронизировано");
+  if(!deviceClockValid())return compact?String("--.--.---- --:--"):String("Время не синхронизировано");
   time_t localEpoch=time(nullptr)+(time_t)(clockUtcOffsetMinutes*60);
   struct tm t={};
   gmtime_r(&localEpoch,&t);
   char buf[32];
-  if(compact)snprintf(buf,sizeof(buf),"%02d.%02d %02d:%02d",
-     t.tm_mday,t.tm_mon+1,t.tm_hour,t.tm_min);
+  if(compact)snprintf(buf,sizeof(buf),"%02d.%02d.%04d %02d:%02d",
+     t.tm_mday,t.tm_mon+1,t.tm_year+1900,t.tm_hour,t.tm_min);
   else snprintf(buf,sizeof(buf),"%02d.%02d.%04d %02d:%02d:%02d",
      t.tm_mday,t.tm_mon+1,t.tm_year+1900,t.tm_hour,t.tm_min,t.tm_sec);
   return String(buf);
@@ -186,6 +186,10 @@ uint8_t keyPairs[20],newPairs[20];
 uint8_t learnStep=0;
 bool keypadReady=false,keypadLearning=false;
 String keypadMessage="Обучение не выполнено",rawPair="—";
+int candidatePair=-1;uint32_t candidateAt=0;
+uint8_t candidateStep=255;
+bool learnCommitPair(int pair); // Shared by auto capture and "Следующая" button
+
 bool validKeymap(const uint8_t *m){
   uint8_t counts[16]={0};
   for(int i=0;i<20;i++){
@@ -241,6 +245,7 @@ void startKeyLearning(){
   keypadLearning=true;learnStep=0;
   memset(newPairs,255,sizeof(newPairs));
   pendingPair=-1;keyHeld=false;pendingAt=millis();
+  candidatePair=-1;candidateStep=255;candidateAt=0;
   keypadMessage="Нажми F1, затем отпусти";
   currentPage=4;tftView=0;tftDirty=true;
 }
@@ -356,32 +361,55 @@ void keypadAction(int k){
   tftDirty=true;
 }
 
+
+bool learnCommitPair(int pair){
+  if(!keypadLearning||pair<0||pair>255||learnStep>=20)return false;
+  for(int n=0;n<learnStep;n++)if(newPairs[n]==pair){
+    keypadMessage="Контакты уже записаны: "+pairName(pair)+
+      ". Повтори "+String(KEY_CAPS[learnStep]);
+    keyMessage=keypadMessage;
+    tftDirty=true;
+    return false;
+  }
+  newPairs[learnStep]=pair;
+  keyMessage=String(KEY_CAPS[learnStep])+" = "+pairName(pair);
+  learnStep++;
+  candidatePair=-1;candidateStep=255;
+  if(learnStep==20){
+    if(validKeymap(newPairs) &&
+      prefs.putBytes("keys20",newPairs,sizeof(newPairs))==sizeof(newPairs)){
+      memcpy(keyPairs,newPairs,sizeof(keyPairs));
+      keypadReady=true;keypadLearning=false;
+      keypadMessage="Все 20 клавиш сохранены";
+    }else{
+      learnStep=19;newPairs[19]=255;
+      keypadMessage="Матрица не прошла проверку. Повтори Ent";
+    }
+  }else{
+    keypadMessage="Далее: "+String(KEY_CAPS[learnStep])+
+       " ("+String(learnStep+1)+"/20)";
+  }
+  tftDirty=true;
+  return true;
+}
 void pollKeys(uint32_t now){
   if(!pcfDetected||!elapsed(now,lastKeyScan,60))return;
   lastKeyScan=now;
   int pair=scanKeyPair();
+  if(pair>=0){
+    rawPair=pairName(pair);
+    if(keypadLearning && (pair!=candidatePair||candidateStep!=learnStep)){
+      candidatePair=pair;candidateStep=learnStep;candidateAt=now;
+    }
+  }else if(pair==-2){
+    rawPair="НЕОДНОЗНАЧНО: проверь кнопку";
+  }
   if(pair!=pendingPair){pendingPair=pair;pendingAt=now;keyHeld=false;}
   if(pair<0||keyHeld||!elapsed(now,pendingAt,80))return;
-  keyHeld=true;keyCount++;rawPair=pairName(pair);
+  keyHeld=true;
+  keyCount++;
   if(keypadLearning){
-    for(int i=0;i<learnStep;i++)if(newPairs[i]==pair){
-      keypadMessage="Контакт уже назначен! Повторите "+String(KEY_CAPS[learnStep]);
-      keyMessage=keypadMessage;tftDirty=true;return;
-    }
-    newPairs[learnStep]=pair;
-    keyMessage=String(KEY_CAPS[learnStep])+" = "+rawPair;
-    learnStep++;
-    if(learnStep==20){
-      if(validKeymap(newPairs) &&
-         prefs.putBytes("keys20",newPairs,sizeof(newPairs))==sizeof(newPairs)){
-        memcpy(keyPairs,newPairs,sizeof(keyPairs));
-        keypadReady=true;keypadLearning=false;
-        keypadMessage="Все 20 клавиш сохранены";
-      }else{
-        learnStep=19;newPairs[19]=255;
-        keypadMessage="Проверка матрицы не пройдена. Повторите Ent";
-      }
-    }else keypadMessage="Нажми "+String(KEY_CAPS[learnStep])+", затем отпусти";
+    learnCommitPair(pair);
   }else{
     int k=-1;
     if(keypadReady)for(int i=0;i<20;i++)if(keyPairs[i]==pair){k=i;break;}
@@ -397,6 +425,7 @@ Adafruit_GFX* screen=nullptr;
 U8G2_FOR_ADAFRUIT_GFX ru;
 uint8_t tftProfile=1;
 bool tftStarted=false;
+uint32_t splashStartedAt=0;
 const uint16_t BG=0x080f,PANEL=0x10a3,BLUE=0x1c9f,GREEN=0x07e0,WHITE=0xffff,
                YELLOW=0xffe0,GRAY=0xbdf7;
 const char* pages[6]={"Главная","Температуры","Отбор","Графики","События","Настройки"};
@@ -428,11 +457,24 @@ void startScreen(){
   ru.begin(*screen);
   ru.setFont(u8g2_font_6x13_t_cyrillic);
   ru.setFontMode(1);
+  // Startup splash. The diagnostic UI draws only after a short delay.
+  screen->fillScreen(BG);
+  screen->drawRoundRect(12,26,296,187,12,BLUE);
+  screen->setTextColor(WHITE);
+  screen->setTextSize(3);
+  screen->setCursor(41,82);
+  screen->print("BUSA 1M AI");
+  screen->setTextSize(2);
+  screen->setCursor(120,135);
+  screen->print("001");
+  screen->setTextSize(1);
+  splashStartedAt=millis();
   tftStarted=true;tftDirty=true;
-  Serial0.println("TFT: landscape init done");
+  Serial0.println("TFT: splash BUSA 1M AI; landscape init done");
 }
 void renderScreen(uint32_t now){
   if(!tftStarted||!screen)return;
+  if(!elapsed(now,splashStartedAt,1700))return;
   static uint8_t drawnPage=255,drawnTab=255,drawnView=255;
   bool layout=tftDirty||drawnPage!=currentPage||
      drawnTab!=settingsSubTab||drawnView!=tftView;
@@ -476,7 +518,7 @@ void renderScreen(uint32_t now){
     ruText("UP/DOWN: вверх-вниз  LEFT/RIGHT: выбор",5,231,GRAY);
   }
   // Clock is refreshed separately; avoid wiping the entire screen each tick.
-  screenField(clockStamp(true),218,21,98,deviceClockValid()?WHITE:YELLOW);
+  screenField(clockStamp(true),211,21,105,deviceClockValid()?WHITE:YELLOW);
   if(currentPage<=1){
     if(tftView==0){
       for(int i=0;i<4;i++){
@@ -728,7 +770,9 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
 <div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
+<p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
 <button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
+<button id="keyNext" type="button" class="full">Считать и далее →</button>
 <div class="grid"><button type="button" id="keyUndo">Назад на шаг</button>
 <button type="button" id="keyCancel">Отмена</button></div></div></section>
 <footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer></main>
@@ -763,6 +807,7 @@ async function keyCommand(action){
  }catch(e){get('keyInfo').textContent='Ошибка: '+e.message}
 }
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
+get('keyNext').onclick=()=>keyCommand('next');
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
 get('refsSave').onclick=async()=>{
@@ -1023,18 +1068,43 @@ void setup(){
     startKeyLearning();
     server.send(200,"text/plain; charset=utf-8","Обучение: нажми F1 и отпусти");
   });
+  server.on("/api/keypad/next",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain","Local AP only");return;
+    }
+    if(!keypadLearning){
+      server.send(409,"text/plain; charset=utf-8","Обучение сейчас не запущено");return;
+    }
+    // Try a fresh scan if the key is still held; otherwise use the last pair
+    // observed at the CURRENT step, only within the last 10 seconds.
+    int detected=scanKeyPair(),pair=-1;
+    if(detected>=0)pair=detected;
+    else if(candidatePair>=0&&candidateStep==learnStep &&
+            !elapsed(millis(),candidateAt,10000))pair=candidatePair;
+    if(pair<0){
+      keypadMessage=detected==-2?
+        "Несколько линий замкнуты: отпусти другие клавиши":
+        "Сигнала нет: F1 или текущая клавиша не распознана. Повтори нажатие.";
+      server.send(409,"text/plain; charset=utf-8",keypadMessage);return;
+    }
+    if(!learnCommitPair(pair)){
+      server.send(409,"text/plain; charset=utf-8",keypadMessage);return;
+    }
+    keyHeld=true; // Avoid double submission of the same held key
+    server.send(200,"text/plain; charset=utf-8",keypadMessage);
+  });
   server.on("/api/keypad/undo",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
     if(!keypadLearning||learnStep==0){server.send(409,"text/plain","No previous step");return;}
     learnStep--;newPairs[learnStep]=255;
-    pendingPair=-1;keyHeld=false;
+    pendingPair=-1;keyHeld=false;candidatePair=-1;candidateStep=255;
     keypadMessage="Повтори "+String(KEY_CAPS[learnStep]);
     tftDirty=true;
     server.send(200,"text/plain; charset=utf-8",keypadMessage);
   });
   server.on("/api/keypad/cancel",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
-    keypadLearning=false;learnStep=0;
+    keypadLearning=false;learnStep=0;candidatePair=-1;candidateStep=255;
     keypadMessage=keypadReady?"Сохранённая раскладка сохранена":"Обучение отменено";
     tftDirty=true;
     server.send(200,"text/plain; charset=utf-8",keypadMessage);
