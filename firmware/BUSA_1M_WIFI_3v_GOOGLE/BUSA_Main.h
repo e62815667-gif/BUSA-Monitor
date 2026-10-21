@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v-HQ-APPROVED-LANDSCAPE";
+const char VERSION[]="БУСА 1М WiFi 14v-LIGHT-WATER-UI-FIX";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -149,6 +149,8 @@ uint32_t flowPulses(){
 constexpr float FLOW_HZ_PER_LPM=98.0f; // must be calibrated by water-volume test
 uint32_t flowCycle=0,flowLastCount=0;
 float flowLpm=0.0f,flowTrace[40]={};
+uint32_t waterPulseHistory[40]={}; // raw pulses only, not calibrated
+uint32_t waterPulseDelta=0;
 bool flowReady=false,flowSeen=false;
 uint8_t flowTraceHead=0;
 void sampleFlow(uint32_t now){
@@ -161,6 +163,8 @@ void sampleFlow(uint32_t now){
   flowLpm=(float)diff*60000.0f/(dt*FLOW_HZ_PER_LPM);
   if(diff)flowSeen=true;
   flowReady=true;
+  waterPulseDelta=diff;
+  waterPulseHistory[flowTraceHead%40]=diff;
   flowTrace[flowTraceHead++%40]=flowLpm;
 }
 float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
@@ -260,6 +264,7 @@ bool pcfRead(uint16_t &v){
   v=(uint8_t)Wire.read();v|=(uint16_t)((uint8_t)Wire.read())<<8;return true;
 }
 uint8_t currentPage=0; // Six approved UI pages
+uint8_t graphSubView=0; // 0 T1-T4, 1 cooling water, 2 collection no sensor
 uint8_t approvedSettingsItem=0; // The six approved settings rows on the physical TFT
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 bool tftDirty=true;
@@ -352,7 +357,9 @@ void startKeyLearning(){
   pendingPair=-1;keyHeld=false;pendingAt=millis();
   candidatePair=-1;candidateStep=255;candidateAt=0;
   keypadMessage="Нажми F1, затем отпусти";
-  currentPage=4;tftView=0;tftDirty=true;
+  // Stay in Settings / System keyboard diagnostics; never jump to Events.
+  previousMainPage=currentPage;
+  currentPage=5;approvedSettingsItem=4;tftView=1;tftDirty=true;
 }
 
 void navigatePage(uint8_t target){
@@ -428,7 +435,9 @@ void keypadAction(int k){
     if(currentPage==1){
       selectedTemp=(selectedTemp+(k==7?3:1))%4; // sensor row
     }else if(currentPage==5){
-      approvedSettingsItem=(approvedSettingsItem+(k==7?5:1))%6; // six settings rows
+      approvedSettingsItem=(approvedSettingsItem+(k==7?5:1))%6;
+    }else if(currentPage==3){
+      graphSubView=(graphSubView+(k==7?2:1))%3;
     }else{
       tftView=k==7?0:1; // scroll between upper/lower information
     }
@@ -437,6 +446,8 @@ void keypadAction(int k){
       selectedField=k==16?0:1; // target / warning informational fields
     }else if(currentPage==5){
       approvedSettingsItem=(approvedSettingsItem+(k==16?5:1))%6;
+    }else if(currentPage==3){
+      graphSubView=(graphSubView+(k==16?2:1))%3;
     }else{
       moveApprovedTab(k==16?-1:+1);
     }
@@ -449,7 +460,10 @@ void keypadAction(int k){
     }else if(currentPage==0){
       navigatePage(1); // Open temperature cards from home
     }else if(currentPage==5){
-      tftView=1; // Open selected settings information
+      if(tftView && approvedSettingsItem==0)navigatePage(1);
+      else tftView=1;
+    }else if(currentPage==3){
+      graphSubView=(graphSubView+1)%3;
     }else{
       tftView=1; // Open detailed read-only view
     }
@@ -605,7 +619,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V14 HQ APPROVED";
+  const String version="FW V14.1 LIGHT";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -920,19 +934,14 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <h2>Экран TFT · V14</h2>
 <p class="hint">Белый TFT может означать неверный контроллер дисплея или проблему SPI. Профиль выбирается вручную: ESP32 не умеет подтвердить, что пиксели действительно видны.</p>
 <label for="tftDriver">Драйвер TFT</label>
-<select id="tftDriver"><option value="1">ST7789 · 240×320</option><option value="2">ILI9341 · 240×320</option></select>
+<select id="tftDriver"><option value="1">ST7789 · горизонтально 320×240</option></select>
 <label for="tftRotation">Ориентация экрана</label>
-<select id="tftRotation">
-<option value="0">0 · Вертикально</option>
-<option value="1">1 · Горизонтально</option>
-<option value="2">2 · Вертикально (разворот 180°)</option>
-<option value="3">3 · Горизонтально (разворот 180°)</option>
-</select>
+<select id="tftRotation"><option value="1">1 · Горизонтально 320×240</option></select>
 <button type="button" id="tftSave" class="full">Сохранить профиль и перезапустить ESP32</button>
 <button type="button" id="tftTest" class="full">Тест TFT: чёрный фон, BUSA 1M AI · 5 секунд</button>
-<p id="tftProfileStatus" class="hint">После теста проверь результат на самом дисплее. При неудаче можно выбрать второй драйвер.</p>
-<p class="hint">Если TFT показывает светлый фон вместо тёмного макета, переключи аппаратную инверсию цветов. Настройка сохраняется, при необходимости можно вернуть обратно.</p>
-<button type="button" id="tftTheme" class="full">Переключить светлый / тёмный TFT</button>
+<p id="tftProfileStatus" class="hint">Драйвер ST7789 закреплён. Проверка физического экрана выполняется отдельно.</p>
+<p class="hint">Утверждена светлая цветовая тема и драйвер ST7789.</p>
+<button type="button" id="tftTheme" class="full" disabled>Светлая тема · утверждена</button>
 <p id="tftThemeStatus" class="hint">—</p>
 <button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
@@ -1156,12 +1165,12 @@ void handleCommand(String x){
     int n=x.substring(5).toInt();
     if(n>=1&&n<=6){navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;Serial0.printf("PAGE=%d\n",n);}
   }
-  else if(x=="TFT ST7789"||x=="TFT ILI9341"){
-    tftProfile=(x=="TFT ILI9341")?2:1;
+  else if(x=="TFT ST7789"){
+    tftProfile=1;
     prefs.putUChar("tft",tftProfile);
     Serial0.println("TFT profile saved. Reset board to apply.");
   }
-  else Serial0.println("Commands: STATUS | PAGE 1..6 | TFT ST7789 | TFT ILI9341");
+  else Serial0.println("Commands: STATUS | PAGE 1..6 | TFT ST7789");
 }
 void readConsole(){
   // CH343 UART0 (COM6 on current board) is diagnostic console.
@@ -1173,34 +1182,23 @@ void readConsole(){
 }
 void setup(){
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V14 LANDSCAPE-OTA; physical outputs LOCKED");
+  Serial0.println("\nBUSA 1M WiFi V14.1 LIGHT-WATER; physical outputs LOCKED");
   Serial.begin(115200);
   delay(400);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   prefs.begin("busa-r04",false);
-  tftProfile=prefs.getUChar("tft",1);
-  tftInverted=prefs.getBool("tftInvert",false);
-  // One-time V13 migration of V12 landscape preference to approved portrait.
-  // After migration user may still tune hardware orientation via iPhone.
-  tftRotation=prefs.getUChar("tftRotate",0);
-  if(tftRotation>3)tftRotation=0;
-  if(!prefs.getBool("v13portrait",false)){
-    if(tftRotation==1||tftRotation==3)tftRotation=0;
-    prefs.putUChar("tftRotate",tftRotation);
-    prefs.putBool("v13portrait",true);
+  // User-approved ST7789 320x240 rotation 1 and software-drawn light theme.
+  if(!prefs.getBool("v14lightSt",false)){
+    prefs.putUChar("tft",1);
+    prefs.putUChar("tftRotate",1);
+    prefs.putBool("tftInvert",false);
+    prefs.putBool("v14lightSt",true);
   }
-  // V14 HQ follows user-approved horizontal TFT 320x240 layout.
-  // One-time NVS migration preserves preconfigured landscape rotation 1 or 3.
-  if(!prefs.getBool("v14hqLandscape",false)){
-    if(tftRotation==0)tftRotation=1;
-    else if(tftRotation==2)tftRotation=3;
-    prefs.putUChar("tftRotate",tftRotation);
-    prefs.putBool("v14hqLandscape",true);
-  }
+  tftProfile=1;tftRotation=1;tftInverted=false;
   startedAt=millis();
-  if(tftProfile!=2)tftProfile=1;
+  tftProfile=1; // ST7789 only
   // Initialize TFT first so splash actually covers Wi-Fi and sensor initialization.
   screenAttempted=true;
   startScreen();
@@ -1332,22 +1330,13 @@ void setup(){
   });
   server.on("/api/tft/profile",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){
-      server.send(403,"text/plain; charset=utf-8","Нужна локальная Wi-Fi сеть БУСА");return;
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;
     }
-    String profile=server.arg("profile");
-    if(profile!="1"&&profile!="2"){
-      server.send(400,"text/plain; charset=utf-8","Неверный профиль");return;
+    if(server.arg("profile")!="1"||server.arg("rotation")!="1"){
+      server.send(400,"text/plain; charset=utf-8","Зафиксированы ST7789 и поворот 1");return;
     }
-    String rotation=server.arg("rotation");
-    if(rotation!="0" && rotation!="1" && rotation!="2" && rotation!="3"){
-      server.send(400,"text/plain; charset=utf-8","Укажи ориентацию 0..3");return;
-    }
-    if(prefs.putUChar("tft",(uint8_t)profile.toInt())!=1 ||
-       prefs.putUChar("tftRotate",(uint8_t)rotation.toInt())!=1){
-      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить настройки TFT");return;
-    }
-    server.send(200,"text/plain; charset=utf-8","Профиль сохранён. ESP32 перезагрузится через 3 секунды.");
-    tftRebootPending=true;tftRebootAt=millis();
+    prefs.putUChar("tft",1);prefs.putUChar("tftRotate",1);
+    server.send(200,"text/plain; charset=utf-8","ST7789 320×240 сохранён");
   });
   server.on("/api/tft/test",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){
@@ -1362,15 +1351,7 @@ void setup(){
       "Тест отправлен: 5 секунд чёрного фона и белой надписи BUSA 1M AI.");
   });
   server.on("/api/tft/theme",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){
-      server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;
-    }
-    tftInverted=!tftInverted;
-    prefs.putBool("tftInvert",tftInverted);
-    if(tftStarted&&screen)screen->invertDisplay(tftInverted);
-    tftDirty=true;lastRender=0;
-    server.send(200,"text/plain; charset=utf-8",
-      tftInverted?"Инверсия TFT: ВКЛ — сравни оформление":"Инверсия TFT: ВЫКЛ — исходные цвета");
+    server.send(200,"text/plain; charset=utf-8","V14.1: светлая тема, инверсия отключена");
   });
   server.on("/api/keypad/start",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
@@ -1440,6 +1421,12 @@ void setup(){
     }
     tftDirty=true;
     server.send(200,"text/plain; charset=utf-8","Справочные значения сохранены. Реле не затронуты.");
+  });
+  server.on("/api/graph-view",HTTP_GET,[]{
+    int n=server.arg("view").toInt();
+    if(n<0||n>2){server.send(400,"text/plain","Bad graph");return;}
+    graphSubView=(uint8_t)n;tftDirty=true;lastRender=0;
+    server.send(200,"application/json","{\"ok\":true}");
   });
   server.on("/api/settings-tab",HTTP_GET,[]{
     int n=server.arg("n").toInt();
