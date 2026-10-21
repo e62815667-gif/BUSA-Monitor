@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -93,6 +93,30 @@ jobs:
         run: |
           cp google/BUSA_GoogleSheets_Receiver.gs /tmp/BUSA_GoogleSheets_Receiver.js
           node --check /tmp/BUSA_GoogleSheets_Receiver.js
+      - name: Validate both iPhone app scripts and manual-only screen behavior
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
+          app=Path('index.html').read_text()
+          assert '14v4-MANUAL-SCREEN-APP' in main
+          assert 'TFT_DISPLAY_IDLE_MS' not in main
+          assert 'darkenTftDisplay();' in main
+          assert 'screenSt.enableDisplay(true)' in main
+          assert 'data-tab="home"' in app and 'data-tab="events"' in app
+          assert 'YF-S401' in app and 'data-section="5"' in main
+          assert 'Google Диск' in main and '/api/google/test' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
+          raw=re.search(r'R"HTMLBUSA\((.*?)\)HTMLBUSA"', main, re.S)
+          assert raw, 'Missing embedded HTML'
+          for name, html in [('embedded',raw.group(1)),('iphone',app)]:
+              script=re.search(r'<script>(.*?)</script>', html, re.S)
+              assert script, name+' missing script'
+              Path('/tmp/busa-'+name+'.js').write_text(script.group(1))
+              assert html.count('<section')==html.count('</section>'), name+' unbalanced sections'
+          PY
+          node --check /tmp/busa-embedded.js
+          node --check /tmp/busa-iphone.js
       - name: Package full recovery BIN plus app-only BIN
         run: |
           SDK="$HOME/.arduino15/packages/esp32"
