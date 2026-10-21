@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -68,6 +68,15 @@ jobs:
                       assert ref in art, ref
                   for unsafe in ('digitalWrite(', 'pinMode(', 'ledcWrite(', 'relay', 'HTTPClient'):
                       assert unsafe not in art, unsafe
+              if '14v3-DISPLAY-GOOGLE-FINAL' in a:
+                  google = Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
+                  assert 'ru.drawUTF8(x,y,v.c_str())' in a, 'UTF-8 renderer not active'
+                  assert 'screenSt.enableDisplay(false)' in a and 'screenSt.enableDisplay(true)' in a, 'display standby/wake'
+                  assert 'TFT_DISPLAY_IDLE_MS=300000' in a and 'if(tftDisplayOff)' in a, 'standby without suspending MCU'
+                  assert '/api/tft/screen' in a and '/api/google/test' in google, 'missing local controls'
+                  assert 'statusJSON()' in google and '30000' in google, 'Google diagnostic telemetry cadence'
+                  assert 'KPIN[4]={7,6,5,4}' in a and 'RELAY_PHYSICAL_OUTPUTS=false' in a
+                  assert Path('google/BUSA_GoogleSheets_Receiver.gs').is_file()
               if '14v2-LIGHT-FONT-FIX' in a:
                   assert 'ru.setFontMode(1);' in a[a.index('void ruText('):a.index('void panelAt(')], 'transparent Cyrillic renderer missing'
               if '14v-LIGHT-WATER-UI-FIX' in a:
@@ -80,6 +89,10 @@ jobs:
                   assert forbidden not in land, forbidden
           print('Passive GPIO only; output relays remain locked')
           PY
+      - name: Verify Google receiver JavaScript syntax
+        run: |
+          cp google/BUSA_GoogleSheets_Receiver.gs /tmp/BUSA_GoogleSheets_Receiver.js
+          node --check /tmp/BUSA_GoogleSheets_Receiver.js
       - name: Package full recovery BIN plus app-only BIN
         run: |
           SDK="$HOME/.arduino15/packages/esp32"
