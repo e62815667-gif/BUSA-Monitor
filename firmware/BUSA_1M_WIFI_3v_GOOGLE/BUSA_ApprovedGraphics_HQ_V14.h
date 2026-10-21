@@ -3,7 +3,7 @@
 // Works on 320x240 ST7789/ILI9341. Passive drawing only, NEVER controls any GPIO.
 // Screen pixel density is physical 320x240; shadows and layered shapes add visual detail.
 // RGB565 high-contrast light palette, based on the six approved mockups.
-static const uint16_t HQ_NAVY=0xffdf,HQ_DEEP=0xffff,HQ_GLOW=0xfca0,
+static uint16_t HQ_NAVY=0xffdf,HQ_DEEP=0xffff,HQ_GLOW=0xfca0,
  HQ_AZURE=0xd4a5,HQ_SKY=0x234c,HQ_CYAN=0x0519,HQ_LIGHT=0x2104,
  HQ_LIME=0x2664,HQ_AQUA=0x767c,HQ_GLASS=0xf638,HQ_STEEL=0xad55,
  HQ_SILVER=0xe73c,HQ_METAL=0xb5b6,HQ_DARKMETAL=0x6b4d;
