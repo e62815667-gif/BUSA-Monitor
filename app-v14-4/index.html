@@ -50,22 +50,77 @@ nav button.active{background:#f7d5a9;border-color:#e8b274;color:#354b55;font-wei
 :root[data-theme="dark"] .rigs svg rect:first-of-type{fill:#183046}
 #themeSwitch{margin:7px 0 1px;padding:9px 13px;border:1px solid #cda275;border-radius:9px;background:#fff0d9;color:#3b5a69;font-size:13px;font-weight:600}
 :root[data-theme="dark"] #themeSwitch{background:#3b576b;color:#e1f4ff;border-color:#75a3bc}
+
+/* V14.5 mobile layout: responsive cards, fully contained diagram, matching six-tab navigation */
+html,body{width:100%;max-width:100%;overflow-x:clip}
+body{padding:0;padding-bottom:92px}
+.appHeader{display:block;padding:10px 13px!important}
+.headerRow{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:620px;margin:auto}
+.eyebrow{font-size:10px;color:#b77635;font-weight:bold;letter-spacing:1px}
+.headerRow h1{font-size:19px;margin:1px 0 4px}
+.brandSub{font-size:13px;font-weight:500;color:var(--muted)}
+.headerTime{max-width:620px;margin:auto;color:var(--muted);font-size:12px}
+#themeSwitch{flex:0 0 auto;padding:9px 10px;font-size:12px;margin:0}
+.connectionStrip{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin:10px 0;font-size:12px;background:var(--surface,#fff);padding:11px;border:1px solid var(--border);border-radius:12px}
+.connectionStrip a{font-size:12px;color:#0e87af;text-decoration:underline}
+main{max-width:620px;width:100%;margin:auto;padding:4px 11px 22px;overflow-x:clip}
+main>*,main>*>*{min-width:0;max-width:100%}
+.card{min-width:0;overflow-wrap:anywhere;padding:13px}
+.grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.grid>*{min-width:0}
+.tile{overflow:hidden;min-width:0}
+.tile strong{font-size:clamp(15px,4.4vw,21px);overflow-wrap:anywhere}
+.hero{padding:16px}
+.hero h2{font-size:24px}
+.rigs{overflow:hidden}
+.rigViewport{width:100%;max-width:430px;aspect-ratio:360/225;max-height:269px;overflow:hidden;margin:8px auto;position:relative}
+.rigViewport svg{width:100%!important;max-width:100%!important;height:100%!important;max-height:100%!important;display:block!important;overflow:hidden}
+.rigs p{clear:both;position:relative}
+.appTabs{position:fixed;bottom:0;left:0;right:0;z-index:8;display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));overflow:visible;gap:2px;background:#fff;box-shadow:0 -4px 15px #243f5516;padding:5px 4px max(7px,env(safe-area-inset-bottom));border-top:2px solid var(--orange)}
+.appTabs button{width:100%;min-width:0!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;line-height:1.15;padding:7px 0;font-size:clamp(9px,2.55vw,12px)!important;white-space:nowrap;border:1px solid transparent;border-radius:9px}
+.appTabs button.active{background:#f7d5a9;border:1px solid #e8b274}
+.tabIcon{font-family:system-ui,sans-serif;display:block;font-size:18px;line-height:19px;color:#178eae}
+.appTabs button.active .tabIcon{color:#88632c}
+.settingsOverview{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.settingsOverview button,.settingsNavLink{font:12px system-ui;text-align:left;text-decoration:none;color:var(--ink);background:var(--paper);border:1px solid var(--border);border-radius:10px;min-height:52px;padding:9px;display:flex;align-items:center;gap:8px}
+.settingsOverview span{color:var(--teal);font-size:20px}
+label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4px}
+input{width:100%;border:1px solid var(--border);border-radius:9px;padding:12px;background:#fff;color:#253e51;font-size:14px;min-width:0}
+button.btn{font:inherit;cursor:pointer}
+.detailTiles .tile small:last-child{color:var(--warn);overflow-wrap:anywhere}
+.graphTabs button{font-size:12px;min-width:0;padding:10px 6px}
+.graphTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+.eventTabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+.eventsList{line-height:1.6;overflow-wrap:anywhere}
+canvas{width:100%;height:auto;aspect-ratio:640/240;background:#fff;border:1px solid var(--border);border-radius:10px}
+:root[data-theme="dark"] .connectionStrip{background:#192f45;border-color:#386279}
+:root[data-theme="dark"] .appTabs{background:#152b40}
+:root[data-theme="dark"] .appTabs button.active{background:#e2974e}
+:root[data-theme="dark"] .appTabs .tabIcon{color:#66d6f7}
+:root[data-theme="dark"] .appTabs button.active .tabIcon{color:#133449}
+:root[data-theme="dark"] .settingsOverview button,:root[data-theme="dark"] .settingsNavLink{background:#224055;border-color:#4b7289;color:#e0f4ff}
+:root[data-theme="dark"] input{background:#122c40;border-color:#537992;color:#e5f4fa}
+:root[data-theme="dark"] canvas{background:#1d3748;border-color:#537992}
+@media(max-width:350px){.appTabs button{font-size:9px!important}.tabIcon{font-size:16px}.card{padding:10px}}
+@media(min-width:650px){.appTabs{max-width:620px;margin:auto;border-left:1px solid var(--border);border-right:1px solid var(--border)}}
 </style></head><body>
-<header><h1>БУСА-1М №001</h1><small>Монитор · iPhone · две цветные темы V14.4</small><div><button type="button" id="themeSwitch">Тёмная цветная тема</button></div></header>
+<header class="appHeader"><div class="headerRow"><div>
+<div class="eyebrow">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
+<button type="button" id="themeSwitch" aria-label="Сменить цветную тему">☾ Тема</button></div>
+<div class="headerTime" id="clockDisplay">Время: —</div></header>
 <main>
-<div class="card"><div class="row"><span>Подключение</span><b id="statusText" class="warn">Не подключено</b></div>
-<p class="muted">Живые показания открываются непосредственно из локальной сети ESP32-S3. Эта страница сохранит знакомые вкладки даже без интернета.</p>
-<a class="btn" href="http://192.168.4.1/">Открыть БУСА по Wi-Fi</a></div>
+<div class="connectionStrip"><span id="statusText" class="warn">Нет удалённых данных</span>
+<a href="http://192.168.4.1/">Локальная панель <span aria-hidden="true">›</span></a></div>
 <section id="home">
-<div class="hero"><small>СИСТЕМА МОНИТОРИНГА</small><h2>Главная</h2><span class="status">● Ожидается соединение с БУСА</span></div>
+<div class="hero"><small>СИСТЕМА МОНИТОРИНГА</small><h2>Главная</h2><span class="status" id="heroStatus">● Ожидается соединение с БУСА</span></div>
 <div class="card"><h2>Четыре температуры</h2><div class="grid">
-<div class="tile"><small><i class="point p1"></i>T1 Вода</small><strong>Н/Д</strong></div>
-<div class="tile"><small><i class="point p2"></i>T2 Колонна</small><strong>Н/Д</strong></div>
-<div class="tile"><small><i class="point p3"></i>T3 Куб</small><strong>Н/Д</strong></div>
-<div class="tile"><small><i class="point p4"></i>T4 Верх колонны</small><strong>Н/Д</strong></div>
+<div class="tile"><small><i class="point p1"></i>T1 Вода</small><strong id="remoteT0">Н/Д</strong></div>
+<div class="tile"><small><i class="point p2"></i>T2 Колонна</small><strong id="remoteT1">Н/Д</strong></div>
+<div class="tile"><small><i class="point p3"></i>T3 Куб</small><strong id="remoteT2">Н/Д</strong></div>
+<div class="tile"><small><i class="point p4"></i>T4 Верх колонны</small><strong id="remoteT3">Н/Д</strong></div>
 </div></div>
-<div class="card rigs"><h2>Схема установки</h2>
-<svg viewBox="0 0 360 225" role="img" aria-label="Рисунок установки с YF-S401 на линии охлаждающей воды">
+<div class="card rigs"><h2>Схема установки</h2><div class="rigViewport">
+<svg viewBox="0 0 360 225" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Рисунок установки с YF-S401 на линии охлаждающей воды">
 <defs><linearGradient id="silver" x1="0" x2="1"><stop stop-color="#738b9b"/><stop offset=".42" stop-color="#e6f1f4"/><stop offset="1" stop-color="#829aa7"/></linearGradient></defs>
 <rect width="360" height="225" rx="12" fill="#f7fbfd"/>
 <path d="M96 16 H255 V49" fill="none" stroke="#7d929d" stroke-width="6"/>
@@ -84,37 +139,72 @@ nav button.active{background:#f7d5a9;border-color:#e8b274;color:#354b55;font-wei
 <rect x="312" y="183" width="31" height="33" rx="5" fill="white" stroke="#8299a7" stroke-width="2"/>
 <rect x="315" y="199" width="25" height="13" rx="2" fill="#aeddeb"/>
 <text x="94" y="218" text-anchor="middle" fill="#6f8695" font-size="11">T1–T4</text>
-</svg>
+</svg></div>
 <p class="muted">YF-S401 показан на линии охлаждающей воды, не отбора. Изображение иллюстративное.</p></div>
-<div class="grid"><div class="card"><h2>Вода YF-S401</h2><span class="warn">Нет показаний</span><p class="muted">Импульсы и калибровка доступны в локальной панели.</p></div>
+<div class="grid"><div class="card"><h2>Вода YF-S401</h2><span class="warn" id="waterLive">Нет показаний</span><p class="muted">Импульсы и калибровка доступны в локальной панели.</p></div>
 <div class="card"><h2>Отбор</h2><span class="warn">Нет датчика</span><p class="muted">Показания не имитируются.</p></div></div>
 <div class="card"><h2>К1–К4</h2><div class="chips"><span>К1<b>БЛОК</b></span><span>К2<b>БЛОК</b></span><span>К3<b>БЛОК</b></span><span>К4<b>БЛОК</b></span></div></div>
 </section>
-<section id="temps" hidden><div class="card"><h2>Температуры · T1–T4</h2>
-<div class="row"><span>Вода</span><b>Н/Д</b></div><div class="row"><span>Колонна</span><b>Н/Д</b></div><div class="row"><span>Куб</span><b>Н/Д</b></div><div class="row"><span>Верх колонны</span><b>Н/Д</b></div>
-<p class="muted">Настройка справочных порогов температуры и реальные показания доступны после открытия локальной панели БУСА.</p></div></section>
+<section id="temps" hidden><div class="card"><h2>Температуры · DS18B20</h2>
+<div class="grid detailTiles">
+<div class="tile"><small><i class="point p1"></i>Вода T1</small><strong id="detailT0">Н/Д</strong><small id="errorT0">Нет данных</small></div>
+<div class="tile"><small><i class="point p2"></i>Колонна T2</small><strong id="detailT1">Н/Д</strong><small id="errorT1">Нет данных</small></div>
+<div class="tile"><small><i class="point p3"></i>Куб T3</small><strong id="detailT2">Н/Д</strong><small id="errorT2">Нет данных</small></div>
+<div class="tile"><small><i class="point p4"></i>Верх колонны T4</small><strong id="detailT3">Н/Д</strong><small id="errorT3">Нет данных</small></div>
+</div><p class="muted">Фактические измерения и диагностические ошибки, без имитации. Настройка справочных порогов — в локальной панели БУСА.</p></div></section>
 <section id="collection" hidden><div class="card"><h2>Отбор жидкости</h2><div class="row"><span>Расход, мл/мин</span><b class="warn">НЕТ ДАТЧИКА</b></div><div class="row"><span>Собрано, мл</span><b class="warn">Н/Д</b></div><p class="muted">YF-S401 измеряет импульсы охлаждающей воды, не отбор.</p></div></section>
 <section id="settings" hidden>
-<div class="card"><h2>Настройки</h2>
-<div class="row"><span>Температуры T1–T4</span><b>Локальная панель</b></div>
-<div class="row"><span>Экран ST7789</span><b>320 × 240</b></div>
-<div class="row"><span>Гашение экрана</span><b>Только вручную</b></div>
-<div class="row"><span>К1–К4</span><b>БЛОК</b></div>
-<div class="row"><span>Wi-Fi и Google</span><b>Настроить в БУСА</b></div>
-<div class="actions"><a class="btn" href="http://192.168.4.1/">Открыть настройки БУСА</a>
-<a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/blob/lab/busa-v14-3-final-display-google/google/README_BUSA_Google_Drive.md">Инструкция Google Диск</a></div>
-<p class="muted">Переключатель темы сверху меняет оформление этого приложения. Для переключения самой TFT-матрицы открой настройки экрана в локальной панели БУСА.</p>
-<p class="muted">Google Диск на iPhone позволяет смотреть таблицу. Для передачи каждые 30 секунд БУСА требует соединения с интернетом и Apps Script-приёмника.</p>
+<div class="card"><h2>Настройки</h2><div class="settingsOverview">
+<button type="button" data-settings-page="temps"><span>♨</span>Температуры</button>
+<button type="button" data-settings-page="collection"><span>♧</span>Отбор жидкости</button>
+<a href="http://192.168.4.1/" class="settingsNavLink"><span>⌁</span>Wi-Fi</a>
+<a href="http://192.168.4.1/" class="settingsNavLink"><span>▣</span>Экран и звук</a>
+<a href="#googleSettings" class="settingsNavLink"><span>⚙</span>Система</a>
+<a href="#aboutSettings" class="settingsNavLink"><span>ⓘ</span>О системе</a>
+</div></div>
+<div class="card" id="googleSettings"><h2>Удалённый мониторинг · Google</h2>
+<p class="muted">Введи адрес своего Google Apps Script и отдельный <b>ключ просмотра</b> BUSA_VIEW_TOKEN. Ключ отправки BUSA_TOKEN здесь не нужен.</p>
+<label for="viewUrl">Ссылка веб-приложения Google /exec</label>
+<input type="url" id="viewUrl" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+<label for="viewToken">Ключ просмотра · 64 символа</label>
+<input type="password" id="viewToken" placeholder="BUSA_VIEW_TOKEN (не BUSA_TOKEN)" autocomplete="off">
+<div class="actions"><button type="button" id="viewConnect" class="btn">Подключить данные</button>
+<button type="button" id="viewClear" class="btn secondary">Отключить</button></div>
+<div class="row"><span>Получение данных</span><b id="viewState">Не настроено</b></div>
+<p class="muted">Данные обновляются примерно каждые 30 секунд, если БУСА отправляет их в Google. Ключ просмотра сохраняется только на этом iPhone. При утере телефона смени ключ в Apps Script.</p>
+<div class="actions"><a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/blob/main/google/README_BUSA_Google_Drive.md" target="_blank" rel="noopener">Инструкция Google</a></div></div>
+<div class="card" id="aboutSettings"><h2>О системе</h2>
+<div class="row"><span>БУСА-1М №001</span><b>ESP32-S3</b></div>
+<div class="row"><span>TFT</span><b>ST7789 · 320×240</b></div>
+<div class="row"><span>К1–К4</span><b class="warn">БЛОК</b></div>
+<div class="row"><span>Экран</span><b>Гаснет только вручную</b></div>
+<p class="muted">Настройка самой ESP32, датчиков, прошивки и экрана выполняется через локальную сеть БУСА.</p>
+<a class="btn" href="http://192.168.4.1/">Открыть локальную панель</a></div>
+</section>
+<section id="graphs" hidden><div class="card"><h2>Графики · реальные измерения</h2>
+<div class="graphTabs"><button class="on" data-chart="0">Температуры</button><button data-chart="1">Вода</button><button data-chart="2">Отбор</button></div>
+<div data-chart-panel="0"><canvas id="remoteGraphT" width="640" height="240" aria-label="График температур"></canvas>
+<p class="muted">Вода, колонна, куб, верх колонны. Только полученные значения.</p></div>
+<div data-chart-panel="1" hidden><canvas id="remoteGraphW" width="640" height="240" aria-label="Импульсы охлаждающей воды"></canvas>
+<p class="muted">YF-S401: число зарегистрированных импульсов (не л/мин). Калибровка отсутствует.</p></div>
+<div data-chart-panel="2" hidden><p class="warn">Отсутствует отдельный датчик отбора — график не строится.</p></div>
 </div></section>
-<section id="graphs" hidden>
-<div class="card"><h2>Графики</h2><div class="graphTabs"><button class="on" data-chart="0">T1–T4</button><button data-chart="1">Вода</button><button data-chart="2">Отбор</button></div>
-<div data-chart-panel="0"><p class="muted">Четыре температурные линии появятся после подключения к БУСА.</p></div>
-<div data-chart-panel="1" hidden><p class="muted">График реальных импульсов охлаждающей воды доступен в локальной панели.</p></div>
-<div data-chart-panel="2" hidden><p class="warn">Датчик отбора отсутствует. График не формируется.</p></div>
-</div></section>
-<section id="events" hidden><div class="card"><h2>Журнал событий</h2><p class="muted">Для просмотра текущих событий и ошибок PCF8575, DS18B20, YF-S401 открой локальную панель БУСА.</p></div></section>
+<section id="events" hidden><div class="card"><h2>Журнал диагностики</h2><div class="graphTabs eventTabs">
+<button class="on" data-event-filter="all">Все</button>
+<button data-event-filter="warn">Предупр.</button>
+<button data-event-filter="alarm">Аварии</button>
+<button data-event-filter="system">Система</button></div>
+<div id="remoteEvents" class="eventsList">Сначала подключи данные Google.</div>
+<p class="muted">События формируются только из полученного диагностического отчёта, не являются журналом аварий оборудования.</p></div></section>
 </main>
-<nav aria-label="Разделы"><button data-tab="home" class="active">Главная</button><button data-tab="temps">T1–T4</button><button data-tab="collection">Отбор</button><button data-tab="settings">Настройки</button><button data-tab="graphs">Графики</button><button data-tab="events">События</button></nav>
+<nav class="appTabs" aria-label="Разделы">
+<button data-tab="home" class="active"><span class="tabIcon">⌂</span><span>Главная</span></button>
+<button data-tab="temps"><span class="tabIcon">♨</span><span>Температуры</span></button>
+<button data-tab="collection"><span class="tabIcon">♧</span><span>Отбор</span></button>
+<button data-tab="graphs"><span class="tabIcon">⌁</span><span>Графики</span></button>
+<button data-tab="events"><span class="tabIcon">▤</span><span>События</span></button>
+<button data-tab="settings"><span class="tabIcon">⚙</span><span>Настройки</span></button>
+</nav>
 <script>
 // Change the standalone iPhone page's palette only; the TFT palette is
 // changed from the controller's own Settings screen.
