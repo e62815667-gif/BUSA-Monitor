@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v2-LIGHT-FONT-FIX";
+const char VERSION[]="БУСА 1М WiFi 14v3-DISPLAY-GOOGLE-FINAL";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -512,6 +512,10 @@ bool learnCommitPair(int pair){
   tftDirty=true;
   return true;
 }
+void wakeTftDisplay(); // Wake works even when the 5x4 keymap is untrained.
+bool tftDisplayOff=false;
+uint32_t tftDisplayActivityMs=0;
+const uint32_t TFT_DISPLAY_IDLE_MS=300000; // 5 minutes; ESP32 and Wi-Fi stay awake
 void pollKeys(uint32_t now){
   if(!pcfDetected||!elapsed(now,lastKeyScan,60))return;
   lastKeyScan=now;
@@ -530,6 +534,14 @@ void pollKeys(uint32_t now){
   if(pair<0||keyHeld||!elapsed(now,pendingAt,80))return;
   keyHeld=true;
   keyCount++;
+  if(tftDisplayOff){
+    // First recognized electrical key press only wakes the TFT.
+    // No menu action, setpoint edit, or output action on wake.
+    wakeTftDisplay();
+    keyMessage="Экран пробуждён";
+    return;
+  }
+  tftDisplayActivityMs=now;
   if(keypadLearning){
     learnCommitPair(pair);
   }else{
@@ -566,13 +578,12 @@ void moveApprovedTab(int direction){int slot=(orderSlot(currentPage)+6+direction
 extern String stationSsid,otaMessage,nearbyNames[5];
 extern uint8_t nearbyCount;
 void ruText(const String &v,int x,int y,uint16_t color=WHITE){
-  // On ST7789 light background force transparent bitmap glyphs before EVERY
-  // UTF-8 write, including after setFont(). Without this, dark background
-  // pixels of font cells obscure the Cyrillic labels.
+  // Explicit UTF-8 glyph renderer; transparent background, 0-degree orientation.
+  // Avoid Print::write byte-by-byte path and opaque font-cell rectangles.
   ru.setFontMode(1);
+  ru.setFontDirection(0);
   ru.setForegroundColor(color);
-  ru.setCursor(x,y);
-  ru.print(v);
+  ru.drawUTF8(x,y,v.c_str());
 }
 
 void panelAt(int x,int y,int w,int h){
@@ -663,10 +674,25 @@ void startScreen(){
   ru.setFont(u8g2_font_6x13_t_cyrillic);
   ru.setFontMode(1);
   tftStarted=true;
+  tftDisplayOff=false;tftDisplayActivityMs=millis();
   drawBootSplash(8000); // Wi-Fi AP + web start while splash visible; max 8 seconds
   Serial0.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
 }
-// Portrait-specific layout prevents 320px-wide landscape cards from clipping at 240px.
+// Display-only standby; does NOT sleep ESP32, alter sensors, Wi-Fi or GPIO.
+void wakeTftDisplay(){
+  if(!tftStarted)return;
+  screenSt.enableDisplay(true);
+  tftDisplayOff=false;
+  tftDisplayActivityMs=millis();
+  tftDirty=true;
+}
+void darkenTftDisplay(){
+  if(!tftStarted||tftDisplayOff)return;
+  screenSt.enableDisplay(false);
+  tftDisplayOff=true;
+}
+// Note: a separately wired always-on TFT backlight may still glow in display-off.
+ // Portrait-specific layout prevents 320px-wide landscape cards from clipping at 240px.
 #include "BUSA_ApprovedUI_V13.h"
 
 #include "BUSA_ApprovedGraphics_HQ_V14.h"
@@ -741,6 +767,7 @@ String statusJSON(){
   s+=",\"tft_physical_pixels_confirmed\":false";
   s+=",\"last_key\":"+quoteJson(keyMessage)+"}";
   s+=",\"tft_theme_inverted\":"+(tftInverted?String("true"):String("false"));
+  s+=",\"display_sleep\":"+(tftDisplayOff?String("true"):String("false"));
   s+=",\"keypad\":{\"ready\":"+(keypadReady?String("true"):String("false"));
   s+=",\"learning\":"+(keypadLearning?String("true"):String("false"));
   s+=",\"step\":"+String(learnStep);
@@ -898,15 +925,17 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна при подключении к защищённой сети БУСА. Пароль остаётся на контроллере.</p></div>
-<div class="card settingCard" data-stab="1" hidden><h2>Google Диск · дистанционный просмотр</h2>
-<div class="row">Канал Google <b id="googleState">НЕ НАСТРОЕН</b></div>
-<p class="hint">Передача только измерений каждые 30 секунд. Локальная сеть работает без интернета.
-Нужен опубликованный Google Apps Script и уникальный токен. Автоматического управления нет.</p>
+<div class="card settingCard" data-stab="1" hidden><h2>Google Диск · диагностика БУСА</h2>
+<div class="row">Состояние канала <b id="googleState">НЕ НАСТРОЕН</b></div>
+<p class="hint">БУСА передаёт реальные показания и коды ошибок каждые 30 секунд в вашу Google Таблицу по HTTPS. Это только мониторинг, без управления внешним оборудованием.</p>
+<p class="hint"><b>Важно:</b> приложение «Google Диск» на iPhone показывает файлы, но само не принимает данные с ESP32. Один раз создайте свою Google Таблицу и установите Apps Script-приёмник, затем вставьте адрес /exec и секрет ниже.</p>
+<p><a href="https://github.com/e62815667-gif/BUSA-Monitor/blob/lab/busa-v14-3-final-display-google/google/README_BUSA_Google_Drive.md" target="_blank" rel="noopener noreferrer" style="color:#a6dfff">Пошаговая инструкция настройки Google Таблицы</a></p>
 <label for="googleUrl">Адрес Apps Script (ссылка /exec)</label>
 <input id="googleUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
 <label for="googleToken">Секрет устройства (токен из Apps Script)</label>
 <input id="googleToken" type="password" autocomplete="off" placeholder="Вставить на устройстве, не в чат">
 <button id="googleSave" type="button" class="full">Сохранить подключение Google</button>
+<button id="googleTest" type="button" class="full">Проверить отправку диагностики сейчас</button>
 <button id="googleStop" type="button" class="full">Отключить передачу в Google</button>
 <p id="googleResult" role="status" class="hint">Отправка выключена до настройки.</p>
 </div><div class="card settingCard" data-stab="2" hidden><h2>Обновление ПО · вручную</h2>
@@ -917,6 +946,9 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
 <p id="updateResult" role="status">Ожидание подтверждения</p>
 </div><div class="card settingCard" data-stab="3" hidden><h2>Диагностика</h2>
+<div class="row">Экран ST7789 <b id="displayState">—</b></div>
+<p class="hint">Через 5 минут без нажатий TFT отключает отображение, а мониторинг и Wi-Fi продолжают работать. Любая правильно распознанная клавиша пробуждает экран без выполнения команды. Если клавиатура неисправна, пробуди экран с iPhone. Подсветка, подключённая постоянно к питанию, может оставаться включённой.</p>
+<div class="grid"><button id="screenSleep" type="button">Погасить экран</button><button id="screenWake" type="button">Разбудить экран</button></div>
 <div class="row">Прошивка <b id="ver">—</b></div>
 <div class="row">Время работы <b id="uptime">—</b></div>
 <div class="row">PCF8575 <b id="pcf">—</b></div>
@@ -993,6 +1025,15 @@ async function keyCommand(action){
    get('keyInfo').textContent=await r.text();
  }catch(e){get('keyInfo').textContent='Ошибка: '+e.message}
 }
+async function setScreenPower(action){
+ try{
+  const resp=await fetch('/api/tft/screen',{method:'POST',body:new URLSearchParams({action})});
+  if(!resp.ok)throw new Error(await resp.text());
+  get('displayState').textContent=action==='wake'?'РАБОТАЕТ':'ЭКРАН ПОГАШЕН';
+ }catch(e){get('displayState').textContent='ОШИБКА: '+e.message}
+}
+get('screenSleep').onclick=()=>setScreenPower('sleep');
+get('screenWake').onclick=()=>setScreenPower('wake');
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
 get('keyNext').onclick=()=>keyCommand('next');
 get('tftSave').onclick=async()=>{
@@ -1094,6 +1135,7 @@ if(s.station.connected&&s.station.ssid){
  if(!select.value)select.value=s.station.ssid;
 }
 const cs=s.google;
+get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent;
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
@@ -1148,6 +1190,13 @@ if(!url.startsWith('https://script.google.com/macros/s/')||!url.endsWith('/exec'
 if(!confirm('Включить отправку показаний в свой Google Диск? Только мониторинг.'))return;
 let resp=await fetch('/api/google/config',{method:'POST',body:new URLSearchParams({url,token})});
 get('googleResult').textContent=await resp.text();if(resp.ok)get('googleToken').value='';
+};
+get('googleTest').onclick=async()=>{
+  try{
+    const r=await fetch('/api/google/test',{method:'POST',
+      body:new URLSearchParams({confirm:'YES'})});
+    get('googleResult').textContent=await r.text();
+  }catch(e){get('googleResult').textContent='Ошибка проверки: '+e.message}
 };
 get('googleStop').onclick=async()=>{
 if(!confirm('Отключить отправку диагностических данных в Google?'))return;
@@ -1382,6 +1431,17 @@ void setup(){
     prefs.putUChar("tft",1);prefs.putUChar("tftRotate",1);
     server.send(200,"text/plain; charset=utf-8","ST7789 320×240 сохранён");
   });
+  server.on("/api/tft/screen",HTTP_POST,[]{
+    if(!apClient()){server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;}
+    String action=server.arg("action");
+    if(action=="wake"){
+      wakeTftDisplay();
+      server.send(200,"text/plain; charset=utf-8","TFT включён");
+    }else if(action=="sleep"){
+      darkenTftDisplay();
+      server.send(200,"text/plain; charset=utf-8","TFT погашен; ESP32 продолжает мониторинг");
+    }else server.send(400,"text/plain; charset=utf-8","Неверная команда");
+  });
   server.on("/api/tft/test",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){
       server.send(403,"text/plain; charset=utf-8","Нужна локальная Wi-Fi сеть БУСА");return;
@@ -1525,7 +1585,12 @@ void loop(){
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
     pollKeys(now);
   }
-  if(tftStarted && !otaActive && (tftDirty||lastRender==0 || elapsed(now,lastRender,2500))){
+  if(bootSplashComplete && !tftDisplayOff && !keypadLearning &&
+     elapsed(now,tftDisplayActivityMs,TFT_DISPLAY_IDLE_MS)){
+    darkenTftDisplay();
+  }
+  if(tftStarted && !tftDisplayOff && !otaActive &&
+     (tftDirty||lastRender==0 || elapsed(now,lastRender,2500))){
     lastRender=now;
     renderScreen(now);
   }
