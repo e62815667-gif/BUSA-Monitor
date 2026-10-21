@@ -1080,8 +1080,17 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
 <div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
-<h2>Диагностика V12 · реальные входы</h2><pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса 1-Wire...</pre>
+<h2>Диагностика V12 · все модули</h2>
+<p class="hint">Отображаются ответы интерфейсов, а не гарантии исправности оборудования. Отсутствие импульсов расходомера не доказывает отсутствия воды.</p>
+<pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса DS18B20...</pre>
 <pre id="diagKeyboard" style="white-space:pre-wrap;word-break:break-word">Ожидание PCF8575...</pre>
+<pre id="diagI2c" style="white-space:pre-wrap;word-break:break-word">Сканирование I2C...</pre>
+<pre id="diagOther" style="white-space:pre-wrap;word-break:break-word">TFT / ESP32 / Wi-Fi / YF-S401...</pre>
+<h2>Отчёт для анализа</h2>
+<p class="hint">Скопируй отчёт и пришли в наш чат. Wi-Fi пароли и Google-токены в отчёт не включены.</p>
+<textarea id="diagReport" rows="9" readonly style="width:100%;font:11px ui-monospace,monospace;white-space:pre;overflow:auto">Ожидание диагностики...</textarea>
+<button type="button" id="diagCopy" class="full">Скопировать отчёт всех модулей</button>
+<p id="diagCopyResult" class="hint">—</p>
 <p class="hint">Температура: T1 GPIO38, T2 GPIO39, T3 GPIO40, T4 GPIO41. IDLE=1 — линия DATA высока в покое; IDLE=0 или LINE_LOW — линия низкая. AFTER — состояние после импульса сброса. NO_PRESENCE при IDLE=1 — нет ответа датчика, но это не доказывает, что сам датчик неисправен. NO_ROM — не найден адрес; ROM_CRC_BAD — неверная CRC.</p>
 <p class="hint">Клавиатура: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
 <p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
@@ -1110,6 +1119,7 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
+let lastDiagnosticReport='';
 function showPhoneClock(){
   get('clockDisplay').textContent='Дата и время: '+
     new Date().toLocaleString('ru-RU',{year:'numeric',month:'2-digit',day:'2-digit',
@@ -1151,6 +1161,20 @@ get('tftTest').onclick=async()=>{
   const r=await fetch('/api/tft/test',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
   get('tftProfileStatus').textContent=await r.text();
  }catch(e){get('tftProfileStatus').textContent='Ошибка: '+e.message}
+};
+get('diagCopy').onclick=async()=>{
+ const t=get('diagReport');
+ if(!lastDiagnosticReport){get('diagCopyResult').textContent='Отчёт ещё не получен';return;}
+ try{
+  if(navigator.clipboard && window.isSecureContext){
+   await navigator.clipboard.writeText(lastDiagnosticReport);
+   get('diagCopyResult').textContent='Скопировано — вставь в чат';
+  }else{
+   t.focus();t.select();t.setSelectionRange(0,t.value.length);
+   const ok=document.execCommand('copy');
+   get('diagCopyResult').textContent=ok?'Скопировано — вставь в чат':'Выдели отчёт и скопируй вручную';
+  }
+ }catch(e){t.focus();t.select();get('diagCopyResult').textContent='Выдели отчёт и скопируй вручную'}
 };
 get('tftTheme').onclick=async()=>{
  try{
@@ -1211,6 +1235,30 @@ if(s.keypad){
    get('diagKeyboard').textContent='PCF 0x'+Number(k.pcf_address||0).toString(16)+
       ' | idle=0x'+k.idle_hex+' | low=0x'+k.low_hex+
       ' | pair='+k.raw_pair+' | error='+k.scan_error;
+   const d=s.diagnostics,addresses=(d.i2c?.addresses||[]);
+   get('diagI2c').textContent='I2C GPIO8/9 | ACK total='+d.i2c?.ack_total+
+     ' | addresses='+addresses.map(a=>'0x'+Number(a).toString(16).padStart(2,'0')).join(', ')+
+     '\nPCF8575: ACK='+d.pcf8575?.online+' read='+d.pcf8575?.read_ok+
+     ' idle=0x'+d.pcf8575?.idle_pins_hex+
+     '\nPCA9685: ACK='+d.pca9685?.ack+' MODE1='+d.pca9685?.mode1+
+     ' MODE2='+d.pca9685?.mode2+' PWM disabled';
+   get('diagOther').textContent=
+     'TFT: '+d.tft?.profile+' rotation='+d.tft?.rotation+
+       ' init='+d.tft?.init_sent+' (pixels not verified by software)'+
+     '\nESP32: '+d.esp32?.chip+' heap='+d.esp32?.free_heap_bytes+
+       ' flash='+d.esp32?.flash_bytes+' reset='+d.esp32?.reset_reason_code+
+     '\nWi-Fi: AP='+d.wifi?.ap_running+' clients='+d.wifi?.ap_clients+
+       ' STA='+d.wifi?.sta_connected+' RSSI='+d.wifi?.sta_rssi_dbm+
+     '\nYF-S401 GPIO15: input='+d.water_flow?.input_level+
+       ' pulses='+d.water_flow?.pulses+' '+d.water_flow?.status+' (not calibrated)';
+   lastDiagnosticReport=JSON.stringify({
+     device:s.device,firmware:s.firmware,uptime_ms:s.uptime_ms,
+     temperatures:s.temperatures,modules:s.modules,diagnostics:d,
+     station_connected:s.station?.connected,ap_enabled:s.ap?.enabled,
+     relay_outputs_enabled:s.relays_enabled
+   },null,2);
+   const report=get('diagReport');
+   if(document.activeElement!==report)report.value=lastDiagnosticReport;
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
