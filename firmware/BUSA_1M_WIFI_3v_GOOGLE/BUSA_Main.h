@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 12v-DIAG-FULL";
+const char VERSION[]="БУСА 1М WiFi 13v-APPROVED-UI";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -260,6 +260,7 @@ bool pcfRead(uint16_t &v){
   v=(uint8_t)Wire.read();v|=(uint16_t)((uint8_t)Wire.read())<<8;return true;
 }
 uint8_t currentPage=0; // Six approved UI pages
+uint8_t approvedSettingsItem=0; // The six approved settings rows on the physical TFT
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 bool tftDirty=true;
 float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
@@ -426,7 +427,7 @@ void keypadAction(int k){
     if(currentPage==1){
       selectedTemp=(selectedTemp+(k==7?3:1))%4; // sensor row
     }else if(currentPage==5){
-      settingsSubTab=(settingsSubTab+(k==7?3:1))%4; // setting row
+      approvedSettingsItem=(approvedSettingsItem+(k==7?5:1))%6; // six settings rows
     }else{
       tftView=k==7?0:1; // scroll between upper/lower information
     }
@@ -434,7 +435,7 @@ void keypadAction(int k){
     if(currentPage==1){
       selectedField=k==16?0:1; // target / warning informational fields
     }else if(currentPage==5){
-      settingsSubTab=(settingsSubTab+(k==16?3:1))%4;
+      approvedSettingsItem=(approvedSettingsItem+(k==16?5:1))%6;
     }else{
       navigatePage((uint8_t)((currentPage+(k==16?5:1))%6));
     }
@@ -599,7 +600,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V12 BOOT-ONEWIRE";
+  const String version="FW V13 APPROVED UI";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -643,81 +644,8 @@ void startScreen(){
   Serial0.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
 }
 // Portrait-specific layout prevents 320px-wide landscape cards from clipping at 240px.
-void renderPortrait(uint32_t now){
-  static uint8_t oldPage=255,oldView=255,oldTab=255;
-  const bool layout=tftDirty||oldPage!=currentPage||oldView!=tftView||oldTab!=settingsSubTab;
-  if(layout){
-    tftFieldCount=0;
-    screen->fillScreen(BG);
-    oldPage=currentPage;oldView=tftView;oldTab=settingsSubTab;tftDirty=false;
-    panelAt(3,3,234,30);
-    ruText("BUSA 1M AI",12,22,WHITE);
-    if(currentPage<=1 && tftView==0){
-      const char* names[]={"T1 Вода","T2 Колонна","T3 Куб","T4 Верх колонны"};
-      for(int i=0;i<4;i++){
-        const int y=41+i*61;
-        panelAt(4,y,232,55);
-        ruText(names[i],14,y+18,GRAY);
-      }
-    }else{
-      panelAt(4,40,232,236);
-      ruText(pages[currentPage],13,61,WHITE);
-    }
-    screen->drawFastHLine(0,288,240,BLUE);
-    ruText("V12   BUSA 1M AI",8,305,GRAY);
-  }
-  if(currentPage<=1 && tftView==0){
-    for(int i=0;i<4;i++){
-      const int y=41+i*61;
-      const bool ok=hasTemp(i,now);
-      screenField(ok?String(temperature[i],1)+" C":"НЕТ ДАННЫХ",14,y+40,126,ok?GREEN:YELLOW);
-      if(currentPage==1){
-        const float v=selectedField?noticeTemp[i]:refTemp[i];
-        screenField((selectedField?"П:":"З:")+(isfinite(v)?String(v,1):String("--")),
-                    157,y+39,71,GRAY);
-      }
-    }
-  }else if(currentPage<=1){
-    for(int i=0;i<4;i++){
-      screenField(String("T")+String(i+1)+" GPIO"+String(TPIN[i])+": "+
-            (tempPresent[i]?"НАЙДЕН":"НЕТ ДАТЧИКА"),14,88+i*43,208,
-            tempPresent[i]?GREEN:YELLOW);
-    }
-  }else if(currentPage==2){
-    screenField("Режим: только наблюдение",13,96,210,GRAY);
-    screenField(String("Вода: ")+(flowReady?String(flowLpm,2)+" л/мин":"--"),
-      13,136,210,flowReady?GREEN:YELLOW);
-    screenField(String("Импульсы: ")+String(flowPulses()),13,175,210,GRAY);
-    screenField("Отбор: вручную",13,214,210,GRAY);
-  }else if(currentPage==3){
-    screenField("История расхода воды",13,95,210,GRAY);
-    screen->fillRect(14,109,209,116,PANEL);
-    screen->drawFastHLine(14,225,209,GRAY);
-    for(uint8_t i=1;i<40;i++){
-      const uint8_t a=(flowTraceHead+i-1)%40,b=(flowTraceHead+i)%40;
-      const int x1=16+(i-1)*5,x2=16+i*5;
-      const int y1=220-(int)fminf(100.0f,flowTrace[a]*19.0f);
-      const int y2=220-(int)fminf(100.0f,flowTrace[b]*19.0f);
-      screen->drawLine(x1,y1,x2,y2,GREEN);
-    }
-    screenField("Не для защиты",13,262,210,YELLOW);
-  }else if(currentPage==4){
-    screenField(String("PCF8575: ")+(pcfDetected?"OK":"НЕТ"),13,100,205,
-       pcfDetected?GREEN:YELLOW);
-    screenField(String("PCA9685: ")+(pcaDetected?"OK":"НЕТ"),13,136,205,
-       pcaDetected?GREEN:YELLOW);
-    screenField(String("Нажатий: ")+String(keyCount),13,172,205,GRAY);
-    screenField(String("Клавиатура: ")+(keypadReady?"OK":"НЕ ОБУЧЕНА"),
-                13,208,205,GRAY);
-    screenField("T1-T4: смотри iPhone",13,250,205,GRAY);
-  }else{
-    const char* tabs[]={"Wi-Fi","Google","Обновление","Модули"};
-    screenField(String("Раздел: ")+tabs[settingsSubTab],13,99,205,WHITE);
-    screenField("Управление через iPhone",13,138,205,GRAY);
-    screenField("Реле: отключены",13,177,205,YELLOW);
-    screenField("Диагностика: веб",13,216,205,GRAY);
-  }
-}
+#include "BUSA_ApprovedUI_V13.h"
+
 void renderScreen(uint32_t now){
   if(!tftStarted||!screen)return;
   if(!bootSplashComplete || !elapsed(now,splashStartedAt,splashHoldMs))return;
