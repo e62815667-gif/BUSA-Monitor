@@ -102,6 +102,14 @@ jobs:
           app=Path('index.html').read_text()
           assert '14v4-MANUAL-SCREEN-APP' in main
           assert 'TFT_DISPLAY_IDLE_MS' not in main
+          assert 'tftThemeDark=prefs.getBool("tftDarkColor",false)' in main
+          assert 'ru.drawUTF8(x,y,v.c_str())' in main
+          assert 'invertDisplay(tftInverted)' in main and 'tftInverted=false' in main
+          art=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedGraphics_HQ_V14.h').read_text()
+          landscape=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Landscape_V14.h').read_text()
+          assert 'v14ApplyPalette(bool dark)' in landscape and 'HQ_NAVY=0x088f' in landscape
+          assert 'static uint16_t HQ_NAVY' in art
+          assert 'themeSwitch' in app and 'busa-pwa-dark' in app
           assert 'darkenTftDisplay();' in main
           assert 'screenSt.enableDisplay(true)' in main
           assert 'data-tab="home"' in app and 'data-tab="events"' in app
