@@ -490,6 +490,9 @@ uint8_t tftProfile=1;
 bool tftStarted=false;
 bool tftInverted=false; // Reversible display controller color inversion
 uint32_t splashStartedAt=0,splashHoldMs=1700;
+uint8_t tftRotation=1; // 0/2 portrait, 1/3 landscape
+uint8_t bootStage=0; // 0 TFT, 1 WiFi, 2 modules, 3 1-Wire, 4 ready
+bool bootSplashComplete=false;
 bool tftRebootPending=false;
 uint32_t tftRebootAt=0;
 const char* tftProfileName(){return tftProfile==2?"ILI9341":"ST7789";}
@@ -539,22 +542,47 @@ void screenField(const String &v,int x,int y,int w,uint16_t color=WHITE){
   screen->fillRect(x,y-13,w,16,PANEL);
   ruText(v,x,y,color);
 }
+void updateBootStage(uint8_t stage){
+  if(!screen||!tftStarted)return;
+  bootStage=stage>4?4:stage;
+  const int16_t w=screen->width(),h=screen->height();
+  // Only update the footer. The white logo on black stays stationary.
+  const int16_t y=h-58;
+  screen->fillRect(0,y,w,58,0x0000);
+  screen->setTextColor(0xffff);
+  screen->setTextSize(1);
+  screen->setTextWrap(false);
+  const char* steps[]={"TFT INIT","WIFI INITIALIZING","MODULES CHECK","SENSOR BUS SCAN","READY"};
+  String status=String("BOOT: ")+steps[bootStage];
+  screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
+  screen->print(status);
+  const String version="FW V12 BOOT-ONEWIRE";
+  screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
+  screen->print(version);
+  const int16_t width=w-46;
+  screen->drawRect(22,y+38,width+2,10,0xffff);
+  const int16_t filled=(int16_t)((int32_t)width*bootStage/4);
+  if(filled>0)screen->fillRect(23,y+39,filled,8,0xffff);
+}
 void drawBootSplash(uint32_t holdMs){
   if(!screen)return;
-  screen->fillScreen(0x0000); // pure black
-  screen->setTextColor(0xffff); // pure white
+  const int16_t w=screen->width(),h=screen->height();
+  screen->fillScreen(0x0000);
+  screen->setTextColor(0xffff);
   screen->setTextWrap(false);
-  screen->setTextSize(3);
-  screen->setCursor(70,83);
+  const int scale=w>=300?3:2;
+  screen->setTextSize(scale);
+  screen->setCursor((w-10*6*scale)/2,h/2-50);
   screen->print("BUSA 1M AI");
   screen->setTextSize(2);
-  screen->setCursor(136,139);
+  screen->setCursor((w-36)/2,h/2+3);
   screen->print("001");
   screen->setTextSize(1);
   splashHoldMs=holdMs;
   splashStartedAt=millis();
   tftDirty=true;
   tftFieldCount=0;
+  updateBootStage(bootStage);
 }
 void startScreen(){
   Serial0.println("TFT: HW SPI landscape; controller model unverified");
@@ -562,18 +590,18 @@ void startScreen(){
   SPI.setFrequency(16000000); // moderate stable starting frequency
   if(tftProfile==2){screenIli.begin();screen=&screenIli;}
   else{screenSt.init(240,320);screen=&screenSt;}
-  screen->setRotation(1); // 320x240 landscape, both supported profiles
+  screen->setRotation(tftRotation); // 0..3 selected from iPhone
   screen->invertDisplay(tftInverted);
   ru.begin(*screen);
   ru.setFont(u8g2_font_6x13_t_cyrillic);
   ru.setFontMode(1);
-  drawBootSplash(2500);
   tftStarted=true;
+  drawBootSplash(6000); // splash stays until diagnostic cycle also completes
   Serial0.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
 }
 void renderScreen(uint32_t now){
   if(!tftStarted||!screen)return;
-  if(!elapsed(now,splashStartedAt,splashHoldMs))return;
+  if(!bootSplashComplete || !elapsed(now,splashStartedAt,splashHoldMs))return;
   static uint8_t drawnPage=255,drawnTab=255,drawnView=255;
   bool layout=tftDirty||drawnPage!=currentPage||
      drawnTab!=settingsSubTab||drawnView!=tftView;
@@ -745,6 +773,8 @@ String statusJSON(){
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
   s+=",\"pca9685_ack_only\":"+(pcaDetected?String("true"):String("false"));
   s+=",\"tft_attempted\":"+(tftStarted?String("true"):String("false"));
+  s+=",\"tft_rotation\":"+String(tftRotation);
+  s+=",\"tft_boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
   s+=",\"tft_profile_id\":"+String(tftProfile);
   s+=",\"tft_profile\":"+quoteJson(tftProfileName());
   s+=",\"tft_physical_pixels_confirmed\":false";
@@ -1024,7 +1054,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Команда запуска: '+s.modules.tft_profile+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);tftProfileLoaded=true}if(active===3)graphs();
+get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false}finally{pollBusy=false}}
 get('googleSave').onclick=async()=>{
 const url=get('googleUrl').value.trim(),token=get('googleToken').value.trim();
@@ -1097,7 +1127,7 @@ void readConsole(){
 }
 void setup(){
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V11 TFT DIAG BOOT; physical outputs LOCKED");
+  Serial0.println("\nBUSA 1M WiFi V12 BOOT-ONEWIRE; physical outputs LOCKED");
   Serial.begin(115200);
   delay(400);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
@@ -1106,8 +1136,13 @@ void setup(){
   prefs.begin("busa-r04",false);
   tftProfile=prefs.getUChar("tft",1);
   tftInverted=prefs.getBool("tftInvert",false);
+  tftRotation=prefs.getUChar("tftRotate",1);
+  if(tftRotation>3)tftRotation=1;
   startedAt=millis();
   if(tftProfile!=2)tftProfile=1;
+  // Initialize TFT first so splash actually covers Wi-Fi and sensor initialization.
+  screenAttempted=true;
+  startScreen();
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
   loadKeymap();
@@ -1130,6 +1165,7 @@ void setup(){
   // no STA password is embedded in this public source. Local AP fallback remains.
   apPassword="BUSA"+String((uint32_t)ESP.getEfuseMac(),HEX);
   wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
+  updateBootStage(1);
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str(),apPassword.c_str());
   if(stationSsid.length() && stationPass.length()>=8){
@@ -1357,9 +1393,9 @@ void setup(){
   Serial0.println("WEB started; temperature scan & I2C next");
   i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
   if(i2cOnline){Wire.setTimeOut(25);probeI2c(millis());}
+  updateBootStage(2);
   Serial0.printf("I2C=%d PCF=%d PCA=%d\n",(int)i2cOnline,(int)pcfDetected,(int)pcaDetected);
-  // Prioritize the AP and web UI at startup; start screen later.
-  Serial0.println("TFT: delayed start scheduled (hardware SPI)");
+  updateBootStage(3);
   launchGoogleCloud();
   Serial0.println("SETUP DONE: relay GPIO4/5/6/7 NEVER configured/driven");
 }
@@ -1375,11 +1411,17 @@ void loop(){
   if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
   if(tftRebootPending && elapsed(now,tftRebootAt,3000))ESP.restart();
   if(googleRestart && elapsed(now,googleRestartAt,3500))ESP.restart();
-  if(!screenAttempted && elapsed(now,startedAt,8000)){
-    screenAttempted=true;startScreen();
-  }
   sampleTemperatures(now);
   probeOneWire(now); // Diagnose on idle 1-Wire bus only
+  // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
+  if(!bootSplashComplete && wireProbe[0].checkedAt &&
+     wireProbe[1].checkedAt && wireProbe[2].checkedAt && wireProbe[3].checkedAt &&
+     elapsed(now,splashStartedAt,6000)){
+    bootSplashComplete=true;
+    updateBootStage(4);
+    // Show READY for 1.1 s, then reveal the main screen.
+    splashStartedAt=now;splashHoldMs=1100;
+  }
   sampleFlow(now);
   if(i2cOnline){
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
