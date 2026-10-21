@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 9v-KEY-CAPTURE";
+const char VERSION[]="БУСА 1М WiFi 10v-DIAG";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -47,6 +47,15 @@ float temperature[4]={NAN,NAN,NAN,NAN};
 bool tempPresent[4]={false,false,false,false};
 uint32_t tempAt[4]={0,0,0,0},tempCycle=0,tempRequestAt=0;
 bool tempConverting=false;
+// Read-only health checks; run only between conversion cycles.
+OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
+struct OneWireProbe {
+  bool presence=false,romFound=false,crcOk=false,familyOk=false,multiple=false;
+  uint8_t rom[8]={0};
+  uint32_t checkedAt=0;
+};
+OneWireProbe wireProbe[4];
+uint32_t lastWireProbe=0;
 bool elapsed(uint32_t now,uint32_t then,uint32_t ms){return (uint32_t)(now-then)>=ms;}
 void sampleTemperatures(uint32_t now){
   if(tempConverting && elapsed(now,tempRequestAt,825)){
@@ -74,6 +83,44 @@ void sampleTemperatures(uint32_t now){
   for(int i=0;i<4;i++)if(tempAt[i] && elapsed(now,tempAt[i],7000)){
     temperature[i]=NAN;tempAt[i]=0;
   }
+}
+void probeOneWire(uint32_t now){
+  if(tempConverting||!elapsed(now,lastWireProbe,12000))return;
+  lastWireProbe=now;
+  for(int i=0;i<4;i++){
+    OneWireProbe &p=wireProbe[i];
+    p=OneWireProbe();
+    p.checkedAt=now;
+    OneWire* bus=temperatureBuses[i];
+    p.presence=bus->reset()!=0;
+    bus->reset_search();
+    uint8_t first[8]={0},second[8]={0};
+    p.romFound=bus->search(first);
+    if(p.romFound){
+      memcpy(p.rom,first,8);
+      p.crcOk=OneWire::crc8(first,7)==first[7];
+      p.familyOk=first[0]==0x28; // DS18B20 family
+      p.multiple=bus->search(second);
+    }
+    bus->reset_search();
+  }
+}
+String romHex(const uint8_t rom[8]){
+  char hex[17];for(int j=0;j<8;j++)snprintf(hex+2*j,3,"%02X",(unsigned)rom[j]);
+  return String(hex);
+}
+bool hasTemp(int n,uint32_t now);
+String wireError(int i,uint32_t now){
+  const OneWireProbe& p=wireProbe[i];
+  if(!p.checkedAt)return "WAIT_DIAG";
+  if(!p.presence)return "NO_PRESENCE";
+  if(!p.romFound)return "NO_ROM";
+  if(!p.crcOk)return "ROM_CRC_BAD";
+  if(!p.familyOk)return "NOT_DS18B20";
+  if(p.multiple)return "MULTIPLE_ROM";
+  if(!tempPresent[i])return "LIBRARY_NOT_DETECTED";
+  if(!hasTemp(i,now))return "NO_VALID_READING";
+  return "OK";
 }
 bool hasTemp(int n,uint32_t now){
   return tempAt[n] && !elapsed(now,tempAt[n],7000) && isfinite(temperature[n]);
@@ -120,6 +167,9 @@ uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
 uint32_t keyCount=0,lastKeyScan=0,pendingAt=0;
 int pendingPair=-1;bool keyHeld=false;
 String keyMessage="NO DATA";
+uint16_t pcfIdleMask=65535,pcfObservedLow=0;
+uint8_t pcfPairCount=0,pcfScanError=0;
+uint32_t pcfLastScanAt=0;
 Preferences prefs;
 // Wall clock: phone supplies UTC epoch and local UTC offset via protected AP;
 // optional NTP keeps UTC updated when station internet is available.
@@ -217,23 +267,30 @@ void loadKeymap(){
 }
 // Detect a single closed physical pair on any two PCF8575 P0..P15.
 int scanKeyPair(){
-  if(!pcfDetected)return -1;
+  if(!pcfDetected){pcfScanError=1;return -1;}
+  pcfLastScanAt=millis();
+  pcfScanError=0;pcfPairCount=0;pcfObservedLow=0;
+  if(!pcfWrite(65535)){pcfScanError=2;return -2;}
+  delayMicroseconds(160);
+  if(!pcfRead(pcfIdleMask)){pcfScanError=3;return -2;}
   int found=-1;bool ambiguous=false;
   for(int a=0;a<16;a++){
-    if(!pcfWrite((uint16_t)(65535u & ~(1u<<a)))){ambiguous=true;break;}
+    if(!pcfWrite((uint16_t)(65535u & ~(1u<<a)))){pcfScanError=4;ambiguous=true;break;}
     delayMicroseconds(160);
     uint16_t v;
-    if(!pcfRead(v)){ambiguous=true;break;}
+    if(!pcfRead(v)){pcfScanError=5;ambiguous=true;break;}
     uint16_t lows=(uint16_t)(~v) & (uint16_t)~(1u<<a);
+    pcfObservedLow|=lows;
     if(!lows)continue;
-    if(lows&(lows-1)){ambiguous=true;break;}
+    if(lows&(lows-1)){pcfScanError=6;ambiguous=true;break;}
     int b=0;while(b<16 && !(lows&(1u<<b)))b++;
     if(b>=16)continue;
     int p=(min(a,b)<<4)|max(a,b);
-    if(found>=0 && found!=p){ambiguous=true;break;}
+    if(found>=0 && found!=p){pcfScanError=7;ambiguous=true;break;}
+    if(found<0)pcfPairCount=1;
     found=p;
   }
-  pcfWrite(65535);
+  if(!pcfWrite(65535)){pcfScanError=8;ambiguous=true;}
   return ambiguous?-2:found;
 }
 String pairName(int p){
@@ -403,6 +460,8 @@ void pollKeys(uint32_t now){
     }
   }else if(pair==-2){
     rawPair="НЕОДНОЗНАЧНО: проверь кнопку";
+  }else{
+    rawPair="НЕТ"; // V9 kept stale ambiguous pairs after release
   }
   if(pair!=pendingPair){pendingPair=pair;pendingAt=now;keyHeld=false;}
   if(pair<0||keyHeld||!elapsed(now,pendingAt,80))return;
@@ -655,6 +714,27 @@ String statusJSON(){
   s+=",\"expected\":"+quoteJson(keypadLearning&&learnStep<20?String(KEY_CAPS[learnStep]):String(""));
   s+=",\"raw_pair\":"+quoteJson(rawPair);
   s+=",\"message\":"+quoteJson(keypadMessage)+"}";
+  s+=",\"diagnostics\":{\"onewire\":[";
+  for(int i=0;i<4;i++){
+    if(i)s+=",";
+    const OneWireProbe& p=wireProbe[i];
+    s+="{\"gpio\":"+String(TPIN[i]);
+    s+=",\"probe_ms\":"+String(p.checkedAt);
+    s+=",\"presence\":"+(p.presence?String("true"):String("false"));
+    s+=",\"rom_found\":"+(p.romFound?String("true"):String("false"));
+    s+=",\"rom_crc_ok\":"+(p.crcOk?String("true"):String("false"));
+    s+=",\"family_ds18b20\":"+(p.familyOk?String("true"):String("false"));
+    s+=",\"multiple_rom\":"+(p.multiple?String("true"):String("false"));
+    s+=",\"rom\":"+quoteJson(p.romFound?romHex(p.rom):String(""));
+    s+=",\"result\":"+quoteJson(wireError(i,now))+"}";
+  }
+  s+="],\"keyboard\":{\"pcf_address\":"+String(pcfAddr);
+  s+=",\"last_scan_ms\":"+String(pcfLastScanAt);
+  s+=",\"idle_hex\":"+quoteJson(String(pcfIdleMask,HEX));
+  s+=",\"low_hex\":"+quoteJson(String(pcfObservedLow,HEX));
+  s+=",\"pairs\":"+String(pcfPairCount);
+  s+=",\"scan_error\":"+String(pcfScanError);
+  s+=",\"raw_pair\":"+quoteJson(rawPair)+"}}";
   s+=",\"ap\":{\"enabled\":"+(wifiRunning?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.softAPIP().toString())+"}";
   s+=",\"ota\":"+otaJSON();
@@ -773,6 +853,9 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
 <div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
+<h2>Диагностика V10 · реальные входы</h2><pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса 1-Wire...</pre>
+<pre id="diagKeyboard" style="white-space:pre-wrap;word-break:break-word">Ожидание PCF8575...</pre>
+<p class="hint">Ошибки: NO_PRESENCE — нет ответа на сброс 1-Wire; NO_ROM — не найден адрес; ROM_CRC_BAD — ошибка CRC; NO_VALID_READING — адрес найден, температура недоступна. Для клавиатуры: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
 <p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
 <h2>Экран TFT</h2>
 <p class="hint">Если TFT показывает светлый фон вместо тёмного макета, переключи аппаратную инверсию цветов. Настройка сохраняется, при необходимости можно вернуть обратно.</p>
@@ -865,6 +948,15 @@ if(s.keypad){
    ('Обучение '+s.keypad.step+'/20'):(s.keypad.ready?'Сохранена':'НЕТ');
  get('keyExpected').textContent=s.keypad.expected||'—';
  get('keyRaw').textContent=s.keypad.raw_pair||'—';
+ if(s.diagnostics){
+   get('diagOneWire').textContent=(s.diagnostics.onewire||[]).map((p,i)=>
+     'T'+(i+1)+' GPIO'+p.gpio+': '+p.result+' | RESET='+p.presence+
+     ' | ROM='+(p.rom||'—')+' | CRC='+p.rom_crc_ok).join('\n');
+   const k=s.diagnostics.keyboard||{};
+   get('diagKeyboard').textContent='PCF 0x'+Number(k.pcf_address||0).toString(16)+
+      ' | idle=0x'+k.idle_hex+' | low=0x'+k.low_hex+
+      ' | pair='+k.raw_pair+' | error='+k.scan_error;
+ }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?'Инициализирован':'Не подтверждён';if(active===3)graphs();
@@ -1195,6 +1287,7 @@ void loop(){
     screenAttempted=true;startScreen();
   }
   sampleTemperatures(now);
+  probeOneWire(now); // Diagnose on idle 1-Wire bus only
   sampleFlow(now);
   if(i2cOnline){
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
