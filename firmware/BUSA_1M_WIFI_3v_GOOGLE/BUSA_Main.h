@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v3-DISPLAY-GOOGLE-FINAL";
+const char VERSION[]="БУСА 1М WiFi 14v4-MANUAL-SCREEN-APP";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -380,6 +380,7 @@ void deleteSelectedReference(){
     (selectedField?" Пред.":" Зад.")+" - удалено";
 }
 void moveApprovedTab(int direction); // declaration required by keypad navigation
+void darkenTftDisplay(); // manual screen-off via F2 or local iPhone UI
 void keypadAction(int k){
   // Confirmed user assignments:
   // UP=7, DOWN=11, LEFT=16, RIGHT=18, ENT=19, ESC=15, F1=0.
@@ -467,8 +468,9 @@ void keypadAction(int k){
     }else{
       tftView=1; // Open detailed read-only view
     }
-  }else if(k==1){ // F2 outside editor: diagnostics
-    navigatePage(4);
+  }else if(k==1){ // F2 outside numeric editor: display OFF, monitoring stays active
+    darkenTftDisplay();
+    keyMessage="TFT погашен (ручной режим)";
   }else if(k==17 || k==4){navigatePage(0);} // 0,1 Home
   else if(k==5){navigatePage(1);selectedTemp=0;} // 2 Temperatures
   else if(k==6){navigatePage(2);} // 3 Collection
@@ -515,7 +517,7 @@ bool learnCommitPair(int pair){
 void wakeTftDisplay(); // Wake works even when the 5x4 keymap is untrained.
 bool tftDisplayOff=false;
 uint32_t tftDisplayActivityMs=0;
-const uint32_t TFT_DISPLAY_IDLE_MS=300000; // 5 minutes; ESP32 and Wi-Fi stay awake
+// No inactivity auto-off. Only F2 or explicit iPhone screen button blanks TFT.
 void pollKeys(uint32_t now){
   if(!pcfDetected||!elapsed(now,lastKeyScan,60))return;
   lastKeyScan=now;
@@ -947,7 +949,7 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <p id="updateResult" role="status">Ожидание подтверждения</p>
 </div><div class="card settingCard" data-stab="3" hidden><h2>Диагностика</h2>
 <div class="row">Экран ST7789 <b id="displayState">—</b></div>
-<p class="hint">Через 5 минут без нажатий TFT отключает отображение, а мониторинг и Wi-Fi продолжают работать. Любая правильно распознанная клавиша пробуждает экран без выполнения команды. Если клавиатура неисправна, пробуди экран с iPhone. Подсветка, подключённая постоянно к питанию, может оставаться включённой.</p>
+<p class="hint">Экран гаснет только по F2 или кнопке на iPhone. Любая распознанная клавиша снова включает экран без выполнения команды. Датчики, Wi-Fi и отправка в Google продолжают работать. Подсветка, постоянно подключённая к питанию, может не погаснуть.</p>
 <div class="grid"><button id="screenSleep" type="button">Погасить экран</button><button id="screenWake" type="button">Разбудить экран</button></div>
 <div class="row">Прошивка <b id="ver">—</b></div>
 <div class="row">Время работы <b id="uptime">—</b></div>
@@ -1584,10 +1586,6 @@ void loop(){
   if(i2cOnline){
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
     pollKeys(now);
-  }
-  if(bootSplashComplete && !tftDisplayOff && !keypadLearning &&
-     elapsed(now,tftDisplayActivityMs,TFT_DISPLAY_IDLE_MS)){
-    darkenTftDisplay();
   }
   if(tftStarted && !tftDisplayOff && !otaActive &&
      (tftDirty||lastRender==0 || elapsed(now,lastRender,2500))){
