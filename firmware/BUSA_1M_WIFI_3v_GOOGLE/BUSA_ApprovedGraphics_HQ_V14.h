@@ -2,29 +2,27 @@
 // BUSA-1M-001 V14: detailed RGB565 screen artwork translated from six user-approved PNG designs.
 // Works on 320x240 ST7789/ILI9341. Passive drawing only, NEVER controls any GPIO.
 // Screen pixel density is physical 320x240; shadows and layered shapes add visual detail.
-static const uint16_t HQ_NAVY=0x000b,HQ_DEEP=0x0012,HQ_GLOW=0x05ff,
- HQ_AZURE=0x045e,HQ_SKY=0x64ff,HQ_CYAN=0x67ff,HQ_LIGHT=0xdfff,
- HQ_LIME=0x57e0,HQ_AQUA=0x2e9f,HQ_GLASS=0x0353,HQ_STEEL=0xb5b6,
- HQ_SILVER=0xef9f,HQ_METAL=0x73ce,HQ_DARKMETAL=0x4208;
+// RGB565 high-contrast light palette, based on the six approved mockups.
+static const uint16_t HQ_NAVY=0xffdf,HQ_DEEP=0xffff,HQ_GLOW=0xfca0,
+ HQ_AZURE=0xd4a5,HQ_SKY=0x234c,HQ_CYAN=0x0519,HQ_LIGHT=0x2104,
+ HQ_LIME=0x2664,HQ_AQUA=0x767c,HQ_GLASS=0xf638,HQ_STEEL=0xad55,
+ HQ_SILVER=0xe73c,HQ_METAL=0xb5b6,HQ_DARKMETAL=0x6b4d;
 static uint16_t hqMix(uint16_t a,uint16_t b,uint8_t mix){
  uint16_t ar=(a>>11)&31,ag=(a>>5)&63,ab=a&31,br=(b>>11)&31,bg=(b>>5)&63,bb=b&31;
  return (((ar*(255-mix)+br*mix)/255)<<11)|(((ag*(255-mix)+bg*mix)/255)<<5)|((ab*(255-mix)+bb*mix)/255);
 }
 static void hqBackground(){
- for(int y=0;y<240;y++){
-  uint16_t c=hqMix(HQ_DEEP,HQ_NAVY,(uint8_t)(y*110/240));
-  screen->drawFastHLine(0,y,320,c);
- }
- for(int k=0;k<4;k++)screen->drawRoundRect(3+k,49+k,314-2*k,158-2*k,7,hqMix(HQ_DEEP,HQ_GLASS,k*16));
+  // Solid light cream, not an expensive striped gradient.
+  screen->fillScreen(HQ_NAVY);
+  screen->drawFastHLine(0,49,320,HQ_STEEL);
+  screen->drawFastHLine(0,210,320,HQ_STEEL);
 }
 static void hqPanel(int x,int y,int w,int h){
- if(w<7||h<7)return;
- screen->fillRoundRect(x,y,w,h,5,HQ_DEEP);
- for(int t=1;t<h-1;t++)screen->drawFastHLine(x+3,y+t,w-6,hqMix(0x116c,HQ_DEEP,(uint8_t)(t*170/h)));
- screen->drawRoundRect(x,y,w,h,5,HQ_AZURE);
- screen->drawRoundRect(x+1,y+1,w-2,h-2,4,HQ_GLASS);
- screen->drawFastHLine(x+8,y+1,w-16,HQ_GLOW);
- screen->drawFastHLine(x+8,y+h-2,w-16,0x012d);
+  if(w<7 || h<7)return;
+  screen->fillRoundRect(x,y,w,h,5,HQ_DEEP);
+  screen->drawRoundRect(x,y,w,h,5,HQ_STEEL);
+  screen->drawRoundRect(x+1,y+1,w-2,h-2,4,HQ_GLASS);
+  screen->drawFastHLine(x+6,y+1,w-12,HQ_GLOW);
 }
 static void hqBulb(int x,int y,int r,uint16_t c){
  screen->fillCircle(x,y,r+3,0x008e);
@@ -107,6 +105,18 @@ static void hqRig(int x,int y,int w,int h){
  screen->drawLine(X(42),Y(7),X(75),Y(7),HQ_SILVER);
  screen->drawLine(X(75),Y(7),X(75),Y(18),HQ_SILVER);
  screen->drawLine(X(49),Y(59),X(70),Y(59),HQ_GLOW);
+
+ // Cooling water only: a distinct YF-S401 flow sensor on the BLUE cooling line.
+ // This is a labelled illustrative symbol, not a claim of calibrated flow.
+ int fy=Y(58),fx=X(66);
+ screen->drawLine(X(49),fy,fx,fy,HQ_CYAN);
+ screen->fillRoundRect(fx,fy-7,18,14,3,HQ_SKY);
+ screen->drawRoundRect(fx+2,fy-5,14,10,2,HQ_CYAN);
+ screen->drawLine(fx+4,fy,fx+12,fy,HQ_DEEP);
+ screen->fillTriangle(fx+14,fy,fx+10,fy-3,fx+10,fy+3,HQ_DEEP);
+ // Small legible on-image label: YF and the dedicated cold-water arrow.
+ screen->drawFastHLine(fx+18,fy,8,HQ_CYAN);
+ screen->fillTriangle(fx+27,fy,fx+23,fy-3,fx+23,fy+3,HQ_CYAN);
  // Output bottle + liquid level as *static illustrative color*, NOT sensor reading
  int jarx=X(74),jary=Y(73),jarw=X(20)-X(0),jarh=Y(22)-Y(0);
  screen->drawRoundRect(jarx,jary,jarw,jarh,3,HQ_SILVER);
