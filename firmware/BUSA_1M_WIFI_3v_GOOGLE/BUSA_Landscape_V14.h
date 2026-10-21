@@ -88,7 +88,7 @@ static void v14Home(uint32_t now,bool layout){
   }
   screenField(v13Flow(),248,102,58,YELLOW);
   screenField(v13Total(),248,160,58,YELLOW);
-  v14Tiny(String("Wi-Fi: ")+(wifiRunning?"AP":"—")+
+  v14Tiny(String("Wi-Fi: ")+(WiFi.getMode()!=WIFI_OFF?"AP":"—")+
           "  |  K1-K4 заблокированы",9,206,GRAY);
 }
 static void v14Temperature(uint32_t now,bool layout){
