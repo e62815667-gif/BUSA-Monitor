@@ -1,175 +1,102 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101827"><title>БУСА-Монитор №001</title><link rel="manifest" href="./manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b1220;color:#edf4ff}*{box-sizing:border-box}body{margin:0}header{padding:26px 18px 16px;background:#122139}h1{font-size:25px;margin:0 0 7px}small,.muted{color:#9db1c9}main{max-width:640px;margin:auto;padding:16px 15px 105px}.notice{padding:12px;background:#3a2e21;border:1px solid #88643d;border-radius:12px;font-size:13px;margin-bottom:14px;color:#ffe0b1}.card{background:#18283f;border:1px solid #314761;border-radius:17px;padding:17px;margin-bottom:14px}.card h2{font-size:17px;margin:0 0 15px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.tile{padding:14px;border-radius:13px;background:#233854}.tile b{font-size:27px;display:block;margin:8px 0}.tile small{font-size:12px}.line{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #344c68;font-size:14px}.line:last-child{border:0}.line b{text-align:right}.hidden{display:none!important}nav{position:fixed;bottom:0;left:0;right:0;display:flex;overflow-x:auto;background:#111e31;border-top:1px solid #39506b;padding:8px 5px max(10px,env(safe-area-inset-bottom))}nav button{flex:0 0 auto;min-width:85px;background:transparent;color:#a6bad2;border:0;padding:12px 4px;font-size:13px}nav button.active{color:#80c2ff;font-weight:bold}button.action{padding:12px 15px;border:1px solid #527391;border-radius:10px;background:#2b527c;color:white;font-size:14px;margin:8px 7px 0 0}input{width:100%;background:#101e30;color:white;border:1px solid #526a84;padding:12px;border-radius:10px;margin-top:10px;font-size:16px}.state{color:#ffc27a}.tag{display:inline-block;border:1px solid #5b7797;border-radius:20px;padding:5px 10px;font-size:12px;color:#c7d7eb;margin-top:7px}.history{font-size:13px;max-height:240px;overflow:auto}.history div{padding:8px;border-bottom:1px solid #354b66}
-</style></head><body><header><h1>БУСА-Монитор</h1><small>БУСА-1М №001 · приложение для iPhone · v0.6.2</small><div class="tag" id="badge">Демонстрационный режим</div></header><main><div class="notice" id="notice">Демо-данные условные. Управление оборудованием недоступно.</div>
-<section id="overview"><div class="card"><h2>Состояние системы</h2><div class="line"><span>ESP32-S3</span><b id="dev">Нет подключения</b></div><div class="line"><span>Модуль DS2482S-800</span><b id="bridge">—</b></div><div class="line"><span>Клавиатура PCF8575</span><b id="keypad">—</b></div><div class="line"><span>Выходы управления</span><b>Отключены</b></div></div><div class="card"><h2>Четыре температуры</h2><div class="grid" id="summary"></div></div><div class="card"><h2>Клавиатура · последняя команда</h2><div class="line"><span>Клавиша</span><b id="lastkey">—</b></div><div class="line"><span>Номер события</span><b id="keyseq">—</b></div></div></section>
-<section id="temperatures" class="hidden"><div class="card"><h2>Температурные каналы</h2><div id="channels"></div></div><div class="card"><small>Четыре независимых канала DS18B20 через DS2482S-800. Датчик уровня жидкости исключён из прошивки.</small></div></section>
-<section id="keys" class="hidden"><div class="card"><h2 id="keyboard-title">Клавиатура</h2><div class="line"><span>Модуль</span><b>PCF8575</b></div><div class="line"><span>Последняя клавиша</span><b id="key2">—</b></div><div class="line"><span>Событий в журнале</span><b id="keycount">—</b></div><h2 style="margin-top:18px">Журнал нажатий</h2><div class="history" id="keyhistory">Нет данных</div></div></section>
-<section id="connection" class="hidden"><div class="card"><h2>Подключение к ESP32-S3</h2><small>Подключитесь к Wi-Fi контроллера BUSA-1M-001. Для чтения данных прошивка использует GET /api/telemetry, /api/capabilities и /api/keys.</small><input id="url" value="http://192.168.4.1" autocapitalize="off" spellcheck="false"><button class="action" id="connect">Подключиться</button><button class="action" id="demo">Демо</button><p class="muted" id="connection-status">Нет подключения</p></div><div class="card"><h2>Совместимость</h2><div class="line"><span>Прошивка</span><b id="firmware-version">Не подключена</b></div><div class="line"><span>Контроллер</span><b>ESP32-S3 N16R8</b></div><div class="line"><span>Датчики</span><b>4 × DS18B20</b></div><div class="line"><span>Режим API</span><b>Только чтение</b></div><p class="muted">Важное ограничение Safari: сайт GitHub Pages использует HTTPS, поэтому запросы к HTTP-адресу ESP32 могут блокироваться браузером. Реальную телеметрию следует просматривать через локальную страницу контроллера или после настройки безопасного HTTPS-доступа.</p><button class="action" id="local">Открыть локальный адрес</button></div></section>
-<section id="automation" class="hidden"><div class="card"><h2>Автоматика · проект</h2><div class="line"><span>Реле K1–K3</span><b>Не реализованы</b></div><div class="line"><span>Аварийная блокировка</span><b>Не реализована</b></div><div class="line"><span>Светодиоды PCA9685</span><b>Не реализованы</b></div><div class="line"><span>Экран TFT</span><b id="display-state">Нет подключения</b></div><p class="muted">Раздел сохранён для дальнейшей разработки. Дистанционное управление отсутствует.</p></div></section>
-<section id="calculator" class="hidden"><div class="card"><h2>Калькулятор · разработка приостановлена</h2><div class="notice">По нашему решению работа над калькулятором временно приостановлена. Раздел не удалён и будет продолжен позже.</div><div class="line"><span>Раздел 1</span><b>В ожидании</b></div><div class="line"><span>Раздел 2</span><b>В ожидании</b></div><div class="line"><span>Раздел 3</span><b>В ожидании</b></div><div class="line"><span>Раздел 4</span><b>В ожидании</b></div><div class="line"><span>Раздел 5</span><b>В ожидании</b></div><div class="line"><span>Раздел 6</span><b>В ожидании</b></div><div class="line"><span>Раздел 7</span><b>В ожидании</b></div><p class="muted">Непроверенные расчёты не выполняются. Точные формулы и ранее утверждённые настройки требуется восстановить из архива проекта перед возобновлением.</p></div></section>
-<section id="safety" class="hidden"><div class="card"><h2>Аварийное отключение</h2><p class="state">Функция пока не реализована в прошивке.</p><p class="muted">Приложение не может останавливать оборудование. Аппаратная защита должна работать независимо от ESP32 и Wi-Fi.</p></div></section></main>
-<nav><button data-tab="overview" class="active">Главная</button><button data-tab="temperatures">Температуры</button><button data-tab="keys">Клавиатура</button><button data-tab="connection">Связь</button><button data-tab="automation">Автоматика</button><button data-tab="calculator">Калькулятор</button><button data-tab="safety">Защита</button></nav>
-<script>(() => {
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const names = ['Вода', 'Колонна', 'Куб', 'Верхняя точка'];
-  const POLL_MS = 3000, TIMEOUT_MS = 4000, STALE_MS = 7000;
-  let generation = 0, mode = 'demo', timer = null, watchdog = null;
-  let pending = new Set(), lastGood = 0, counter = 0, caps = null;
-  const text = (id, value) => { $(id).textContent = value; };
-  function clearKeys(message = 'Нет данных') {
-    text('lastkey', '—'); text('key2', '—'); text('keyseq', '—');
-    text('keycount', '0'); text('keyhistory', message);
-  }
-  function clearReadings(label = 'Нет подключения') {
-    draw({temperatures: [], channels: []}, false);
-    text('dev', label); text('bridge', 'Нет данных'); text('keypad', 'Нет данных');
-    clearKeys();
-  }
-  function draw(d, isDemo) {
-    const value = i => Number.isFinite(d.temperatures?.[i]) &&
-      d.channels?.[i]?.valid === true ? d.temperatures[i] : null;
-    $('summary').innerHTML = names.map((name, i) => {
-      const v = value(i);
-      return '<div class="tile"><small>T' + (i+1) + ' · ' + name +
-        '</small><b>' + (v === null ? '—' : v.toFixed(1) + ' °C') +
-        '</b><small>' + (isDemo ? 'Демо' : v === null ? 'Нет достоверных данных' : 'Измерение') + '</small></div>';
-    }).join('');
-    $('channels').innerHTML = names.map((name, i) => '<div class="line"><span>T' +
-      (i+1) + ' · ' + name + '</span><b>' + (value(i) === null ? 'Нет данных' : value(i).toFixed(2) + ' °C') + '</b></div>').join('');
-    text('dev', isDemo ? 'Демо' : d.device || 'Нет подключения');
-    text('bridge', isDemo ? 'Демо' : d.bridge_online === true ? 'На связи' : 'Нет связи');
-    text('keypad', isDemo ? 'Демо' : d.keypad_online === true ? 'На связи' : 'Нет связи');
-    text('lastkey', d.last_key || '—'); text('key2', d.last_key || '—');
-    text('keyseq', d.key_seq ?? '—');
-  }
-  function stop() {
-    generation++; clearTimeout(timer); clearInterval(watchdog);
-    timer = watchdog = null;
-    for (const controller of pending) controller.abort();
-    pending.clear(); lastGood = 0; caps = null;
-  }
-  function baseURL() {
-    const u = new URL($('url').value.trim());
-    if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.search || u.hash)
-      throw Error('Нужен адрес http:// или https:// без пароля, параметров и #');
-    if (u.pathname !== '/' && u.pathname !== '') throw Error('Укажите адрес контроллера без пути');
-    return u.origin;
-  }
-  async function getJSON(base, path, token) {
-    const controller = new AbortController(); pending.add(controller);
-    let timeout;
-    try {
-      // Promise.race bounds the whole operation, including a stalled response body.
-      return await Promise.race([
-        (async () => {
-          const r = await fetch(base + path, {cache: 'no-store', signal: controller.signal});
-          if (!r.ok) throw Error('HTTP ' + r.status);
-          const value = await r.json();
-          if (token !== generation) throw Error('Устаревший запрос');
-          return value;
-        })(),
-        new Promise((_, reject) => {
-          timeout = setTimeout(() => { controller.abort(); reject(Error('Тайм-аут связи')); }, TIMEOUT_MS);
-        })
-      ]);
-    } finally { clearTimeout(timeout); pending.delete(controller); }
-  }
-  function checkCaps(c) {
-    if (c?.device !== 'BUSA-1M-001' || c.api_read_only !== true ||
-        c.physical_outputs !== false || c.temperature_channels !== 4 ||
-        !['5x4 PCF8575', '4x4 PCF8575'].includes(c.keyboard))
-      throw Error('Несовместимые возможности прошивки');
-  }
-  function checkTelemetry(d) {
-    if (d?.device !== 'BUSA-1M-001' || d.mode !== 'MONITOR_ONLY' || d.outputs_enabled !== false ||
-        !Array.isArray(d.temperatures) || d.temperatures.length !== 4 ||
-        !Array.isArray(d.channels) || d.channels.length !== 4 ||
-        typeof d.bridge_online !== 'boolean' || typeof d.keypad_online !== 'boolean')
-      throw Error('Неверный формат телеметрии');
-    d.channels.forEach((c, i) => {
-      if (typeof c?.valid !== 'boolean') throw Error('Нет признака достоверности канала');
-      if (c.valid && (!Number.isFinite(d.temperatures[i]) || d.temperatures[i] < -55 || d.temperatures[i] > 125 ||
-          !Number.isFinite(c.age_ms) || c.age_ms < 0 || c.age_ms > 3000 || !d.bridge_online))
-        throw Error('Недостоверное измерение');
-    });
-  }
-  function offline(message) {
-    lastGood = 0; clearReadings('Нет связи');
-    text('badge', 'Нет связи'); text('connection-status', message);
-    text('notice', 'Свежих измерений нет. Управление оборудованием недоступно.');
-  }
-  async function poll(base, token) {
-    if (token !== generation || mode !== 'real') return;
-    try {
-      // Read capabilities each cycle: detect a changed firmware after a reboot.
-      const c = await getJSON(base, '/api/capabilities', token); checkCaps(c);
-      const d = await getJSON(base, '/api/telemetry', token); checkTelemetry(d);
-      if (token !== generation) return;
-      if (d.version !== c.version) throw Error('Прошивка сменилась во время чтения');
-      caps = c; lastGood = Date.now(); draw(d, false);
-      text('keyboard-title', 'Клавиатура ' + c.keyboard.replace(' PCF8575', '').replace('x','×'));
-      text('firmware-version', c.version || '—');
-      text('display-state', c.display === true ? 'Испытательный профиль' : 'Выключен / отсутствует');
-      text('badge', 'Реальные данные'); text('connection-status', 'Телеметрия получена · ' + c.version);
-      text('notice', 'Мониторинг без управления оборудованием.');
-      try {
-        const k = await getJSON(base, '/api/keys', token);
-        if (token !== generation || !lastGood) return;
-        if (typeof k.stream_id !== 'string' || k.stream_id !== d.key_stream_id ||
-            !Array.isArray(k.events) || k.events.length > 64 ||
-            !k.events.every(e => Number.isInteger(e.seq) && e.seq > 0 && typeof e.key === 'string'))
-          throw Error('Неверный журнал или перезапуск контроллера');
-        text('keycount', String(k.events.length));
-        text('keyhistory', k.events.length ? k.events.map(e => e.seq + ': ' + e.key).join('\n') : 'Нет нажатий');
-      } catch (e) {
-        if (token !== generation) return;
-        text('keycount', '0'); text('keyhistory', 'Журнал недоступен: ' + e.message);
-      }
-    } catch (e) {
-      if (token !== generation) return;
-      caps = null; offline('Ошибка связи: ' + e.message);
-    } finally {
-      if (token === generation && mode === 'real') timer = setTimeout(() => poll(base, token), POLL_MS);
-    }
-  }
-  function sample() {
-    counter++;
-    draw({temperatures: [22.1,35.7,38.3,34.6].map((v,i) => v + .3*Math.sin(counter/7+i)),
-      channels: names.map(() => ({valid:true}))}, true);
-    timer = setTimeout(sample, 2000);
-  }
-  function setDemo() {
-    stop(); mode = 'demo'; clearKeys('В демо журнал реальных кнопок отключён');
-    text('badge', 'Демонстрационный режим'); text('connection-status', 'Демонстрация без ESP32');
-    text('notice', 'Демо-данные условные. Управление оборудованием недоступно.');
-    text('firmware-version', 'Не подключена'); text('keyboard-title', 'Клавиатура · демо'); sample();
-    text('display-state', 'Нет подключения');
-  }
-  $('connect').onclick = () => {
-    stop(); mode = 'real'; clearReadings('Подключение…'); text('firmware-version', 'Проверка…');
-    text('badge', 'Подключение…'); text('connection-status', 'Проверка возможностей контроллера…');
-    try {
-      const base = baseURL();
-      if (location.protocol === 'https:' && base.startsWith('http:'))
-        throw Error('HTTPS-сайт не подключается к HTTP ESP. Откройте локальную страницу контроллера');
-      const token = generation;
-      watchdog = setInterval(() => {
-        if (token === generation && lastGood && Date.now() - lastGood > STALE_MS)
-          offline('Показания устарели; ожидается новый ответ');
-      }, 500);
-      poll(base, token);
-    } catch (e) { offline(e.message); }
-  };
-  $('demo').onclick = setDemo;
-  $('local').onclick = () => { try { location.href = baseURL(); } catch (e) { text('connection-status', e.message); } };
-  document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
-    document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
-    $(b.dataset.tab).classList.remove('hidden');
-    document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
-  });
-  if (['http:', 'https:'].includes(location.protocol) && location.hostname !== 'e62815667-gif.github.io')
-    $('url').value = location.origin;
-  setDemo();
-})();
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f6f1"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>БУСА-Монитор №001</title><link rel="manifest" href="./manifest.webmanifest">
+<style>
+:root{color-scheme:light;--ink:#273f50;--muted:#667e8b;--paper:#faf9f4;--border:#dce6e9;--orange:#dfa05a;--teal:#007fa9;--warn:#ae452f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}
+*{box-sizing:border-box}body{margin:0}header{position:sticky;top:0;z-index:3;background:#fff;border-bottom:2px solid var(--orange);padding:14px 16px 10px;box-shadow:0 3px 12px #283e4f0b}
+h1{font-size:21px;margin:0 0 5px}header small{color:#647c89}main{max-width:660px;margin:auto;padding:13px 14px 108px}
+.card{background:#fff;border:1px solid var(--border);border-radius:15px;margin-bottom:13px;padding:16px;box-shadow:0 4px 12px #2448610a}
+.card h2{font-size:17px;margin:0 0 14px}.hero{background:linear-gradient(126deg,#fff4df,#ebf8fd);border:1px solid #ebd9be;border-radius:15px;padding:17px;margin-bottom:13px}
+.hero small{font-size:10px;letter-spacing:1.3px;font-weight:bold;color:#925829}.hero h2{font-size:27px;margin:7px 0}
+.status{display:inline-block;color:#965c1e;background:#fff5e5;border:1px solid #eacaa1;border-radius:30px;padding:6px 11px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.tile{padding:13px 11px;background:#f7fafb;border:1px solid #e0e9ed;border-radius:11px}.tile small{font-size:12px;color:#4c6c7b}.tile strong{display:block;margin:9px 0 1px;color:#207b6d;font-size:20px}
+.point{display:inline-block;border-radius:50%;width:9px;height:9px;margin-right:6px}.p1{background:#1297c5}.p2{background:#d5813f}.p3{background:#c5503c}.p4{background:#3d9d70}
+.row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #e9eff1;padding:10px 0;font-size:14px}.row:last-child{border-bottom:0}.row b{text-align:right}
+.muted{color:#667e8b;font-size:12px;line-height:1.5}.warn{color:var(--warn)}
+a.btn,button.btn{display:inline-flex;text-decoration:none;justify-content:center;align-items:center;padding:11px 15px;background:#f4d3a7;border:1px solid #d5a978;border-radius:9px;color:#3e413e;font-size:14px;font-weight:600;min-height:44px}
+a.btn.secondary{background:#eef7fa;border-color:#a8cfdf;color:#155e82}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0 4px}.actions a{flex:1 1 200px}
+.rigs svg{width:100%;height:auto;max-height:260px;display:block}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.chips span{background:#fff3e8;border:1px solid #edd5bd;border-radius:8px;padding:10px 3px;text-align:center;font-size:12px}.chips b{display:block;color:#a34d36;font-size:11px;margin-top:6px}
+section[hidden]{display:none!important}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:4;display:flex;overflow-x:auto;background:#fff;border-top:2px solid #efc79b;padding:6px 6px max(7px,env(safe-area-inset-bottom));box-shadow:0 -4px 14px #1d3c510e;scrollbar-width:none}
+nav button{flex:1 0 auto;min-width:72px;border:1px solid transparent;border-radius:9px;background:#fff;color:#58707e;padding:12px 6px;font:12px system-ui;cursor:pointer}
+nav button.active{background:#f7d5a9;border-color:#e8b274;color:#354b55;font-weight:bold}
+.graphTabs{display:flex;gap:7px;margin-bottom:12px}.graphTabs button{flex:1;border:1px solid #c6d5dc;background:#f5fafb;border-radius:9px;padding:11px;color:#2b5b71;font:13px system-ui}.graphTabs button.on{background:#f6cf9c;border-color:#dca767;font-weight:700}
+@media(max-width:380px){.chips{grid-template-columns:repeat(2,1fr)}.tile strong{font-size:17px}nav button{min-width:67px;padding:10px 5px}}
+</style></head><body>
+<header><h1>БУСА-1М №001</h1><small>Монитор · iPhone · светлая версия V14.4</small></header>
+<main>
+<div class="card"><div class="row"><span>Подключение</span><b id="statusText" class="warn">Не подключено</b></div>
+<p class="muted">Живые показания открываются непосредственно из локальной сети ESP32-S3. Эта страница сохранит знакомые вкладки даже без интернета.</p>
+<a class="btn" href="http://192.168.4.1/">Открыть БУСА по Wi-Fi</a></div>
+<section id="home">
+<div class="hero"><small>СИСТЕМА МОНИТОРИНГА</small><h2>Главная</h2><span class="status">● Ожидается соединение с БУСА</span></div>
+<div class="card"><h2>Четыре температуры</h2><div class="grid">
+<div class="tile"><small><i class="point p1"></i>T1 Вода</small><strong>Н/Д</strong></div>
+<div class="tile"><small><i class="point p2"></i>T2 Колонна</small><strong>Н/Д</strong></div>
+<div class="tile"><small><i class="point p3"></i>T3 Куб</small><strong>Н/Д</strong></div>
+<div class="tile"><small><i class="point p4"></i>T4 Верх колонны</small><strong>Н/Д</strong></div>
+</div></div>
+<div class="card rigs"><h2>Схема установки</h2>
+<svg viewBox="0 0 360 225" role="img" aria-label="Рисунок установки с YF-S401 на линии охлаждающей воды">
+<defs><linearGradient id="silver" x1="0" x2="1"><stop stop-color="#738b9b"/><stop offset=".42" stop-color="#e6f1f4"/><stop offset="1" stop-color="#829aa7"/></linearGradient></defs>
+<rect width="360" height="225" rx="12" fill="#f7fbfd"/>
+<path d="M96 16 H255 V49" fill="none" stroke="#7d929d" stroke-width="6"/>
+<rect x="28" y="145" width="127" height="60" rx="18" fill="url(#silver)" stroke="#697e8b" stroke-width="2"/>
+<rect x="43" y="155" width="97" height="39" rx="9" fill="#7c96a5" stroke="#597b89"/>
+<rect x="82" y="22" width="27" height="126" rx="6" fill="url(#silver)" stroke="#648092" stroke-width="2"/>
+<g stroke="#71899b" stroke-width="3"><path d="M78 42 H114 M78 58 H114 M78 74 H114 M78 90 H114 M78 106 H114 M78 122 H114"/></g>
+<rect x="229" y="49" width="58" height="80" rx="11" fill="url(#silver)" stroke="#718b9a" stroke-width="2"/>
+<path d="M240 58 Q277 67 240 73 T240 89 T240 105 T240 120" fill="none" stroke="#0c9dd0" stroke-width="4"/>
+<path d="M216 111 V140 H331" fill="none" stroke="#078ebd" stroke-width="5"/>
+<rect x="285" y="126" width="39" height="27" rx="6" fill="#d8f4fb" stroke="#0a83ad" stroke-width="3"/>
+<path d="M291 139 H317 M310 133 L317 139 L310 145" stroke="#1778a4" fill="none" stroke-width="2"/>
+<text x="305" y="121" font-size="12" fill="#166e98" font-weight="bold" text-anchor="middle">YF-S401</text>
+<text x="304" y="167" font-size="11" fill="#287895" text-anchor="middle">ВОДА</text>
+<path d="M260 129 H339 V185" fill="none" stroke="#8595a0" stroke-width="4"/>
+<rect x="312" y="183" width="31" height="33" rx="5" fill="white" stroke="#8299a7" stroke-width="2"/>
+<rect x="315" y="199" width="25" height="13" rx="2" fill="#aeddeb"/>
+<text x="94" y="218" text-anchor="middle" fill="#6f8695" font-size="11">T1–T4</text>
+</svg>
+<p class="muted">YF-S401 показан на линии охлаждающей воды, не отбора. Изображение иллюстративное.</p></div>
+<div class="grid"><div class="card"><h2>Вода YF-S401</h2><span class="warn">Нет показаний</span><p class="muted">Импульсы и калибровка доступны в локальной панели.</p></div>
+<div class="card"><h2>Отбор</h2><span class="warn">Нет датчика</span><p class="muted">Показания не имитируются.</p></div></div>
+<div class="card"><h2>К1–К4</h2><div class="chips"><span>К1<b>БЛОК</b></span><span>К2<b>БЛОК</b></span><span>К3<b>БЛОК</b></span><span>К4<b>БЛОК</b></span></div></div>
+</section>
+<section id="temps" hidden><div class="card"><h2>Температуры · T1–T4</h2>
+<div class="row"><span>Вода</span><b>Н/Д</b></div><div class="row"><span>Колонна</span><b>Н/Д</b></div><div class="row"><span>Куб</span><b>Н/Д</b></div><div class="row"><span>Верх колонны</span><b>Н/Д</b></div>
+<p class="muted">Настройка справочных порогов температуры и реальные показания доступны после открытия локальной панели БУСА.</p></div></section>
+<section id="collection" hidden><div class="card"><h2>Отбор жидкости</h2><div class="row"><span>Расход, мл/мин</span><b class="warn">НЕТ ДАТЧИКА</b></div><div class="row"><span>Собрано, мл</span><b class="warn">Н/Д</b></div><p class="muted">YF-S401 измеряет импульсы охлаждающей воды, не отбор.</p></div></section>
+<section id="settings" hidden>
+<div class="card"><h2>Настройки</h2>
+<div class="row"><span>Температуры T1–T4</span><b>Локальная панель</b></div>
+<div class="row"><span>Экран ST7789</span><b>320 × 240</b></div>
+<div class="row"><span>Гашение экрана</span><b>Только вручную</b></div>
+<div class="row"><span>К1–К4</span><b>БЛОК</b></div>
+<div class="row"><span>Wi-Fi и Google</span><b>Настроить в БУСА</b></div>
+<div class="actions"><a class="btn" href="http://192.168.4.1/">Открыть настройки БУСА</a>
+<a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/blob/lab/busa-v14-3-final-display-google/google/README_BUSA_Google_Drive.md">Инструкция Google Диск</a></div>
+<p class="muted">Google Диск на iPhone позволяет смотреть таблицу. Для передачи каждые 30 секунд БУСА требует соединения с интернетом и Apps Script-приёмника.</p>
+</div></section>
+<section id="graphs" hidden>
+<div class="card"><h2>Графики</h2><div class="graphTabs"><button class="on" data-chart="0">T1–T4</button><button data-chart="1">Вода</button><button data-chart="2">Отбор</button></div>
+<div data-chart-panel="0"><p class="muted">Четыре температурные линии появятся после подключения к БУСА.</p></div>
+<div data-chart-panel="1" hidden><p class="muted">График реальных импульсов охлаждающей воды доступен в локальной панели.</p></div>
+<div data-chart-panel="2" hidden><p class="warn">Датчик отбора отсутствует. График не формируется.</p></div>
+</div></section>
+<section id="events" hidden><div class="card"><h2>Журнал событий</h2><p class="muted">Для просмотра текущих событий и ошибок PCF8575, DS18B20, YF-S401 открой локальную панель БУСА.</p></div></section>
+</main>
+<nav aria-label="Разделы"><button data-tab="home" class="active">Главная</button><button data-tab="temps">T1–T4</button><button data-tab="collection">Отбор</button><button data-tab="settings">Настройки</button><button data-tab="graphs">Графики</button><button data-tab="events">События</button></nav>
+<script>
+document.querySelectorAll('nav [data-tab]').forEach(b=>b.addEventListener('click',()=>{
+ document.querySelectorAll('main section[id]').forEach(s=>s.hidden=s.id!==b.dataset.tab);
+ document.querySelectorAll('nav [data-tab]').forEach(t=>t.classList.toggle('active',t===b));
+ window.scrollTo(0,0);
+}));
+document.querySelectorAll('[data-chart]').forEach(b=>b.addEventListener('click',()=>{
+ document.querySelectorAll('[data-chart]').forEach(t=>t.classList.toggle('on',t===b));
+ document.querySelectorAll('[data-chart-panel]').forEach(p=>p.hidden=p.dataset.chartPanel!==b.dataset.chart);
+}));
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 </script></body></html>
