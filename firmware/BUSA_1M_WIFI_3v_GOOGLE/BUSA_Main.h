@@ -435,7 +435,7 @@ void keypadAction(int k){
     if(currentPage==1){
       selectedTemp=(selectedTemp+(k==7?3:1))%4; // sensor row
     }else if(currentPage==5){
-      approvedSettingsItem=(approvedSettingsItem+(k==7?5:1))%6;
+      approvedSettingsItem=(approvedSettingsItem+(k==7?6:1))%7;
     }else if(currentPage==3){
       graphSubView=(graphSubView+(k==7?2:1))%3;
     }else{
@@ -445,7 +445,7 @@ void keypadAction(int k){
     if(currentPage==1){
       selectedField=k==16?0:1; // target / warning informational fields
     }else if(currentPage==5){
-      approvedSettingsItem=(approvedSettingsItem+(k==16?5:1))%6;
+      approvedSettingsItem=(approvedSettingsItem+(k==16?6:1))%7;
     }else if(currentPage==3){
       graphSubView=(graphSubView+(k==16?2:1))%3;
     }else{
