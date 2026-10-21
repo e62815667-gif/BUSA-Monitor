@@ -34,7 +34,7 @@ static void v13Collect(uint32_t now){
       v13OldTemps[i]=tempPresent[i];
     }
   }
-  if(flowSeen!=v13OldFlow){v13Log("Импульсы расхода зарегистрированы");v13OldFlow=flowSeen;}
+  if(flowSeen!=v13OldFlow){v13Log("YF-S401: импульсы воды");v13OldFlow=flowSeen;}
   if(v13HistoryCount==0 || elapsed(now,v13LastCapture,5000)){
     v13LastCapture=now;
     for(int i=0;i<4;i++)v13History[i][v13HistoryHead]=hasTemp(i,now)?temperature[i]:NAN;
@@ -58,10 +58,10 @@ static String v13Temp(int i,uint32_t now){
 }
 static String v13Ref(float v){return isfinite(v)?String(v,1):String("--");}
 static String v13Flow(){
-  return flowSeen?String(flowLpm*1000.0f,1):String("Н/Д");
+  return String("Н/Д"); // Collection sensor absent; YF-S401 reports WATER only
 }
 static String v13Total(){
-  return flowSeen?String(totalWaterLitres()*1000.0f,0):String("Н/Д");
+  return String("Н/Д"); // Do not confuse water pulses with collected liquid
 }
 static void v13Frame(uint32_t now){
   screen->fillScreen(BG);
@@ -134,7 +134,7 @@ static void v13Home(uint32_t now,bool layout){
     const int y=34+i*53;
     screenField(v13Temp(i,now),24,y+34,84,hasTemp(i,now)?GREEN:YELLOW);
   }
-  screenField(v13Flow()+" мл/мин",134,218,96,flowSeen?GREEN:YELLOW);
+  screenField(v13Flow()+" мл/мин",134,218,96,YELLOW);
   screenField(v13Total()+" мл",134,248,96,flowSeen?GREEN:YELLOW);
   screenField(String("Wi-Fi ")+(WiFi.getMode()!=WIFI_OFF?"AP OK":"НЕТ")+"   Реле ВЫКЛ",12,267,216,GREEN);
 }
@@ -187,14 +187,15 @@ static void v13Collection(uint32_t now,bool layout){
     v13Text("Текущий расход",15,70,GRAY);
     v13Text("Собрано жидкости",15,127,GRAY);
     v13Panel(5,166,230,68);
-    v13Text("График расхода",13,184,V13_CYAN);
+    v13Text("График отбора",13,184,V13_CYAN);
     v13Panel(5,238,230,34);
-    v13Text("ВОДА · калибровка не выполнена",11,254,YELLOW);
+    v13Text("Нет датчика отбора",11,254,YELLOW);
   }
   screenField(v13Flow()+" мл/мин",18,94,207,flowSeen?GREEN:YELLOW);
   screenField(v13Total()+" мл",18,151,207,flowSeen?GREEN:YELLOW);
-  v13FlowGraph(12,190,216,36);
-  screenField("Импульсов: "+String(flowPulses()),15,269,208,GRAY);
+  screen->fillRect(12,188,216,38,PANEL);
+  v13Text("Пока нет датчика отбора",15,210,YELLOW);
+  screenField("YF-S401 вода: "+String(flowPulses())+" имп.",15,269,208,GRAY);
 }
 static void v13TemperatureGraph(int x,int y,int w,int h){
   screen->fillRect(x,y,w,h,PANEL);
