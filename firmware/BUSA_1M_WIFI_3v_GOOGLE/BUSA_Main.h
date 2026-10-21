@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v-LANDSCAPE-OTA";
+const char VERSION[]="БУСА 1М WiFi 14v-HQ-APPROVED-LANDSCAPE";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -605,7 +605,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V14 LANDSCAPE";
+  const String version="FW V14 HQ APPROVED";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -651,6 +651,7 @@ void startScreen(){
 // Portrait-specific layout prevents 320px-wide landscape cards from clipping at 240px.
 #include "BUSA_ApprovedUI_V13.h"
 
+#include "BUSA_ApprovedGraphics_HQ_V14.h"
 #include "BUSA_Landscape_V14.h"
 void renderScreen(uint32_t now){
   if(!tftStarted||!screen)return;
@@ -1189,6 +1190,14 @@ void setup(){
     if(tftRotation==1||tftRotation==3)tftRotation=0;
     prefs.putUChar("tftRotate",tftRotation);
     prefs.putBool("v13portrait",true);
+  }
+  // V14 HQ follows user-approved horizontal TFT 320x240 layout.
+  // One-time NVS migration preserves preconfigured landscape rotation 1 or 3.
+  if(!prefs.getBool("v14hqLandscape",false)){
+    if(tftRotation==0)tftRotation=1;
+    else if(tftRotation==2)tftRotation=3;
+    prefs.putUChar("tftRotate",tftRotation);
+    prefs.putBool("v14hqLandscape",true);
   }
   startedAt=millis();
   if(tftProfile!=2)tftProfile=1;
