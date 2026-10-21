@@ -18,6 +18,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <time.h>
+#include <sys/time.h>
 #include <esp_system.h>
 #include <Wire.h>
 #include <Preferences.h>
@@ -37,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 5v-MANUAL-ONLY";
+const char VERSION[]="БУСА 1М WiFi 6v-CLOCK-DIAG";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -120,6 +121,26 @@ uint32_t keyCount=0,lastKeyScan=0,pendingAt=0;
 int pendingKey=-1;bool keyHeld=false;
 String keyMessage="NO DATA";
 Preferences prefs;
+// Wall clock: phone supplies UTC epoch and local UTC offset via protected AP;
+// optional NTP keeps UTC updated when station internet is available.
+int32_t clockUtcOffsetMinutes=0;
+bool clockZoneKnown=false;
+bool clockNtpStarted=false;
+bool deviceClockValid(){
+  return clockZoneKnown && time(nullptr)>=(time_t)1609459200;
+}
+String clockStamp(bool compact=false){
+  if(!deviceClockValid())return compact?String("--.-- --:--"):String("Время не синхронизировано");
+  time_t localEpoch=time(nullptr)+(time_t)(clockUtcOffsetMinutes*60);
+  struct tm t={};
+  gmtime_r(&localEpoch,&t);
+  char buf[32];
+  if(compact)snprintf(buf,sizeof(buf),"%02d.%02d %02d:%02d",
+     t.tm_mday,t.tm_mon+1,t.tm_hour,t.tm_min);
+  else snprintf(buf,sizeof(buf),"%02d.%02d.%04d %02d:%02d:%02d",
+     t.tm_mday,t.tm_mon+1,t.tm_year+1900,t.tm_hour,t.tm_min,t.tm_sec);
+  return String(buf);
+}
 bool ack(uint8_t address){
   Wire.beginTransmission(address);return Wire.endTransmission()==0;
 }
@@ -337,6 +358,8 @@ void renderScreen(uint32_t now){
     screen->drawFastHLine(0,217,320,BLUE);
     ruText("# / *: вкладки   UP/DOWN: страницы",5,231,GRAY);
   }
+  // Clock is refreshed separately; avoid wiping the entire screen each tick.
+  screenField(clockStamp(true),218,21,98,deviceClockValid()?WHITE:YELLOW);
   if(currentPage<=1){
     if(tftView==0){
       for(int i=0;i<4;i++){
@@ -435,6 +458,9 @@ String statusJSON(){
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
+  s+=",\"clock\":{\"synchronized\":"+(deviceClockValid()?String("true"):String("false"));
+  s+=",\"datetime\":"+quoteJson(clockStamp(false));
+  s+=",\"utc_offset_minutes\":"+String(clockUtcOffsetMinutes)+"}";
   s+=",\"display_references\":[";
   for(int i=0;i<4;i++){
     if(i)s+=",";
@@ -518,7 +544,7 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <header><h1>БУСА-1М с ИИ · №001</h1><nav>
 <button data-page="0" class="on">Главная</button><button data-page="1">Температуры</button>
 <button data-page="2">Отбор</button><button data-page="3">Графики</button><button data-page="4">События</button><button data-page="5">Настройки</button>
-</nav><div style="display:flex;gap:7px;padding-top:8px"><button type="button" id="tftUp" style="flex:1">TFT ↑</button><button type="button" id="tftDown" style="flex:1">TFT ↓</button></div></header><main>
+</nav><div id="clockDisplay" style="padding:7px 0 2px;color:#a5dfff;font-size:13px" aria-live="off">Дата и время: синхронизация…</div><div style="display:flex;gap:7px;padding-top:8px"><button type="button" id="tftUp" style="flex:1">TFT ↑</button><button type="button" id="tftDown" style="flex:1">TFT ↓</button></div></header><main>
 <section class="page" data-section="0"><div class="card"><h2>Температуры</h2><div class="grid">
 <div class="tile"><small>Вода</small><strong id="t0">—</strong></div><div class="tile"><small>Колонна</small><strong id="t1">—</strong></div>
 <div class="tile"><small>Куб</small><strong id="t2">—</strong></div><div class="tile"><small>Верх колонны</small><strong id="t3">—</strong></div></div></div>
@@ -569,7 +595,23 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 </div><div class="card settingCard" data-stab="3" hidden><h2>Диагностика</h2><div class="row">Прошивка <b id="ver">—</b></div><div class="row">Время работы <b id="uptime">—</b></div><div class="row">PCF8575 <b id="pcf">—</b></div><div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div></div></section>
 <footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer></main>
 <script>
-const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false;
+const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];
+let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0;
+function showPhoneClock(){
+  get('clockDisplay').textContent='Дата и время: '+
+    new Date().toLocaleString('ru-RU',{year:'numeric',month:'2-digit',day:'2-digit',
+      hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+}
+async function syncClock(){
+  const d=new Date();
+  // Negative getTimezoneOffset is the conventional minutes EAST of UTC.
+  const body=new URLSearchParams({epoch:String(Math.floor(d.getTime()/1000)),
+    tz:String(-d.getTimezoneOffset())});
+  try{
+    const r=await fetch('/api/time/sync',{method:'POST',body});
+    if(r.ok)lastClockPush=Date.now();
+  }catch(e){}
+}
 function message(s){logs.unshift(new Date().toLocaleTimeString('ru-RU')+' · '+s);logs.splice(12);get('events').textContent=logs.join('\n')}
 function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
 function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
@@ -655,7 +697,10 @@ let sel=get('net');sel.innerHTML='<option value="">Выберите сеть</op
 catch(e){get('response').textContent='Ошибка поиска: '+e.message}this.disabled=false};
 get('save').onclick=async function(){let ssid=get('net').value,pass=get('pass').value;if(!ssid||pass.length<8||pass.length>63){get('response').textContent='Выбери сеть из списка и введи пароль (8–63 символа)';return}this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
 try{let r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass})});get('response').textContent=await r.text();if(r.ok){get('pass').value='';message('Настройки сети сохранены: '+ssid)}}catch(e){get('response').textContent='Ошибка: '+e.message}this.disabled=false};
-message('Веб-приложение запущено');update();setInterval(update,1500);
+message('Веб-приложение запущено');
+showPhoneClock();setInterval(showPhoneClock,1000);
+syncClock();setInterval(syncClock,300000);
+update();setInterval(update,1500);
 </script></body></html>
 )HTMLBUSA";
 
@@ -695,6 +740,9 @@ void setup(){
   if(tftProfile!=2)tftProfile=1;
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
+  clockZoneKnown=prefs.getBool("clkZone",false);
+  clockUtcOffsetMinutes=prefs.getInt("clkTz",0);
+  if(clockUtcOffsetMinutes<(-12*60)||clockUtcOffsetMinutes>14*60)clockZoneKnown=false;
   for(int i=0;i<4;i++){
     String k=String("rf")+String(i),j=String("nt")+String(i);
     refTemp[i]=prefs.getFloat(k.c_str(),NAN);
@@ -705,6 +753,8 @@ void setup(){
   setupGoogleCloud();
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
+  configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
+  clockNtpStarted=true;
   // Private STA password must be provisioned into NVS after public GitHub build;
   // no STA password is embedded in this public source. Local AP fallback remains.
   apPassword="BUSA"+String((uint32_t)ESP.getEfuseMac(),HEX);
@@ -717,6 +767,29 @@ void setup(){
     Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
   }else Serial0.println("STA config missing: preprovision NVS before use; AP stays available");
   server.on("/",HTTP_GET,[]{server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
+  server.on("/api/time/sync",HTTP_POST,[]{
+    if(!apClient()){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;
+    }
+    String e=server.arg("epoch"),tz=server.arg("tz");
+    char *end=nullptr,*tzEnd=nullptr;
+    long long sec=strtoll(e.c_str(),&end,10);
+    long offset=strtol(tz.c_str(),&tzEnd,10);
+    if(e.isEmpty()||!end||*end||tz.isEmpty()||!tzEnd||*tzEnd||
+       sec<1609459200LL||sec>4102444800LL||offset<-720||offset>840){
+       server.send(400,"text/plain","Неверные дата/время/часовой пояс");return;
+    }
+    timeval tv;tv.tv_sec=(time_t)sec;tv.tv_usec=0;
+    if(settimeofday(&tv,nullptr)!=0){
+      server.send(500,"text/plain","Не удалось синхронизировать часы");return;
+    }
+    clockUtcOffsetMinutes=(int32_t)offset;clockZoneKnown=true;
+    prefs.putInt("clkTz",clockUtcOffsetMinutes);
+    prefs.putBool("clkZone",true);
+    Serial0.println("CLOCK: synchronized from phone, UTC offset stored");
+    tftDirty=true;lastRender=0;
+    server.send(200,"application/json",String("{\"datetime\":")+quoteJson(clockStamp(false))+"}");
+  });
   server.on("/api/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",statusJSON());
