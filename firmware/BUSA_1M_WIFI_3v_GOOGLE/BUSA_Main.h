@@ -34,7 +34,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 4v-LANDSCAPE-DIAG";
+const char VERSION[]="БУСА 1М WiFi 4v-LANDSCAPE-REF";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -140,6 +140,18 @@ bool pcfRead(uint16_t &v){
 uint8_t currentPage=0; // Six approved UI pages
 uint8_t settingsSubTab=0,tftView=0;
 bool tftDirty=true;
+float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
+// Informational display preferences. Never used for physical outputs.
+int selectedTemp=0,selectedField=0;
+bool editingTemp=false;
+String editTempBuffer="";
+bool storeTempReference(int sensor,int field,float value){
+  if(sensor<0||sensor>3||field<0||field>1||!isfinite(value)||value<0||value>125)return false;
+  String key=String(field?"nt":"rf")+String(sensor);
+  if(prefs.putFloat(key.c_str(),value)==0)return false;
+  (field?noticeTemp[sensor]:refTemp[sensor])=value;
+  return true;
+}
 
 // Physical faceplate, row-major by user photo. Exact nine-wire matrix
 // connection must still be confirmed during keypad diagnostic testing.
@@ -148,33 +160,71 @@ const char* const KEY_CAPS[20]={
  "7","8","9","ESC","LEFT","0","RIGHT","ENT"
 };
 void keypadAction(int k){
-  uint8_t old=currentPage;
-  if(k==7) {tftView=0;} // UP: first screen of the selected section
-  else if(k==11) {tftView=1;} // DOWN: additional information
-  else if(k==2||k==16) { // # or left arrow
+  if(editingTemp){
+    if(k==0){if(editTempBuffer.length())editTempBuffer.remove(editTempBuffer.length()-1);} // F1 delete
+    else if(k==1){if(editTempBuffer.indexOf('.')<0)editTempBuffer+='.';} // F2 decimal point
+    else if(k==15){editingTemp=false;editTempBuffer="";} // Esc cancel
+    else if(k==19){ // Ent save informational value
+      if(editTempBuffer.length() && storeTempReference(selectedTemp,selectedField,editTempBuffer.toFloat())){
+        editingTemp=false;editTempBuffer="";
+      }else keyMessage="Проверь значение 0..125";
+    }else{
+      int digit=-1;
+      const int digitKey[10]={17,4,5,6,8,9,10,12,13,14};
+      for(int d=0;d<10;d++)if(k==digitKey[d])digit=d;
+      if(digit>=0 && editTempBuffer.length()<7)editTempBuffer+=String(digit);
+    }
+    tftDirty=true;return;
+  }
+  if(currentPage==1){ // Temperatures page: choose sensor/field, Ent edits
+    if(k==7)selectedTemp=(selectedTemp+3)%4;
+    else if(k==11)selectedTemp=(selectedTemp+1)%4;
+    else if(k==2||k==16)selectedField=0; // # = reference
+    else if(k==3||k==18)selectedField=1; // * = notice
+    else if(k==19){
+      editingTemp=true;
+      float v=selectedField?noticeTemp[selectedTemp]:refTemp[selectedTemp];
+      editTempBuffer=isfinite(v)?String(v,1):String("");
+    }
+    else if(k==15){currentPage=0;tftView=0;}
+    else if(k==1){currentPage=4;tftView=0;} // F2 diagnostics
+    else if(k==0){} // F1 = delete, no input outside editing
+    else if(k==4||k==17){currentPage=0;tftView=0;}
+    else if(k==6){currentPage=2;tftView=0;}
+    else if(k==8){currentPage=3;tftView=0;}
+    else if(k==9){currentPage=4;tftView=0;}
+    else if(k==10){currentPage=5;tftView=0;}
+    else if(k==12){currentPage=5;settingsSubTab=0;tftView=0;}
+    else if(k==13){currentPage=5;settingsSubTab=1;tftView=0;}
+    else if(k==14){currentPage=4;tftView=0;}
+    tftDirty=true;return;
+  }
+  if(k==7){tftView=0;} // Up
+  else if(k==11){tftView=1;} // Down: secondary view
+  else if(k==2||k==16){ // # or LEFT
     if(currentPage==5)settingsSubTab=(settingsSubTab+3)%4;
     else currentPage=(currentPage+5)%6;
     tftView=0;
-  }else if(k==3||k==18){ // * or right arrow
+  }else if(k==3||k==18){ // * or RIGHT
     if(currentPage==5)settingsSubTab=(settingsSubTab+1)%4;
     else currentPage=(currentPage+1)%6;
     tftView=0;
-  }else if(k==15){currentPage=0;tftView=0;} // Esc: Back
-  else if(k==19){if(currentPage==5)settingsSubTab=(settingsSubTab+1)%4;tftView=0;} // Ent: OK
-  else if(k==1){currentPage=4;tftView=0;} // F2: diagnostics
-  else if(k==17||k==4){currentPage=0;tftView=0;} // 0, 1: Home
-  else if(k==5){currentPage=1;tftView=0;} // 2: Temperatures
-  else if(k==6){currentPage=2;tftView=0;} // 3: Collection display
-  else if(k==8){currentPage=3;tftView=0;} // 4: Graphs
-  else if(k==9){currentPage=4;tftView=0;} // 5: Events
-  else if(k==10){currentPage=5;tftView=0;} // 6: Settings
-  else if(k==12){currentPage=5;settingsSubTab=0;tftView=0;} // 7: Wi-Fi
-  else if(k==13){currentPage=5;settingsSubTab=1;tftView=0;} // 8: Google
-  else if(k==14){currentPage=4;tftView=0;} // 9: Diagnostics
-  // F1 (Delete) is reserved until editing-only fields are implemented.
-  // All keys are navigation-only: no relay/power operations.
-  if(old!=currentPage||k>=0)tftDirty=true;
+  }else if(k==15){currentPage=0;tftView=0;} // Esc
+  else if(k==19){if(currentPage==5)settingsSubTab=(settingsSubTab+1)%4;tftView=0;} // Ent
+  else if(k==1){currentPage=4;tftView=0;} // F2 diagnostics
+  else if(k==17||k==4){currentPage=0;tftView=0;} // 0, 1 Home
+  else if(k==5){currentPage=1;selectedTemp=0;tftView=0;} // 2
+  else if(k==6){currentPage=2;tftView=0;} // 3
+  else if(k==8){currentPage=3;tftView=0;} // 4
+  else if(k==9){currentPage=4;tftView=0;} // 5
+  else if(k==10){currentPage=5;tftView=0;} // 6
+  else if(k==12){currentPage=5;settingsSubTab=0;tftView=0;} // 7
+  else if(k==13){currentPage=5;settingsSubTab=1;tftView=0;} // 8
+  else if(k==14){currentPage=4;tftView=0;} // 9
+  // F1 is Delete only when editing a number.
+  tftDirty=true;
 }
+
 void pollKeys(uint32_t now){
   if(!pcfDetected||!elapsed(now,lastKeyScan,70))return;
   lastKeyScan=now;
@@ -256,7 +306,7 @@ void renderScreen(uint32_t now){
         const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
         for(int i=0;i<4;i++){
           int x=(i%2)?163:4,y=(i/2)?112:35;
-          panelAt(x,y,153,72);ruText(names[i],x+9,y+18,GRAY);
+          panelAt(x,y,153,72);ruText(String(currentPage==1&&i==selectedTemp?"> ":"")+names[i],x+9,y+18,GRAY);
         }
       }else{
         panelAt(4,36,312,162);
@@ -289,10 +339,21 @@ void renderScreen(uint32_t now){
       for(int i=0;i<4;i++){
         int x=(i%2)?163:4,y=(i/2)?112:35;
         screenField(hasTemp(i,now)?String(temperature[i],1)+" C":"НЕТ ДАННЫХ",
-             x+9,y+47,135,hasTemp(i,now)?GREEN:YELLOW);
+             x+9,y+41,135,hasTemp(i,now)?GREEN:YELLOW);
+        const float r=refTemp[i],a=noticeTemp[i];
+        screenField(String(selectedField==0?"Зад:":"Пред:")+
+                    (isfinite(selectedField==0?r:a)?String(selectedField==0?r:a,1):String("--")),
+                    x+9,y+61,135,GRAY);
       }
-      screenField(String("Вода: ")+(flowReady?String(flowLpm,2)+" л/мин":"--"),
-                  11,202,300,flowReady?GREEN:YELLOW);
+      if(editingTemp){
+         screenField(String("РЕДАКТ T")+String(selectedTemp+1)+
+           (selectedField?" Пред ":" Зад ")+editTempBuffer,11,202,300,YELLOW);
+      }else if(currentPage==1){
+         screenField("T1-T4: UP/DOWN  #/\x2a: поле  Ent: ввод",11,202,300,GRAY);
+      }else{
+         screenField(String("Вода: ")+(flowReady?String(flowLpm,2)+" л/мин":"--"),
+                    11,202,300,flowReady?GREEN:YELLOW);
+      }
     }else{
       for(int i=0;i<4;i++){
         screenField(String("T")+String(i+1)+" GPIO"+String(TPIN[i])+
@@ -370,6 +431,13 @@ String statusJSON(){
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
+  s+=",\"display_references\":[";
+  for(int i=0;i<4;i++){
+    if(i)s+=",";
+    s+="{\"target\":"+(isfinite(refTemp[i])?String(refTemp[i],1):String("null"));
+    s+=",\"notice\":"+(isfinite(noticeTemp[i])?String(noticeTemp[i],1):String("null"))+"}";
+  }
+  s+="]";
   s+=",\"temperatures\":[";
   for(int i=0;i<4;i++){
     if(i)s+=",";
@@ -454,7 +522,19 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div class="card"><h2>Отбор</h2><div class="grid"><div class="tile"><small>Расход, мл/мин</small><b class="warn">НЕТ ДАТЧИКА</b></div><div class="tile"><small>Собрано, мл</small><b class="warn">НЕТ ДАННЫХ</b></div></div></div>
 <div class="card"><h2>Система</h2><div class="row">Состояние <b class="green">Диагностика</b></div><div class="row">Реле <b class="warn">ЗАБЛОКИРОВАНЫ</b></div><div class="row">Wi-Fi <b id="mainwifi">—</b></div><div class="row">Напряжение <b class="warn">НЕТ ДАТЧИКА</b></div></div>
 <div class="card"><h2>Вода охлаждения · YF-S401</h2><div class="row">Расход, л/мин <b id="flow">—</b></div><div class="row">Импульсы <b id="pulses">—</b></div><p class="warn">Не откалибровано. 0 импульсов не подтверждает охлаждение.</p></div></section>
-<section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div><p class="warn">Уставки защитной автоматики недоступны в диагностической версии.</p></div></section>
+<section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div>
+<p class="hint">Информационные поля для отображения на TFT. Не управляют реле и не заменяют защиту.</p>
+<div class="grid">
+<div><label>T1 Вода · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref0"></div>
+<div><label>T1 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt0"></div>
+<div><label>T2 Колонна · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref1"></div>
+<div><label>T2 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt1"></div>
+<div><label>T3 Куб · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref2"></div>
+<div><label>T3 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt2"></div>
+<div><label>T4 Верх · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref3"></div>
+<div><label>T4 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
+</div><button id="refsSave" type="button" class="full">Сохранить значения отображения</button>
+<p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div></section>
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор</h2><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden><div class="card"><h2>Графики текущей сессии</h2><p>Вода, °C</p><canvas id="graphT" width="600" height="200"></canvas><p>Вода охлаждения, л/мин</p><canvas id="graphF" width="600" height="200"></canvas><p class="hint">Только реальные данные с момента открытия приложения.</p></div></section>
 <section class="page" data-section="4" hidden><div class="card"><h2>События</h2><div id="events">Ожидание...</div><p class="hint">Журнал текущей сессии приложения</p></div></section>
@@ -485,13 +565,28 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 </div><div class="card settingCard" data-stab="3" hidden><h2>Диагностика</h2><div class="row">Прошивка <b id="ver">—</b></div><div class="row">Время работы <b id="uptime">—</b></div><div class="row">PCF8575 <b id="pcf">—</b></div><div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div></div></section>
 <footer class="hint">БУСА-1М №001 · диагностический режим · реле заблокированы</footer></main>
 <script>
-const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0;
+const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false;
 function message(s){logs.unshift(new Date().toLocaleTimeString('ru-RU')+' · '+s);logs.splice(12);get('events').textContent=logs.join('\n')}
 function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
 function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
 get('tftUp').onclick=()=>fetch('/api/tft/scroll?dir=up').catch(()=>{});
 get('tftDown').onclick=()=>fetch('/api/tft/scroll?dir=down').catch(()=>{});
+get('refsSave').onclick=async()=>{
+ let body=new URLSearchParams();
+ for(let i=0;i<4;i++){
+   for(let k of ['ref','nt']){
+     let v=get(k+i).value.trim();
+     if(v&&(!Number.isFinite(Number(v))||Number(v)<0||Number(v)>125)){
+       get('refsResult').textContent='Допустимы только значения 0..125 °C';return;
+     }
+     body.set(k+i,v);
+   }
+ }
+ let r=await fetch('/api/display-refs',{method:'POST',body});
+ get('refsResult').textContent=await r.text();
+ if(r.ok)refsInit=false;
+};
 
 document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.dataset.page)));
 function plot(id,values){const c=get(id),x=c.getContext('2d');x.fillStyle='#061b2c';x.fillRect(0,0,600,200);const a=values.filter(v=>v!==null);if(!a.length){x.fillStyle='#d9bd75';x.fillText('НЕТ ДАННЫХ',24,60);return}let lo=Math.min(...a),hi=Math.max(...a);if(hi-lo<.1)hi=lo+.1;x.strokeStyle='#70e99b';x.beginPath();values.forEach((v,i)=>{if(v===null)return;let xx=10+i*580/80,yy=185-(v-lo)/(hi-lo)*165;if(i===0||values[i-1]===null)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke()}
@@ -499,6 +594,10 @@ function graphs(){plot('graphT',tlog);plot('graphF',flog)}
 async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;if(Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';if(i===0){tlog.push(t.c===null?null:Number(t.c));if(tlog.length>80)tlog.shift()}});
 get('temperatures').textContent=names.map((v,i)=>v+': '+get('t'+i).textContent).join(' | ');
+if(!refsInit && Array.isArray(s.display_references)){
+  s.display_references.forEach((r,i)=>{get('ref'+i).value=r.target===null?'':r.target;get('nt'+i).value=r.notice===null?'':r.notice});
+  refsInit=true;
+}
 let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'НЕТ ДАННЫХ':f.toFixed(2);get('flow2').textContent=get('flow').textContent;get('pulses').textContent=s.water.pulses;get('total').textContent=Number(s.water.total_l_estimate).toFixed(3);
 flog.push(f);if(flog.length>80)flog.shift();let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
 if(s.station.connected&&s.station.ssid){
@@ -561,7 +660,7 @@ void handleCommand(String x){
   if(x=="STATUS") {Serial0.println(statusJSON());Serial.println(statusJSON());}
   else if(x.startsWith("PAGE ")){
     int n=x.substring(5).toInt();
-    if(n>=1&&n<=6){currentPage=(uint8_t)(n-1);tftView=0;tftDirty=true;lastRender=0;Serial0.printf("PAGE=%d\n",n);}
+    if(n>=1&&n<=6){currentPage=(uint8_t)(n-1);editingTemp=false;tftView=0;tftDirty=true;lastRender=0;Serial0.printf("PAGE=%d\n",n);}
   }
   else if(x=="TFT ST7789"||x=="TFT ILI9341"){
     tftProfile=(x=="TFT ILI9341")?2:1;
@@ -592,6 +691,13 @@ void setup(){
   if(tftProfile!=2)tftProfile=1;
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
+  for(int i=0;i<4;i++){
+    String k=String("rf")+String(i),j=String("nt")+String(i);
+    refTemp[i]=prefs.getFloat(k.c_str(),NAN);
+    noticeTemp[i]=prefs.getFloat(j.c_str(),NAN);
+    if(!isfinite(refTemp[i])||refTemp[i]<0||refTemp[i]>125)refTemp[i]=NAN;
+    if(!isfinite(noticeTemp[i])||noticeTemp[i]<0||noticeTemp[i]>125)noticeTemp[i]=NAN;
+  }
   setupGoogleCloud();
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
@@ -676,8 +782,30 @@ void setup(){
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
     if(n<1||n>6){server.send(400,"application/json","{\"error\":\"page 1..6\"}");return;}
-    currentPage=(uint8_t)(n-1);tftView=0;tftDirty=true;lastRender=0;
+    currentPage=(uint8_t)(n-1);editingTemp=false;tftView=0;tftDirty=true;lastRender=0;
     server.send(200,"application/json","{\"ok\":true}");
+  });
+  server.on("/api/display-refs",HTTP_POST,[]{
+    if(!apClient()){server.send(403,"text/plain; charset=utf-8","Нужна локальная точка доступа БУСА");return;}
+    float target[4],notice[4];
+    for(int i=0;i<4;i++){
+      String a=server.arg(String("ref")+i),b=server.arg(String("nt")+i);
+      target[i]=a.length()?a.toFloat():NAN;
+      notice[i]=b.length()?b.toFloat():NAN;
+      if((isfinite(target[i])&&(target[i]<0||target[i]>125))||
+         (isfinite(notice[i])&&(notice[i]<0||notice[i]>125))){
+         server.send(400,"text/plain","Диапазон 0..125");return;
+      }
+    }
+    for(int i=0;i<4;i++){
+      String k=String("rf")+i,j=String("nt")+i;
+      if(isfinite(target[i]))storeTempReference(i,0,target[i]);
+      else{prefs.remove(k.c_str());refTemp[i]=NAN;}
+      if(isfinite(notice[i]))storeTempReference(i,1,notice[i]);
+      else{prefs.remove(j.c_str());noticeTemp[i]=NAN;}
+    }
+    tftDirty=true;
+    server.send(200,"text/plain; charset=utf-8","Справочные значения сохранены. Реле не затронуты.");
   });
   server.on("/api/settings-tab",HTTP_GET,[]{
     int n=server.arg("n").toInt();
