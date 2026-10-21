@@ -29,7 +29,7 @@ static void v14Metric(const String& txt,int x,int y,int width,bool valid){
 }
 static void v14FootArrow(int x,int direction,uint16_t color){
   // All four icons have identical centre and stroke proportions.
-  const int cx=x+10,cy=225,r=5;
+  const int cx=x+8,cy=225,r=5;
   if(direction==0){screen->fillTriangle(cx-r,cy,cx+3,cy-r,cx+3,cy+r,color);}
   if(direction==1){screen->fillTriangle(cx,cy-r,cx-r,cy+3,cx+r,cy+3,color);}
   if(direction==2){screen->fillTriangle(cx,cy+r,cx-r,cy-3,cx+r,cy-3,color);}
@@ -55,7 +55,7 @@ static void v14Frame(uint32_t now){
     if(chosen)screen->drawFastHLine(x+6,45,39,V14_WARN);
     String title=v14Tabs[i];
     int w=ru.getUTF8Width(title.c_str());
-    v14Print(title,x+max(2,(51-w)/2),41,chosen?V14_CARD:V14_TEXT);
+    v14Print(title,x+max(2,(51-w)/2),41,V14_TEXT);
   }
   // Footer always visible, no truncation, equal arrow centres.
   screen->fillRect(0,211,320,29,V14_CARD);
@@ -68,7 +68,7 @@ static void v14Frame(uint32_t now){
     if(i<4)v14FootArrow(x,i,V14_ORANGE);
     else if(i==4){screen->drawCircle(x+10,225,5,V14_GREEN);screen->fillCircle(x+10,225,2,V14_GREEN);}
     else{screen->drawFastHLine(x+4,225,11,V14_BLUE);screen->fillTriangle(x+4,225,x+9,221,x+9,229,V14_BLUE);}
-    v14Tiny(labels[i],x+18,229,V14_TEXT);
+    v14Print(labels[i],x+14,229,V14_TEXT);
   }
 }
 static void v14MiniRig(){
@@ -83,7 +83,7 @@ static void v14Home(uint32_t now,bool layout){
     int y=52+i*36;
     hqPanel(3,y,116,34);
     screen->fillCircle(12,y+12,4,v14SeriesColors[i]);
-    v14Tiny(names[i],22,y+13,V14_MUTED);
+    v14Print(names[i],22,y+16,V14_TEXT);
     v14Metric(v13Temp(i,now),21,y+30,94,hasTemp(i,now));
   }
   hqPanel(240,52,77,65);
@@ -141,7 +141,7 @@ static void v14GraphTabs(){
     const String name=names[j];
     ru.setFont(u8g2_font_6x13_t_cyrillic);
     int w=ru.getUTF8Width(name.c_str());
-    v14Print(name,x+max(2,(100-w)/2),67,graphSubView==j?V14_CARD:V14_TEXT);
+    v14Print(name,x+max(2,(100-w)/2),67,V14_TEXT);
   }
 }
 static void v14Graphs(bool layout){
