@@ -3,6 +3,9 @@
   BUSA-1M-001 БУСА 1М WiFi 3v-GOOGLE
   ESP32-S3 N8R2 44-pin, TFT GMT028-05 V1.1 320x240 landscape, monitoring-only.
   LOW-VOLTAGE MONITORING ONLY. DO NOT DRIVE RELAYS OR POWER OUTPUTS.
+  Approved hardware scope: mains power controller and motorized valve are
+  REMOVED from this project; they are operated manually, outside ESP32.
+  Approved informational section "Отбор" is retained without actuator control.
   Real 4 x DS18B20 + YF-S401 cooling-water pulse readings, no simulated values.
   Hardware compatibility of TFT controller, PCF8575 keypad and pulse output 
   must be verified on a powered-off low-voltage bench before connecting.
@@ -34,7 +37,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 4v-LANDSCAPE-REF";
+const char VERSION[]="БУСА 1М WiFi 5v-MANUAL-ONLY";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -315,8 +318,8 @@ void renderScreen(uint32_t now){
       }
     }else if(currentPage==2){
       panelAt(4,37,312,161);
-      ruText("Отбор: датчик не установлен",12,57,YELLOW);
-      ruText("Контроль воды YF-S401",12,94,BLUE);
+      ruText("Отбор вручную. Датчика нет",12,57,YELLOW);
+      ruText("Только контроль воды YF-S401",12,94,BLUE);
       ruText("Импульсы воды",12,145,GRAY);
       ruText("Калибровка расхода не проведена",12,177,YELLOW);
     }else if(currentPage==3){
@@ -397,7 +400,7 @@ void renderScreen(uint32_t now){
   }else{
     screenField(String("PCF8575: ")+(pcfDetected?"НАЙДЕН":"НЕТ"),12,91,295,pcfDetected?GREEN:YELLOW);
     screenField(String("PCA9685: ")+(pcaDetected?"НАЙДЕН":"НЕТ"),12,118,295,pcaDetected?GREEN:YELLOW);
-    screenField("Исполнительные выходы: ВЫКЛ",12,160,295,YELLOW);
+    screenField("Ручное управление - вне ESP32",12,160,295,GRAY);
   }
 }
 
@@ -430,6 +433,7 @@ String statusJSON(){
   uint32_t now=millis();
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
+  s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"display_references\":[";
   for(int i=0;i<4;i++){
@@ -520,7 +524,7 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div class="tile"><small>Куб</small><strong id="t2">—</strong></div><div class="tile"><small>Верх колонны</small><strong id="t3">—</strong></div></div></div>
 <div class="card"><h2>Схема установки</h2><div class="grid"><div class="tile">Куб → Колонна</div><div class="tile">→ Верх колонны</div></div><p class="hint">Схематичное отображение без управления исполнительными механизмами</p></div>
 <div class="card"><h2>Отбор</h2><div class="grid"><div class="tile"><small>Расход, мл/мин</small><b class="warn">НЕТ ДАТЧИКА</b></div><div class="tile"><small>Собрано, мл</small><b class="warn">НЕТ ДАННЫХ</b></div></div></div>
-<div class="card"><h2>Система</h2><div class="row">Состояние <b class="green">Диагностика</b></div><div class="row">Реле <b class="warn">ЗАБЛОКИРОВАНЫ</b></div><div class="row">Wi-Fi <b id="mainwifi">—</b></div><div class="row">Напряжение <b class="warn">НЕТ ДАТЧИКА</b></div></div>
+<div class="card"><h2>Система</h2><div class="row">Состояние <b class="green">Диагностика</b></div><div class="row">Режим <b class="green">Внешнее управление вручную</b></div><div class="row">Блок 220 В и электрокран <b class="green">ИСКЛЮЧЕНЫ</b></div><div class="row">Выходы ESP32 <b class="warn">ОТКЛЮЧЕНЫ</b></div><div class="row">Wi-Fi <b id="mainwifi">—</b></div><div class="row">Напряжение <b class="warn">НЕТ ДАТЧИКА</b></div></div>
 <div class="card"><h2>Вода охлаждения · YF-S401</h2><div class="row">Расход, л/мин <b id="flow">—</b></div><div class="row">Импульсы <b id="pulses">—</b></div><p class="warn">Не откалибровано. 0 импульсов не подтверждает охлаждение.</p></div></section>
 <section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div>
 <p class="hint">Информационные поля для отображения на TFT. Не управляют реле и не заменяют защиту.</p>
@@ -535,7 +539,7 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <div><label>T4 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
 </div><button id="refsSave" type="button" class="full">Сохранить значения отображения</button>
 <p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div></section>
-<section class="page" data-section="2" hidden><div class="card"><h2>Отбор</h2><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
+<section class="page" data-section="2" hidden><div class="card"><h2>Отбор · ручной режим</h2><p class="hint">Блок 220 В и электропривод крана исключены. ESP32 не управляет ими.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden><div class="card"><h2>Графики текущей сессии</h2><p>Вода, °C</p><canvas id="graphT" width="600" height="200"></canvas><p>Вода охлаждения, л/мин</p><canvas id="graphF" width="600" height="200"></canvas><p class="hint">Только реальные данные с момента открытия приложения.</p></div></section>
 <section class="page" data-section="4" hidden><div class="card"><h2>События</h2><div id="events">Ожидание...</div><p class="hint">Журнал текущей сессии приложения</p></div></section>
 <section class="page" data-section="5" hidden><div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
@@ -563,7 +567,7 @@ const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
 <p id="updateResult" role="status">Ожидание подтверждения</p>
 </div><div class="card settingCard" data-stab="3" hidden><h2>Диагностика</h2><div class="row">Прошивка <b id="ver">—</b></div><div class="row">Время работы <b id="uptime">—</b></div><div class="row">PCF8575 <b id="pcf">—</b></div><div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div></div></section>
-<footer class="hint">БУСА-1М №001 · диагностический режим · реле заблокированы</footer></main>
+<footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[];let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false;
 function message(s){logs.unshift(new Date().toLocaleTimeString('ru-RU')+' · '+s);logs.splice(12);get('events').textContent=logs.join('\n')}
