@@ -1,0 +1,42 @@
+name: BUSA iPhone UI V14.5 Check
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app-v14-4/**'
+      - '.github/workflows/busa-iphone-ui-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check six-tab layout and syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          app=Path('app-v14-4/index.html').read_text()
+          assert app.count('<section id=')==6, 'Expected exactly six top-level pages'
+          assert app.count('data-tab=')==6, 'Exactly six navigation buttons'
+          assert 'rigViewport' in app and 'preserveAspectRatio="xMidYMid meet"' in app
+          assert 'grid-template-columns:repeat(6,minmax(0,1fr))' in app
+          assert 'themeSwitch' in app and 'data-theme="dark"' in app
+          assert 'busaViewReceive' in app and 'BUSA_VIEW_TOKEN' in app
+          assert 'remoteGraphT' in app and 'remoteGraphW' in app
+          assert "http://192.168.4.1/" in app
+          assert app.count('<section')==app.count('</section>')
+          script=re.search(r'<script>(.*?)</script>',app,re.S)
+          assert script, 'Missing inline app JS'
+          Path('/tmp/busa-iphone-v14-5.js').write_text(script.group(1))
+          PY
+          node --check /tmp/busa-iphone-v14-5.js
+      - name: Package app snapshot for visual QA
+        run: zip -r /tmp/busa-iphone-v14-5-ui.zip app-v14-4/index.html app-v14-4/sw.js app-v14-4/manifest.webmanifest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_IPHONE_V14_5_UI_QA
+          path: /tmp/busa-iphone-v14-5-ui.zip
+          retention-days: 30
