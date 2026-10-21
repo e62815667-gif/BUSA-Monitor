@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v-LIGHT-WATER-UI-FIX";
+const char VERSION[]="БУСА 1М WiFi 14v2-LIGHT-FONT-FIX";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -566,6 +566,10 @@ void moveApprovedTab(int direction){int slot=(orderSlot(currentPage)+6+direction
 extern String stationSsid,otaMessage,nearbyNames[5];
 extern uint8_t nearbyCount;
 void ruText(const String &v,int x,int y,uint16_t color=WHITE){
+  // On ST7789 light background force transparent bitmap glyphs before EVERY
+  // UTF-8 write, including after setFont(). Without this, dark background
+  // pixels of font cells obscure the Cyrillic labels.
+  ru.setFontMode(1);
   ru.setForegroundColor(color);
   ru.setCursor(x,y);
   ru.print(v);
