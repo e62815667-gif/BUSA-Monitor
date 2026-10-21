@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -56,11 +56,18 @@ jobs:
               for item in ('v13Home','v13Temperatures','v13Collection','v13Graphs','v13EventsPage','v13Settings','renderPortrait'):
                   assert item in ui, item
               assert 'digitalWrite(' not in ui
-          if '14v-LANDSCAPE-OTA' in a:
+          if '14v-' in a:
               land=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Landscape_V14.h').read_text()
               assert '#include "BUSA_Landscape_V14.h"' in a
               for item in ('renderLandscape','v14Frame','v14MiniRig','v14Temperature','v14Collection','v14Settings','v14Graphs','v14Events','UI_ORDER[6]={0,1,2,5,3,4}','drawBootSplash(8000)','otaActive'):
                   assert item in a+land, item
+              if 'HQ-APPROVED-LANDSCAPE' in a:
+                  art=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedGraphics_HQ_V14.h').read_text()
+                  assert '#include "BUSA_ApprovedGraphics_HQ_V14.h"' in a
+                  for ref in ('hqRig','hqPanel','hqBackground','hqSymbol','HQ_CYAN'):
+                      assert ref in art, ref
+                  for unsafe in ('digitalWrite(', 'pinMode(', 'ledcWrite(', 'relay', 'HTTPClient'):
+                      assert unsafe not in art, unsafe
               for forbidden in ('digitalWrite(', 'pinMode(KPIN','ledcWrite(', 'WiFiClientSecure::setInsecure'):
                   assert forbidden not in land, forbidden
           print('Passive GPIO only; output relays remain locked')
