@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-NET-LEDS-MONO-TLS";
+const char VERSION[]="БУСА 1М WiFi 14v8-CALIBRATION-READY";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -131,9 +131,8 @@ bool hasTemp(int n,uint32_t now){
 }
 
 // YF-S401 pulse reader for ordinary cooling WATER only. No process control.
-// 98Hz per litre/minute is a provisional example, NOT factory-calibrated for
-// this individual sensor. Range and pulse format depend on sensor revision.
-// Never interpret 0 pulses as proof of cooling water or as a safety interlock.
+// Until a real measured-volume calibration, only raw pulses are factual.
+// Never use zero pulse count or calculated flow as a safety interlock.
 portMUX_TYPE flowMux=portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t pulseCounter=0;
 void IRAM_ATTR flowISR(){
@@ -146,9 +145,14 @@ uint32_t flowPulses(){
   portENTER_CRITICAL(&flowMux);n=pulseCounter;portEXIT_CRITICAL(&flowMux);
   return n;
 }
-constexpr float FLOW_HZ_PER_LPM=98.0f; // must be calibrated by water-volume test
+// Calibrated pulses per litre are stored in Preferences, never hardcoded.
+// A calibration is a local, explicit, measured-volume water-only action.
+float waterPulsesPerLiter=NAN;
+bool waterCalibrated=false,waterCalSession=false;
+uint32_t waterCalStartPulses=0,waterCalLastPulses=0;
+float waterCalLastMl=0.0f;
 uint32_t flowCycle=0,flowLastCount=0;
-float flowLpm=0.0f,flowTrace[40]={};
+float flowLpm=NAN,flowTrace[40]={};
 uint32_t waterPulseHistory[40]={}; // raw pulses only, not calibrated
 uint32_t waterPulseDelta=0;
 bool flowReady=false,flowSeen=false;
@@ -160,14 +164,29 @@ void sampleFlow(uint32_t now){
   uint32_t count=flowPulses();
   uint32_t diff=count-flowLastCount;
   flowLastCount=count;flowCycle=now;
-  flowLpm=(float)diff*60000.0f/(dt*FLOW_HZ_PER_LPM);
+  // Expose no calculated litres/minute before calibration.
+  flowLpm=waterCalibrated && isfinite(waterPulsesPerLiter) && waterPulsesPerLiter>0
+     ?(float)diff*60000.0f/(dt*waterPulsesPerLiter):NAN;
   if(diff)flowSeen=true;
   flowReady=true;
   waterPulseDelta=diff;
   waterPulseHistory[flowTraceHead%40]=diff;
   flowTrace[flowTraceHead++%40]=flowLpm;
 }
-float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
+float totalWaterLitres(){
+  return waterCalibrated && isfinite(waterPulsesPerLiter) && waterPulsesPerLiter>0
+      ?(float)flowPulses()/waterPulsesPerLiter:NAN;
+}
+String waterCalJSON(){
+  const uint32_t nowPulses=flowPulses();
+  const uint32_t delta=waterCalSession?(nowPulses-waterCalStartPulses):0;
+  return String("{\"calibrated\":")+(waterCalibrated?"true":"false")+
+    ",\"pulses_per_litre\":"+(waterCalibrated?String(waterPulsesPerLiter,3):String("null"))+
+    ",\"session_active\":"+(waterCalSession?"true":"false")+
+    ",\"session_pulses\":"+String(delta)+
+    ",\"last_test_pulses\":"+String(waterCalLastPulses)+
+    ",\"last_test_ml\":"+String(waterCalLastMl,1)+"}";
+}
 
 // I2C devices: PCF8575 keypad is monitored; PCA9685 ACK-only (never PWM).
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
@@ -757,9 +776,11 @@ String statusJSON(){
     s+=",\"c\":"+(hasTemp(i,now)?String(temperature[i],2):String("null"))+"}";
   }
   s+="],\"water\":{\"gpio\":15,\"pulses\":"+String(flowPulses());
-  s+=",\"lpm\":"+(flowReady?String(flowLpm,3):String("null"));
-  s+=",\"total_l_estimate\":"+String(totalWaterLitres(),3);
-  s+=",\"calibrated\":false,\"seen_pulses\":"+(flowSeen?String("true"):String("false"))+"}";
+  s+=",\"lpm\":"+(flowReady && waterCalibrated && isfinite(flowLpm)?String(flowLpm,3):String("null"));
+  s+=",\"total_l_estimate\":"+(waterCalibrated?String(totalWaterLitres(),3):String("null"));
+  s+=",\"calibrated\":"+(waterCalibrated?String("true"):String("false"));
+  s+=",\"calibration\":"+waterCalJSON();
+  s+=",\"seen_pulses\":"+(flowSeen?String("true"):String("false"))+"}";
   s+=",\"collection\":{\"sensor_present\":false,\"ml_per_min\":null,\"total_ml\":null}";
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
   s+=",\"pca9685_ack_only\":"+(pcaDetected?String("true"):String("false"));
@@ -822,7 +843,8 @@ String statusJSON(){
   s+=",\"pixel_feedback_available\":false}";
   s+=",\"water_flow\":{\"gpio\":15,\"input_level\":"+String(digitalRead(FLOW_GPIO));
   s+=",\"pulses\":"+String(flowPulses())+",\"pulse_seen\":"+(flowSeen?String("true"):String("false"));
-  s+=",\"frequency_calibrated\":false,\"status\":"+quoteJson(flowSeen?"PULSES_SEEN":"WAITING_FOR_PULSES")+"}";
+  s+=",\"frequency_calibrated\":"+(waterCalibrated?String("true"):String("false"));
+  s+=",\"status\":"+quoteJson(flowSeen?"PULSES_SEEN":"WAITING_FOR_PULSES")+"}";
   s+=",\"esp32\":{\"chip\":"+quoteJson(ESP.getChipModel());
   s+=",\"free_heap_bytes\":"+String(ESP.getFreeHeap());
   s+=",\"min_free_heap_bytes\":"+String(ESP.getMinFreeHeap());
@@ -1526,6 +1548,9 @@ void setup(){
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   prefs.begin("busa-r04",false);
+  waterPulsesPerLiter=prefs.getFloat("wf_ppl",NAN);
+  waterCalibrated=prefs.getBool("wf_ready",false) && isfinite(waterPulsesPerLiter) && waterPulsesPerLiter>=10.0f && waterPulsesPerLiter<=500000.0f;
+  if(!waterCalibrated)waterPulsesPerLiter=NAN;
   // User-approved ST7789 320x240 rotation 1 and software-drawn light theme.
   if(!prefs.getBool("v14lightSt",false)){
     prefs.putUChar("tft",1);
@@ -1598,6 +1623,52 @@ void setup(){
   server.on("/api/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",statusJSON());
+  });
+  // All calibration actions are low-voltage, read-only monitoring settings.
+  // Never expose these write operations through the public Internet.
+  server.on("/api/water/calibration/start",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная Wi-Fi сеть БУСА");return;
+    }
+    waterCalStartPulses=flowPulses();waterCalSession=true;
+    server.send(200,"text/plain; charset=utf-8","Старт записан. Измеренные импульсы считаются, пока активна проба.");
+  });
+  server.on("/api/water/calibration/finish",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная Wi-Fi сеть БУСА");return;
+    }
+    if(!waterCalSession){
+      server.send(409,"text/plain; charset=utf-8","Сначала начните пробу калибровки");return;
+    }
+    const String input=server.arg("volume_ml");
+    const float measuredMl=input.toFloat();
+    if(input.isEmpty()||!isfinite(measuredMl)||measuredMl<100.0f||measuredMl>50000.0f){
+      server.send(400,"text/plain; charset=utf-8","Укажите реальный измеренный объём воды: 100–50000 мл");return;
+    }
+    const uint32_t pulseDelta=flowPulses()-waterCalStartPulses;
+    if(pulseDelta<10){
+      server.send(400,"text/plain; charset=utf-8","Импульсов недостаточно для калибровки");return;
+    }
+    const float factor=(float)pulseDelta*1000.0f/measuredMl;
+    if(!isfinite(factor)||factor<10.0f||factor>500000.0f){
+      server.send(400,"text/plain; charset=utf-8","Получен неправдоподобный коэффициент. Проверьте объём и импульсы.");return;
+    }
+    if(prefs.putFloat("wf_ppl",factor)==0||prefs.putBool("wf_ready",true)==0){
+      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить калибровку");return;
+    }
+    waterPulsesPerLiter=factor;waterCalibrated=true;waterCalSession=false;
+    waterCalLastPulses=pulseDelta;waterCalLastMl=measuredMl;
+    server.send(200,"text/plain; charset=utf-8",
+      String("Калибровка сохранена: ")+String(pulseDelta)+" имп. / "+
+      String(measuredMl,1)+" мл; "+String(factor,2)+" имп./л");
+  });
+  server.on("/api/water/calibration/reset",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная Wi-Fi сеть БУСА");return;
+    }
+    prefs.remove("wf_ready");prefs.remove("wf_ppl");
+    waterCalibrated=false;waterCalSession=false;waterPulsesPerLiter=NAN;flowLpm=NAN;
+    server.send(200,"text/plain; charset=utf-8","Калибровка сброшена; отображаются только импульсы.");
   });
 
   addGoogleRoutes();
