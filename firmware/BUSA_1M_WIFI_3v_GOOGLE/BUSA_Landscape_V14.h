@@ -1,10 +1,11 @@
 #pragma once
-// БУСА-1М №001 — V14.6: six screens, anti-flicker TFT; dark mode is splash-like black/white.
+// БУСА-1М №001 — V14.7: flicker-free TFT, monochrome dark theme, Internet / local Wi-Fi LED.
 // THIS CODE ONLY DRAWS DATA. NO RELAY/POWER/PWM CONTROL.
 // No placeholder readings: water flow raw pulses only until calibrated.
 // Google transport is implemented later in BUSA_Google.h; TFT displays status only.
 extern volatile bool googleEnabled;
 extern volatile int googleState;
+extern volatile int googleInternet;
 static const uint8_t v14Order[6]={0,1,2,5,3,4};
 static const char* const v14Tabs[6]={"Глав","Т","Отбор","Настр","Граф","Событ"};
 // V14 palette is software-defined. DO NOT use ST7789 invertDisplay(): it
@@ -16,10 +17,11 @@ static uint16_t v14SeriesColors[4]={0x037b,0xd980,0xb500,0x3685};
 static uint16_t V14_INFO=0xff16,V14_GRID=0xe71c,V14_BADGE=0xe7f8;
 static uint32_t v14FlowLast=UINT32_MAX;
 static String v14ClockLast="";
+static int8_t v14NetLast=-1,v14LocalLast=-1;
 struct V14MetricCache{int16_t x=-1,y=-1,width=-1;String value;uint16_t fg=0,bg=0;};
 static V14MetricCache v14Metrics[10];
 static uint8_t v14MetricCount=0;
-static void v14InvalidateLive(){v14MetricCount=0;v14FlowLast=UINT32_MAX;v14ClockLast="";}
+static void v14InvalidateLive(){v14MetricCount=0;v14FlowLast=UINT32_MAX;v14ClockLast="";v14NetLast=-1;v14LocalLast=-1;}
 static void v14ApplyPalette(bool dark){
  HQ_MONO_DARK=dark;
  if(dark){
@@ -89,12 +91,25 @@ static void v14FootArrow(int x,int direction,uint16_t color){
   if(direction==2){screen->fillTriangle(cx,cy+r,cx-r,cy-3,cx+r,cy-3,color);}
   if(direction==3){screen->fillTriangle(cx+r,cy,cx-3,cy-r,cx-3,cy+r,color);}
 }
+// Independent status dots: Internet external TCP/443 probe, local blue AP client.
+// Red means not confirmed. TFT settings show STA name and AP address in detail.
+static void v14NetIndicators(){
+  const int8_t net=(WiFi.status()==WL_CONNECTED && googleInternet==1)?1:0;
+  const int8_t local=(WiFi.softAPgetStationNum()>0)?1:0;
+  if(v14NetLast==net && v14LocalLast==local)return;
+  v14NetLast=net;v14LocalLast=local;
+  screen->fillRect(121,2,98,17,V14_CARD);
+  screen->fillCircle(130,11,4,net?0x07e0:0xf800);
+  v14Tiny("ИНТ",137,14,V14_TEXT);
+  screen->fillCircle(179,11,4,local?0x001f:0xf800);
+  v14Tiny("ЛОК",186,14,V14_TEXT);
+}
 static void v14Frame(uint32_t now){
   hqBackground();
   screen->fillRect(0,0,320,21,V14_CARD);
   screen->drawFastHLine(0,21,320,V14_ORANGE);
   v14Big("БУСА-1М №001",5,15,V14_TEXT);
-  hqBulb(206,11,3,WiFi.getMode()!=WIFI_OFF?V14_GREEN:V14_WARN);
+  v14NetIndicators();
   // DD.MM.YY HH:MM. Exact pixel width is measured; date cannot clip at 320.
   String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
   if(dt.length()==16)dt=dt.substring(0,6)+dt.substring(8);
@@ -299,8 +314,10 @@ static void v14Settings(bool layout){
         v14Print("Датчика отбора нет",48,126,V14_WARN);
         v14Tiny("YF-S401 — только вода",48,151,V14_MUTED);break;
       case 2:
-        v14Print(WiFi.status()==WL_CONNECTED?"STA: ДА":"STA: НЕТ",48,125,V14_TEXT);
-        v14Tiny("AP: "+WiFi.softAPIP().toString(),48,148,V14_BLUE);break;
+        v14Print(WiFi.status()==WL_CONNECTED?"Интернет Wi-Fi: ДА":"Интернет Wi-Fi: НЕТ",48,120,V14_TEXT);
+        v14Tiny(String("Сеть: ")+(WiFi.status()==WL_CONNECTED?stationSsid.substring(0,19):String("--")),48,139,V14_BLUE);
+        v14Tiny("AP: "+WiFi.softAPIP().toString(),48,158,V14_BLUE);
+        v14Tiny(String("Клиентов локально: ")+WiFi.softAPgetStationNum(),48,176,V14_TEXT);break;
       case 3:
         v14Print("ST7789 / 320x240",48,129,V14_TEXT);
         v14Tiny("Ориентация: горизонтальная",48,151,V14_MUTED);break;
@@ -353,6 +370,7 @@ void renderLandscape(uint32_t now){
 // and the narrow clock/flow strips are repainted.
 void v14RefreshLive(uint32_t now){
   v13Collect(now);
+  v14NetIndicators();
   if(currentPage==0){
     for(int i=0;i<4;i++)
       v14Metric(v13Temp(i,now),21,52+i*36+30,94,hasTemp(i,now));
