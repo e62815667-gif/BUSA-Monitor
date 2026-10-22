@@ -1374,7 +1374,10 @@ main>*{max-width:100%;min-width:0}
 <p class="hint">Управление видом TFT; физические выходы не затрагиваются.</p></div>
 <div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
-<label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select><p class="hint">Если нужной сети нет, включите на телефоне раздачу интернета и повторите поиск.</p>
+<label for="net">Доступные сети Wi-Fi</label><select id="net"><option value="">Выберите сеть из списка</option></select>
+<p class="hint">Поиск может временно не видеть точку доступа телефона. В этом случае укажите имя сети вручную, без сканирования.</p>
+<label for="manualSsid">Имя сети Wi-Fi вручную (SSID)</label>
+<input id="manualSsid" type="text" maxlength="32" autocomplete="off" placeholder="Например, iPhone 16">
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна при подключении к защищённой сети БУСА. Пароль остаётся на контроллере.</p></div>
@@ -1890,13 +1893,46 @@ get('manualUpdate').onclick=async function(){
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
   finally{otaUiUploading=false;this.disabled=false;}
 };
-get('net').onchange=()=>{if(get('net').value)get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.'};
-get('scan').onclick=async function(){this.disabled=true;get('response').textContent='Идёт поиск сетей...';
-try{await fetch('/api/wifi/scan?start=1');let j=null;for(let i=0;i<12;i++){await new Promise(r=>setTimeout(r,1000));let x=await fetch('/api/wifi/scan',{cache:'no-store'});j=await x.json();if(!j.scanning)break}
-let sel=get('net');sel.innerHTML='<option value="">Выберите сеть</option>';let seen=new Set();(j.networks||[]).forEach(w=>{if(!w.ssid||seen.has(w.ssid))return;seen.add(w.ssid);sel.add(new Option(w.ssid+' ('+w.rssi+' dBm)',w.ssid))});get('response').textContent='Найдено: '+(sel.options.length-1)}
-catch(e){get('response').textContent='Ошибка поиска: '+e.message}this.disabled=false};
-get('save').onclick=async function(){let ssid=get('net').value,pass=get('pass').value;if(!ssid||pass.length<8||pass.length>63){get('response').textContent='Выбери сеть из списка и введи пароль (8–63 символа)';return}this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
-try{let r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass})});get('response').textContent=await r.text();if(r.ok){get('pass').value='';message('Настройки сети сохранены: '+ssid)}}catch(e){get('response').textContent='Ошибка: '+e.message}this.disabled=false};
+get('net').onchange=()=>{if(get('net').value){get('manualSsid').value='';get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.';}};
+get('manualSsid').oninput=()=>{if(get('manualSsid').value.trim())get('net').value='';};
+get('scan').onclick=async function(){
+  this.disabled=true;get('response').textContent='Идёт поиск сетей...';
+  try{
+    let r=await fetch('/api/wifi/scan?start=1',{cache:'no-store'});
+    if(!r.ok)throw Error('сервер поиска вернул HTTP '+r.status);
+    let j=await r.json();
+    for(let i=0;i<12&&j.scanning;i++){
+      await new Promise(done=>setTimeout(done,1000));
+      r=await fetch('/api/wifi/scan',{cache:'no-store'});
+      if(!r.ok)throw Error('сервер поиска вернул HTTP '+r.status);
+      j=await r.json();
+    }
+    let sel=get('net'),previous=sel.value;
+    sel.innerHTML='<option value="">Выберите сеть</option>';
+    const seen=new Set();
+    (j.networks||[]).forEach(w=>{if(!w.ssid||seen.has(w.ssid))return;seen.add(w.ssid);sel.add(new Option(w.ssid+' ('+w.rssi+' dBm)',w.ssid));});
+    if(previous&&seen.has(previous))sel.value=previous;
+    const count=sel.options.length-1;
+    get('response').textContent=j.scanning?'Поиск не завершился. Введи имя сети вручную.':
+      j.error?'Поиск Wi-Fi недоступен: '+j.error+'. Введи имя сети вручную.':
+      count?'Найдено сетей: '+count:'Найдено: 0. Введи имя Wi-Fi вручную ниже.';
+  }catch(e){get('response').textContent='Ошибка поиска: '+e.message+'. Введи имя сети вручную.';}
+  finally{this.disabled=false;}
+};
+get('save').onclick=async function(){
+  const ssid=(get('manualSsid').value.trim()||get('net').value).trim(),pass=get('pass').value;
+  const nameBytes=new TextEncoder().encode(ssid).length;
+  if(!ssid||nameBytes>32||pass.length<8||pass.length>63){
+    get('response').textContent='Введите имя сети (до 32 байт) и пароль (8–63 символа).';return;
+  }
+  this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
+  try{
+    const r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass}),cache:'no-store'});
+    get('response').textContent=await r.text();
+    if(r.ok){get('pass').value='';message('Настройки сети сохранены: '+ssid);}
+  }catch(e){get('response').textContent='Ошибка: '+e.message;}
+  finally{this.disabled=false;}
+};
 message('Веб-приложение запущено');
 showPhoneClock();setInterval(showPhoneClock,1000);
 syncClock();setInterval(syncClock,300000);
@@ -2138,10 +2174,18 @@ void setup(){
     }
     if(server.hasArg("start") && server.arg("start")=="1"){
       WiFi.scanDelete();
-      WiFi.scanNetworks(true,false);
+      const int started=WiFi.scanNetworks(true,false);
+      if(started==WIFI_SCAN_FAILED){
+        server.send(200,"application/json","{\"scanning\":false,\"error\":\"scan_start_failed\",\"networks\":[]}");return;
+      }
     }
-    int n=WiFi.scanComplete();
-    if(n<0){server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;}
+    const int n=WiFi.scanComplete();
+    if(n==WIFI_SCAN_RUNNING){
+      server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
+    }
+    if(n==WIFI_SCAN_FAILED){
+      server.send(200,"application/json","{\"scanning\":false,\"error\":\"scan_failed\",\"networks\":[]}");return;
+    }
     nearbyCount=0;
     for(int i=0;i<n && nearbyCount<5;i++){
       if(WiFi.SSID(i).length()>0)nearbyNames[nearbyCount++]=WiFi.SSID(i);
