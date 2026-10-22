@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -26,12 +26,32 @@ jobs:
           arduino-cli lib install "Adafruit ST7735 and ST7789 Library"
           arduino-cli lib install "Adafruit ILI9341"
           arduino-cli lib install "U8g2_for_Adafruit_GFX"
-      - run: |
-          cp /etc/ssl/certs/GTS_Root_R1.pem tmp_gts_r1.pem
+      - name: Generate and validate GTS Root R1–R4 trust anchors
+        run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('tmp_gts_r1.pem').read_text()
-          Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h').write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+p+'\n)GOOGLECERT";\n')
+          import subprocess
+          roots = {}
+          expected_sha256 = {
+            'R1':'D947432ABDE7B7FA90FC2E6B59101B1280E0E1C7E4E40FA3C6887FFF57A7F4CF',
+            'R2':'8D25CD97229DBF70356BDA4EB3CC734031E24CF00FAFCFD32DC76EB5841C7EA8',
+            'R3':'34D8A73EE208D9BCDB0D956520934B4E40E69482596E8B6F73C8426B010A6F48',
+            'R4':'349DFA4058C5E263123B398AE795573C4E1313C83FE68F93556CD5E8031B3C7D',
+          }
+          for n in ('R1','R2','R3','R4'):
+            file = Path('/etc/ssl/certs/GTS_Root_'+n+'.pem')
+            if not file.is_file():
+              raise RuntimeError('Missing trusted certificate '+str(file))
+            pem=file.read_text()
+            assert pem.count('-----BEGIN CERTIFICATE-----')==1, n
+            fingerprint=subprocess.check_output(['openssl','x509','-in',str(file),'-noout','-fingerprint','-sha256'],text=True).strip().split('=',1)[1].replace(':','').upper()
+            assert fingerprint==expected_sha256[n], f'{n}: unexpected trust anchor {fingerprint}'
+            roots[n]=pem.strip()
+          bundle='\n'.join(roots[n] for n in ('R1','R2','R3','R4'))+'\n'
+          assert bundle.count('-----BEGIN CERTIFICATE-----')==4
+          p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h')
+          p.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+bundle+')GOOGLECERT";\n')
+          print('Verified trust anchors: GTS R1, R2, R3, R4. TLS verification is mandatory.')
           PY
       - run: |
           mkdir -p build
@@ -48,6 +68,9 @@ jobs:
                        'setInterval(update,1500)'):
               assert term in a, term
           assert "WiFiClientSecure" in b and "setCACert" in b
+          roots=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h').read_text()
+          assert roots.count('-----BEGIN CERTIFICATE-----')==4, 'four GTS certs needed'
+          assert 'setInsecure(' not in a+b, 'TLS verification must remain on'
           for forbidden in ('BLEDevice','BLESecurity','digitalWrite(', 'pinMode(KPIN', 'setInsecure('):
               assert forbidden not in a+b, forbidden
           ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
@@ -100,7 +123,7 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v8-CALIBRATION-READY' in main
+          assert '14v9-GTS4-TLS-CERT-VERIFY' in main
           assert 'TFT_DISPLAY_IDLE_MS' not in main
           assert 'class="appTabs"' in main
           assert '<div class="rigViewport">' in main
