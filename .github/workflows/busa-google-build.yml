@@ -69,7 +69,7 @@ jobs:
           PY
       - run: |
           mkdir -p build
-          arduino-cli compile --fqbn 'esp32:esp32:esp32s3:FlashSize=8M,PartitionScheme=default_8MB,PSRAM=disabled,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio,FlashFreq=40' --output-dir build firmware/BUSA_1M_WIFI_3v_GOOGLE
+          arduino-cli compile --fqbn 'esp32:esp32:esp32s3:FlashSize=8M,PartitionScheme=default_8MB,PSRAM=disabled,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio' --output-dir build firmware/BUSA_1M_WIFI_3v_GOOGLE
       - name: Verify GPIO and compile-time safety restrictions
         run: |
           python3 - <<'PY'
@@ -187,7 +187,7 @@ jobs:
       - name: Package full recovery BIN plus app-only BIN
         run: |
           SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 8MB -o build/BUSA_1M_WIFI_3v_GOOGLE_8MB_merged.bin 0x0 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 80m --flash_size 8MB -o build/BUSA_1M_WIFI_3v_GOOGLE_8MB_merged.bin 0x0 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
           cp firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h build/
           git rev-parse HEAD > build/SOURCE_COMMIT.txt
           arduino-cli lib list > build/LIBRARIES.txt
