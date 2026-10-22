@@ -9,10 +9,21 @@
 namespace BusaLed {
 constexpr uint8_t kAddress=0x40;
 constexpr uint8_t kCount=11;
+// Owner-confirmed individual indicator LEDs, tested for colour at +3.3 V.
+// This does NOT verify a series resistor or safe peak output current.
+constexpr uint16_t kOwnerConfirmedLedSupplyMv=3300;
+constexpr bool kOwnerConfirmedIndividualLeds=true;
+constexpr bool kSeriesCurrentLimitingVerified=false;
+constexpr bool kOeHardwareStateVerified=false;
 // Safety latch: the board's LED current limiting, OE and load topology are not
 // verified in a physical electrical test. No PCA9685 register writes allowed.
 constexpr bool kPhysicalOutputsApproved=false;
 static_assert(!kPhysicalOutputsApproved,"PCA9685 physical LED actuation is not approved");
+static_assert(kOwnerConfirmedLedSupplyMv==3300 && kOwnerConfirmedIndividualLeds,
+              "The confirmed owner LED supply/type must not be guessed");
+static_assert(!kSeriesCurrentLimitingVerified || !kOeHardwareStateVerified ||
+              !kPhysicalOutputsApproved,
+              "Physical test needs independent engineering validation");
 
 enum Channel : uint8_t {
   WaterBlue=0, ColumnGreen=1, CubeYellow=2, TopRed=3,
@@ -37,6 +48,10 @@ inline bool writeReg(uint8_t reg,uint8_t value) {
   return Wire.endTransmission()==0;
 }
 // PCA9685 supports full ON/OFF bit 4 in corresponding LEDn_ON_H/OFF_H.
+inline bool physicalTestPreflight(uint8_t channel){
+  return channel<kCount && kPhysicalOutputsApproved &&
+         kSeriesCurrentLimitingVerified && kOeHardwareStateVerified;
+}
 inline bool set(uint8_t channel,bool on) {
   if(!kPhysicalOutputsApproved)return false;
   if(channel>=kCount)return false;
