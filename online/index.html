@@ -164,6 +164,12 @@ input::placeholder{color:#a3bdce}
 :root[data-theme="light"] .appTabs button{color:#b3cadb}
 :root[data-theme="light"] .connectionStrip{background:#fff;border-color:#bad1dc}
 
+
+.quickMenu{max-width:620px;margin:5px auto 11px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.quickMenu button{min-height:48px;border:1px solid #3d83aa;border-radius:11px;background:#17425b;color:#ecfaff;font-size:14px;font-weight:800}
+.quickMenu button:focus-visible{outline:3px solid #4cdb94}
+.diagList{white-space:pre-line;color:#d9eef8;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:2}
+:root[data-theme="light"] .diagList{color:#173d51}
 </style></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <div class="eyebrow">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
@@ -177,6 +183,7 @@ input::placeholder{color:#a3bdce}
 </div>
 <div class="connectionStrip"><span id="statusText" class="warn">Нет удалённых данных</span>
 <a href="http://192.168.4.1/">Локальная панель <span aria-hidden="true">›</span></a></div>
+<div class="quickMenu"><button type="button" data-open-page="connection">⌁ Связь</button><button type="button" data-open-page="diagnostics">⊞ Диагностика</button></div>
 <section id="home">
 <div class="hero"><small>СИСТЕМА МОНИТОРИНГА</small><h2>Главная</h2><span class="status" id="heroStatus">● Ожидается соединение с БУСА</span></div>
 <div class="card"><h2>Четыре температуры</h2><div class="grid">
@@ -262,6 +269,48 @@ input::placeholder{color:#a3bdce}
 <button data-event-filter="system">Система</button></div>
 <div id="remoteEvents" class="eventsList">Сначала подключи данные Google.</div>
 <p class="muted">События формируются только из полученного диагностического отчёта, не являются журналом аварий оборудования.</p></div></section>
+
+<section id="connection" hidden>
+<div class="card"><h2>Связь с БУСА</h2><p class="muted">Состояние с последнего отчёта, полученного через Google. Это не прямое соединение с ESP32.</p>
+<div class="row"><span>Последний пакет</span><b id="connectionLast">—</b></div>
+<div class="row"><span>Актуальность</span><b id="connectionFresh">Нет данных</b></div>
+<div class="row"><span>Интернет ESP32</span><b id="connectionInternet">—</b></div>
+<div class="row"><span>Wi-Fi STA</span><b id="connectionWifi">—</b></div>
+<div class="row"><span>Уровень Wi-Fi (RSSI)</span><b id="connectionRssi">—</b></div>
+<div class="row"><span>Клиенты локальной точки доступа</span><b id="connectionClients">—</b></div>
+<div class="row"><span>Передача Google включена</span><b id="connectionEnabled">—</b></div>
+<div class="row"><span>Ответ Google HTTP</span><b id="connectionHttp">—</b></div>
+<div class="row"><span>Подтверждений ESP32</span><b id="connectionSent">—</b></div>
+<div class="row"><span>DNS / TLS</span><b id="connectionTls">—</b></div>
+<p class="muted">HTTP 302 означает перенаправление Google. Факт записи в таблицу и счётчик подтверждений самой ESP32 — разные проверки.</p>
+</div><div class="card"><h2>Подключение онлайн-монитора</h2><p class="muted">Для первого подключения нужны ссылка /exec и отдельный BUSA_VIEW_TOKEN. Они задаются только на вашем устройстве; отправляющий токен БУСА не использовать.</p>
+<button type="button" class="btn" id="goConnectionSettings">Открыть подключение Google</button>
+</div></section>
+<section id="diagnostics" hidden>
+<div class="card"><h2>Диагностика ESP32-S3</h2>
+<div class="row"><span>Прошивка</span><b id="diagFw">—</b></div>
+<div class="row"><span>Время работы</span><b id="diagUp">—</b></div>
+<div class="row"><span>Свободная память</span><b id="diagHeap">—</b></div>
+<div class="row"><span>Flash</span><b id="diagFlash">—</b></div>
+<div class="row"><span>Причина перезапуска (код)</span><b id="diagReset">—</b></div>
+<div class="row"><span>TFT</span><b id="diagTft">—</b></div>
+<div class="row"><span>Реле / PWM</span><b id="diagOutputs">—</b></div>
+</div>
+<div class="card"><h2>Температуры · OneWire</h2><div id="diagOneWireRemote" class="diagList">Нет данных</div></div>
+<div class="card"><h2>Клавиатура и I²C</h2>
+<div class="row"><span>PCF8575</span><b id="diagPcf">—</b></div>
+<div class="row"><span>Ошибка клавиатуры</span><b id="diagKey">—</b></div>
+<div class="row"><span>Линии в покое</span><b id="diagIdle">—</b></div>
+<div class="row"><span>I²C адреса</span><b id="diagI2c">—</b></div>
+<div class="row"><span>PCA9685</span><b id="diagPca">—</b></div>
+</div>
+<div class="card"><h2>Счётчик импульсов воды</h2>
+<div class="row"><span>YF-S401, импульсов</span><b id="diagPulses">—</b></div>
+<div class="row"><span>Калибровка</span><b id="diagCal">—</b></div>
+<p class="muted">Значение 0 не является подтверждением отсутствия потока. Без калибровки расход не рассчитывается.</p>
+</div>
+<div class="card"><h2>Проверка передачи</h2><p id="diagCloud" class="muted">Пока нет данных из Google.</p></div>
+</section>
 <section id="calculator" hidden><div class="card"><h2>Калькулятор</h2><div class="calcComing"><span aria-hidden="true">▦</span><strong>Запланирован</strong><p>Вкладка зарезервирована. Формулы, параметры и расчёты добавим позже по утверждённому заданию.</p></div></div></section>
 </main>
 <nav class="appTabs" aria-label="Разделы">
@@ -288,11 +337,17 @@ applyTheme(darkSaved);
 document.getElementById('themeSwitch').addEventListener('click',()=>{
  applyTheme(document.documentElement.dataset.theme!=='dark');
 });
-document.querySelectorAll('nav [data-tab]').forEach(b=>b.addEventListener('click',()=>{
- document.querySelectorAll('main section[id]').forEach(s=>s.hidden=s.id!==b.dataset.tab);
- document.querySelectorAll('nav [data-tab]').forEach(t=>t.classList.toggle('active',t===b));
+function showOnlinePage(page){
+ document.querySelectorAll('main section[id]').forEach(s=>s.hidden=s.id!==page);
+ document.querySelectorAll('nav [data-tab]').forEach(t=>t.classList.toggle('active',t.dataset.tab===page||((page==='connection'||page==='diagnostics')&&t.dataset.tab==='settings')));
  window.scrollTo(0,0);
-}));
+}
+document.querySelectorAll('nav [data-tab]').forEach(b=>b.addEventListener('click',()=>showOnlinePage(b.dataset.tab)));
+document.querySelectorAll('[data-open-page]').forEach(b=>b.addEventListener('click',()=>showOnlinePage(b.dataset.openPage)));
+document.getElementById('goConnectionSettings').addEventListener('click',()=>{
+ showOnlinePage('settings');
+ document.getElementById('googleSettings').scrollIntoView({block:'start',behavior:'smooth'});
+});
 document.querySelectorAll('[data-chart]').forEach(b=>b.addEventListener('click',()=>{
  document.querySelectorAll('[data-chart]').forEach(t=>t.classList.toggle('on',t===b));
  document.querySelectorAll('[data-chart-panel]').forEach(p=>p.hidden=p.dataset.chartPanel!==b.dataset.chart);
@@ -315,6 +370,10 @@ function remoteStatus(msg){
  byId('viewState').textContent=msg;
 }
 function clearRemoteNumbers(){
+ const placeholders=['connectionLast','connectionFresh','connectionInternet','connectionWifi','connectionRssi','connectionClients','connectionEnabled','connectionHttp','connectionSent','connectionTls','diagFw','diagUp','diagHeap','diagFlash','diagReset','diagTft','diagOutputs','diagPcf','diagKey','diagIdle','diagI2c','diagPca','diagPulses','diagCal'];
+ placeholders.forEach(id=>{const v=byId(id);if(v)v.textContent='—'});
+ byId('diagOneWireRemote').textContent='Нет данных';
+ byId('diagCloud').textContent='Пока нет данных из Google.';
  indicator("cloudInternet","cloudInternetLabel",false,true);
  indicator("cloudLocal","cloudLocalLabel",false,true);
  indicator("cloudData","cloudDataLabel",false,true);
@@ -334,9 +393,44 @@ function renderRemoteEvents(){
  const items=remoteErrors.filter(e=>eventFilter==='all'||e.kind===eventFilter);
  byId('remoteEvents').textContent=items.length?items.map(e=>e.text).join('\n'):'Событий выбранного типа нет';
 }
+function renderDiagnostics(d,at,fresh){
+ const val=(id,text)=>{const el=byId(id);if(el)el.textContent=String(text)};
+ const diag=d.diagnostics||{},cloud=d.google||{},chip=diag.esp32||{},wire=Array.isArray(diag.onewire)?diag.onewire:[],wifi=diag.wifi||{},i2c=diag.i2c||{},key=diag.keyboard||{},modules=d.modules||{},pca=diag.pca9685||{},net=d.network_indicators||{};
+ val('connectionLast',stampRussian(at));
+ val('connectionFresh',fresh?'Свежая запись':'УСТАРЕЛА');
+ val('connectionInternet',net.internet===true?'Есть связь':net.internet===false?'Нет связи':'—');
+ val('connectionWifi',wifi.sta_connected===true?'Подключено':'Нет подключения');
+ val('connectionRssi',Number.isFinite(wifi.sta_rssi_dbm)?wifi.sta_rssi_dbm+' dBm':'—');
+ val('connectionClients',Number.isInteger(wifi.ap_clients)?wifi.ap_clients:'—');
+ val('connectionEnabled',cloud.configured===true?'Включена':'Выключена');
+ val('connectionHttp',Number.isInteger(cloud.http)?String(cloud.http):'—');
+ val('connectionSent',Number.isInteger(cloud.sent)?String(cloud.sent):'—');
+ val('connectionTls',String(cloud.dns??'—')+' / '+String(cloud.tls_error??'—'));
+ val('diagFw',d.firmware||'—');
+ val('diagUp',Number.isFinite(d.uptime_ms)?Math.floor(d.uptime_ms/1000)+' сек':'—');
+ val('diagHeap',Number.isFinite(chip.free_heap_bytes)?chip.free_heap_bytes+' байт':'—');
+ val('diagFlash',Number.isFinite(chip.flash_bytes)?Math.round(chip.flash_bytes/1048576)+' МБ':'—');
+ val('diagReset',Number.isInteger(chip.reset_reason_code)?chip.reset_reason_code:'—');
+ val('diagTft',modules.tft_boot_complete===true?'Запущен (изображение не проверено)':'Нет подтверждения');
+ val('diagOutputs',d.relays_enabled===false&&d.pwm_enabled===false?'Отключены':'Проверить состояние');
+ val('diagPcf',modules.pcf8575===true?'Обнаружен':'Нет подтверждения');
+ val('diagKey',Number.isInteger(key.scan_error)?key.scan_error:'—');
+ val('diagIdle',typeof key.idle_hex==='string'?key.idle_hex:'—');
+ val('diagI2c',Array.isArray(i2c.addresses)?i2c.addresses.map(n=>'0x'+Number(n).toString(16)).join(', '):'—');
+ val('diagPca',pca.ack===true?'Обнаружен':'Нет подтверждения');
+ val('diagPulses',Number.isFinite(d.water?.pulses)?d.water.pulses:'—');
+ val('diagCal',d.water?.calibrated===true?'Да':'Нет');
+ const rows=['T1','T2','T3','T4'].map((name,i)=>{
+   const p=wire[i]||{};
+   return name+' · GPIO '+String(p.gpio??'—')+' · '+String(p.result||'Н/Д');
+ });
+ byId('diagOneWireRemote').textContent=rows.join('\n');
+ byId('diagCloud').textContent='Google: '+(cloud.configured?'передача включена':'выключена')+', HTTP '+String(cloud.http??'—')+', подтверждений ESP32 '+String(cloud.sent??'—')+'. Записи в Google Таблице могут сохраняться и при HTTP 302.';
+}
 function renderRemote(d,history,receivedAt){
  const age=Date.now()-receivedAt;
  const fresh=age>=0&&age<150000;
+ renderDiagnostics(d,receivedAt,fresh);
  const diag=d.diagnostics||{},one=Array.isArray(diag.onewire)?diag.onewire:[];
  const nets=d.network_indicators||{};
  indicator("cloudInternet","cloudInternetLabel",nets.internet===true,!fresh||typeof nets.internet!=="boolean");
@@ -478,9 +572,7 @@ byId('viewClear').addEventListener('click',()=>{
 });
 document.querySelectorAll('[data-settings-page]').forEach(b=>b.addEventListener('click',()=>{
  const target=byId(b.dataset.settingsPage);
- if(target){target.hidden=false;document.querySelectorAll('main section[id]').forEach(x=>x.hidden=x!==target)}
- document.querySelectorAll('.appTabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===b.dataset.settingsPage));
- window.scrollTo(0,0);
+ if(target)showOnlinePage(target.id);
 }));
 document.querySelectorAll('[data-event-filter]').forEach(b=>b.addEventListener('click',()=>{
  eventFilter=b.dataset.eventFilter;
