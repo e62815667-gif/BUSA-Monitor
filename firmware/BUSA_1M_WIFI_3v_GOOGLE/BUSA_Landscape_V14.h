@@ -115,7 +115,7 @@ static void v14Frame(uint32_t now){
   hqBackground();
   screen->fillRect(0,0,320,21,V14_CARD);
   screen->drawFastHLine(0,21,320,V14_ORANGE);
-  v14Big("BUSA 1M AI",5,15,V14_TEXT);
+  v14Big("BUSA 1M AI",5,15,tftThemeDark?V14_TEXT:0x0000);
   v14NetIndicators();
   // DD.MM.YY HH:MM. Exact pixel width is measured; date cannot clip at 320.
   String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
@@ -150,13 +150,13 @@ static void v14Frame(uint32_t now){
     else if(i==5){screen->drawFastHLine(x+4,225,11,V14_BLUE);screen->fillTriangle(x+4,225,x+9,221,x+9,229,V14_BLUE);}
     // No extra circle before "OK": one clear button label, not a second button.
     if(i==4)v14Big("OK",x+18,231,tftThemeDark?0x07e0:0x0400);
-    else v14Print(labels[i],x+14,229,V14_TEXT);
+    else v14Print(labels[i],x+14,229,tftThemeDark?V14_TEXT:0x0000);
   }
 }
 static void v14MiniRig(){
   // Approved stylized installation; YF-S401 is on the cooling-water line.
-  hqRig(123,52,113,142);
-  v14Tiny("ВОДА YF",176,188,V14_BLUE);
+  hqRig(103,52,133,142);
+  v14Tiny("ВОДА YF",171,188,V14_BLUE);
 }
 
 static void v14DrawFlowBar(){
@@ -168,14 +168,14 @@ static void v14DrawFlowBar(){
      " имп. (не калибр.)    K1-K4: БЛОК",8,206,V14_TEXT);
 }
 static void v14Home(uint32_t now,bool layout){
-  static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
+  static const char* names[]={"Вода","Колонна","Куб","Верх кол."};
   v14MiniRig();
   for(int i=0;i<4;i++){
     int y=52+i*36;
-    hqPanel(3,y,116,34);
+    hqPanel(3,y,96,34);
     screen->fillCircle(12,y+12,4,v14SeriesColors[i]);
-    v14Print(names[i],22,y+16,V14_TEXT);
-    v14Metric(v13Temp(i,now),21,y+30,94,hasTemp(i,now));
+    v14Tiny(names[i],22,y+16,V14_TEXT);
+    v14Metric(v13Temp(i,now),21,y+30,74,hasTemp(i,now));
   }
   hqPanel(240,52,77,65);
   v14Tiny("ОТБОР",247,65,V14_TEXT);
@@ -386,7 +386,7 @@ void v14RefreshLive(uint32_t now){
   v14NetIndicators();
   if(currentPage==0){
     for(int i=0;i<4;i++)
-      v14Metric(v13Temp(i,now),21,52+i*36+30,94,hasTemp(i,now));
+      v14Metric(v13Temp(i,now),21,52+i*36+30,74,hasTemp(i,now));
     v14DrawFlowBar();
   } else if(currentPage==1 && !editingTemp){
     for(int i=0;i<4;i++){
