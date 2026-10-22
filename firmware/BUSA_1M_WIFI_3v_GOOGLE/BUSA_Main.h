@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v5-IPHONE-LAYOUT";
+const char VERSION[]="БУСА 1М WiFi 14v6-MONO-NOFLICKER-TLS";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -1566,7 +1566,8 @@ void setup(){
     prefs.putInt("clkTz",clockUtcOffsetMinutes);
     prefs.putBool("clkZone",true);
     Serial0.println("CLOCK: synchronized from phone, UTC offset stored");
-    tftDirty=true;lastRender=0;
+    // V14.6 live clock refreshes its own header strip; no full-screen flash.
+    if(screen && screen->width()<300)tftDirty=true;
     server.send(200,"application/json",String("{\"datetime\":")+quoteJson(clockStamp(false))+"}");
   });
   server.on("/api/status",HTTP_GET,[]{
@@ -1815,10 +1816,15 @@ void loop(){
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
     pollKeys(now);
   }
-  if(tftStarted && !tftDisplayOff && !otaActive &&
+  // Landscape V14.6: rebuild background ONLY on explicit view/theme change.
+  // A 2.5 s telemetry tick refreshes changed text without wiping the TFT.
+  if(tftStarted && !tftDisplayOff && !otaActive && bootSplashComplete &&
+     elapsed(now,splashStartedAt,splashHoldMs) &&
      (tftDirty||lastRender==0 || elapsed(now,lastRender,2500))){
+    const bool wholeFrame=tftDirty||lastRender==0;
     lastRender=now;
-    renderScreen(now);
+    if(screen->width()>=300 && !wholeFrame)v14RefreshLive(now);
+    else renderScreen(now);
   }
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
