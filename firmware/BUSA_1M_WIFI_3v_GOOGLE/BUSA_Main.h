@@ -59,6 +59,8 @@ struct OneWireProbe {
 };
 OneWireProbe wireProbe[4];
 uint32_t lastWireProbe=0;
+uint32_t oneWireNoPresenceCount[4]={0,0,0,0};
+uint32_t oneWireDetectedCount[4]={0,0,0,0};
 bool elapsed(uint32_t now,uint32_t then,uint32_t ms){return (uint32_t)(now-then)>=ms;}
 void sampleTemperatures(uint32_t now){
   if(tempConverting && elapsed(now,tempRequestAt,825)){
@@ -104,6 +106,8 @@ void probeOneWire(uint32_t now){
     OneWire* bus=temperatureBuses[i];
     p.idleLevel=digitalRead(TPIN[i]);
     p.presence=bus->reset()!=0;
+    if(p.presence)oneWireDetectedCount[i]++;
+    else oneWireNoPresenceCount[i]++;
     p.afterResetLevel=digitalRead(TPIN[i]);
     bus->reset_search();
     uint8_t first[8]={0},second[8]={0};
@@ -367,13 +371,30 @@ int scanKeyPair(){
     pcfWrite(65535);
     return -2;
   }
+  uint8_t scanCounts[16]={0};
+  if(keypadReady){
+    for(int k=0;k<20;k++){
+      ++scanCounts[keyPairs[k]>>4];
+      ++scanCounts[keyPairs[k]&15];
+    }
+  }
   int found=-1;bool ambiguous=false;
   for(int a=0;a<16;a++){
+    if(keypadReady && scanCounts[a]!=5)continue; // 4 matrix columns only
+
     if(!pcfWrite((uint16_t)(65535u & ~(1u<<a)))){pcfScanError=4;ambiguous=true;break;}
     delayMicroseconds(160);
     uint16_t v;
     if(!pcfRead(v)){pcfScanError=5;ambiguous=true;break;}
     uint16_t lows=(uint16_t)(~v) & (uint16_t)~(1u<<a);
+    if(lows && (lows&(lows-1))){
+      // Verify a multi-line reading after settling; never forge a keypress.
+      delayMicroseconds(350);
+      uint16_t retry=65535;
+      if(pcfRead(retry)){
+        lows=(uint16_t)(~retry) & (uint16_t)~(1u<<a);
+      }
+    }
     pcfObservedLow|=lows;
     if(!lows)continue;
     if(lows&(lows-1)){pcfScanError=6;pcfError6Total++;pcfConflictDrive=a;pcfConflictMask=lows;ambiguous=true;break;}
@@ -885,6 +906,8 @@ String statusJSON(){
     s+="{\"gpio\":"+String(TPIN[i]);
     s+=",\"probe_ms\":"+String(p.checkedAt);
     s+=",\"presence\":"+(p.presence?String("true"):String("false"));
+    s+=",\"no_presence_count\":"+String(oneWireNoPresenceCount[i]);
+    s+=",\"detected_count\":"+String(oneWireDetectedCount[i]);
     s+=",\"rom_found\":"+(p.romFound?String("true"):String("false"));
     s+=",\"idle_gpio\":"+String(p.idleLevel);
     s+=",\"after_reset_gpio\":"+String(p.afterResetLevel);
