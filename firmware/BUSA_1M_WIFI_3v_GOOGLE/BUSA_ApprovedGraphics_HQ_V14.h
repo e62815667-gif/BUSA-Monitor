@@ -3,6 +3,7 @@
 // Works on 320x240 ST7789/ILI9341. Passive drawing only, NEVER controls any GPIO.
 // Screen pixel density is physical 320x240; shadows and layered shapes add visual detail.
 // RGB565 high-contrast light palette, based on the six approved mockups.
+static bool HQ_MONO_DARK=false; // V14.6 TFT black-white theme
 static uint16_t HQ_NAVY=0xffdf,HQ_DEEP=0xffff,HQ_GLOW=0xfca0,
  HQ_AZURE=0xd4a5,HQ_SKY=0x234c,HQ_CYAN=0x0519,HQ_LIGHT=0x2104,
  HQ_LIME=0x2664,HQ_AQUA=0x767c,HQ_GLASS=0xf638,HQ_STEEL=0xad55,
@@ -25,7 +26,7 @@ static void hqPanel(int x,int y,int w,int h){
   screen->drawFastHLine(x+6,y+1,w-12,HQ_GLOW);
 }
 static void hqBulb(int x,int y,int r,uint16_t c){
- screen->fillCircle(x,y,r+3,0x008e);
+ screen->fillCircle(x,y,r+3,HQ_MONO_DARK?0x4208:0x008e);
  screen->fillCircle(x,y,r+1,HQ_AZURE);
  screen->fillCircle(x,y,r,c);
  screen->fillCircle(x-1,y-1,1,HQ_LIGHT);
@@ -69,7 +70,7 @@ static void hqRig(int x,int y,int w,int h){
  auto Y=[&](int n){return y+3+n*(h-6)/100;};
  // Equipment shadows and nickel-steel surfaces
  int vl=X(8),vr=X(53),top=Y(64),bottom=Y(88);
- screen->fillRoundRect(vl+3,top+3,vr-vl,bottom-top+6,5,0x31a6);
+ screen->fillRoundRect(vl+3,top+3,vr-vl,bottom-top+6,5,HQ_MONO_DARK?0x4208:0x31a6);
  screen->fillRoundRect(vl,top,vr-vl,bottom-top+5,5,HQ_METAL);
  for(int k=0;k<6;k++){
   int xx=vl+2+k*(vr-vl-4)/5;
