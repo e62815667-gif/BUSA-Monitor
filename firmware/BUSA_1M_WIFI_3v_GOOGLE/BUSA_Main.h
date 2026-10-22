@@ -754,6 +754,7 @@ String quoteJson(const String &x){
 // Read-only diagnostic of the ACTUAL installed ESP32 OTA partitions.
 // Not an authorization to flash: presence/size cannot prove image signatures,
 // compatibility of the current bootloader or a working rollback policy.
+extern volatile uint32_t cloudReleaseSize; // declared in BUSA_Google.h
 String otaPartitionPreflightJSON(){
   const esp_partition_t* running=esp_ota_get_running_partition();
   const esp_partition_t* next=esp_ota_get_next_update_partition(nullptr);
