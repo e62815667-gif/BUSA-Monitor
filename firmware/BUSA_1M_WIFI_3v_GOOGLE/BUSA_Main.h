@@ -43,7 +43,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-T16-17-18-21";
+const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-DUAL-THEMES";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -960,6 +960,7 @@ String statusJSON(){
   s+=",\"last_key\":"+quoteJson(keyMessage)+"}";
   s+=",\"tft_theme_inverted\":"+(tftInverted?String("true"):String("false"));
   s+=",\"tft_theme_dark\":"+(tftThemeDark?String("true"):String("false"));
+  s+=",\"tft_theme_mode\":\""+String(tftThemeDark?"dark":"light")+"\"";
   s+=",\"display_sleep\":"+(tftDisplayOff?String("true"):String("false"));
   s+=",\"keypad\":{\"ready\":"+(keypadReady?String("true"):String("false"));
   s+=",\"learning\":"+(keypadLearning?String("true"):String("false"));
@@ -1468,7 +1469,9 @@ main>*{max-width:100%;min-width:0}
 <button type="button" id="tftTest" class="full">Тест TFT: чёрный фон, BUSA 1M AI · 5 секунд</button>
 <p id="tftProfileStatus" class="hint">Драйвер ST7789 закреплён. Проверка физического экрана выполняется отдельно.</p>
 <p class="hint">Обе темы цветные: синяя вода, разноцветные датчики, оранжевые выделения. Аппаратная инверсия выключена. Драйвер ST7789 не меняется.</p>
-<button type="button" id="tftTheme" class="full">Переключить светлую / тёмную цветную тему TFT</button>
+<label for="tftThemeSelect">Тема физического TFT БУСА (не тема iPhone)</label>
+<select id="tftThemeSelect"><option value="dark">Тёмная</option><option value="light">Светлая</option></select>
+<button type="button" id="tftTheme" class="full">Применить тему TFT БУСА</button>
 <p id="tftThemeStatus" class="hint">—</p>
 <button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
@@ -1589,15 +1592,34 @@ get('diagCopy').onclick=async()=>{
   }
  }catch(e){t.focus();t.select();get('diagCopyResult').textContent='Выдели отчёт и скопируй вручную'}
 };
+async function setTftPhysicalTheme(theme){
+ if(theme!=='dark'&&theme!=='light')throw Error('Недопустимая тема');
+ const r=await fetch('/api/tft/theme',{method:'POST',
+  body:new URLSearchParams({confirm:'YES',theme})});
+ const payload=await r.text();
+ if(!r.ok)throw Error(payload);
+ const info=JSON.parse(payload);
+ get('tftThemeSelect').value=info.theme;
+ get('tftThemeStatus').textContent='TFT БУСА: '+(info.theme==='dark'?'тёмная':'светлая')+
+  ' · сохранено в ESP32. Тема iPhone не изменена.';
+ return info;
+}
 get('tftTheme').onclick=async()=>{
- try{
-   const r=await fetch('/api/tft/theme',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
-   const t=await r.text();
-   get('tftThemeStatus').textContent=t;
-   if(r.ok){document.documentElement.dataset.theme=
-     document.documentElement.dataset.theme==='dark'?'light':'dark';}
- }catch(e){get('tftThemeStatus').textContent='Ошибка: '+e.message}
+ try{await setTftPhysicalTheme(get('tftThemeSelect').value);}
+ catch(e){get('tftThemeStatus').textContent='Ошибка TFT: '+e.message;}
 };
+// GitHub Pages can navigate here, but HTTPS cannot post directly to HTTP ESP32.
+// Never apply a theme merely by opening a link without explicit user consent.
+const requestedTftTheme=new URLSearchParams(location.search).get('tfttheme');
+if(requestedTftTheme==='dark'||requestedTftTheme==='light'){
+  window.addEventListener('load',async()=>{
+   if(!window.confirm('Установить '+(requestedTftTheme==='dark'?'ТЁМНУЮ':'СВЕТЛУЮ')+
+     ' тему физического TFT БУСА? Тема приложения iPhone не изменится.'))return;
+   try{await setTftPhysicalTheme(requestedTftTheme);}
+   catch(e){get('tftThemeStatus').textContent='Ошибка: '+e.message;}
+   history.replaceState(null,'',location.pathname);
+  });
+}
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
 get('refsSave').onclick=async()=>{
@@ -1639,7 +1661,7 @@ function graphAllTemperatures(){
 }
 function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
 let otaUiUploading=false;
-async function update(){if(pollBusy||otaUiUploading)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;
+async function update(){if(pollBusy||otaUiUploading)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();get('tftThemeSelect').value=s.tft_theme_dark?'dark':'light';if(!connected)message('Связь с ESP32 восстановлена');connected=true;
 networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(active!==6&&Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
  get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';
@@ -2181,14 +2203,19 @@ void setup(){
     if(!apClient()||server.arg("confirm")!="YES"){
       server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;
     }
-    const bool dark=!tftThemeDark;
-    if(prefs.putBool("tftDarkColor",dark)!=1){
-      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить тему");return;
+    const String theme=server.arg("theme");
+    if(theme!="dark"&&theme!="light"){
+      server.send(400,"application/json","{\"error\":\"use explicit theme dark or light\"}");return;
+    }
+    const bool dark=theme=="dark";
+    if(dark!=tftThemeDark && prefs.putBool("tftDarkColor",dark)!=1){
+      server.send(500,"application/json","{\"error\":\"theme persist failed\"}");return;
     }
     tftThemeDark=dark;
     tftDirty=true;lastRender=0;
-    server.send(200,"text/plain; charset=utf-8",
-      dark?"Тёмная ЦВЕТНАЯ тема включена":"Светлая ЦВЕТНАЯ тема включена");
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json",
+      String("{\"theme\":")+(dark?"\"dark\"":"\"light\"")+",\"saved\":true}");
   });
   server.on("/api/keypad/start",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
