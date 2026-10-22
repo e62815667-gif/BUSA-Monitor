@@ -97,7 +97,7 @@ void googleWorker(void* unused){
                        code,(int)googleTlsError,tlsText);
       }else if(code==200){
         const String reply=request.getString();
-        googleState=reply.indexOf("\\"stored\\":true")>=0?5:7;
+        googleState=reply.indexOf("\"stored\":true")>=0?5:7;
         googleErrorStage=googleState==5?0:3;
         googleTlsError=0;
       }else if(code==302||code==303){
