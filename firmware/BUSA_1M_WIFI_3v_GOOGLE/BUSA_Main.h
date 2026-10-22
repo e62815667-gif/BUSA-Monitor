@@ -1037,9 +1037,12 @@ main>*{max-width:100%;min-width:0}
 .netIndicators{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:5px auto 3px;max-width:620px;font-size:11px;line-height:1.3}
 .netPill{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-weight:700;color:var(--ink);max-width:100%}
 .netDot{display:inline-block;width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:#d33a32;box-shadow:0 0 0 1px #73737355}
-.netDot.internetOn{background:#13a44c}.netDot.localOn{background:#168de3}
+.netDot.internetOn,.netDot.dataOn{background:#13a44c}.netDot.localOn{background:#168de3}
 .netText{font-size:10px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:145px}
 
+.localShortcuts{max-width:620px;margin:7px auto 2px;display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.localShortcuts button{border:1px solid #3d83aa;border-radius:9px;background:#17425b;color:#ecfaff;font-size:13px;font-weight:800;min-height:39px}
+.localShortcuts button:focus-visible{outline:3px solid #4cdb94}
 /* Shared design system with online/index.html. Browser views only. */
 :root{--unified-panel:#152a3d;--unified-line:#34546a;--unified-green:#0b994f;--unified-blue:#299bde;}
 :root[data-theme="dark"] body{background:#0b1928;color:#f0f7ff}
@@ -1069,6 +1072,7 @@ main>*{max-width:100%;min-width:0}
 <span class="netPill"><span id="localLed" class="netDot"></span>БУСА Wi-Fi <span id="localLabel" class="netText">нет клиента</span></span>
 <span class="netPill"><span id="dataLed" class="netDot"></span>ДАН <span id="dataLabel" class="netText">не настроено</span></span>
 </div>
+<div class="localShortcuts"><button type="button" data-quick-local="wifi">⌁ Связь</button><button type="button" data-quick-local="diagnostics">⊞ Диагностика</button></div>
 <nav class="appTabs" aria-label="Разделы">
 <button data-page="0" class="on"><span class="tabIcon">⌂</span><span>Главная</span></button>
 <button data-page="1"><span class="tabIcon">♨</span><span>Температуры</span></button>
@@ -1305,6 +1309,10 @@ document.querySelectorAll('[data-settings-link]').forEach(b=>b.onclick=()=>{
  window.scrollTo({top:Math.max(0,top),behavior:'smooth'});
 });
 function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(n===6)send=false;if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
+document.querySelectorAll('[data-quick-local]').forEach(b=>b.addEventListener('click',()=>{
+ page(5);settingsTab(b.dataset.quickLocal==='wifi'?0:3);
+ document.getElementById('settingsTabs').scrollIntoView({behavior:'smooth',block:'start'});
+}));
 function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
 document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=async()=>{
@@ -1409,7 +1417,7 @@ function graphAllTemperatures(){
 }
 function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
 async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;
-networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(active!==6&&Date.now()-lastLocalNav>1800){if(typeof s.ui_page='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
+networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(active!==6&&Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
  get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';
  const a=tlog4[i];a.push(t.c===null?null:Number(t.c));if(a.length>80)a.shift();
@@ -1440,7 +1448,7 @@ if(s.station.connected&&s.station.ssid){
 }
 const cs=s.google;
 const dataDot=get('dataLed'),dataLabel=get('dataLabel');
-if(dataDot){dataDot.classList.toggle('connected',cs?.configured===true);dataDot.classList.toggle('online',cs?.configured===true);dataDot.classList.toggle('off',cs?.configured!==true)}
+if(dataDot)dataDot.classList.toggle('dataOn',cs?.configured===true);
 if(dataLabel)dataLabel.textContent=cs?.configured===true?'включено':'выключено';
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
 if(!themeInitialized && typeof s.tft_theme_dark==='boolean'){
