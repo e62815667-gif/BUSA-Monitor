@@ -176,7 +176,7 @@ jobs:
           assert 'candidate_fits_slot' in main
           assert 'remote_install_enabled\\":false' in main or 'remote_install_enabled' in main
           assert 'signed_image_verified\\":false' in main or 'signed_image_verified' in main
-          assert 'remote_install_enabled\\":false' not in main, 'Cloud update must not be writable from main code'
+          assert 'remote_install_enabled\\":true' not in main, 'Cloud update must remain disabled, never true'
           assert 'v14NetIndicators()' in landscape and '0x07e0' in landscape and '0x001f' in landscape
           assert 'WiFi.hostByName("script.google.com"' in google
           assert 'secure.setCACert(GOOGLE_TRUST_ANCHOR)' in google
