@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v11-UNIFIED-OTA";
+const char VERSION[]="БУСА 1М WiFi 14v12-CLOUD-PREFLIGHT";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -1202,7 +1202,15 @@ main>*{max-width:100%;min-width:0}
 <button id="googleTest" type="button" class="full">Проверить отправку диагностики сейчас</button>
 <button id="googleStop" type="button" class="full">Отключить передачу в Google</button>
 <p id="googleResult" role="status" class="hint">Отправка выключена до настройки.</p>
-</div><div class="card settingCard" data-stab="2" hidden><h2>Обновление ПО · вручную</h2>
+</div><div class="card settingCard" data-stab="2" hidden><h2>Обновления · Google и локально</h2>
+<p class="hint">Облачная проверка версии поступает в проверенном HTTPS-ответе Google вместе с подтверждением телеметрии. Дистанционная установка НЕ включена.</p>
+<div class="row"><span>Каталог Google</span><b id="cloudCatalogue">Ожидание</b></div>
+<div class="row"><span>Новая версия</span><b id="cloudVersion">—</b></div>
+<div class="row"><span>Flash на ESP32</span><b id="cloudFlash">—</b></div>
+<div class="row"><span>Flash в сборке</span><b id="cloudBuildFlash">—</b></div>
+<div class="row"><span>OTA через интернет</span><b>ЗАБЛОКИРОВАНО</b></div>
+<p class="hint" id="cloudSafety">Совпадение Flash не подтверждает совместимость разделов OTA и откат. Не устанавливайте непроверенную прошивку.</p>
+<h2>Ручное обновление через локальный Wi-Fi</h2>
 <p class="hint">Только через локальную сеть БУСА. Выберите APP BIN для ESP32-S3 N8R2,
 НЕ объединённый merged BIN. Только проверенные диагностические сборки.
 Перед обновлением отключите внешние исполнительные цепи.</p>
@@ -1448,6 +1456,12 @@ if(s.station.connected&&s.station.ssid){
  if(!select.value)select.value=s.station.ssid;
 }
 const cs=s.google;
+const cloud=cs.cloud_update||{};
+get('cloudCatalogue').textContent=cloud.catalog_seen?'Прочитан':'Нет метаданных';
+get('cloudVersion').textContent=cloud.available_version||'—';
+get('cloudFlash').textContent=cloud.device_flash_bytes?Math.round(cloud.device_flash_bytes/1048576)+' МБ':'—';
+get('cloudBuildFlash').textContent=cloud.build_flash_bytes?Math.round(cloud.build_flash_bytes/1048576)+' МБ':'—';
+get('cloudSafety').textContent=cloud.catalog_seen&&!cloud.flash_size_matches?'Размер Flash устройства отличается от каталога. Установка запрещена.':'Облачная установка отключена. OTA-разметка, подпись и безопасный откат не подтверждены.';
 const dataDot=get('dataLed'),dataLabel=get('dataLabel');
 if(dataDot)dataDot.classList.toggle('dataOn',cs?.configured===true);
 if(dataLabel)dataLabel.textContent=cs?.configured===true?'включено':'выключено';
