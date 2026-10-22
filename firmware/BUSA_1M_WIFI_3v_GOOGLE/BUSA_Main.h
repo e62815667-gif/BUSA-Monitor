@@ -43,7 +43,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-DUAL-THEMES";
+const char VERSION[]="БУСА 1М WiFi 14v15-N8R2-MODULE-DIAG";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -142,8 +142,19 @@ String wireError(int i,uint32_t now){
   if(!hasTemp(i,now))return "NO_VALID_READING";
   return "OK";
 }
+// V14.15: do not publish a temperature as valid if the independent
+// bus diagnostic has not confirmed a unique, CRC-valid DS18B20 ROM.
+// This prevents the misleading T2/T3 mirrored-value case from looking OK.
+// This is a conservative display/telemetry filter, not a wiring repair.
+bool oneWireVerified(int n){
+  if(n<0||n>=4)return false;
+  const OneWireProbe& p=wireProbe[n];
+  return p.checkedAt && p.presence && p.romFound && p.crcOk && p.familyOk && !p.multiple;
+}
 bool hasTemp(int n,uint32_t now){
-  return tempAt[n] && !elapsed(now,tempAt[n],7000) && isfinite(temperature[n]);
+  if(n<0||n>=4)return false;
+  return tempAt[n] && !elapsed(now,tempAt[n],7000) &&
+         isfinite(temperature[n]) && oneWireVerified(n);
 }
 
 // YF-S401 pulse reader for ordinary cooling WATER only. No process control.
@@ -940,6 +951,7 @@ String statusJSON(){
     if(i)s+=",";
     s+="{\"name\":"+quoteJson(String(i==0?"Вода":i==1?"Колонна":i==2?"Куб":"Верх колонны"));
     s+=",\"gpio\":"+String(TPIN[i])+",\"present\":"+(tempPresent[i]?"true":"false");
+    s+=",\"verified\":"+(oneWireVerified(i)?"true":"false");
     s+=",\"c\":"+(hasTemp(i,now)?String(temperature[i],2):String("null"))+"}";
   }
   s+="],\"water\":{\"gpio\":15,\"pulses\":"+String(flowPulses());
@@ -975,6 +987,7 @@ String statusJSON(){
     s+="{\"gpio\":"+String(TPIN[i]);
     s+=",\"probe_ms\":"+String(p.checkedAt);
     s+=",\"presence\":"+(p.presence?String("true"):String("false"));
+    s+=",\"measurement_verified\":"+(oneWireVerified(i)?String("true"):String("false"));
     s+=",\"no_presence_count\":"+String(oneWireNoPresenceCount[i]);
     s+=",\"detected_count\":"+String(oneWireDetectedCount[i]);
     s+=",\"rom_found\":"+(p.romFound?String("true"):String("false"));
