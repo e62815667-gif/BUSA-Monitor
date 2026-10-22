@@ -15,6 +15,8 @@
 #include <SPI.h>
 #include <WebServer.h>
 #include <Update.h>
+#include <esp_ota_ops.h>
+#include <esp_partition.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <time.h>
@@ -38,7 +40,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v12-CLOUD-PREFLIGHT";
+const char VERSION[]="БУСА 1М WiFi 14v13-N8R2-OTA-DIAG";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -749,6 +751,27 @@ String quoteJson(const String &x){
   }
   return out+"\"";
 }
+// Read-only diagnostic of the ACTUAL installed ESP32 OTA partitions.
+// Not an authorization to flash: presence/size cannot prove image signatures,
+// compatibility of the current bootloader or a working rollback policy.
+String otaPartitionPreflightJSON(){
+  const esp_partition_t* running=esp_ota_get_running_partition();
+  const esp_partition_t* next=esp_ota_get_next_update_partition(nullptr);
+  const esp_partition_t* boot=esp_ota_get_boot_partition();
+  const uint32_t candidate=cloudReleaseSize;
+  const bool hasSlot=running && next && (running->address!=next->address);
+  const bool fits=hasSlot && candidate>=60000U && candidate<=next->size;
+  String out="{\"running_address\":";
+  out+=running?String((uint32_t)running->address):String("null");
+  out+=",\"running_size\":"+(running?String((uint32_t)running->size):String("null"));
+  out+=",\"next_address\":"+(next?String((uint32_t)next->address):String("null"));
+  out+=",\"next_size\":"+(next?String((uint32_t)next->size):String("null"));
+  out+=",\"boot_address\":"+(boot?String((uint32_t)boot->address):String("null"));
+  out+=",\"slot_available\":"+(hasSlot?String("true"):String("false"));
+  out+=",\"candidate_fits_slot\":"+(fits?String("true"):String("false"));
+  out+=",\"signed_image_verified\":false,\"rollback_tested\":false,\"remote_install_enabled\":false}";
+  return out;
+}
 String otaJSON(); // forward declaration
 String cloudJSON(); // forward declaration; read-only Google status
 extern volatile int googleInternet; // external TCP health, no credentials
@@ -860,6 +883,7 @@ String statusJSON(){
   s+=",\"ap\":{\"enabled\":"+(wifiRunning?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.softAPIP().toString())+"}";
   s+=",\"ota\":"+otaJSON();
+  s+=",\"ota_preflight\":"+otaPartitionPreflightJSON();
   s+=",\"bluetooth_enabled\":false";
   s+=",\"google\":"+cloudJSON();
   s+=",\"network_indicators\":{\"internet\":"+(googleInternet==1?String("true"):String("false"));
@@ -1208,6 +1232,9 @@ main>*{max-width:100%;min-width:0}
 <div class="row"><span>Новая версия</span><b id="cloudVersion">—</b></div>
 <div class="row"><span>Flash на ESP32</span><b id="cloudFlash">—</b></div>
 <div class="row"><span>Flash в сборке</span><b id="cloudBuildFlash">—</b></div>
+<div class="row"><span>Активный раздел OTA</span><b id="cloudOtaRunning">—</b></div>
+<div class="row"><span>Резервный раздел OTA</span><b id="cloudOtaNext">—</b></div>
+<div class="row"><span>Образ помещается</span><b id="cloudOtaFits">Неизвестно</b></div>
 <div class="row"><span>OTA через интернет</span><b>ЗАБЛОКИРОВАНО</b></div>
 <p class="hint" id="cloudSafety">Совпадение Flash не подтверждает совместимость разделов OTA и откат. Не устанавливайте непроверенную прошивку.</p>
 <h2>Ручное обновление через локальный Wi-Fi</h2>
@@ -1461,7 +1488,11 @@ get('cloudCatalogue').textContent=cloud.catalog_seen?'Прочитан':'Нет 
 get('cloudVersion').textContent=cloud.available_version||'—';
 get('cloudFlash').textContent=cloud.device_flash_bytes?Math.round(cloud.device_flash_bytes/1048576)+' МБ':'—';
 get('cloudBuildFlash').textContent=cloud.build_flash_bytes?Math.round(cloud.build_flash_bytes/1048576)+' МБ':'—';
-get('cloudSafety').textContent=cloud.catalog_seen&&!cloud.flash_size_matches?'Размер Flash устройства отличается от каталога. Установка запрещена.':'Облачная установка отключена. OTA-разметка, подпись и безопасный откат не подтверждены.';
+const part=s.ota_preflight||{};
+get('cloudOtaRunning').textContent=Number.isInteger(part.running_address)?'0x'+part.running_address.toString(16)+' · '+Math.round(part.running_size/1024)+' КБ':'—';
+get('cloudOtaNext').textContent=Number.isInteger(part.next_address)?'0x'+part.next_address.toString(16)+' · '+Math.round(part.next_size/1024)+' КБ':'—';
+get('cloudOtaFits').textContent=part.slot_available!==true?'Нет второго раздела':!cloud.catalog_seen?'Нет каталога':part.candidate_fits_slot===true?'По размеру да':'По размеру нет';
+get('cloudSafety').textContent=cloud.catalog_seen&&!cloud.flash_size_matches?'Размер Flash устройства отличается от каталога. Установка запрещена.':'Облачная установка отключена. Реальные разделы OTA отображаются выше, но подпись, совместимость и безопасный откат пока не проверены.';
 const dataDot=get('dataLed'),dataLabel=get('dataLabel');
 if(dataDot)dataDot.classList.toggle('dataOn',cs?.configured===true);
 if(dataLabel)dataLabel.textContent=cs?.configured===true?'включено':'выключено';
