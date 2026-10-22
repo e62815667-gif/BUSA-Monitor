@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v10-GOOGLE-ACK-FIX";
+const char VERSION[]="БУСА 1М WiFi 14v11-UNIFIED-OTA";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -993,7 +993,7 @@ body{padding:0!important;padding-bottom:90px!important;-webkit-text-size-adjust:
 .brandSub{font-size:13px;font-weight:500;color:var(--muted)}
 .readOnlyLabel{font-size:10px;color:#20866c;font-weight:700;flex-shrink:0}
 .clockBar{max-width:620px;margin:auto;font-size:12px!important;color:var(--muted)!important;padding:0!important}
-.appTabs{position:fixed;bottom:0;left:0;right:0;z-index:15;display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px!important;overflow:visible!important;background:var(--surface);border-top:2px solid var(--orange);padding:6px 5px max(7px,env(safe-area-inset-bottom));box-shadow:0 -4px 15px #2f485c18}
+.appTabs{position:fixed;bottom:0;left:0;right:0;z-index:15;display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px!important;overflow:visible!important;background:var(--surface);border-top:2px solid var(--orange);padding:6px 5px max(7px,env(safe-area-inset-bottom));box-shadow:0 -4px 15px #2f485c18}
 .appTabs button{min-width:0!important;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:7px 0!important;border:1px solid transparent;border-radius:9px;font-size:clamp(9px,2.55vw,12px)!important;line-height:1.15;white-space:nowrap}
 .appTabs .on{background:#f7c58f;color:#3c342a;border-color:#e4a064}
 .tabIcon{font-family:system-ui,sans-serif;font-size:18px;line-height:19px;color:var(--sea)}
@@ -1037,8 +1037,31 @@ main>*{max-width:100%;min-width:0}
 .netIndicators{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:5px auto 3px;max-width:620px;font-size:11px;line-height:1.3}
 .netPill{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-weight:700;color:var(--ink);max-width:100%}
 .netDot{display:inline-block;width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:#d33a32;box-shadow:0 0 0 1px #73737355}
-.netDot.internetOn{background:#13a44c}.netDot.localOn{background:#168de3}
+.netDot.internetOn,.netDot.dataOn{background:#13a44c}.netDot.localOn{background:#168de3}
 .netText{font-size:10px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:145px}
+
+.localShortcuts{max-width:620px;margin:7px auto 2px;display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.localShortcuts button{border:1px solid #3d83aa;border-radius:9px;background:#17425b;color:#ecfaff;font-size:13px;font-weight:800;min-height:39px}
+.localShortcuts button:focus-visible{outline:3px solid #4cdb94}
+/* Shared design system with online/index.html. Browser views only. */
+:root{--unified-panel:#152a3d;--unified-line:#34546a;--unified-green:#0b994f;--unified-blue:#299bde;}
+:root[data-theme="dark"] body{background:#0b1928;color:#f0f7ff}
+:root[data-theme="dark"] header{background:#112436;border-color:var(--unified-blue)}
+:root[data-theme="dark"] .card{background:var(--unified-panel);border-color:var(--unified-line)}
+:root[data-theme="dark"] .homeHero{background:linear-gradient(125deg,#17374f,#0b2943);border-color:#3878a1}
+:root[data-theme="dark"] .tile{background:#1a364b;border-color:#346583}
+:root[data-theme="dark"] .tile small{color:#b9d6e5}
+:root[data-theme="dark"] .tile strong{color:#70e4b0}
+:root[data-theme="dark"] .appTabs{background:#10283b;border-top-color:var(--unified-blue)}
+.appTabs .on,:root[data-theme="dark"] .appTabs .on{background:var(--unified-green)!important;color:#eafff2!important;border-color:#41d98d!important;font-weight:800}
+.appTabs .on .tabIcon,:root[data-theme="dark"] .appTabs .on .tabIcon{color:#e5fff0!important}
+.appTabs button{font-size:clamp(8px,2.35vw,11px)!important;padding:9px 1px!important}
+@media(max-width:380px){.appTabs button{font-size:8px!important}.tabIcon{font-size:16px}}
+.netIndicators{flex-wrap:wrap}
+.calcComing{min-height:200px;border:1px dashed #5586a5;border-radius:13px;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--muted)}
+.calcComing span{font-size:45px;color:var(--sea)}.calcComing strong{font-size:20px;color:var(--ink)}
+.calcComing p{margin:0;max-width:370px}
+
 </style></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
@@ -1047,14 +1070,17 @@ main>*{max-width:100%;min-width:0}
 <div class="netIndicators" role="status" aria-label="Два подключения БУСА">
 <span class="netPill"><span id="internetLed" class="netDot"></span>ИНТЕРНЕТ <span id="internetLabel" class="netText">нет связи</span></span>
 <span class="netPill"><span id="localLed" class="netDot"></span>БУСА Wi-Fi <span id="localLabel" class="netText">нет клиента</span></span>
+<span class="netPill"><span id="dataLed" class="netDot"></span>ДАН <span id="dataLabel" class="netText">не настроено</span></span>
 </div>
+<div class="localShortcuts"><button type="button" data-quick-local="wifi">⌁ Связь</button><button type="button" data-quick-local="diagnostics">⊞ Диагностика</button></div>
 <nav class="appTabs" aria-label="Разделы">
 <button data-page="0" class="on"><span class="tabIcon">⌂</span><span>Главная</span></button>
 <button data-page="1"><span class="tabIcon">♨</span><span>Температуры</span></button>
 <button data-page="2"><span class="tabIcon">♧</span><span>Отбор</span></button>
 <button data-page="3"><span class="tabIcon">⌁</span><span>Графики</span></button>
 <button data-page="4"><span class="tabIcon">▤</span><span>События</span></button>
-<button data-page="5"><span class="tabIcon">⚙</span><span>Настройки</span></button>
+<button data-page="5"><span class="tabIcon">⚙</span><span>Настр.</span></button>
+<button data-page="6"><span class="tabIcon">▦</span><span>Кальк.</span></button>
 </nav></header><main>
 <section class="page" data-section="0">
   <div class="homeHero"><div class="heroEyebrow">БУСА-1М №001 · ПАНЕЛЬ МОНИТОРИНГА</div>
@@ -1226,7 +1252,10 @@ main>*{max-width:100%;min-width:0}
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
 <div class="grid"><button type="button" id="keyUndo">Назад на шаг</button>
 <button type="button" id="keyCancel">Отмена</button></div></div></section>
-<footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer></main>
+<footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer><section class="page" data-section="6" hidden><div class="card">
+<h2>Калькулятор</h2><div class="calcComing"><span aria-hidden="true">▦</span><strong>Раздел зарезервирован</strong><p>Расчёты добавим позднее по утверждённому заданию. Сейчас эта вкладка ничего не измеряет и не управляет оборудованием.</p></div>
+</div></section>
+</main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let lastWaterPulse=null,themeInitialized=false;
@@ -1279,7 +1308,11 @@ document.querySelectorAll('[data-settings-link]').forEach(b=>b.onclick=()=>{
  const top=get('settingsTabs').getBoundingClientRect().top+window.scrollY-115;
  window.scrollTo({top:Math.max(0,top),behavior:'smooth'});
 });
-function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
+function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(n===6)send=false;if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
+document.querySelectorAll('[data-quick-local]').forEach(b=>b.addEventListener('click',()=>{
+ page(5);settingsTab(b.dataset.quickLocal==='wifi'?0:3);
+ document.getElementById('settingsTabs').scrollIntoView({behavior:'smooth',block:'start'});
+}));
 function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
 document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=async()=>{
@@ -1383,8 +1416,9 @@ function graphAllTemperatures(){
  if(!tlog4.some(a=>a.some(v=>v!==null))){x.fillStyle='#a43c24';x.fillText('НЕТ ИЗМЕРЕНИЙ T1–T4',180,107)}
 }
 function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
-async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;
-networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
+let otaUiUploading=false;
+async function update(){if(pollBusy||otaUiUploading)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;
+networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(active!==6&&Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
  get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';
  const a=tlog4[i];a.push(t.c===null?null:Number(t.c));if(a.length>80)a.shift();
@@ -1414,6 +1448,9 @@ if(s.station.connected&&s.station.ssid){
  if(!select.value)select.value=s.station.ssid;
 }
 const cs=s.google;
+const dataDot=get('dataLed'),dataLabel=get('dataLabel');
+if(dataDot)dataDot.classList.toggle('dataOn',cs?.configured===true);
+if(dataLabel)dataLabel.textContent=cs?.configured===true?'включено':'выключено';
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
 if(!themeInitialized && typeof s.tft_theme_dark==='boolean'){
   document.documentElement.dataset.theme=s.tft_theme_dark?'dark':'light';
@@ -1521,7 +1558,9 @@ get('manualUpdate').onclick=async function(){
     if(!begin.ok)throw Error(await begin.text());
     const grant=await begin.json(),body=new FormData();
     body.append('firmware',file,file.name);
-    get('updateResult').textContent='Загрузка, не отключайте USB';
+    get('updateResult').textContent='Загрузка APP BIN по Wi-Fi — не отключайте БУСА';
+    otaUiUploading=true;
+    let lastOtaPaint=0;
     const t0=Date.now();
     await new Promise((resolve,reject)=>{
       const xhr=new XMLHttpRequest();
@@ -1529,7 +1568,9 @@ get('manualUpdate').onclick=async function(){
       xhr.setRequestHeader('X-Busa-Token',grant.token);
       xhr.upload.onprogress=e=>{
         if(!e.lengthComputable)return;
-        const secs=Math.max((Date.now()-t0)/1000,0.1);
+        const ts=Date.now();if(ts-lastOtaPaint<180&&e.loaded<e.total)return;
+        lastOtaPaint=ts;
+        const secs=Math.max((ts-t0)/1000,0.1);
         const pct=Math.min(100,Math.round(e.loaded*100/e.total));
         get('updateResult').textContent='Передача APP BIN: '+pct+'% · '+(e.loaded/1024).toFixed(0)+' КБ · '+(e.loaded/1024/secs).toFixed(1)+' КБ/с';
       };
@@ -1541,7 +1582,7 @@ get('manualUpdate').onclick=async function(){
     });
     get('updateResult').textContent='APP BIN записан. БУСА перезапускается';
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
-  this.disabled=false;
+  finally{otaUiUploading=false;this.disabled=false;}
 };
 get('net').onchange=()=>{if(get('net').value)get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.'};
 get('scan').onclick=async function(){this.disabled=true;get('response').textContent='Идёт поиск сетей...';
