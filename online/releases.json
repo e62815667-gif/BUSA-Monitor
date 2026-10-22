@@ -6,6 +6,36 @@
   "remote_flash_enabled": false,
   "releases": [
     {
+      "version": "V14.13",
+      "firmware_version": "БУСА 1М WiFi 14v13-N8R2-OTA-DIAG",
+      "date": "2026-10-22",
+      "build_status": "ci_success_telemetry_confirmed_local_ota_used",
+      "target": "ESP32-S3",
+      "module": "N8R2",
+      "build_flash_bytes": 8388608,
+      "build_partition": "default_8MB",
+      "psram": "disabled_in_build",
+      "app_size_bytes": 1110768,
+      "app_sha256": "b6880028bc17e2b549a082d89f0828b855ac8723b447adafe31705ec27a54396",
+      "usb_size_bytes": 1176304,
+      "usb_sha256": "8b8160f78230ccfbef48b9d8fa41d32dc09329ff73d9f45f70dff28105d4de5e",
+      "source_branch": "lab/busa-v14-13-n8r2-cloud-ota-diagnostics",
+      "build_commit": "692cbadea755dbdd19f09272af4315f780628cd8",
+      "build_url": "https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/39817012549",
+      "download_folder_url": "https://drive.google.com/drive/folders/1et2-Unaf7IIndcwK2zF85ITsxU5twBaE",
+      "work_audit_url": "https://github.com/e62815667-gif/BUSA-Monitor/issues/4",
+      "hardware_telemetry_observed": true,
+      "boot_and_google_delivery_observed": true,
+      "ota_partition_reported": true,
+      "ota_partition_sizes_bytes": [
+        3342336,
+        3342336
+      ],
+      "hardware_functional_test_complete": false,
+      "ota_rollback_tested": false,
+      "remote_install_supported": false
+    },
+    {
       "version": "V14.11",
       "firmware_version": "БУСА 1М WiFi 14v11-UNIFIED-OTA",
       "date": "2026-10-22",
