@@ -1,175 +1,214 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101827"><title>БУСА-Монитор №001</title><link rel="manifest" href="./manifest.webmanifest"><meta name="apple-mobile-web-app-capable" content="yes"><style>
-:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#0b1220;color:#edf4ff}*{box-sizing:border-box}body{margin:0}header{padding:26px 18px 16px;background:#122139}h1{font-size:25px;margin:0 0 7px}small,.muted{color:#9db1c9}main{max-width:640px;margin:auto;padding:16px 15px 105px}.notice{padding:12px;background:#3a2e21;border:1px solid #88643d;border-radius:12px;font-size:13px;margin-bottom:14px;color:#ffe0b1}.card{background:#18283f;border:1px solid #314761;border-radius:17px;padding:17px;margin-bottom:14px}.card h2{font-size:17px;margin:0 0 15px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.tile{padding:14px;border-radius:13px;background:#233854}.tile b{font-size:27px;display:block;margin:8px 0}.tile small{font-size:12px}.line{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid #344c68;font-size:14px}.line:last-child{border:0}.line b{text-align:right}.hidden{display:none!important}nav{position:fixed;bottom:0;left:0;right:0;display:flex;overflow-x:auto;background:#111e31;border-top:1px solid #39506b;padding:8px 5px max(10px,env(safe-area-inset-bottom))}nav button{flex:0 0 auto;min-width:85px;background:transparent;color:#a6bad2;border:0;padding:12px 4px;font-size:13px}nav button.active{color:#80c2ff;font-weight:bold}button.action{padding:12px 15px;border:1px solid #527391;border-radius:10px;background:#2b527c;color:white;font-size:14px;margin:8px 7px 0 0}input{width:100%;background:#101e30;color:white;border:1px solid #526a84;padding:12px;border-radius:10px;margin-top:10px;font-size:16px}.state{color:#ffc27a}.tag{display:inline-block;border:1px solid #5b7797;border-radius:20px;padding:5px 10px;font-size:12px;color:#c7d7eb;margin-top:7px}.history{font-size:13px;max-height:240px;overflow:auto}.history div{padding:8px;border-bottom:1px solid #354b66}
-</style></head><body><header><h1>БУСА-Монитор</h1><small>БУСА-1М №001 · приложение для iPhone · v0.6.2</small><div class="tag" id="badge">Демонстрационный режим</div></header><main><div class="notice" id="notice">Демо-данные условные. Управление оборудованием недоступно.</div>
-<section id="overview"><div class="card"><h2>Состояние системы</h2><div class="line"><span>ESP32-S3</span><b id="dev">Нет подключения</b></div><div class="line"><span>Модуль DS2482S-800</span><b id="bridge">—</b></div><div class="line"><span>Клавиатура PCF8575</span><b id="keypad">—</b></div><div class="line"><span>Выходы управления</span><b>Отключены</b></div></div><div class="card"><h2>Четыре температуры</h2><div class="grid" id="summary"></div></div><div class="card"><h2>Клавиатура · последняя команда</h2><div class="line"><span>Клавиша</span><b id="lastkey">—</b></div><div class="line"><span>Номер события</span><b id="keyseq">—</b></div></div></section>
-<section id="temperatures" class="hidden"><div class="card"><h2>Температурные каналы</h2><div id="channels"></div></div><div class="card"><small>Четыре независимых канала DS18B20 через DS2482S-800. Датчик уровня жидкости исключён из прошивки.</small></div></section>
-<section id="keys" class="hidden"><div class="card"><h2 id="keyboard-title">Клавиатура</h2><div class="line"><span>Модуль</span><b>PCF8575</b></div><div class="line"><span>Последняя клавиша</span><b id="key2">—</b></div><div class="line"><span>Событий в журнале</span><b id="keycount">—</b></div><h2 style="margin-top:18px">Журнал нажатий</h2><div class="history" id="keyhistory">Нет данных</div></div></section>
-<section id="connection" class="hidden"><div class="card"><h2>Подключение к ESP32-S3</h2><small>Подключитесь к Wi-Fi контроллера BUSA-1M-001. Для чтения данных прошивка использует GET /api/telemetry, /api/capabilities и /api/keys.</small><input id="url" value="http://192.168.4.1" autocapitalize="off" spellcheck="false"><button class="action" id="connect">Подключиться</button><button class="action" id="demo">Демо</button><p class="muted" id="connection-status">Нет подключения</p></div><div class="card"><h2>Совместимость</h2><div class="line"><span>Прошивка</span><b id="firmware-version">Не подключена</b></div><div class="line"><span>Контроллер</span><b>ESP32-S3 N16R8</b></div><div class="line"><span>Датчики</span><b>4 × DS18B20</b></div><div class="line"><span>Режим API</span><b>Только чтение</b></div><p class="muted">Важное ограничение Safari: сайт GitHub Pages использует HTTPS, поэтому запросы к HTTP-адресу ESP32 могут блокироваться браузером. Реальную телеметрию следует просматривать через локальную страницу контроллера или после настройки безопасного HTTPS-доступа.</p><button class="action" id="local">Открыть локальный адрес</button></div></section>
-<section id="automation" class="hidden"><div class="card"><h2>Автоматика · проект</h2><div class="line"><span>Реле K1–K3</span><b>Не реализованы</b></div><div class="line"><span>Аварийная блокировка</span><b>Не реализована</b></div><div class="line"><span>Светодиоды PCA9685</span><b>Не реализованы</b></div><div class="line"><span>Экран TFT</span><b id="display-state">Нет подключения</b></div><p class="muted">Раздел сохранён для дальнейшей разработки. Дистанционное управление отсутствует.</p></div></section>
-<section id="calculator" class="hidden"><div class="card"><h2>Калькулятор · разработка приостановлена</h2><div class="notice">По нашему решению работа над калькулятором временно приостановлена. Раздел не удалён и будет продолжен позже.</div><div class="line"><span>Раздел 1</span><b>В ожидании</b></div><div class="line"><span>Раздел 2</span><b>В ожидании</b></div><div class="line"><span>Раздел 3</span><b>В ожидании</b></div><div class="line"><span>Раздел 4</span><b>В ожидании</b></div><div class="line"><span>Раздел 5</span><b>В ожидании</b></div><div class="line"><span>Раздел 6</span><b>В ожидании</b></div><div class="line"><span>Раздел 7</span><b>В ожидании</b></div><p class="muted">Непроверенные расчёты не выполняются. Точные формулы и ранее утверждённые настройки требуется восстановить из архива проекта перед возобновлением.</p></div></section>
-<section id="safety" class="hidden"><div class="card"><h2>Аварийное отключение</h2><p class="state">Функция пока не реализована в прошивке.</p><p class="muted">Приложение не может останавливать оборудование. Аппаратная защита должна работать независимо от ESP32 и Wi-Fi.</p></div></section></main>
-<nav><button data-tab="overview" class="active">Главная</button><button data-tab="temperatures">Температуры</button><button data-tab="keys">Клавиатура</button><button data-tab="connection">Связь</button><button data-tab="automation">Автоматика</button><button data-tab="calculator">Калькулятор</button><button data-tab="safety">Защита</button></nav>
-<script>(() => {
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const names = ['Вода', 'Колонна', 'Куб', 'Верхняя точка'];
-  const POLL_MS = 3000, TIMEOUT_MS = 4000, STALE_MS = 7000;
-  let generation = 0, mode = 'demo', timer = null, watchdog = null;
-  let pending = new Set(), lastGood = 0, counter = 0, caps = null;
-  const text = (id, value) => { $(id).textContent = value; };
-  function clearKeys(message = 'Нет данных') {
-    text('lastkey', '—'); text('key2', '—'); text('keyseq', '—');
-    text('keycount', '0'); text('keyhistory', message);
-  }
-  function clearReadings(label = 'Нет подключения') {
-    draw({temperatures: [], channels: []}, false);
-    text('dev', label); text('bridge', 'Нет данных'); text('keypad', 'Нет данных');
-    clearKeys();
-  }
-  function draw(d, isDemo) {
-    const value = i => Number.isFinite(d.temperatures?.[i]) &&
-      d.channels?.[i]?.valid === true ? d.temperatures[i] : null;
-    $('summary').innerHTML = names.map((name, i) => {
-      const v = value(i);
-      return '<div class="tile"><small>T' + (i+1) + ' · ' + name +
-        '</small><b>' + (v === null ? '—' : v.toFixed(1) + ' °C') +
-        '</b><small>' + (isDemo ? 'Демо' : v === null ? 'Нет достоверных данных' : 'Измерение') + '</small></div>';
-    }).join('');
-    $('channels').innerHTML = names.map((name, i) => '<div class="line"><span>T' +
-      (i+1) + ' · ' + name + '</span><b>' + (value(i) === null ? 'Нет данных' : value(i).toFixed(2) + ' °C') + '</b></div>').join('');
-    text('dev', isDemo ? 'Демо' : d.device || 'Нет подключения');
-    text('bridge', isDemo ? 'Демо' : d.bridge_online === true ? 'На связи' : 'Нет связи');
-    text('keypad', isDemo ? 'Демо' : d.keypad_online === true ? 'На связи' : 'Нет связи');
-    text('lastkey', d.last_key || '—'); text('key2', d.last_key || '—');
-    text('keyseq', d.key_seq ?? '—');
-  }
-  function stop() {
-    generation++; clearTimeout(timer); clearInterval(watchdog);
-    timer = watchdog = null;
-    for (const controller of pending) controller.abort();
-    pending.clear(); lastGood = 0; caps = null;
-  }
-  function baseURL() {
-    const u = new URL($('url').value.trim());
-    if (!['http:', 'https:'].includes(u.protocol) || u.username || u.password || u.search || u.hash)
-      throw Error('Нужен адрес http:// или https:// без пароля, параметров и #');
-    if (u.pathname !== '/' && u.pathname !== '') throw Error('Укажите адрес контроллера без пути');
-    return u.origin;
-  }
-  async function getJSON(base, path, token) {
-    const controller = new AbortController(); pending.add(controller);
-    let timeout;
-    try {
-      // Promise.race bounds the whole operation, including a stalled response body.
-      return await Promise.race([
-        (async () => {
-          const r = await fetch(base + path, {cache: 'no-store', signal: controller.signal});
-          if (!r.ok) throw Error('HTTP ' + r.status);
-          const value = await r.json();
-          if (token !== generation) throw Error('Устаревший запрос');
-          return value;
-        })(),
-        new Promise((_, reject) => {
-          timeout = setTimeout(() => { controller.abort(); reject(Error('Тайм-аут связи')); }, TIMEOUT_MS);
-        })
-      ]);
-    } finally { clearTimeout(timeout); pending.delete(controller); }
-  }
-  function checkCaps(c) {
-    if (c?.device !== 'BUSA-1M-001' || c.api_read_only !== true ||
-        c.physical_outputs !== false || c.temperature_channels !== 4 ||
-        !['5x4 PCF8575', '4x4 PCF8575'].includes(c.keyboard))
-      throw Error('Несовместимые возможности прошивки');
-  }
-  function checkTelemetry(d) {
-    if (d?.device !== 'BUSA-1M-001' || d.mode !== 'MONITOR_ONLY' || d.outputs_enabled !== false ||
-        !Array.isArray(d.temperatures) || d.temperatures.length !== 4 ||
-        !Array.isArray(d.channels) || d.channels.length !== 4 ||
-        typeof d.bridge_online !== 'boolean' || typeof d.keypad_online !== 'boolean')
-      throw Error('Неверный формат телеметрии');
-    d.channels.forEach((c, i) => {
-      if (typeof c?.valid !== 'boolean') throw Error('Нет признака достоверности канала');
-      if (c.valid && (!Number.isFinite(d.temperatures[i]) || d.temperatures[i] < -55 || d.temperatures[i] > 125 ||
-          !Number.isFinite(c.age_ms) || c.age_ms < 0 || c.age_ms > 3000 || !d.bridge_online))
-        throw Error('Недостоверное измерение');
-    });
-  }
-  function offline(message) {
-    lastGood = 0; clearReadings('Нет связи');
-    text('badge', 'Нет связи'); text('connection-status', message);
-    text('notice', 'Свежих измерений нет. Управление оборудованием недоступно.');
-  }
-  async function poll(base, token) {
-    if (token !== generation || mode !== 'real') return;
-    try {
-      // Read capabilities each cycle: detect a changed firmware after a reboot.
-      const c = await getJSON(base, '/api/capabilities', token); checkCaps(c);
-      const d = await getJSON(base, '/api/telemetry', token); checkTelemetry(d);
-      if (token !== generation) return;
-      if (d.version !== c.version) throw Error('Прошивка сменилась во время чтения');
-      caps = c; lastGood = Date.now(); draw(d, false);
-      text('keyboard-title', 'Клавиатура ' + c.keyboard.replace(' PCF8575', '').replace('x','×'));
-      text('firmware-version', c.version || '—');
-      text('display-state', c.display === true ? 'Испытательный профиль' : 'Выключен / отсутствует');
-      text('badge', 'Реальные данные'); text('connection-status', 'Телеметрия получена · ' + c.version);
-      text('notice', 'Мониторинг без управления оборудованием.');
-      try {
-        const k = await getJSON(base, '/api/keys', token);
-        if (token !== generation || !lastGood) return;
-        if (typeof k.stream_id !== 'string' || k.stream_id !== d.key_stream_id ||
-            !Array.isArray(k.events) || k.events.length > 64 ||
-            !k.events.every(e => Number.isInteger(e.seq) && e.seq > 0 && typeof e.key === 'string'))
-          throw Error('Неверный журнал или перезапуск контроллера');
-        text('keycount', String(k.events.length));
-        text('keyhistory', k.events.length ? k.events.map(e => e.seq + ': ' + e.key).join('\n') : 'Нет нажатий');
-      } catch (e) {
-        if (token !== generation) return;
-        text('keycount', '0'); text('keyhistory', 'Журнал недоступен: ' + e.message);
-      }
-    } catch (e) {
-      if (token !== generation) return;
-      caps = null; offline('Ошибка связи: ' + e.message);
-    } finally {
-      if (token === generation && mode === 'real') timer = setTimeout(() => poll(base, token), POLL_MS);
-    }
-  }
-  function sample() {
-    counter++;
-    draw({temperatures: [22.1,35.7,38.3,34.6].map((v,i) => v + .3*Math.sin(counter/7+i)),
-      channels: names.map(() => ({valid:true}))}, true);
-    timer = setTimeout(sample, 2000);
-  }
-  function setDemo() {
-    stop(); mode = 'demo'; clearKeys('В демо журнал реальных кнопок отключён');
-    text('badge', 'Демонстрационный режим'); text('connection-status', 'Демонстрация без ESP32');
-    text('notice', 'Демо-данные условные. Управление оборудованием недоступно.');
-    text('firmware-version', 'Не подключена'); text('keyboard-title', 'Клавиатура · демо'); sample();
-    text('display-state', 'Нет подключения');
-  }
-  $('connect').onclick = () => {
-    stop(); mode = 'real'; clearReadings('Подключение…'); text('firmware-version', 'Проверка…');
-    text('badge', 'Подключение…'); text('connection-status', 'Проверка возможностей контроллера…');
-    try {
-      const base = baseURL();
-      if (location.protocol === 'https:' && base.startsWith('http:'))
-        throw Error('HTTPS-сайт не подключается к HTTP ESP. Откройте локальную страницу контроллера');
-      const token = generation;
-      watchdog = setInterval(() => {
-        if (token === generation && lastGood && Date.now() - lastGood > STALE_MS)
-          offline('Показания устарели; ожидается новый ответ');
-      }, 500);
-      poll(base, token);
-    } catch (e) { offline(e.message); }
-  };
-  $('demo').onclick = setDemo;
-  $('local').onclick = () => { try { location.href = baseURL(); } catch (e) { text('connection-status', e.message); } };
-  document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
-    document.querySelectorAll('main section').forEach(s => s.classList.add('hidden'));
-    $(b.dataset.tab).classList.remove('hidden');
-    document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
-  });
-  if (['http:', 'https:'].includes(location.protocol) && location.hostname !== 'e62815667-gif.github.io')
-    $('url').value = location.origin;
-  setDemo();
+<!doctype html>
+<html lang="ru">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#06172c"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="БУСА-1М №001. Утверждённый графический монитор для iPhone 12, 15 Pro, 16.">
+<title>БУСА-1М №001 — Монитор</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;color-scheme:dark;--bg:#050f1e;--panel:#0a1b32;--panel2:#0b233e;--edge:#17456e;--text:#e8f5ff;--sub:#8aaec9;--cyan:#23ceff;--blue:#098ded;--green:#4afa65;--danger:#ff666a;--label:#bedbed;--active:#066ffc;--glow:#115fd3;background:var(--bg);color:var(--text)}
+*{box-sizing:border-box}
+body{margin:0;padding:0;background:radial-gradient(ellipse at 60% -10%,#143357 0%,#050f1e 55%);min-height:100dvh;font-size:14px}
+button,a{-webkit-tap-highlight-color:transparent}
+button{font:inherit;cursor:pointer}
+header{position:sticky;top:0;z-index:20;background:#071527f5;border-bottom:1px solid #183958;padding:9px 12px 8px;backdrop-filter:blur(16px)}
+.topline{display:flex;align-items:center;justify-content:space-between;gap:5px}
+.brand{font-weight:750;font-size:14px;letter-spacing:.1px;color:#eaf8ff;white-space:nowrap}
+.headright{display:flex;align-items:center;gap:10px;font-size:12px;color:#b5e9ff}
+.wifi-icon{font-size:20px;color:#39c5ff}
+.powerdot{display:block;width:13px;height:13px;flex-shrink:0;background:#43e729;border-radius:50%;box-shadow:0 0 10px #41ea4d77}
+.headmeta{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:7px;font-size:10px;color:#8eb7d3}
+.headmeta strong{color:#82ccff;font-weight:650}
+.switch{background:#0d3155;border:1px solid #1f6694;border-radius:8px;color:#cbecff;padding:6px 8px;font-size:11px}
+main{width:min(100%,530px);margin:auto;padding:10px 9px calc(88px + env(safe-area-inset-bottom))}
+.view[hidden]{display:none!important}
+.sectiontitle{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:800;margin:8px 5px 11px;letter-spacing:.25px}
+.sectiontitle .visual{font-size:23px;color:var(--cyan)}
+.panel{border:1px solid var(--edge);border-radius:12px;background:linear-gradient(155deg,#0d2644,#07162d);box-shadow:inset 0 1px 0 #315a8630;margin:8px 0;padding:11px}
+.panel h2{font-size:14px;margin:0 0 10px;color:#d0eaff}
+.muted{font-size:11px;color:var(--sub);line-height:1.45}
+.board{display:grid;grid-template-columns:minmax(125px,.82fr) minmax(170px,1.18fr);gap:8px}
+.tempstack{display:grid;grid-template-rows:repeat(4,minmax(72px,1fr));gap:7px}
+.tempmini{background:linear-gradient(150deg,#0c2444,#07182d);border:1px solid #185082;border-radius:10px;display:flex;align-items:center;gap:5px;padding:6px 5px;min-width:0;box-shadow:inset 0 0 11px #1456a019}
+.tempmini .sym{width:30px;text-align:center;font-size:25px;filter:drop-shadow(0 0 7px #00bdff88);flex:0 0 30px}
+.tempmini .val{min-width:0;flex:1}
+.tempmini .cap{display:block;color:#d1e9f9;font-size:10px;line-height:1.2}
+.tempmini strong{display:block;color:#e4f9ff;font-size:19px;letter-spacing:-.45px;margin:2px 0}
+.tempmini em{display:block;font-size:9px;color:#9ebfce;font-style:normal}
+.temppage .tempmini{min-height:85px;padding:11px}
+.temppage .tempmini .sym{width:43px;flex-basis:43px;font-size:32px}
+.temppage .tempmini strong{font-size:25px}
+.temppage .tempmini .cap{font-size:14px}
+.schematic{border:1px solid #1b5d91;border-radius:11px;background:radial-gradient(ellipse at 55% 40%,#14375d,#061326 84%);min-height:309px;display:flex;flex-direction:column;position:relative;overflow:hidden;padding:6px}
+.schematic .schematitle{font-size:10px;color:#9ee4ff;font-weight:750;text-align:center;letter-spacing:.3px}
+.schematic svg{display:block;width:100%;height:266px;flex:1;filter:drop-shadow(0 0 8px #20a8ff36)}
+.schematic .schemafoot{font-size:9px;text-align:center;color:#82b5d4}
+.statrow{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.statbox{padding:11px 10px;border:1px solid #185081;background:linear-gradient(130deg,#09223b,#0a1d35);border-radius:10px}
+.statbox .small{font-size:11px;color:#afcfdf}
+.statbox .big{display:block;color:#d4f6ff;font-size:21px;font-weight:800;padding:7px 0 0}
+.statbox .suffix{font-size:10px;color:#8fcfe8}
+.warning{color:#ffd17a}
+.statusbar{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:9px 11px;background:#071a2b;border:1px solid #225078;border-radius:10px;font-size:11px;margin:8px 0}
+.statusbar span{color:#bbdbed}
+.statusbar strong{color:#6bee83}
+.statusbar .locked{color:#f6a1a1}
+.row{display:flex;align-items:center;justify-content:space-between;gap:15px;border-bottom:1px solid #1b3b5c;padding:13px 3px;font-size:13px}
+.row:last-child{border:0}
+.row b{color:#c5eaff;text-align:right;font-size:13px}
+.lights{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.light{border:1px solid #2c5a7d;background:#0b2340;border-radius:9px;text-align:center;padding:10px 2px;color:#b6d6ec;font-size:10px}
+.light .led{display:block;font-size:20px;margin:0 0 6px;color:#fa807e}
+.tips{border-left:3px solid #16b6f4;background:#0a2844;padding:10px 12px;border-radius:6px;color:#a9d8f6;font-size:11px;line-height:1.6;margin:10px 0}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kv .panel{margin:0}
+.kv .panel h2{margin-bottom:4px;font-size:12px}
+.kv strong{font-size:20px;color:#dff9ff}
+.pill{display:inline-block;padding:4px 8px;border-radius:8px;background:#153657;color:#cdeaff;border:1px solid #27608c;font-size:10px}
+.btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:43px;text-decoration:none;font-size:13px;font-weight:700;border:1px solid #289aff;border-radius:9px;background:linear-gradient(150deg,#1169db,#073e9d);color:#fff;margin:10px 0;box-shadow:0 2px 9px #064ca959}
+.btn.ghost{border-color:#315a82;background:#0a2642;color:#c9eeff;box-shadow:none}
+.chartbox{height:230px;border-radius:11px;background:linear-gradient(#0b1c33,#061426);border:1px solid #1e4b72;position:relative;padding:11px}
+.chartbox:before{content:"";position:absolute;inset:23px 13px 24px;background:repeating-linear-gradient(to bottom,transparent 0px,transparent 34px,#16406366 35px),repeating-linear-gradient(to right,transparent 0px,transparent 49px,#16406366 50px);pointer-events:none}
+.chartbox .nodata{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;font-size:12px;white-space:nowrap;color:#9dc8e5}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.tabs button{flex:1;border:1px solid #2966aa;border-radius:7px;background:#0b2b50;color:#b5e2ff;padding:9px 5px;font-size:11px}
+.tabs button.selected{background:linear-gradient(#0989ff,#0751b8);border-color:#2dacff;color:white;font-weight:700}
+.event{display:flex;gap:10px;border-bottom:1px solid #153c60;padding:11px 3px;color:#adcce0;font-size:12px}
+.event strong{color:#d3efff}
+.event .eventicon{color:#22caff}
+.settings-menu{padding:0}
+.settings-menu .row{padding:17px 15px}
+.settings-menu .row .arr{font-size:18px;color:#80b1d2}
+.settings-menu .row:hover{background:#143b5c}
+.footer-nav{position:fixed;z-index:25;bottom:0;left:0;right:0;background:#061930f9;border-top:1px solid #1c5080;display:flex;justify-content:space-around;padding:5px max(6px,env(safe-area-inset-left)) max(5px,env(safe-area-inset-bottom));box-shadow:0 -5px 19px #0312249e;backdrop-filter:blur(12px)}
+.footer-nav button{flex:1;min-width:0;padding:6px 1px 4px;border:1px solid transparent;background:transparent;border-radius:7px;color:#9bcde6;font-size:9px;white-space:nowrap;display:flex;align-items:center;flex-direction:column;gap:3px}
+.footer-nav button .ni{font-size:21px;line-height:1.15}
+.footer-nav button.active{background:linear-gradient(#1599ff,#024dab);color:#fff;border-color:#2e9eff;box-shadow:inset 0 1px #99dfff}
+body.theme-light{background:#ebf3fa;color:#102b3f}
+.theme-light header,.theme-light .footer-nav{background:#e5f2fc;border-color:#8eb8d6}
+.theme-light .brand{color:#152f48}
+.theme-light .headmeta{color:#516e85}
+.theme-light .panel,.theme-light .tempmini,.theme-light .statbox,.theme-light .statusbar,.theme-light .schematic,.theme-light .light{background:#fff;border-color:#9cc2db;color:#17344a}
+.theme-light .tempmini .cap,.theme-light .muted,.theme-light .row,.theme-light .statbox .small,.theme-light .schematic .schematitle{color:#395d76}
+.theme-light .tempmini strong,.theme-light .statbox .big,.theme-light .row b,.theme-light .kv strong,.theme-light .panel h2{color:#184a6b}
+.theme-light .footer-nav button{color:#214e72}
+.theme-light .footer-nav button.active{color:#fff}
+.theme-light .schematic svg>rect:first-of-type{fill:#e6f4fc}
+@media(min-width:650px){main{padding:14px 16px 108px}.board{grid-template-columns:185px 1fr}.schematic svg{height:300px}}
+@media(max-width:355px){.board{grid-template-columns:minmax(113px,.86fr) minmax(140px,1.14fr);gap:5px}.tempmini .sym{width:25px;flex-basis:25px;font-size:20px}.tempmini strong{font-size:16px}.footer-nav button{font-size:8px}}
+</style></head>
+<body>
+<header><div class="topline"><span class="brand">БУСА-1М №001</span>
+<div class="headright"><span class="wifi-icon" aria-hidden="true">◉</span><span id="appClock">--:--</span><span class="powerdot" title="Индикатор интерфейса, не состояния ESP32"></span></div></div>
+<div class="headmeta"><span>V14.14 · iPhone · 6 экранов</span><strong id="headConnection">ЛОКАЛЬНЫЕ ДАННЫЕ НЕ ПОДКЛЮЧЕНЫ</strong><button class="switch" id="themeSwitch" type="button" aria-label="Переключить светлую и тёмную тему">☼ Тема</button></div></header>
+<main>
+<section class="view" id="home">
+<div class="board">
+<div class="tempstack">
+<div class="tempmini"><span class="sym">💧</span><div class="val"><span class="cap">Вода · T1</span><strong>Н/Д</strong><em>GPIO16</em></div></div>
+<div class="tempmini"><span class="sym">▥</span><div class="val"><span class="cap">Колонна · T2</span><strong>Н/Д</strong><em>GPIO17</em></div></div>
+<div class="tempmini"><span class="sym">◕</span><div class="val"><span class="cap">Куб · T3</span><strong>Н/Д</strong><em>GPIO18</em></div></div>
+<div class="tempmini"><span class="sym">♨</span><div class="val"><span class="cap">Верх колонны · T4</span><strong>Н/Д</strong><em>GPIO21</em></div></div>
+</div>
+<div class="schematic"><span class="schematitle">УТВЕРЖДЁННАЯ СХЕМА БУСА</span><svg viewBox="0 0 360 225" role="img" aria-label="Схема установки БУСА с датчиком YF-S401 на линии охлаждающей воды" preserveAspectRatio="xMidYMid meet">
+<defs><linearGradient id="steel" x1="0" x2="1"><stop stop-color="#71899a"/><stop offset=".45" stop-color="#e6f0f3"/><stop offset="1" stop-color="#768b9b"/></linearGradient><linearGradient id="water" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#31b6e8"/><stop offset="1" stop-color="#087eae"/></linearGradient></defs>
+<rect width="360" height="225" rx="14" fill="#091a30"/>
+<path d="M88 179 V93 Q88 85 96 85 H164" fill="none" stroke="#738c9b" stroke-width="7"/>
+<rect x="26" y="144" width="126" height="63" rx="18" fill="url(#steel)" stroke="#607b8a" stroke-width="2"/>
+<rect x="40" y="155" width="99" height="38" rx="9" fill="#809aaa" stroke="#526d7e"/>
+<path d="M58 178 V160 M71 177 V157 M83 178 V157 M96 178 V157 M109 178 V157" stroke="#bde5f2" stroke-width="3"/>
+<rect x="83" y="22" width="24" height="126" rx="7" fill="url(#steel)" stroke="#6b8699" stroke-width="2"/>
+<g stroke="#657f91" stroke-width="3"><path d="M78 43 H112 M78 58 H112 M78 73 H112 M78 88 H112 M78 103 H112 M78 118 H112"/></g>
+<path d="M95 22 V16 H255 V49" fill="none" stroke="#798c99" stroke-width="6" stroke-linejoin="round"/>
+<rect x="230" y="48" width="57" height="81" rx="10" fill="url(#steel)" stroke="#6c8494" stroke-width="2"/>
+<path d="M242 59 Q272 65 242 72 T242 88 T242 103 T242 119" fill="none" stroke="#1e9dc9" stroke-width="4"/>
+<path d="M231 139 H317 V167" stroke="#1599ca" stroke-width="5" stroke-linecap="round" fill="none"/>
+<path d="M214 117 V139 H231" stroke="#1599ca" stroke-width="5" fill="none"/>
+<path d="M278 167 H321" stroke="#1687b9" stroke-width="5"/>
+<rect x="288" y="126" width="37" height="26" rx="7" fill="#dcf4fa" stroke="#087faf" stroke-width="3"/>
+<path d="M296 139 H316 M309 134 L316 139 L309 144" stroke="#0b749d" stroke-width="2" fill="none"/>
+<text x="306" y="122" text-anchor="middle" font-size="12" font-weight="bold" fill="#38d9ff">YF-S401</text>
+<text x="306" y="164" text-anchor="middle" font-size="10" fill="#38d9ff">ВОДА</text>
+<path d="M261 129 H341 V184" fill="none" stroke="#7c8c98" stroke-width="4"/>
+<rect x="312" y="183" width="32" height="33" rx="5" fill="#b5cad5" stroke="#7b92a1" stroke-width="2"/>
+<rect x="315" y="199" width="26" height="13" rx="3" fill="#b4e4ed"/>
+<text x="95" y="217" text-anchor="middle" font-size="11" fill="#abc9d8">Мониторинг температур T1–T4</text>
+<text x="254" y="41" text-anchor="middle" font-size="10" fill="#abc9d8">Охлаждение</text>
+</svg><span class="schemafoot">YF-S401 — охлаждение · не отбор</span></div>
+</div>
+<div class="statrow"><div class="statbox"><span class="small">◉ Вода · YF-S401</span><strong class="big">Н/Д</strong><span class="suffix">Импульсы в локальной панели</span></div>
+<div class="statbox"><span class="small">▤ Собрано</span><strong class="big">Н/Д</strong><span class="suffix">Датчик отбора отсутствует</span></div></div>
+<div class="statusbar"><span>♧ K1–K4</span><strong class="locked">ФИЗИЧЕСКИ ЗАБЛОКИРОВАНЫ</strong></div>
+<div class="panel"><h2>Подключение к ESP32-S3</h2><p class="muted">Этот экран — устанавливаемое веб-приложение. На HTTPS-странице нет прямого доступа к локальному HTTP ESP32. Для живых температур, Google и диагностики перейди в панель БУСА по её Wi-Fi.</p>
+<a class="btn" href="http://192.168.4.1/">Открыть локальную БУСА — живые данные ↗</a>
+<div class="pill" id="siteConnectivity">Проверка интернет-соединения…</div></div>
+</section>
+<section class="view temppage" id="temps" hidden>
+<div class="sectiontitle"><span class="visual">♨</span> ТЕМПЕРАТУРЫ</div>
+<div class="tempstack" style="grid-template-rows:none">
+<div class="tempmini"><span class="sym">💧</span><div class="val"><span class="cap">Вода · T1 · GPIO16</span><strong>Н/Д</strong><em>Порог предупреждения — · автоматика заблокирована</em></div></div>
+<div class="tempmini"><span class="sym">▥</span><div class="val"><span class="cap">Колонна · T2 · GPIO17</span><strong>Н/Д</strong><em>Порог предупреждения — · автоматика заблокирована</em></div></div>
+<div class="tempmini"><span class="sym">◕</span><div class="val"><span class="cap">Куб · T3 · GPIO18</span><strong>Н/Д</strong><em>Порог предупреждения — · автоматика заблокирована</em></div></div>
+<div class="tempmini"><span class="sym">♨</span><div class="val"><span class="cap">Верх колонны · T4 · GPIO21</span><strong>Н/Д</strong><em>Порог предупреждения — · автоматика заблокирована</em></div></div>
+</div><p class="tips">Показания здесь намеренно не подставляются. Четыре реальных значения читаются в локальной панели ESP32 после подключения DS18B20.</p>
+<a class="btn" href="http://192.168.4.1/">Показания T1–T4 с контроллера ↗</a>
+</section>
+<section class="view" id="collection" hidden><div class="sectiontitle"><span class="visual">💧</span> ОТБОР ЖИДКОСТИ</div>
+<div class="kv"><div class="panel"><h2>Текущий расход</h2><strong>Н/Д</strong><div class="muted">мл/мин · нет датчика</div></div><div class="panel"><h2>Собрано</h2><strong>Н/Д</strong><div class="muted">мл · нет датчика</div></div></div>
+<div class="panel"><h2>График отбора</h2><div class="chartbox"><div class="nodata">НЕТ ДАТЧИКА ОТБОРА<br><small>Фиктивные измерения не рисуются</small></div></div></div>
+<div class="panel"><div class="row"><span>Время отбора</span><b>Н/Д</b></div><div class="row"><span>Средний расход</span><b>Н/Д</b></div><div class="row"><span>Максимальный расход</span><b>Н/Д</b></div></div>
+<p class="tips">YF-S401 относится к линии охлаждающей воды, а не к отбору. Его показания доступны в локальной панели.</p></section>
+<section class="view" id="graphs" hidden><div class="sectiontitle"><span class="visual">▥</span> ГРАФИКИ</div>
+<div class="tabs" id="graphTabs"><button class="selected" data-graph="temp">Температуры</button><button data-graph="water">Вода YF-S401</button><button data-graph="collection">Отбор</button></div>
+<div class="panel"><h2 id="graphTitle">Температуры, °C</h2><div class="chartbox"><div class="nodata" id="graphEmpty">НЕТ ИЗМЕРЕНИЙ T1–T4<br><small>Подключись к локальной БУСА</small></div></div><div class="muted" style="margin-top:12px">Графики не строятся из вымышленных данных.</div></div><a class="btn ghost" href="http://192.168.4.1/">Открыть реальные графики ↗</a></section>
+<section class="view" id="events" hidden><div class="sectiontitle"><span class="visual">▤</span> СОБЫТИЯ</div>
+<div class="tabs" id="eventsTabs"><button class="selected" data-events="all">Все</button><button data-events="warning">Предупр.</button><button data-events="alarm">Аварии</button><button data-events="system">Система</button></div>
+<div class="panel"><h2>Журнал ESP32</h2><div class="event"><span class="eventicon">ⓘ</span><div><strong>Живые события не загружены</strong><div class="muted">GitHub Pages не может самостоятельно читать локальный ESP32 из HTTPS.</div></div></div><div class="event"><span class="eventicon">◈</span><div><strong>Диагностика Google и DS18B20</strong><div class="muted">Открывается через локальную панель БУСА.</div></div></div></div><a class="btn" href="http://192.168.4.1/">Открыть события контроллера ↗</a></section>
+<section class="view" id="settings" hidden><div class="sectiontitle"><span class="visual">⚙</span> НАСТРОЙКИ</div>
+<div class="panel settings-menu">
+<div class="row"><span>♨ &nbsp; Температуры T1–T4</span><b>GPIO16–21 <span class="arr">›</span></b></div>
+<div class="row"><span>💧 &nbsp; Отбор жидкости</span><b>НЕТ ДАТЧИКА <span class="arr">›</span></b></div>
+<div class="row"><span>◉ &nbsp; Wi-Fi и Google</span><b>ESP32 <span class="arr">›</span></b></div>
+<div class="row"><span>▣ &nbsp; Экран и темы</span><b>iPhone <span class="arr">›</span></b></div>
+<div class="row"><span>◈ &nbsp; Светодиоды PCA9685</span><b>11 КАНАЛОВ <span class="arr">›</span></b></div>
+<div class="row"><span>⚑ &nbsp; Реле K1–K4</span><b class="warning">БЛОК <span class="arr">›</span></b></div>
+<div class="row"><span>ⓘ &nbsp; О системе</span><b>V14.14 <span class="arr">›</span></b></div>
+</div>
+<div class="panel"><h2>Тема оформления iPhone</h2><button type="button" id="themeSettings" class="btn ghost">Переключить светлую / тёмную тему</button>
+<p class="muted">Тема сайта не меняет палитру TFT. Настройки контроллера — отдельно в локальной панели.</p></div>
+<a class="btn" href="http://192.168.4.1/">Открыть настройки ESP32 ↗</a>
+<div class="statusbar"><span>Версия сайта</span><strong>V14.14 · Approved UI</strong></div>
+</section>
+</main>
+<nav class="footer-nav" aria-label="Шесть утверждённых экранов">
+<button type="button" data-page="home" class="active"><span class="ni">⌂</span>Главная</button>
+<button type="button" data-page="temps"><span class="ni">♨</span>Темпер.</button>
+<button type="button" data-page="collection"><span class="ni">💧</span>Отбор</button>
+<button type="button" data-page="graphs"><span class="ni">▥</span>Графики</button>
+<button type="button" data-page="events"><span class="ni">▤</span>События</button>
+<button type="button" data-page="settings"><span class="ni">⚙</span>Настр.</button>
+</nav>
+<script>
+(function(){
+const buttons=[...document.querySelectorAll('[data-page]')];
+const views=[...document.querySelectorAll('.view')];
+function selectPage(id){views.forEach(v=>v.hidden=v.id!==id);buttons.forEach(b=>{const yes=b.dataset.page===id;b.classList.toggle('active',yes);b.setAttribute('aria-current',yes?'page':'false')});history.replaceState(null,'','#'+id);window.scrollTo({top:0,behavior:'instant'});}
+buttons.forEach(b=>b.addEventListener('click',()=>selectPage(b.dataset.page)));
+const allowed=['home','temps','collection','graphs','events','settings'];const requested=location.hash.replace('#','');
+if(allowed.includes(requested))selectPage(requested);
+let light=false;try{light=localStorage.getItem('busa-ui-light')==='1'}catch(e){}
+function applyTheme(){document.body.classList.toggle('theme-light',light);const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=light?'#e5f2fc':'#06172c';try{localStorage.setItem('busa-ui-light',light?'1':'0')}catch(e){}}
+applyTheme();function flip(){light=!light;applyTheme()}
+document.getElementById('themeSwitch').addEventListener('click',flip);document.getElementById('themeSettings').addEventListener('click',flip);
+function clock(){const d=new Date();document.getElementById('appClock').textContent=d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}
+clock();setInterval(clock,30000);
+document.querySelectorAll('[data-graph]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-graph]').forEach(x=>x.classList.toggle('selected',x===b));const v=b.dataset.graph;document.getElementById('graphTitle').textContent=v==='temp'?'Температуры, °C':v==='water'?'Импульсы воды YF-S401':'Отбор, мл/мин';document.getElementById('graphEmpty').textContent=v==='temp'?'НЕТ ИЗМЕРЕНИЙ T1–T4':v==='water'?'ДАННЫЕ ТОЛЬКО В ЛОКАЛЬНОЙ БУСА':'ДАТЧИК ОТБОРА ОТСУТСТВУЕТ'}));
+document.querySelectorAll('[data-events]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-events]').forEach(x=>x.classList.toggle('selected',x===b))}));
+async function siteCheck(){let ok=false;try{const r=await fetch('./manifest.webmanifest?check=1',{cache:'no-store'});ok=r.ok}catch(e){}
+document.getElementById('siteConnectivity').textContent=ok?'Веб-приложение доступно · данные ESP32 через Wi-Fi':'Веб-приложение офлайн · сохранённый экран';
+document.getElementById('headConnection').textContent=ok?'САЙТ ОНЛАЙН · ESP32 ОТДЕЛЬНО':'САЙТ ОФЛАЙН · ESP32 ОТДЕЛЬНО'}
+siteCheck();setInterval(siteCheck,20000);
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{})}
 })();
 </script></body></html>
