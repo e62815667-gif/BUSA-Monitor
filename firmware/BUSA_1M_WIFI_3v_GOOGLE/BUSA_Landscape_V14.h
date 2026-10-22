@@ -135,13 +135,14 @@ static void v14Frame(uint32_t now){
     ru.setFont(u8g2_font_6x13_t_cyrillic);
     int w=ru.getUTF8Width(title.c_str());
     const int tx=x+max(2,(51-w)/2);
-    v14Print(title,tx,41,chosen?selectedText:V14_TEXT);
+    if(w>47)v14Tiny(title,tx,40,chosen?selectedText:V14_TEXT);
+    else v14Print(title,tx,41,chosen?selectedText:V14_TEXT);
     if(chosen)v14Print(title,tx+1,41,selectedText); // thicker active glyphs
   }
   // Footer always visible, no truncation, equal arrow centres.
   screen->fillRect(0,211,320,29,V14_CARD);
   screen->drawFastHLine(0,211,320,V14_ORANGE);
-  static const char* labels[]={"Влево","Вверх","Вниз","Вправо","OK","Назад"};
+  static const char* labels[]={"ЛЕВ","ВЕРХ","НИЗ","ПРАВ","OK","НАЗ"};
   for(int i=0;i<6;i++){
     const int x=1+i*53;
     screen->fillRoundRect(x,215,51,22,4,i==4?V14_BADGE:V14_CARD);
@@ -150,13 +151,13 @@ static void v14Frame(uint32_t now){
     else if(i==5){screen->drawFastHLine(x+4,225,11,V14_BLUE);screen->fillTriangle(x+4,225,x+9,221,x+9,229,V14_BLUE);}
     // No extra circle before "OK": one clear button label, not a second button.
     if(i==4)v14Big("OK",x+18,231,tftThemeDark?0x07e0:0x0400);
-    else v14Print(labels[i],x+14,229,V14_TEXT);
+    else v14Tiny(labels[i],x+(i<4?20:18),229,tftThemeDark?V14_TEXT:0x0000);
   }
 }
 static void v14MiniRig(){
   // Approved stylized installation; YF-S401 is on the cooling-water line.
-  hqRig(123,52,113,142);
-  v14Tiny("ВОДА YF",176,188,V14_BLUE);
+  hqRig(97,52,141,142); // enlarged, no overlap with 91px temperature cards
+  v14Tiny("ВОДА YF",165,189,V14_BLUE);
 }
 
 static void v14DrawFlowBar(){
@@ -172,10 +173,10 @@ static void v14Home(uint32_t now,bool layout){
   v14MiniRig();
   for(int i=0;i<4;i++){
     int y=52+i*36;
-    hqPanel(3,y,116,34);
+    hqPanel(3,y,91,34);
     screen->fillCircle(12,y+12,4,v14SeriesColors[i]);
-    v14Print(names[i],22,y+16,V14_TEXT);
-    v14Metric(v13Temp(i,now),21,y+30,94,hasTemp(i,now));
+    v14Tiny(names[i],22,y+15,V14_TEXT);
+    v14Metric(v13Temp(i,now),18,y+29,71,hasTemp(i,now));
   }
   hqPanel(240,52,77,65);
   v14Tiny("ОТБОР",247,65,V14_TEXT);
@@ -350,13 +351,14 @@ static void v14Settings(bool layout){
         v14Tiny("Настройка: iPhone / Google",48,167,V14_MUTED);
         break;
       default:
-        v14Print("К1–К4: БЛОК",48,126,V14_WARN);
+        v14Print("K1-K4: ИМИТАЦИЯ",48,120,V14_WARN);
         for(int i=0;i<4;i++){
           int x=49+i*53;
-          screen->fillRoundRect(x,140,46,29,4,V14_INFO);
-          v14Tiny("К"+String(i+1),x+5,151,V14_TEXT);
-          v14Tiny("ВЫКЛ",x+5,164,V14_WARN);
+          screen->fillRoundRect(x,134,46,34,4,V14_INFO);
+          v14Tiny("К"+String(i+1),x+5,146,V14_TEXT);
+          v14Tiny(relaySimChannel==i+1?"SIM":"БЛОК",x+5,160,relaySimChannel==i+1?V14_GREEN:V14_WARN);
         }
+        v14Tiny("12В: НЕТ ДАТЧИКА",49,184,V14_MUTED);
     }
     v14Tiny("ESC: назад",190,190,V14_MUTED);
   }
@@ -386,13 +388,34 @@ void v14RefreshLive(uint32_t now){
   v14NetIndicators();
   if(currentPage==0){
     for(int i=0;i<4;i++)
-      v14Metric(v13Temp(i,now),21,52+i*36+30,94,hasTemp(i,now));
+      v14Metric(v13Temp(i,now),18,52+i*36+29,71,hasTemp(i,now));
     v14DrawFlowBar();
   } else if(currentPage==1 && !editingTemp){
     for(int i=0;i<4;i++){
       int x=4+(i%2)*158,y=52+(i/2)*77;
       v14Metric(v13Temp(i,now),x+11,y+40,133,hasTemp(i,now));
     }
+  }
+  // Refresh only the middle 320x160 area; never erase the header or footer.
+  if(currentPage==3)v14Graphs(true);
+  else if(currentPage==4){
+    static uint8_t lastRenderedEvents=255;
+    if(lastRenderedEvents!=v13EventCount){
+      lastRenderedEvents=v13EventCount;v14Events(true);
+    }
+  }else if(currentPage==5 && tftView && approvedSettingsItem==6){
+    // K1-K4 virtual-only state shown separately from unmeasured physical contacts.
+    hqPanel(37,72,247,126);
+    v14Big("K1-K4: ИМИТАЦИЯ",48,96,V14_TEXT);
+    for(int i=0;i<4;i++){
+      const int x=49+i*53;
+      screen->fillRoundRect(x,119,46,39,4,V14_INFO);
+      v14Tiny("К"+String(i+1),x+5,131,V14_TEXT);
+      v14Tiny(relaySimChannel==i+1?"SIM":"БЛОК",x+5,149,
+              relaySimChannel==i+1?V14_GREEN:V14_WARN);
+    }
+    v14Tiny("КОНТАКТЫ: НЕТ ОБР. СВЯЗИ",49,173,V14_WARN);
+    v14Tiny("12В: НЕ ИЗМЕРЕНО",49,189,V14_MUTED);
   }
   String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
   if(dt.length()==16)dt=dt.substring(0,6)+dt.substring(8);
