@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix, lab/busa-v14-10-google-ack-fix, lab/busa-14-11-monitor-ui, lab/busa-v14-12-cloud-update-preflight, lab/busa-v14-13-n8r2-cloud-ota-diagnostics, lab/busa-v14-14-n8r2-onewire-fix-wifi-ota, lab/busa-v14-14-combined-display-keypad-relay-sim]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix, lab/busa-v14-10-google-ack-fix, lab/busa-14-11-monitor-ui, lab/busa-v14-12-cloud-update-preflight, lab/busa-v14-13-n8r2-cloud-ota-diagnostics, lab/busa-v14-14-n8r2-onewire-fix-wifi-ota, lab/busa-v14-14-combined-display-keypad-relay-sim, lab/busa-v14-14-combined-pca9685-led-diagnostics]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -137,7 +137,21 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v14-N8R2-COMBINED-SIM' in main
+          assert '14v14-N8R2-LED-DIAG-LOCK' in main
+          leds=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_PCA9685_Leds.h').read_text()
+          assert '#include "BUSA_PCA9685_Leds.h"' in main
+          assert 'kCount=11' in leds and 'kAddress=0x40' in leds
+          assert 'kPhysicalOutputsApproved=false' in leds
+          assert 'static_assert(!kPhysicalOutputsApproved' in leds
+          assert 'if(!kPhysicalOutputsApproved)return false;' in leds
+          assert 'BusaLed::snapshot(ch)' in main
+          assert 'probePcaLedRegisters(now)' in main
+          assert 'ledSimStop("OTA_PREPARE")' in main
+          assert 'ledSimStop("OTA_TRANSFER")' in main
+          assert 'LED_SIM_MAX_MS=8000U' in main
+          assert 'current_limit_verified' in main and 'oe_state_verified' in main
+          assert 'server.on("/api/led/sim"' in main
+          assert "ledSimJSON()" in main
           assert 'RELAY_PHYSICAL_OUTPUTS=false' in main
           assert 'RELAY_SIM_MAX_MS=10000U' in main
           assert 'contact_feedback_available\\":false' in main or 'contact_feedback_available' in main
