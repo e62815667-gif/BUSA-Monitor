@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix, lab/busa-v14-10-google-ack-fix]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -20,12 +20,15 @@ jobs:
           arduino-cli core update-index
           arduino-cli core install esp32:esp32@2.0.17
       - run: |
+          arduino-cli lib install "ArduinoJson@6.21.5"
           arduino-cli lib install "OneWire"
           arduino-cli lib install "DallasTemperature"
           arduino-cli lib install "Adafruit GFX Library"
           arduino-cli lib install "Adafruit ST7735 and ST7789 Library"
           arduino-cli lib install "Adafruit ILI9341"
           arduino-cli lib install "U8g2_for_Adafruit_GFX"
+      - name: Test Google response and redirect handling
+        run: python3 tests/test_google_transport.py
       - name: Generate and validate GTS Root R1–R4 trust anchors
         run: |
           python3 - <<'PY'
@@ -66,7 +69,7 @@ jobs:
           PY
       - run: |
           mkdir -p build
-          arduino-cli compile --fqbn 'esp32:esp32:esp32s3:FlashSize=8M,PartitionScheme=default_8MB,PSRAM=disabled,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio' --output-dir build firmware/BUSA_1M_WIFI_3v_GOOGLE
+          arduino-cli compile --fqbn 'esp32:esp32:esp32s3:FlashSize=8M,PartitionScheme=default_8MB,PSRAM=disabled,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio,FlashFreq=40' --output-dir build firmware/BUSA_1M_WIFI_3v_GOOGLE
       - name: Verify GPIO and compile-time safety restrictions
         run: |
           python3 - <<'PY'
@@ -134,7 +137,7 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v9-GTS4-TLS-CERT-VERIFY' in main
+          assert '14v10-GOOGLE-ACK-FIX' in main
           assert 'TFT_DISPLAY_IDLE_MS' not in main
           assert 'class="appTabs"' in main
           assert '<div class="rigViewport">' in main
@@ -185,6 +188,9 @@ jobs:
         run: |
           SDK="$HOME/.arduino15/packages/esp32"
           python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 8MB -o build/BUSA_1M_WIFI_3v_GOOGLE_8MB_merged.bin 0x0 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h build/
+          git rev-parse HEAD > build/SOURCE_COMMIT.txt
+          arduino-cli lib list > build/LIBRARIES.txt
           test -s build/BUSA_1M_WIFI_3v_GOOGLE_8MB_merged.bin
           test -s build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
           (cd build && sha256sum BUSA_1M_WIFI_3v_GOOGLE_8MB_merged.bin BUSA_1M_WIFI_3v_GOOGLE.ino.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
@@ -193,3 +199,4 @@ jobs:
           name: BUSA_GOOGLE_3V_COMPILATION
           path: |
             build/
+

@@ -4,6 +4,7 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <time.h>
+#include <ArduinoJson.h>
 // Generated from Google Trust Services root CA certificates in the verified CI build.
 #include "BUSA_GoogleCA.h"
 
@@ -14,7 +15,7 @@ volatile int googleHttp=0,googleState=0;
 volatile int googleDns=-1; // -1 not attempted, 0 failed, 1 resolved
 volatile int googleInternet=0; // 1 only if external TCP/443 connection succeeds
 volatile int googleTlsError=0;
-volatile int googleErrorStage=0; // 0 OK/idle, 1 DNS, 2 HTTPS, 3 HTTP
+volatile int googleErrorStage=0; // 0 OK/idle, 1 DNS, 2 HTTPS, 3 HTTP/response, 4 redirect, 5 packet size
 
 String googleEndpoint,googleSecret;
 // Sending is one-way HTTPS. No remote command endpoint is ever accepted.
@@ -42,6 +43,45 @@ String cloudJSON(){
   ",\"dns\":"+String((int)googleDns)+
   ",\"tls_error\":"+String((int)googleTlsError)+
   ",\"error_stage\":"+String((int)googleErrorStage)+"}";
+}
+// Limit the decoded response, including chunked HTTP bodies.
+class GoogleReplyBuffer : public Stream {
+public:
+  char data[2049] = {};
+  size_t used=0;
+  bool overflow=false;
+  int available() override { return 0; }
+  int read() override { return -1; }
+  int peek() override { return -1; }
+  void flush() override {}
+  size_t write(uint8_t b) override { return write(&b,1); }
+  size_t write(const uint8_t* src,size_t n) override {
+    if(n>2048-used){overflow=true;return 0;}
+    memcpy(data+used,src,n);used+=n;data[used]=0;return n;
+  }
+};
+bool googleRedirectValid(const String& url){
+  // Exact HTTPS authority. Never follow sign-in, lookalike or HTTP URLs.
+  if(!url.startsWith("https://script.googleusercontent.com/") || url.length()>4096)return false;
+  for(size_t i=0;i<url.length();i++){
+    unsigned char c=url[i];
+    if(c<=32 || c>=127 || c=='\\' || c=='#')return false;
+  }
+  return true;
+}
+bool googleStoredReply(HTTPClient& request){
+  if(request.getSize()>2048)return false;
+  GoogleReplyBuffer body;
+  if(request.writeToStream(&body)<0 || body.overflow || !body.used)return false;
+  StaticJsonDocument<1024> doc;
+  DeserializationError err=deserializeJson(doc,body.data,body.used);
+  return !err && doc.is<JsonObject>() && doc["stored"].is<bool>() && doc["stored"].as<bool>();
+}
+void googleConfigureHttp(HTTPClient& request){
+  request.setConnectTimeout(20000);
+  request.setTimeout(20000); // HTTPClient uses milliseconds.
+  request.setReuse(false);
+  request.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
 }
 void setupGoogleCloud(){
   googleEndpoint=prefs.getString("g-url","");
@@ -72,7 +112,7 @@ void googleWorker(void* unused){
       googleInternet=(dns==1 && probe.connect(remote,443,1600))?1:0;
       probe.stop();
     }
-    if(!googleEnabled)continue;
+    if(!googleEnabled || otaActive)continue;
     if(time(nullptr)<1700000000){googleState=2;continue;}
     const uint32_t now=millis();
     if(!googleTestRequested && (uint32_t)(now-last)<30000)continue;
@@ -86,6 +126,7 @@ void googleWorker(void* unused){
       +String((uint32_t)time(nullptr))
       +",\"telemetry\":"+statusJSON()
       +",\"token\":"+quoteJson(googleSecret)+"}";
+    if(packet.length()>12000){googleState=7;googleHttp=0;googleErrorStage=5;continue;}
     // Resolve Google before TLS, so HTTP -1 can be diagnosed rather than guessed.
     // TLS authentication stays mandatory; insecure mode is NOT used.
     IPAddress googleHostIP;
@@ -98,32 +139,43 @@ void googleWorker(void* unused){
     googleDns=1;googleTlsError=0;googleErrorStage=0;
     WiFiClientSecure secure;
     secure.setCACert(GOOGLE_TRUST_ANCHOR);
-    secure.setTimeout(20000);
+    secure.setTimeout(20); // WiFiClientSecure 2.0.17 uses seconds.
+    secure.setHandshakeTimeout(20);
     HTTPClient request;
-    request.setConnectTimeout(20000);
-    request.setTimeout(20000);
+    googleConfigureHttp(request);
     int code=-1;
     if(request.begin(secure,googleEndpoint)){
+      const char* headers[]={"Location"};
+      request.collectHeaders(headers,1);
       request.addHeader("Content-Type","application/json");
       code=request.POST((uint8_t*)packet.c_str(),packet.length());
+      // ContentService executes POST once, then serves its result via GET.
+      // Never replay the telemetry/token to the redirected host.
+      for(unsigned hop=0;(code==302 || code==303) && hop<3;hop++){
+        String next=request.header("Location");
+        if(!googleRedirectValid(next)){googleErrorStage=4;break;}
+        request.end();secure.stop();
+        googleConfigureHttp(request);
+        if(!request.begin(secure,next)){code=-1;break;}
+        request.collectHeaders(headers,1);
+        code=request.GET();
+      }
       if(code<0){
         char tlsText[96]={0};
         googleTlsError=secure.lastError(tlsText,sizeof(tlsText));
         googleErrorStage=2;googleState=6;
-        Serial0.printf("GOOGLE TX: HTTPS error %d, TLS code %d (%s)\\n",
+        Serial0.printf("GOOGLE TX: HTTPS error %d, TLS code %d (%s)\n",
                        code,(int)googleTlsError,tlsText);
       }else if(code==200){
-        const String reply=request.getString();
-        googleState=reply.indexOf("\"stored\":true")>=0?5:7;
+        googleState=googleStoredReply(request)?5:7;
         googleErrorStage=googleState==5?0:3;
         googleTlsError=0;
       }else if(code==302||code==303){
-        // Apps Script ContentService redirects after execution. Delivery is
-        // not counted as confirmed unless sheet response says stored:true.
-        googleState=4;googleErrorStage=0;
+        // Unsafe, missing or excessive redirects are unconfirmed delivery.
+        googleState=4;googleErrorStage=4;
       }else{
         googleState=6;googleErrorStage=3;
-        Serial0.printf("GOOGLE TX: HTTP status %d\\n",code);
+        Serial0.printf("GOOGLE TX: HTTP status %d\n",code);
       }
       request.end();
     }else{
@@ -132,6 +184,7 @@ void googleWorker(void* unused){
     }
     googleHttp=code;
     if(googleState==5)googleSent++;
+    last=millis(); // Avoid immediate new POST after a slow timeout.
   }
 }
 void addGoogleRoutes(){
@@ -176,3 +229,4 @@ void launchGoogleCloud(){
     Serial0.println("GOOGLE TASK FAILED; LOCAL AP STILL AVAILABLE");
   }
 }
+
