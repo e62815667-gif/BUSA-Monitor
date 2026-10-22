@@ -40,9 +40,20 @@ jobs:
           }
           for n in ('R1','R2','R3','R4'):
             file = Path('/etc/ssl/certs/GTS_Root_'+n+'.pem')
-            if not file.is_file():
-              raise RuntimeError('Missing trusted certificate '+str(file))
-            pem=file.read_text()
+            if file.is_file():
+              pem=file.read_text()
+            else:
+              # Hosted Ubuntu runners do not guarantee every GTS root exists.
+              # Fetch ONLY from Google's official CA repository, then pin SHA256.
+              import urllib.request
+              url='https://pki.goog/repo/certs/gtsr'+n[1]+'.pem'
+              try:
+                with urllib.request.urlopen(url,timeout=25) as response:
+                  pem=response.read(12000).decode('ascii')
+              except Exception as ex:
+                raise RuntimeError('Unable to obtain GTS '+n+' from verified repository') from ex
+              file=Path('/tmp/BUSA_GTS_Root_'+n+'.pem')
+              file.write_text(pem)
             assert pem.count('-----BEGIN CERTIFICATE-----')==1, n
             fingerprint=subprocess.check_output(['openssl','x509','-in',str(file),'-noout','-fingerprint','-sha256'],text=True).strip().split('=',1)[1].replace(':','').upper()
             assert fingerprint==expected_sha256[n], f'{n}: unexpected trust anchor {fingerprint}'
