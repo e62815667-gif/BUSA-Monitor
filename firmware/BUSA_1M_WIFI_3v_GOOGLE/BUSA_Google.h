@@ -18,6 +18,46 @@ volatile int googleTlsError=0;
 volatile int googleErrorStage=0; // 0 OK/idle, 1 DNS, 2 HTTPS, 3 HTTP/response, 4 redirect, 5 packet size
 
 String googleEndpoint,googleSecret;
+// Cloud update PRE-FLIGHT: metadata only, no installer, no flash writes.
+// Fixed-size integral fields avoid sharing dynamic Strings between FreeRTOS tasks.
+volatile int cloudReleaseMinor=-1;
+volatile uint32_t cloudReleaseFlash=0,cloudReleaseSize=0;
+volatile bool cloudReleaseShaValid=false,cloudReleasePresent=false,cloudReleaseTargetValid=false;
+String cloudUpdateJSON(){
+  const int minor=cloudReleaseMinor;
+  return String("{\"catalog_seen\":")+(cloudReleasePresent?"true":"false")+
+    ",\"available_version\":"+(minor>=0?quoteJson(String("V14.")+String(minor)):String("null"))+
+    ",\"target_valid\":"+(cloudReleaseTargetValid?"true":"false")+
+    ",\"sha_format_valid\":"+(cloudReleaseShaValid?"true":"false")+
+    ",\"build_flash_bytes\":"+String((uint32_t)cloudReleaseFlash)+
+    ",\"app_size_bytes\":"+String((uint32_t)cloudReleaseSize)+
+    ",\"device_flash_bytes\":"+String((uint32_t)ESP.getFlashChipSize())+
+    ",\"flash_size_matches\":"+(cloudReleasePresent&&cloudReleaseFlash==ESP.getFlashChipSize()?"true":"false")+
+    ",\"remote_install_enabled\":false,\"ota_partition_verified\":false}";
+}
+bool cloudShaIsValid(const char* hex){
+  if(!hex || strlen(hex)!=64)return false;
+  for(int i=0;i<64;i++)if(!isxdigit((unsigned char)hex[i]))return false;
+  return true;
+}
+void cloudReleaseFromReply(JsonVariantConst obj){
+  if(!obj.is<JsonObjectConst>())return;
+  const char* version=obj["version"]|"";
+  const char* target=obj["target"]|"";
+  const char* sha=obj["app_sha256"]|"";
+  uint32_t size=obj["app_size_bytes"]|0;
+  uint32_t flash=obj["build_flash_bytes"]|0;
+  if(strncmp(version,"V14.",4)!=0)return;
+  const char* digits=version+4;
+  if(!*digits || strlen(digits)>3)return;
+  int minor=0;
+  while(*digits){if(*digits<'0'||*digits>'9')return;minor=minor*10+(*digits++-'0');}
+  if(size<60000||size>4000000 || (flash!=8388608UL&&flash!=16777216UL))return;
+  cloudReleaseTargetValid=strcmp(target,"ESP32-S3")==0;
+  cloudReleaseShaValid=cloudShaIsValid(sha);
+  if(!cloudReleaseTargetValid||!cloudReleaseShaValid)return;
+  cloudReleaseMinor=minor;cloudReleaseSize=size;cloudReleaseFlash=flash;cloudReleasePresent=true;
+}
 // Sending is one-way HTTPS. No remote command endpoint is ever accepted.
 bool googleURLValid(const String &s){
   const String prefix="https://script.google.com/macros/s/";
@@ -42,7 +82,7 @@ String cloudJSON(){
   ",\"sent\":"+String((uint32_t)googleSent)+
   ",\"dns\":"+String((int)googleDns)+
   ",\"tls_error\":"+String((int)googleTlsError)+
-  ",\"error_stage\":"+String((int)googleErrorStage)+"}";
+  ",\"error_stage\":"+String((int)googleErrorStage)+",\"cloud_update\":"+cloudUpdateJSON()+"}";
 }
 // Limit the decoded response, including chunked HTTP bodies.
 class GoogleReplyBuffer : public Stream {
@@ -75,7 +115,10 @@ bool googleStoredReply(HTTPClient& request){
   if(request.writeToStream(&body)<0 || body.overflow || !body.used)return false;
   StaticJsonDocument<1024> doc;
   DeserializationError err=deserializeJson(doc,body.data,body.used);
-  return !err && doc.is<JsonObject>() && doc["stored"].is<bool>() && doc["stored"].as<bool>();
+  if(err || !doc.is<JsonObject>() || !doc["stored"].is<bool>())return false;
+  const bool confirmed=doc["stored"].as<bool>();
+  if(confirmed)cloudReleaseFromReply(doc["release"].as<JsonVariantConst>());
+  return confirmed;
 }
 void googleConfigureHttp(HTTPClient& request){
   request.setConnectTimeout(20000);
