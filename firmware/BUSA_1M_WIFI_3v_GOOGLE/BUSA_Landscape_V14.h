@@ -17,11 +17,11 @@ static uint16_t v14SeriesColors[4]={0x037b,0xd980,0xb500,0x3685};
 static uint16_t V14_INFO=0xff16,V14_GRID=0xe71c,V14_BADGE=0xe7f8;
 static uint32_t v14FlowLast=UINT32_MAX;
 static String v14ClockLast="";
-static int8_t v14NetLast=-1,v14LocalLast=-1;
+static int8_t v14NetLast=-1,v14LocalLast=-1,v14DataLast=-1;
 struct V14MetricCache{int16_t x=-1,y=-1,width=-1;String value;uint16_t fg=0,bg=0;};
 static V14MetricCache v14Metrics[10];
 static uint8_t v14MetricCount=0;
-static void v14InvalidateLive(){v14MetricCount=0;v14FlowLast=UINT32_MAX;v14ClockLast="";v14NetLast=-1;v14LocalLast=-1;}
+static void v14InvalidateLive(){v14MetricCount=0;v14FlowLast=UINT32_MAX;v14ClockLast="";v14NetLast=-1;v14LocalLast=-1;v14DataLast=-1;}
 static void v14ApplyPalette(bool dark){
  HQ_MONO_DARK=dark;
  if(dark){
@@ -93,16 +93,23 @@ static void v14FootArrow(int x,int direction,uint16_t color){
 }
 // Independent status dots: Internet external TCP/443 probe, local blue AP client.
 // Red means not confirmed. TFT settings show STA name and AP address in detail.
+// Three compact indicators use only the 100px strip before the clock:
+// ИНТ: internet TCP probe; ЛОК: local AP client; ДАН: Google sending configured.
 static void v14NetIndicators(){
   const int8_t net=(WiFi.status()==WL_CONNECTED && googleInternet==1)?1:0;
   const int8_t local=(WiFi.softAPgetStationNum()>0)?1:0;
-  if(v14NetLast==net && v14LocalLast==local)return;
-  v14NetLast=net;v14LocalLast=local;
-  screen->fillRect(121,2,98,17,V14_CARD);
-  screen->fillCircle(130,11,4,net?0x07e0:0xf800);
-  v14Tiny("ИНТ",137,14,V14_TEXT);
-  screen->fillCircle(179,11,4,local?0x001f:0xf800);
-  v14Tiny("ЛОК",186,14,V14_TEXT);
+  const int8_t data=googleEnabled?1:0;
+  if(v14NetLast==net && v14LocalLast==local && v14DataLast==data)return;
+  v14NetLast=net;v14LocalLast=local;v14DataLast=data;
+  screen->fillRect(120,2,101,17,V14_CARD);
+  static const char* caps[]={"ИНТ","ЛОК","ДАН"};
+  const int8_t flags[]={net,local,data};
+  for(int i=0;i<3;i++){
+    const int x=122+i*34;
+    const uint16_t color=flags[i]?(i==1?0x001f:0x07e0):0xf800;
+    screen->fillCircle(x+4,11,3,color);
+    v14Tiny(caps[i],x+10,14,V14_TEXT);
+  }
 }
 static void v14Frame(uint32_t now){
   hqBackground();
@@ -119,12 +126,17 @@ static void v14Frame(uint32_t now){
   // Six tabs, preserving internal IDs with the explicit approved visual order.
   for(int i=0;i<6;i++){
     int x=1+i*53;bool chosen=(v14Order[i]==currentPage);
-    screen->fillRoundRect(x,25,51,22,4,chosen?V14_ORANGE:V14_CARD);
-    screen->drawRoundRect(x,25,51,22,4,chosen?V14_ORANGE:V14_RULE);
-    if(chosen)screen->drawFastHLine(x+6,45,39,V14_WARN);
+    // Selected tab must never turn into a white, unreadable rectangle.
+    const uint16_t selectedText=tftThemeDark?0x07e0:0x0400;
+    const uint16_t selectedBg=tftThemeDark?0x0841:0xe7fa;
+    screen->fillRoundRect(x,25,51,22,4,chosen?selectedBg:V14_CARD);
+    screen->drawRoundRect(x,25,51,22,4,chosen?selectedText:V14_RULE);
     String title=v14Tabs[i];
+    ru.setFont(u8g2_font_6x13_t_cyrillic);
     int w=ru.getUTF8Width(title.c_str());
-    v14Print(title,x+max(2,(51-w)/2),41,V14_TEXT);
+    const int tx=x+max(2,(51-w)/2);
+    v14Print(title,tx,41,chosen?selectedText:V14_TEXT);
+    if(chosen)v14Print(title,tx+1,41,selectedText); // thicker active glyphs
   }
   // Footer always visible, no truncation, equal arrow centres.
   screen->fillRect(0,211,320,29,V14_CARD);
@@ -135,9 +147,10 @@ static void v14Frame(uint32_t now){
     screen->fillRoundRect(x,215,51,22,4,i==4?V14_BADGE:V14_CARD);
     screen->drawRoundRect(x,215,51,22,4,V14_RULE);
     if(i<4)v14FootArrow(x,i,V14_ORANGE);
-    else if(i==4){screen->drawCircle(x+10,225,5,V14_GREEN);screen->fillCircle(x+10,225,2,V14_GREEN);}
-    else{screen->drawFastHLine(x+4,225,11,V14_BLUE);screen->fillTriangle(x+4,225,x+9,221,x+9,229,V14_BLUE);}
-    v14Print(labels[i],x+14,229,V14_TEXT);
+    else if(i==5){screen->drawFastHLine(x+4,225,11,V14_BLUE);screen->fillTriangle(x+4,225,x+9,221,x+9,229,V14_BLUE);}
+    // No extra circle before "OK": one clear button label, not a second button.
+    if(i==4)v14Big("OK",x+18,231,tftThemeDark?0x07e0:0x0400);
+    else v14Print(labels[i],x+14,229,V14_TEXT);
   }
 }
 static void v14MiniRig(){
