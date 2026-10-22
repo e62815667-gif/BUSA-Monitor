@@ -58,6 +58,24 @@ function setupBusaReadOnlyReleaseV1411() {
   cfg.setProperty('BUSA_RELEASE_APP_BYTES', '1104224');
   cfg.setProperty('BUSA_RELEASE_APP_SHA256', '1fc280130318c26bda982d48e5b2d2b3b3171c1697e79e7a9ea63b308860cc08');
 }
+/**
+ * V14.14 DUAL THEMES read-only catalogue metadata for the installed N8R2 lab unit.
+ * Source: independent archived APP OTA SHA-256 manifest, 23.10.2026.
+ * This DOES NOT issue update commands, download firmware, or write device flash.
+ * It only changes version details included in the ordinary telemetry ACK.
+ * Existing spreadsheet ID and access tokens are preserved.
+ */
+function setupBusaReadOnlyReleaseV1414DualThemes() {
+  const cfg = PropertiesService.getScriptProperties();
+  cfg.setProperties({
+    BUSA_RELEASE_VERSION: 'V14.14',
+    BUSA_RELEASE_TARGET: 'ESP32-S3',
+    BUSA_RELEASE_BUILD_FLASH: '8388608',
+    BUSA_RELEASE_APP_BYTES: '1128096',
+    BUSA_RELEASE_APP_SHA256: '3a0af440669eb8b82b9db2af2a10f9237fb0ba7339bf70c526496305b5ea2770'
+  }, false);
+}
+
 function busaReleaseMetadata_() {
   const props=PropertiesService.getScriptProperties();
   const version=props.getProperty('BUSA_RELEASE_VERSION') || '';
