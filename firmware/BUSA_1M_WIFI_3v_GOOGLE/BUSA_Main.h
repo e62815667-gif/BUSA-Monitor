@@ -230,26 +230,27 @@ void ledSimTick(uint32_t now){
   if(ledSimChannel>=0 && WiFi.softAPgetStationNum()==0)
     ledSimStop("AP_CLIENT_LOST");
 }
+String quoteJson(const String &x); // forward declaration
 String ledSimJSON(){
   const uint32_t now=millis();
   ledSimTick(now);
-  String o="{\\"physical_enabled\\":false,\\"current_limit_verified\\":false";
-  o+=",\\"oe_state_verified\\":false,\\"driver_connected\\":"+(pcaDetected?String("true"):String("false"));
-  o+=",\\"mode1\\":"+(pcaMode1>=0?String(pcaMode1):String("null"));
-  o+=",\\"mode2\\":"+(pcaMode2>=0?String(pcaMode2):String("null"));
-  o+=",\\"read_ok_total\\":"+String(pcaLedReadOk)+",\\"read_error_total\\":"+String(pcaLedReadErrors);
-  o+=",\\"register_scan_ms\\":"+String(pcaLedScanAt);
-  o+=",\\"sim_channel\\":"+String((int)ledSimChannel);
-  o+=",\\"sim_remaining_ms\\":"+String(ledSimChannel>=0?(uint32_t)(ledSimUntil-now):0);
-  o+=",\\"sim_reason\\":"+quoteJson(ledSimReason)+",\\"channels\\":[";
+  String o="{\"physical_enabled\":false,\"current_limit_verified\":false";
+  o+=",\"oe_state_verified\":false,\"driver_connected\":"+(pcaDetected?String("true"):String("false"));
+  o+=",\"mode1\":"+(pcaMode1>=0?String(pcaMode1):String("null"));
+  o+=",\"mode2\":"+(pcaMode2>=0?String(pcaMode2):String("null"));
+  o+=",\"read_ok_total\":"+String(pcaLedReadOk)+",\"read_error_total\":"+String(pcaLedReadErrors);
+  o+=",\"register_scan_ms\":"+String(pcaLedScanAt);
+  o+=",\"sim_channel\":"+String((int)ledSimChannel);
+  o+=",\"sim_remaining_ms\":"+String(ledSimChannel>=0?(uint32_t)(ledSimUntil-now):0);
+  o+=",\"sim_reason\":"+quoteJson(ledSimReason)+",\"channels\":[";
   for(uint8_t ch=0;ch<BusaLed::kCount;ch++){
     if(ch)o+=",";
     const auto &r=pcaLedRegs[ch];
-    o+="{\\"ch\\":"+String(ch)+",\\"name\\":"+quoteJson(String(LED_CAPS[ch]));
-    o+=",\\"virtual_on\\":"+(ledSimChannel==ch?String("true"):String("false"));
-    o+=",\\"read_ok\\":"+(r.valid?String("true"):String("false"));
-    o+=",\\"pwm_on_full\\":"+(r.valid?((r.onH&0x10)?"true":"false"):"null");
-    o+=",\\"pwm_off_full\\":"+(r.valid?((r.offH&0x10)?"true":"false"):"null");
+    o+="{\"ch\":"+String(ch)+",\"name\":"+quoteJson(String(LED_CAPS[ch]));
+    o+=",\"virtual_on\":"+(ledSimChannel==ch?String("true"):String("false"));
+    o+=",\"read_ok\":"+(r.valid?String("true"):String("false"));
+    o+=",\"pwm_on_full\":"+(r.valid?((r.onH&0x10)?"true":"false"):"null");
+    o+=",\"pwm_off_full\":"+(r.valid?((r.offH&0x10)?"true":"false"):"null");
     o+="}";
   }
   return o+"]}";
