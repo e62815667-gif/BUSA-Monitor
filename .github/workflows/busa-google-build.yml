@@ -139,7 +139,7 @@ jobs:
           app=Path('index.html').read_text()
           assert '14v14-N8R2-DUAL-THEMES' in main
           assert 'tft_theme_mode' in main
-          assert 'get("theme")' in main
+          assert 'server.arg("theme")' in main
           assert 'setTftPhysicalTheme(theme)' in main
           assert 'tftThemeSelect' in main
           assert 'window.confirm(' in main
