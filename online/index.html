@@ -328,6 +328,10 @@ input::placeholder{color:#a3bdce}
 <div class="row"><span>Каталог получен контроллером</span><b id="cloudDeviceCatalog">Нет данных</b></div>
 <div class="row"><span>Облачная установка на контроллере</span><b id="cloudRemoteAllowed" class="warn">Отключена</b></div>
 <div class="row"><span>Разметка OTA проверена</span><b id="cloudPartitionCheck" class="warn">Нет</b></div>
+<div class="row"><span>Активный APP-раздел</span><b id="cloudRunningSlot">Нет данных</b></div>
+<div class="row"><span>Резервный APP-раздел</span><b id="cloudNextSlot">Нет данных</b></div>
+<div class="row"><span>Размер нового BIN подходит</span><b id="cloudSlotFits">Не проверено</b></div>
+<div class="row"><span>Подпись проверена / откат испытан</span><b id="cloudSecurity">НЕТ / НЕТ</b></div>
 <div class="row"><span>Совместимость для OTA</span><b id="cloudCompatible" class="warn">Не подтверждена</b></div>
 <div class="row"><span>SHA-256 APP BIN</span><b id="cloudAppSha">—</b></div>
 <div class="row"><span>Обновление облачного каталога</span><b id="cloudCatalogState">Не загружен</b></div>
@@ -336,7 +340,7 @@ input::placeholder{color:#a3bdce}
 </div>
 <div class="card"><h2>Возможности сейчас</h2>
 <p class="muted">Проверка версии и параметров сборки — доступна здесь. Прямое облачное обновление и команды устройству — не активированы. Для проекта ведётся отдельная проверка безопасности и совместимости.</p>
-<a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/issues/4" target="_blank" rel="noopener">Техническое задание Work</a>
+<a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/issues/4" target="_blank" rel="noopener">Проект и требования к безопасности</a>
 </div>
 </section>
 <section id="calculator" hidden><div class="card"><h2>Калькулятор</h2><div class="calcComing"><span aria-hidden="true">▦</span><strong>Запланирован</strong><p>Вкладка зарезервирована. Формулы, параметры и расчёты добавим позже по утверждённому заданию.</p></div></div></section>
@@ -438,13 +442,21 @@ function renderCloudCompatibility(){
  el('cloudDeviceCatalog').textContent=update.catalog_seen===true?(update.available_version||'Получен'):'Нет подтверждения';
  el('cloudRemoteAllowed').textContent=update.remote_install_enabled===true?'Запросить проверку':'ОТКЛЮЧЕНА';
  el('cloudPartitionCheck').textContent=update.ota_partition_verified===true?'Отмечена (требуется аппаратная проверка)':'НЕ ПОДТВЕРЖДЕНА';
+ const slot=telemetry?.ota_preflight||{};
+ const fmt=(address,size)=>Number.isInteger(address)&&Number.isInteger(size)?'0x'+address.toString(16)+' · '+Math.round(size/1024)+' КБ':'Нет данных';
+ el('cloudRunningSlot').textContent=fmt(slot.running_address,slot.running_size);
+ el('cloudNextSlot').textContent=fmt(slot.next_address,slot.next_size);
+ el('cloudSlotFits').textContent=slot.slot_available===true?(slot.candidate_fits_slot===true?'ДА (только размер)':'НЕТ / нет размера BIN'):'НЕ ПРОВЕРЕНО';
+ el('cloudSecurity').textContent=slot.signed_image_verified===true?'ПОДПИСЬ: ДА · ОТКАТ: '+(slot.rollback_tested===true?'ДА':'НЕТ'):'НЕТ / НЕТ';
  let reason='';
  if(!release)reason='Каталог версий ещё не проверен.';
  else if(!telemetry || !Number.isFinite(cloudCurrentAt))reason='Нет отчёта ESP32 из Google.';
  else if(Date.now()-cloudCurrentAt>150000)reason='Последний отчёт ESP32 устарел.';
  else if(!(Number.isInteger(bytes)&&bytes>0))reason='Объём Flash на контроллере не подтверждён телеметрией.';
  else if(bytes!==release.build_flash_bytes)reason='Размер Flash отличается от настроек сборки ('+Math.round(bytes/1048576)+' МБ против '+Math.round(release.build_flash_bytes/1048576)+' МБ).';
- else reason='Объём Flash совпадает, но OTA-разметка, текущий слот, подпись образа и возможность отката дистанционно не проверены.';
+ else if(telemetry?.ota_preflight?.slot_available===false)reason='На устройстве не обнаружен отдельный резервный OTA-раздел.';
+ else if(telemetry?.ota_preflight?.candidate_fits_slot===false)reason='Обновление не помещается в резервный OTA-раздел либо размер пакета пока не получен.';
+ else reason='Для облачного OTA ещё не проверены криптографическая подпись, надёжный откат и локальное подтверждение.';
  el('cloudCompatible').textContent='Не подтверждена';
  el('cloudReason').textContent=reason+' Облачная установка отключена.';
 }
