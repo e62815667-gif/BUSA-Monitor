@@ -1095,7 +1095,7 @@ main>*{max-width:100%;min-width:0}
   <div class="grid homeMini">
    <div class="card"><h2>Охлаждающая вода</h2><div class="row">YF-S401 <b>GPIO15</b></div>
    <div class="row">Импульсы <b id="pulses">—</b></div>
-   <div class="row">Расход, оценка <b id="flow">—</b></div><p class="hint">Не откалибровано; 0 импульсов не доказывает отсутствие воды.</p></div>
+   <div class="row">Расход, л/мин <b id="flow">—</b></div><p class="hint">Не откалибровано; 0 импульсов не доказывает отсутствие воды.</p></div>
    <div class="card"><h2>Отбор</h2><div class="row">Расход <b class="warn">НЕТ ДАТЧИКА</b></div>
    <div class="row">Собрано <b class="warn">Н/Д</b></div>
    <p class="hint">Датчик охлаждающей воды не измеряет отбор.</p></div>
@@ -1141,6 +1141,19 @@ main>*{max-width:100%;min-width:0}
 <button type="button" data-settings-link="system"><span class="miniIcon">⚙</span>Система</button>
 <button type="button" data-settings-link="about"><span class="miniIcon">ⓘ</span>О системе</button>
 </div><p class="hint">Режим мониторинга: исполнительные выходы не включаются.</p></div>
+<div class="card"><h2>YF-S401 · калибровка по воде</h2>
+<div class="row"><span>Калибровка</span><b id="waterCalState">НЕ ПРОВЕДЕНА</b></div>
+<div class="row"><span>Импульсов в текущей пробе</span><b id="waterCalPulses">—</b></div>
+<div class="row"><span>Коэффициент, имп./л</span><b id="waterCalFactor">—</b></div>
+<p class="hint">Сначала проверяем только импульсы. Коэффициент сохраняется после измерения реального объёма обычной воды.
+До этого расход и объём показываются как Н/Д. Это не система защиты или управления.</p>
+<button id="waterCalStart" type="button" class="full">Начать запись импульсов пробы воды</button>
+<label for="waterCalVolume">Фактически измеренный объём воды, мл</label>
+<input id="waterCalVolume" inputmode="decimal" type="number" min="100" max="50000" step="1" placeholder="Ввести после измерения">
+<button id="waterCalFinish" type="button" class="full">Сохранить результат калибровки</button>
+<button id="waterCalReset" type="button" class="full">Сбросить коэффициент</button>
+<p id="waterCalResult" role="status" class="hint">Калибровка ещё не начата.</p>
+</div>
 <div class="card settingsTools"><h2>Технические разделы</h2><div class="row">Экран TFT <b>ST7789 · 320×240</b></div>
 <div class="grid"><button type="button" id="tftUp">TFT ↑</button><button type="button" id="tftDown">TFT ↓</button></div>
 <p class="hint">Управление видом TFT; физические выходы не затрагиваются.</p></div>
@@ -1382,7 +1395,11 @@ if(!refsInit && Array.isArray(s.display_references)){
   s.display_references.forEach((r,i)=>{get('ref'+i).value=r.target===null?'':r.target;get('nt'+i).value=r.notice===null?'':r.notice});
   refsInit=true;
 }
-let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'НЕТ ДАННЫХ':f.toFixed(2);get('flow2').textContent=get('flow').textContent;get('pulses').textContent=s.water.pulses;get('total').textContent=Number(s.water.total_l_estimate).toFixed(3);
+let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'Н/Д · не калибровано':f.toFixed(2);get('flow2').textContent=get('flow').textContent;get('pulses').textContent=s.water.pulses;get('total').textContent=s.water.total_l_estimate===null?'Н/Д':Number(s.water.total_l_estimate).toFixed(3);
+const wc=s.water?.calibration||{};
+get('waterCalState').textContent=wc.calibrated?'СОХРАНЕНА':wc.session_active?'ИДЁТ ПРОБА':'НЕ ПРОВЕДЕНА';
+get('waterCalPulses').textContent=wc.session_active?String(wc.session_pulses??0):'—';
+get('waterCalFactor').textContent=wc.pulses_per_litre===null||wc.pulses_per_litre===undefined?'Н/Д':Number(wc.pulses_per_litre).toFixed(2);
 flog.push(f);if(flog.length>80)flog.shift();
 const currentPulse=Number(s.water.pulses);
 if(Number.isFinite(currentPulse)){
@@ -1448,6 +1465,27 @@ if(s.keypad){
 }
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
+get('waterCalStart').onclick=async()=>{
+ if(!confirm('Начать запись импульсов для будущей пробы обычной воды?'))return;
+ try{const r=await fetch('/api/water/calibration/start',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+ get('waterCalResult').textContent=await r.text();}
+ catch(e){get('waterCalResult').textContent='Ошибка: '+e.message}
+};
+get('waterCalFinish').onclick=async()=>{
+ const value=get('waterCalVolume').value.trim(),n=Number(value);
+ if(!value||!Number.isFinite(n)||n<100||n>50000){get('waterCalResult').textContent='Укажите измеренный объём 100–50000 мл';return}
+ if(!confirm('Сохранить коэффициент по действительно измеренному объёму обычной воды?'))return;
+ try{const r=await fetch('/api/water/calibration/finish',{method:'POST',
+ body:new URLSearchParams({volume_ml:value,confirm:'YES'})});
+ get('waterCalResult').textContent=await r.text();}
+ catch(e){get('waterCalResult').textContent='Ошибка: '+e.message}
+};
+get('waterCalReset').onclick=async()=>{
+ if(!confirm('Стереть сохранённый коэффициент YF-S401?'))return;
+ try{const r=await fetch('/api/water/calibration/reset',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+ get('waterCalResult').textContent=await r.text();}
+ catch(e){get('waterCalResult').textContent='Ошибка: '+e.message}
+};
 get('googleSave').onclick=async()=>{
 const url=get('googleUrl').value.trim(),token=get('googleToken').value.trim();
 if(!url.startsWith('https://script.google.com/macros/s/')||!url.endsWith('/exec')||!/^[a-fA-F0-9]{64}$/.test(token)){
