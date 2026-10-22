@@ -10,6 +10,11 @@
 volatile bool googleEnabled=false,googleRestart=false,googleTestRequested=false;
 volatile uint32_t googleRestartAt=0,googleSent=0;
 volatile int googleHttp=0,googleState=0;
+// Diagnostics only: no tokens or passwords in logs or /api/status.
+volatile int googleDns=-1; // -1 not attempted, 0 failed, 1 resolved
+volatile int googleTlsError=0;
+volatile int googleErrorStage=0; // 0 OK/idle, 1 DNS, 2 HTTPS, 3 HTTP
+
 String googleEndpoint,googleSecret;
 // Sending is one-way HTTPS. No remote command endpoint is ever accepted.
 bool googleURLValid(const String &s){
@@ -32,7 +37,10 @@ String cloudJSON(){
  return String("{\"configured\":")+(googleEnabled?"true":"false")+
   ",\"state\":"+String((int)googleState)+
   ",\"http\":"+String((int)googleHttp)+
-  ",\"sent\":"+String((uint32_t)googleSent)+"}";
+  ",\"sent\":"+String((uint32_t)googleSent)+
+  ",\"dns\":"+String((int)googleDns)+
+  ",\"tls_error\":"+String((int)googleTlsError)+
+  ",\"error_stage\":"+String((int)googleErrorStage)+"}";
 }
 void setupGoogleCloud(){
   googleEndpoint=prefs.getString("g-url","");
@@ -61,23 +69,50 @@ void googleWorker(void* unused){
       +String((uint32_t)time(nullptr))
       +",\"telemetry\":"+statusJSON()
       +",\"token\":"+quoteJson(googleSecret)+"}";
+    // Resolve Google before TLS, so HTTP -1 can be diagnosed rather than guessed.
+    // TLS authentication stays mandatory; insecure mode is NOT used.
+    IPAddress googleHostIP;
+    if(WiFi.hostByName("script.google.com",googleHostIP)!=1){
+      googleDns=0;googleTlsError=0;googleErrorStage=1;
+      googleHttp=-1;googleState=6;
+      Serial0.println("GOOGLE TX: DNS lookup failed");
+      continue;
+    }
+    googleDns=1;googleTlsError=0;googleErrorStage=0;
     WiFiClientSecure secure;
     secure.setCACert(GOOGLE_TRUST_ANCHOR);
-    secure.setTimeout(10000);
-    HTTPClient request;request.setTimeout(10000);
+    secure.setTimeout(20000);
+    HTTPClient request;
+    request.setConnectTimeout(20000);
+    request.setTimeout(20000);
     int code=-1;
     if(request.begin(secure,googleEndpoint)){
       request.addHeader("Content-Type","application/json");
       code=request.POST((uint8_t*)packet.c_str(),packet.length());
-      // ContentService often redirects to script.googleusercontent.com.
-      // 302 only proves delivery to Google's front-end, not database insertion.
-      if(code==200){
+      if(code<0){
+        char tlsText[96]={0};
+        googleTlsError=secure.lastError(tlsText,sizeof(tlsText));
+        googleErrorStage=2;googleState=6;
+        Serial0.printf("GOOGLE TX: HTTPS error %d, TLS code %d (%s)\\n",
+                       code,(int)googleTlsError,tlsText);
+      }else if(code==200){
         const String reply=request.getString();
-        googleState=reply.indexOf("\"stored\":true")>=0?5:7;
-      }else if(code==302||code==303){googleState=4;}
-      else googleState=6;
+        googleState=reply.indexOf("\\"stored\\":true")>=0?5:7;
+        googleErrorStage=googleState==5?0:3;
+        googleTlsError=0;
+      }else if(code==302||code==303){
+        // Apps Script ContentService redirects after execution. Delivery is
+        // not counted as confirmed unless sheet response says stored:true.
+        googleState=4;googleErrorStage=0;
+      }else{
+        googleState=6;googleErrorStage=3;
+        Serial0.printf("GOOGLE TX: HTTP status %d\\n",code);
+      }
       request.end();
-    }else googleState=6;
+    }else{
+      googleState=6;googleErrorStage=2;googleTlsError=0;
+      Serial0.println("GOOGLE TX: HTTPClient.begin failed");
+    }
     googleHttp=code;
     if(googleState==5)googleSent++;
   }
