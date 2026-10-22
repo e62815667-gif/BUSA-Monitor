@@ -1,9 +1,10 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix, lab/busa-v14-10-google-ack-fix, lab/busa-14-11-monitor-ui, lab/busa-v14-12-cloud-update-preflight, lab/busa-v14-13-n8r2-cloud-ota-diagnostics]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix, lab/busa-v14-10-google-ack-fix, lab/busa-14-11-monitor-ui, lab/busa-v14-12-cloud-update-preflight, lab/busa-v14-13-n8r2-cloud-ota-diagnostics, lab/busa-v14-13-google-catalog-activation]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+      - 'google/**'
       - '.github/workflows/busa-google-build.yml'
   workflow_dispatch:
 permissions:
@@ -170,6 +171,13 @@ jobs:
           assert 'otaUiUploading' in main, 'OTA browser performance guard missing'
           assert 'v14DataLast' in landscape and 'googleEnabled?1:0' in landscape, 'TFT Google state LED missing'
           assert 'cloudUpdateJSON()' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
+          receiver=Path('google/BUSA_GoogleSheets_Receiver.gs').read_text()
+          assert "function setupBusaReadOnlyReleaseV1413()" in receiver
+          assert "cfg.setProperty('BUSA_RELEASE_VERSION', 'V14.13')" in receiver
+          assert "cfg.setProperty('BUSA_RELEASE_APP_BYTES', '1110768')" in receiver
+          assert "cfg.setProperty('BUSA_RELEASE_APP_SHA256', 'b6880028bc17e2b549a082d89f0828b855ac8723b447adafe31705ec27a54396')" in receiver
+          assert "return busaJson_({stored: true, release: busaReleaseMetadata_()});" in receiver
+          assert "BUSA_TOKEN" in receiver and "BUSA_VIEW_TOKEN" in receiver
           assert '#include <esp_ota_ops.h>' in main
           assert 'esp_ota_get_running_partition()' in main
           assert 'esp_ota_get_next_update_partition(nullptr)' in main
