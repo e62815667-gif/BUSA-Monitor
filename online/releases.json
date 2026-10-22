@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "device": "BUSA-1M-001",
+  "generated_utc": "2026-10-22",
+  "read_only": true,
+  "remote_flash_enabled": false,
+  "releases": [
+    {
+      "version": "V14.11",
+      "firmware_version": "БУСА 1М WiFi 14v11-UNIFIED-OTA",
+      "date": "2026-10-22",
+      "build_status": "compiled_successfully_not_hardware_verified",
+      "target": "ESP32-S3",
+      "build_flash_bytes": 8388608,
+      "build_partition": "default_8MB",
+      "psram": "disabled",
+      "app_size_bytes": 1104224,
+      "app_sha256": "1fc280130318c26bda982d48e5b2d2b3b3171c1697e79e7a9ea63b308860cc08",
+      "usb_size_bytes": 1169760,
+      "usb_sha256": "341b74e7ac4b0c8813f6d6e6680f77d812122f7763a1ad511c5c89037459163e",
+      "source_branch": "lab/busa-14-11-monitor-ui",
+      "build_commit": "2aa64db1869dbada169e9d48cd3a1cf1ff599f5e",
+      "build_url": "https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/39806956682",
+      "work_audit_url": "https://github.com/e62815667-gif/BUSA-Monitor/issues/3",
+      "cloud_ota_spec": "https://github.com/e62815667-gif/BUSA-Monitor/issues/4",
+      "hardware_compatibility_verified": false,
+      "ota_partition_verified": false,
+      "remote_install_supported": false
+    }
+  ]
+}
