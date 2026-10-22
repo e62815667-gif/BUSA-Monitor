@@ -7,5 +7,13 @@
   "display": "standalone",
   "background_color": "#06172c",
   "theme_color": "#06172c",
-  "lang": "ru"
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "./busa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
