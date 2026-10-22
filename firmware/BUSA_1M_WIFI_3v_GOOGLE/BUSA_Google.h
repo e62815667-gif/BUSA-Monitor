@@ -5,6 +5,7 @@
 #include <HTTPClient.h>
 #include <time.h>
 #include <ArduinoJson.h>
+#include <freertos/semphr.h>
 // Generated from Google Trust Services root CA certificates in the verified CI build.
 #include "BUSA_GoogleCA.h"
 
@@ -132,6 +133,28 @@ void setupGoogleCloud(){
   googleEnabled=googleURLValid(googleEndpoint)&&googleTokenValid(googleSecret);
   googleState=googleEnabled?1:0;
 }
+// Only loop() builds statusJSON: mutable UI Strings and sensor state are not
+// safe to traverse from the networking core. Hold the lock only to copy.
+SemaphoreHandle_t googleSnapshotMutex=nullptr;
+String googleSnapshot;
+uint32_t googleSnapshotAt=0;
+void publishGoogleSnapshot(uint32_t now){
+  if(!googleEnabled||otaActive||!googleSnapshotMutex)return;
+  if(googleSnapshotAt && !elapsed(now,googleSnapshotAt,2000))return;
+  String next=statusJSON();
+  if(xSemaphoreTake(googleSnapshotMutex,0)==pdTRUE){
+    googleSnapshot=next;googleSnapshotAt=now;
+    xSemaphoreGive(googleSnapshotMutex);
+  }
+}
+String copyGoogleSnapshot(){
+  String result;
+  if(googleSnapshotMutex && xSemaphoreTake(googleSnapshotMutex,pdMS_TO_TICKS(20))==pdTRUE){
+    result=googleSnapshot;
+    xSemaphoreGive(googleSnapshotMutex);
+  }
+  return result;
+}
 void googleWorker(void* unused){
   (void)unused;
   configTime(0,0,"pool.ntp.org","time.google.com");
@@ -144,6 +167,7 @@ void googleWorker(void* unused){
       if(googleEnabled)googleState=1;
       continue;
     }
+    if(otaActive)continue;
     const uint32_t netNow=millis();
     if((uint32_t)(netNow-lastNetProbe)>=15000){
       lastNetProbe=netNow;
@@ -159,6 +183,8 @@ void googleWorker(void* unused){
     if(time(nullptr)<1700000000){googleState=2;continue;}
     const uint32_t now=millis();
     if(!googleTestRequested && (uint32_t)(now-last)<30000)continue;
+    String snapshot=copyGoogleSnapshot();
+    if(snapshot.isEmpty())continue;
     googleTestRequested=false;
     last=now;
     googleState=3;
@@ -167,7 +193,7 @@ void googleWorker(void* unused){
     // Never save the authentication token inside telemetry/raw sheet rows.
     String packet=String("{\"version\":3,\"kind\":\"monitor_diagnostics\",\"device_id\":\"BUSA-1M-001\",\"sent_epoch\":")
       +String((uint32_t)time(nullptr))
-      +",\"telemetry\":"+statusJSON()
+      +",\"telemetry\":"+snapshot
       +",\"token\":"+quoteJson(googleSecret)+"}";
     if(packet.length()>12000){googleState=7;googleHttp=0;googleErrorStage=5;continue;}
     // Resolve Google before TLS, so HTTP -1 can be diagnosed rather than guessed.
@@ -267,9 +293,12 @@ void addGoogleRoutes(){
   });
 }
 void launchGoogleCloud(){
+  googleSnapshotMutex=xSemaphoreCreateMutex();
+  if(!googleSnapshotMutex){googleEnabled=false;googleState=6;return;}
   if(xTaskCreatePinnedToCore(googleWorker,"busa-google",12288,nullptr,1,nullptr,0)!=pdPASS){
     googleEnabled=false;googleState=6;
     Serial0.println("GOOGLE TASK FAILED; LOCAL AP STILL AVAILABLE");
   }
 }
+
 

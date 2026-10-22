@@ -27,6 +27,10 @@ jobs:
           arduino-cli lib install "Adafruit ST7735 and ST7789 Library"
           arduino-cli lib install "Adafruit ILI9341"
           arduino-cli lib install "U8g2_for_Adafruit_GFX"
+      - name: Test Wi-Fi recovery and Safari timeouts
+        run: |
+          python3 tests/test_wifi_recovery.py
+          node tests/test_local_fetch.js
       - name: Test Google response and redirect handling
         run: python3 tests/test_google_transport.py
       - name: Generate and validate GTS Root R1–R4 trust anchors
@@ -259,4 +263,5 @@ jobs:
           name: BUSA_GOOGLE_3V_COMPILATION
           path: |
             build/
+
 

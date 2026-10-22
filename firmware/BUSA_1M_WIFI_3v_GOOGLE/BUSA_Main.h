@@ -12,6 +12,7 @@
 */
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_wifi.h>
 #include <SPI.h>
 #include <WebServer.h>
 #include <Update.h>
@@ -43,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v15-N8R2-MODULE-DIAG";
+const char VERSION[]="БУСА 1М WiFi 14v15-N8R2-MODULE-DIAG-WIFI-R2";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -849,7 +850,12 @@ void renderScreen(uint32_t now){
 }
 
 WebServer server(80);
-bool otaActive=false,otaSuccess=false,otaRestart=false,otaWriteAllowed=false;
+volatile bool otaActive=false;
+bool otaSuccess=false,otaRestart=false,otaWriteAllowed=false,otaUploadCompleted=false;
+uint32_t otaExpectedBytes=0;
+uint8_t otaPrefix[36]={0};
+size_t otaPrefixUsed=0;
+#include "BUSA_AppHeader.h"
 uint32_t otaBytes=0,otaRestartAt=0,otaTokenIssued=0,startedAt=0;
 String otaToken="",otaMessage="Ожидание",nearbyNames[5];
 uint8_t nearbyCount=0;
@@ -867,10 +873,12 @@ String quoteJson(const String &x){
     if(c=='\"'||c=='\\'){out+='\\';out+=c;}
     else if(c=='\n')out+="\\n";
     else if(c=='\r')out+="\\r";
+    else if((unsigned char)c<32){char escaped[7];snprintf(escaped,sizeof(escaped),"\\u%04x",(unsigned char)c);out+=escaped;}
     else out+=c;
   }
   return out+"\"";
 }
+#include "BUSA_WifiRecovery.h"
 // Safety-bounded virtual relay diagnostics ONLY. No GPIO writes, no PCA PWM.
 // This mode never energizes SRD-12VDC-SL-C coils; there is no feedback sensor.
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,
@@ -1054,6 +1062,7 @@ String statusJSON(){
   s+=",\"network_indicators\":{\"internet\":"+(googleInternet==1?String("true"):String("false"));
   s+=",\"local_client\":"+(WiFi.softAPgetStationNum()>0?String("true"):String("false"));
   s+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"))+"}";
+  s+=",\"wifi_recovery\":"+wifiRecoveryJSON();
   s+=",\"station\":{\"ssid\":"+quoteJson(stationSsid);
   s+=",\"connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():String(""))+"}";
@@ -1069,29 +1078,46 @@ String otaJSON(){
 void uploadOTA(){
  HTTPUpload &u=server.upload();
  if(u.status==UPLOAD_FILE_START){
-  otaWriteAllowed=false;otaActive=false;otaSuccess=false;otaBytes=0;
-  if(!apClient()||otaToken.length()<16||(uint32_t)(millis()-otaTokenIssued)>90000
+  otaWriteAllowed=false;otaActive=false;otaSuccess=false;otaBytes=0;otaPrefixUsed=0;otaUploadCompleted=false;
+  if(otaRestart||wifiScanBusy()||otaExpectedBytes<60000||!apClient()||otaToken.length()<16||(uint32_t)(millis()-otaTokenIssued)>90000
      ||server.header("X-Busa-Token")!=otaToken||!u.filename.endsWith(".bin")){
     otaMessage="Отказ: локальная авторизация / формат BIN";return;
   }
   otaToken="";
-  if(!Update.begin(UPDATE_SIZE_UNKNOWN,U_FLASH)){
+  if(!Update.begin(otaExpectedBytes,U_FLASH)){
     otaMessage="Не найден OTA-раздел";Update.printError(Serial0);return;
   }
   otaWriteAllowed=true;otaActive=true;otaMessage="Записывается";
  }else if(u.status==UPLOAD_FILE_WRITE){
   if(!otaWriteAllowed)return;
-  if(otaBytes==0 && (u.currentSize<4||u.buf[0]!=0xe9)){
-    otaMessage="Неверный образ APP BIN";Update.abort();otaActive=false;otaWriteAllowed=false;return;
+  if(u.currentSize>otaExpectedBytes-otaBytes){
+    otaMessage="Размер больше разрешённого";Update.abort();otaActive=false;otaWriteAllowed=false;return;
   }
-  if(Update.write(u.buf,u.currentSize)!=u.currentSize){
+  size_t used=0;
+  if(otaPrefixUsed<sizeof(otaPrefix)){
+    const size_t need=sizeof(otaPrefix)-otaPrefixUsed;
+    used=u.currentSize<need?u.currentSize:need;
+    memcpy(otaPrefix+otaPrefixUsed,u.buf,used);otaPrefixUsed+=used;
+    if(otaPrefixUsed==sizeof(otaPrefix)){
+      if(!busaAppHeaderValid(otaPrefix,sizeof(otaPrefix))){
+        otaMessage="Нужен APP ESP32-S3, USB MERGED запрещён";
+        Update.abort();otaActive=false;otaWriteAllowed=false;return;
+      }
+      if(Update.write(otaPrefix,sizeof(otaPrefix))!=sizeof(otaPrefix)){
+        otaMessage="Ошибка записи заголовка";Update.abort();otaActive=false;otaWriteAllowed=false;return;
+      }
+    }
+  }
+  if(u.currentSize>used && Update.write(u.buf+used,u.currentSize-used)!=u.currentSize-used){
     otaMessage="Ошибка записи";Update.printError(Serial0);
     Update.abort();otaActive=false;otaWriteAllowed=false;return;
   }
   otaBytes+=u.currentSize;
  }else if(u.status==UPLOAD_FILE_END){
   if(!otaWriteAllowed)return;
-  otaSuccess=Update.end(true);otaActive=false;otaWriteAllowed=false;
+  otaSuccess=otaBytes==otaExpectedBytes && otaPrefixUsed==sizeof(otaPrefix) && Update.end(false);
+  if(!otaSuccess)Update.abort();
+  otaUploadCompleted=true;otaActive=false;otaWriteAllowed=false;
   otaMessage=otaSuccess?"Успешно, перезагрузка":"BIN не прошёл проверку";
   if(!otaSuccess)Update.printError(Serial0);
   if(otaSuccess){otaRestart=true;otaRestartAt=millis();}
@@ -1498,6 +1524,16 @@ main>*{max-width:100%;min-width:0}
 </div></section>
 </main>
 <script>
+async function localFetch(url,options={}){
+  const ctl=new AbortController();
+  const timer=setTimeout(()=>ctl.abort(),10000);
+  try{
+    const response=await fetch(url,{...options,signal:ctl.signal});
+    const body=await response.arrayBuffer();
+    return new Response(body,{status:response.status,statusText:response.statusText,headers:response.headers});
+  }finally{clearTimeout(timer)}
+}
+
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let lastWaterPulse=null,themeInitialized=false;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
@@ -1523,7 +1559,7 @@ async function syncClock(){
   const body=new URLSearchParams({epoch:String(Math.floor(d.getTime()/1000)),
     tz:String(-d.getTimezoneOffset())});
   try{
-    const r=await fetch('/api/time/sync',{method:'POST',body});
+    const r=await localFetch('/api/time/sync',{method:'POST',body});
     if(r.ok)lastClockPush=Date.now();
   }catch(e){}
 }
@@ -1549,30 +1585,30 @@ document.querySelectorAll('[data-settings-link]').forEach(b=>b.onclick=()=>{
  const top=get('settingsTabs').getBoundingClientRect().top+window.scrollY-115;
  window.scrollTo({top:Math.max(0,top),behavior:'smooth'});
 });
-function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(n===6)send=false;if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
+function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(n===6)send=false;if(send){lastLocalNav=Date.now();localFetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
 document.querySelectorAll('[data-quick-local]').forEach(b=>b.addEventListener('click',()=>{
  page(5);settingsTab(b.dataset.quickLocal==='wifi'?0:3);
  document.getElementById('settingsTabs').scrollIntoView({behavior:'smooth',block:'start'});
 }));
-function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
+function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();localFetch('/api/settings-tab?n='+n).catch(()=>{})}}
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
 document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=async()=>{
   const n=Number(b.dataset.graphTft);
   document.querySelectorAll('[data-graph-tft]').forEach(c=>c.classList.toggle('on',c===b));
   document.querySelectorAll('[data-graph-panel]').forEach(p=>p.hidden=Number(p.dataset.graphPanel)!==n);
-  await fetch('/api/graph-view?view='+n).catch(()=>{});
+  await localFetch('/api/graph-view?view='+n).catch(()=>{});
 });
-get('tftUp').onclick=()=>fetch('/api/tft/scroll?dir=up').catch(()=>{});
-get('tftDown').onclick=()=>fetch('/api/tft/scroll?dir=down').catch(()=>{});
+get('tftUp').onclick=()=>localFetch('/api/tft/scroll?dir=up').catch(()=>{});
+get('tftDown').onclick=()=>localFetch('/api/tft/scroll?dir=down').catch(()=>{});
 async function keyCommand(action){
  try{
-   let r=await fetch('/api/keypad/'+action,{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+   let r=await localFetch('/api/keypad/'+action,{method:'POST',body:new URLSearchParams({confirm:'YES'})});
    get('keyInfo').textContent=await r.text();
  }catch(e){get('keyInfo').textContent='Ошибка: '+e.message}
 }
 async function setScreenPower(action){
  try{
-  const resp=await fetch('/api/tft/screen',{method:'POST',body:new URLSearchParams({action})});
+  const resp=await localFetch('/api/tft/screen',{method:'POST',body:new URLSearchParams({action})});
   if(!resp.ok)throw new Error(await resp.text());
   get('displayState').textContent=action==='wake'?'РАБОТАЕТ':'ЭКРАН ПОГАШЕН';
  }catch(e){get('displayState').textContent='ОШИБКА: '+e.message}
@@ -1584,13 +1620,13 @@ get('keyNext').onclick=()=>keyCommand('next');
 get('tftSave').onclick=async()=>{
  if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Реле остаются отключены.'))return;
  try{
-  const r=await fetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value,rotation:get('tftRotation').value})});
+  const r=await localFetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value,rotation:get('tftRotation').value})});
   get('tftProfileStatus').textContent=await r.text();
  }catch(e){get('tftProfileStatus').textContent='Ошибка: '+e.message}
 };
 get('tftTest').onclick=async()=>{
  try{
-  const r=await fetch('/api/tft/test',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+  const r=await localFetch('/api/tft/test',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
   get('tftProfileStatus').textContent=await r.text();
  }catch(e){get('tftProfileStatus').textContent='Ошибка: '+e.message}
 };
@@ -1610,7 +1646,7 @@ get('diagCopy').onclick=async()=>{
 };
 async function setTftPhysicalTheme(theme){
  if(theme!=='dark'&&theme!=='light')throw Error('Недопустимая тема');
- const r=await fetch('/api/tft/theme',{method:'POST',
+ const r=await localFetch('/api/tft/theme',{method:'POST',
   body:new URLSearchParams({confirm:'YES',theme})});
  const payload=await r.text();
  if(!r.ok)throw Error(payload);
@@ -1649,7 +1685,7 @@ get('refsSave').onclick=async()=>{
      body.set(k+i,v);
    }
  }
- let r=await fetch('/api/display-refs',{method:'POST',body});
+ let r=await localFetch('/api/display-refs',{method:'POST',body});
  get('refsResult').textContent=await r.text();
  if(r.ok)refsInit=false;
 };
@@ -1677,7 +1713,7 @@ function graphAllTemperatures(){
 }
 function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
 let otaUiUploading=false;
-async function update(){if(pollBusy||otaUiUploading)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();get('tftThemeSelect').value=s.tft_theme_dark?'dark':'light';if(!connected)message('Связь с ESP32 восстановлена');connected=true;
+async function update(){if(pollBusy||otaUiUploading)return;pollBusy=true;try{let r=await localFetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();get('tftThemeSelect').value=s.tft_theme_dark?'dark':'light';if(!connected)message('Связь с ESP32 восстановлена');connected=true;
 networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(active!==6&&Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
  get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';
@@ -1788,14 +1824,14 @@ get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_
 document.querySelectorAll('[data-relay-sim]').forEach(b=>b.onclick=async()=>{
   if(!confirm('Только виртуальный тест K'+b.dataset.relaySim+' на 10 секунд. Физические реле не включатся. Продолжить?'))return;
   try{
-    const r=await fetch('/api/relay/sim',{method:'POST',body:new URLSearchParams({
+    const r=await localFetch('/api/relay/sim',{method:'POST',body:new URLSearchParams({
       action:'single',channel:b.dataset.relaySim,confirm:'DRY_RUN_ONLY'})});
     get('relaySimResult').textContent=await r.text();
   }catch(e){get('relaySimResult').textContent='Ошибка симуляции: '+e.message}
 });
 get('relaySimStop').onclick=async()=>{
  try{
-   const r=await fetch('/api/relay/sim',{method:'POST',
+   const r=await localFetch('/api/relay/sim',{method:'POST',
       body:new URLSearchParams({action:'stop'})});
    get('relaySimResult').textContent=await r.text();
  }catch(e){get('relaySimResult').textContent='Ошибка остановки: '+e.message}
@@ -1803,19 +1839,19 @@ get('relaySimStop').onclick=async()=>{
 document.querySelectorAll('[data-led-channel]').forEach(b=>b.onclick=async()=>{
   if(!confirm('Виртуальная проверка CH'+b.dataset.ledChannel+' на 8 секунд без подачи сигнала на лампочку?'))return;
   try{
-    const r=await fetch('/api/led/sim',{method:'POST',body:new URLSearchParams({action:'test',channel:b.dataset.ledChannel,confirm:'DRY_RUN_ONLY'})});
+    const r=await localFetch('/api/led/sim',{method:'POST',body:new URLSearchParams({action:'test',channel:b.dataset.ledChannel,confirm:'DRY_RUN_ONLY'})});
     get('ledSimResult').textContent=await r.text();
   }catch(e){get('ledSimResult').textContent='Ошибка: '+e.message}
 });
 get('ledSimStop').onclick=async()=>{
   try{
-    const r=await fetch('/api/led/sim',{method:'POST',body:new URLSearchParams({action:'stop'})});
+    const r=await localFetch('/api/led/sim',{method:'POST',body:new URLSearchParams({action:'stop'})});
     get('ledSimResult').textContent=await r.text();
   }catch(e){get('ledSimResult').textContent='Ошибка: '+e.message}
 };
 get('waterCalStart').onclick=async()=>{
  if(!confirm('Начать запись импульсов для будущей пробы обычной воды?'))return;
- try{const r=await fetch('/api/water/calibration/start',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+ try{const r=await localFetch('/api/water/calibration/start',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
  get('waterCalResult').textContent=await r.text();}
  catch(e){get('waterCalResult').textContent='Ошибка: '+e.message}
 };
@@ -1823,14 +1859,14 @@ get('waterCalFinish').onclick=async()=>{
  const value=get('waterCalVolume').value.trim(),n=Number(value);
  if(!value||!Number.isFinite(n)||n<100||n>50000){get('waterCalResult').textContent='Укажите измеренный объём 100–50000 мл';return}
  if(!confirm('Сохранить коэффициент по действительно измеренному объёму обычной воды?'))return;
- try{const r=await fetch('/api/water/calibration/finish',{method:'POST',
+ try{const r=await localFetch('/api/water/calibration/finish',{method:'POST',
  body:new URLSearchParams({volume_ml:value,confirm:'YES'})});
  get('waterCalResult').textContent=await r.text();}
  catch(e){get('waterCalResult').textContent='Ошибка: '+e.message}
 };
 get('waterCalReset').onclick=async()=>{
  if(!confirm('Стереть сохранённый коэффициент YF-S401?'))return;
- try{const r=await fetch('/api/water/calibration/reset',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+ try{const r=await localFetch('/api/water/calibration/reset',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
  get('waterCalResult').textContent=await r.text();}
  catch(e){get('waterCalResult').textContent='Ошибка: '+e.message}
 };
@@ -1840,19 +1876,19 @@ if(!url.startsWith('https://script.google.com/macros/s/')||!url.endsWith('/exec'
  get('googleResult').textContent='Требуется ссылка Apps Script /exec и секрет из 64 шестнадцатеричных символов';return;
 }
 if(!confirm('Включить отправку показаний в свой Google Диск? Только мониторинг.'))return;
-let resp=await fetch('/api/google/config',{method:'POST',body:new URLSearchParams({url,token})});
+let resp=await localFetch('/api/google/config',{method:'POST',body:new URLSearchParams({url,token})});
 get('googleResult').textContent=await resp.text();if(resp.ok)get('googleToken').value='';
 };
 get('googleTest').onclick=async()=>{
   try{
-    const r=await fetch('/api/google/test',{method:'POST',
+    const r=await localFetch('/api/google/test',{method:'POST',
       body:new URLSearchParams({confirm:'YES'})});
     get('googleResult').textContent=await r.text();
   }catch(e){get('googleResult').textContent='Ошибка проверки: '+e.message}
 };
 get('googleStop').onclick=async()=>{
 if(!confirm('Отключить отправку диагностических данных в Google?'))return;
-const resp=await fetch('/api/google/off',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+const resp=await localFetch('/api/google/off',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
 get('googleResult').textContent=await resp.text();
 };
 get('manualUpdate').onclick=async function(){
@@ -1863,7 +1899,9 @@ get('manualUpdate').onclick=async function(){
   if(!confirm('Подтвердите ручное обновление диагностической прошивки. ESP32-S3 N8R2, внешние выходы отключены, выбран APP BIN?'))return;
   this.disabled=true;
   try{
-    const begin=await fetch('/api/ota/prepare',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+    const header=new DataView(await file.slice(0,36).arrayBuffer());
+    if(header.byteLength<36||header.getUint8(0)!==0xe9||header.getUint16(12,true)!==9||header.getUint32(32,true)!==0xabcd5432)throw Error('Выбран не APP ESP32-S3. USB MERGED нельзя передавать по OTA');
+    const begin=await localFetch('/api/ota/prepare',{method:'POST',body:new URLSearchParams({confirm:'YES',size:String(file.size)})});
     if(!begin.ok)throw Error(await begin.text());
     const grant=await begin.json(),body=new FormData();
     body.append('firmware',file,file.name);
@@ -1883,7 +1921,7 @@ get('manualUpdate').onclick=async function(){
         const pct=Math.min(100,Math.round(e.loaded*100/e.total));
         get('updateResult').textContent='Передача APP BIN: '+pct+'% · '+(e.loaded/1024).toFixed(0)+' КБ · '+(e.loaded/1024/secs).toFixed(1)+' КБ/с';
       };
-      xhr.onload=()=>xhr.status===200?resolve(xhr.responseText):reject(Error(xhr.responseText||'HTTP '+xhr.status));
+      xhr.onload=()=>{try{const result=JSON.parse(xhr.responseText);if(xhr.status!==200||result.success!==true)throw Error(result.message||'HTTP '+xhr.status);resolve(result);}catch(e){reject(e)}};
       xhr.onerror=()=>reject(Error('Wi-Fi связь прервана при передаче'));
       xhr.ontimeout=()=>reject(Error('Время передачи истекло'));
       xhr.timeout=180000;
@@ -1898,12 +1936,12 @@ get('manualSsid').oninput=()=>{if(get('manualSsid').value.trim())get('net').valu
 get('scan').onclick=async function(){
   this.disabled=true;get('response').textContent='Идёт поиск сетей...';
   try{
-    let r=await fetch('/api/wifi/scan?start=1',{cache:'no-store'});
+    let r=await localFetch('/api/wifi/scan?start=1',{cache:'no-store'});
     if(!r.ok)throw Error('сервер поиска вернул HTTP '+r.status);
     let j=await r.json();
-    for(let i=0;i<12&&j.scanning;i++){
+    for(let i=0;i<20&&j.scanning;i++){
       await new Promise(done=>setTimeout(done,1000));
-      r=await fetch('/api/wifi/scan',{cache:'no-store'});
+      r=await localFetch('/api/wifi/scan',{cache:'no-store'});
       if(!r.ok)throw Error('сервер поиска вернул HTTP '+r.status);
       j=await r.json();
     }
@@ -1927,7 +1965,7 @@ get('save').onclick=async function(){
   }
   this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
   try{
-    const r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass}),cache:'no-store'});
+    const r=await localFetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass}),cache:'no-store'});
     get('response').textContent=await r.text();
     if(r.ok){get('pass').value='';message('Настройки сети сохранены: '+ssid);}
   }catch(e){get('response').textContent='Ошибка: '+e.message;}
@@ -2004,6 +2042,9 @@ void setup(){
     if(!isfinite(noticeTemp[i])||noticeTemp[i]<0||noticeTemp[i]>125)noticeTemp[i]=NAN;
   }
   setupGoogleCloud();
+  WiFi.persistent(false); // Credentials live only in application Preferences.
+  WiFi.setAutoReconnect(false); // One owner: wifiRecoveryTick, including during scans.
+  WiFi.onEvent(wifiRecoveryEvent);
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
   configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
@@ -2013,11 +2054,10 @@ void setup(){
   apPassword="BUSA"+String((uint32_t)ESP.getEfuseMac(),HEX);
   wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
   updateBootStage(1);
-  Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
-                 (int)wifiRunning,WiFi.softAPIP().toString().c_str(),apPassword.c_str());
+  Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
+                 (int)wifiRunning,WiFi.softAPIP().toString().c_str());
   if(stationSsid.length() && stationPass.length()>=8){
-    WiFi.setAutoReconnect(true);
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    wifiScheduleConnect(millis());
     Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
   }else Serial0.println("STA config missing: preprovision NVS before use; AP stays available");
   server.on("/",HTTP_GET,[]{server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
@@ -2154,9 +2194,17 @@ void setup(){
   server.on("/api/ota/prepare",HTTP_POST,[]{
     relaySimStop("OTA_PREPARE");
     ledSimStop("OTA_PREPARE");
-    if(!apClient()||server.arg("confirm")!="YES"||otaActive){
+    if(!apClient()||server.arg("confirm")!="YES"||otaActive||otaRestart||wifiScanBusy()){
       server.send(403,"text/plain","Требуется локальная сеть БУСА и согласие");return;
     }
+    const String sizeText=server.arg("size");
+    char *sizeEnd=nullptr;
+    const unsigned long size=strtoul(sizeText.c_str(),&sizeEnd,10);
+    const esp_partition_t* slot=esp_ota_get_next_update_partition(nullptr);
+    if(sizeText.isEmpty()||!sizeEnd||*sizeEnd||!slot||size<60000||size>slot->size){
+      server.send(400,"text/plain","APP size / OTA partition invalid");return;
+    }
+    otaExpectedBytes=size;otaSuccess=false;otaUploadCompleted=false;
     char token[17];
     snprintf(token,sizeof(token),"%08lx%08lx",
       (unsigned long)esp_random(),(unsigned long)esp_random());
@@ -2166,44 +2214,28 @@ void setup(){
   });
   server.on("/api/ota/upload",HTTP_POST,[]{
     server.sendHeader("Cache-Control","no-store");
+    const bool completed=otaUploadCompleted;
+    if(!completed){server.send(400,"application/json","{\"success\":false,\"message\":\"No completed upload\"}");return;}
     server.send(otaSuccess?200:400,"application/json",otaJSON());
+    otaUploadCompleted=false;
   },uploadOTA);
   server.on("/api/wifi/scan",HTTP_GET,[]{
     if(server.client().localIP()!=WiFi.softAPIP()){
       server.send(403,"application/json","{\"error\":\"Only protected local AP\"}");return;
     }
-    if(server.hasArg("start") && server.arg("start")=="1"){
-      WiFi.scanDelete();
-      const int started=WiFi.scanNetworks(true,false);
-      if(started==WIFI_SCAN_FAILED){
-        server.send(200,"application/json","{\"scanning\":false,\"error\":\"scan_start_failed\",\"networks\":[]}");return;
-      }
+    if(otaActive || otaRestart){
+      server.send(409,"application/json","{\"error\":\"ota_busy\"}");return;
     }
-    const int n=WiFi.scanComplete();
-    if(n==WIFI_SCAN_RUNNING){
-      server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
-    }
-    if(n==WIFI_SCAN_FAILED){
-      server.send(200,"application/json","{\"scanning\":false,\"error\":\"scan_failed\",\"networks\":[]}");return;
-    }
-    nearbyCount=0;
-    for(int i=0;i<n && nearbyCount<5;i++){
-      if(WiFi.SSID(i).length()>0)nearbyNames[nearbyCount++]=WiFi.SSID(i);
-    }
-    String out="{\"scanning\":false,\"networks\":[";
-    for(int i=0;i<n&&i<28;i++){
-      if(i)out+=",";
-      out+="{\"ssid\":"+quoteJson(WiFi.SSID(i));
-      out+=",\"rssi\":"+String(WiFi.RSSI(i))+"}";
-    }
-    out+="]}";WiFi.scanDelete();
-    server.send(200,"application/json; charset=utf-8",out);
+    if(server.hasArg("start") && server.arg("start")=="1")wifiRequestScan(millis());
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json; charset=utf-8",wifiScanJSON());
   });
   server.on("/api/wifi",HTTP_POST,[]{
     // Credentials may only be provisioned while connected to the protected local AP.
     if(server.client().localIP()!=WiFi.softAPIP()){
       server.send(403,"text/plain; charset=utf-8","Настройка Wi-Fi доступна только через сеть БУСА.");return;
     }
+    if(otaActive||otaRestart){server.send(409,"text/plain","OTA busy");return;}
     String ssid=server.arg("ssid"),pass=server.arg("pass");
     ssid.trim();
     if(ssid.isEmpty()||ssid.length()>32||pass.length()<8||pass.length()>63){
@@ -2213,8 +2245,8 @@ void setup(){
     bool ok=(prefs.putString("ssid",ssid)>0 && prefs.putString("pass",pass)>0);
     if(!ok){server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;}
     stationSsid=ssid;stationPass=pass;
-    WiFi.disconnect();WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-    lastStationCheck=millis();
+    wifiCancelScan();
+    wifiScheduleConnect(millis()); // Begin in loop after the HTTP response, with a settle delay.
     server.send(200,"text/plain; charset=utf-8","Wi-Fi сохранён. Подключение к сети запущено.");
   });
   server.on("/api/page",HTTP_GET,[]{
@@ -2378,11 +2410,7 @@ void loop(){
   relaySimTick(now);
   ledSimTick(now);
   server.handleClient();
-  if(stationSsid.length() && stationPass.length()>=8 && WiFi.status()!=WL_CONNECTED && elapsed(now,lastStationCheck,20000)){
-    lastStationCheck=now;
-    WiFi.reconnect();
-    Serial0.println("STA reconnect attempt; AP unaffected");
-  }
+  wifiRecoveryTick(millis());
   readConsole();
   if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
@@ -2390,6 +2418,7 @@ void loop(){
   if(otaActive){relaySimStop("OTA_TRANSFER");ledSimStop("OTA_TRANSFER");delay(0);return;}
   if(tftRebootPending && elapsed(now,tftRebootAt,3000))ESP.restart();
   if(googleRestart && elapsed(now,googleRestartAt,3500))ESP.restart();
+  publishGoogleSnapshot(now);
   sampleTemperatures(now);
   probeOneWire(now); // Diagnose on idle 1-Wire bus only
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
@@ -2422,4 +2451,5 @@ void loop(){
   }
   delay(2);
 }
+
 
