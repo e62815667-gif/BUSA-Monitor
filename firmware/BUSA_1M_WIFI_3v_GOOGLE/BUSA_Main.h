@@ -322,16 +322,28 @@ bool ack(uint8_t address){
   Wire.beginTransmission(address);return Wire.endTransmission()==0;
 }
 // I2C discovery plus read-only register inspection; never modify PWM outputs.
+bool i2cScanActive=false;
+uint8_t i2cScanNext=0x08,i2cPendingCount=0,i2cPendingAck=0,i2cPending[24]={0};
+uint32_t i2cScanStepAt=0;
 void scanI2cAddresses(uint32_t now){
-  if(!i2cOnline)return;
-  i2cFoundCount=0;i2cAckCount=0;
-  for(uint8_t addr=0x08;addr<=0x77;addr++){
-    if(ack(addr)){
-      i2cAckCount++;
-      if(i2cFoundCount<24)i2cFound[i2cFoundCount++]=addr;
-    }
+  if(!i2cOnline||i2cScanActive)return;
+  i2cScanActive=true;i2cScanNext=0x08;i2cPendingCount=0;i2cPendingAck=0;
+  i2cScanStepAt=now-25;
+}
+void scanI2cStep(uint32_t now){
+  if(!i2cOnline||!i2cScanActive||!elapsed(now,i2cScanStepAt,25))return;
+  i2cScanStepAt=now;
+  // One transaction per loop. A stuck bus cannot multiply the 25 ms Wire
+  // timeout by all 112 addresses before HTTP/TFT gets CPU time again.
+  if(ack(i2cScanNext)){
+    ++i2cPendingAck;
+    if(i2cPendingCount<24)i2cPending[i2cPendingCount++]=i2cScanNext;
   }
-  i2cFullScanAt=now;
+  if(++i2cScanNext>0x77){
+    i2cAckCount=i2cPendingAck;i2cFoundCount=i2cPendingCount;
+    for(uint8_t i=0;i<i2cPendingCount;++i)i2cFound[i]=i2cPending[i];
+    i2cFullScanAt=now;i2cScanActive=false;
+  }
 }
 int readPcaReg(uint8_t reg){
   if(!pcaDetected)return -1;
@@ -1737,7 +1749,7 @@ if(Number.isFinite(currentPulse)){
  lastWaterPulse=currentPulse;waterPulseLog.push(delta);
  if(waterPulseLog.length>80)waterPulseLog.shift();
 }
-let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
+let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');if(!s.station.connected&&s.wifi_recovery)ss+=' · попыток: '+s.wifi_recovery.attempts+' · код Wi-Fi: '+s.wifi_recovery.last_disconnect_reason;get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
 if(s.station.connected&&s.station.ssid){
  let select=get('net'),found=Array.from(select.options).some(o=>o.value===s.station.ssid);
  if(!found)select.add(new Option(s.station.ssid+' (подключена)',s.station.ssid));
@@ -1798,7 +1810,7 @@ if(s.keypad){
    lastDiagnosticReport=JSON.stringify({
      device:s.device,firmware:s.firmware,uptime_ms:s.uptime_ms,
      temperatures:s.temperatures,modules:s.modules,diagnostics:d,
-     station_connected:s.station?.connected,ap_enabled:s.ap?.enabled,
+     station_connected:s.station?.connected,ap_enabled:s.ap?.enabled,wifi_recovery:s.wifi_recovery,
      network_indicators:s.network_indicators,google:s.google,
      water_calibration:s.water?.calibration,
      relay_outputs_enabled:s.relays_enabled
@@ -2430,6 +2442,7 @@ void loop(){
   }
     sampleFlow(now);
   if(i2cOnline){
+    scanI2cStep(now);
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
     pollKeys(now);
   }

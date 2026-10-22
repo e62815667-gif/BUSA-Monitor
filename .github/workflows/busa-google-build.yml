@@ -30,6 +30,7 @@ jobs:
       - name: Test Wi-Fi recovery and Safari timeouts
         run: |
           python3 tests/test_wifi_recovery.py
+          python3 tests/test_ota_upload.py
           node tests/test_local_fetch.js
       - name: Test Google response and redirect handling
         run: python3 tests/test_google_transport.py
