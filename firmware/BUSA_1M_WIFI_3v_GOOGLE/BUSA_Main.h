@@ -951,7 +951,7 @@ String statusJSON(){
     if(i)s+=",";
     s+="{\"name\":"+quoteJson(String(i==0?"Вода":i==1?"Колонна":i==2?"Куб":"Верх колонны"));
     s+=",\"gpio\":"+String(TPIN[i])+",\"present\":"+(tempPresent[i]?"true":"false");
-    s+=",\"verified\":"+(oneWireVerified(i)?"true":"false");
+    s+=",\"verified\":";s+=(oneWireVerified(i)?"true":"false");
     s+=",\"c\":"+(hasTemp(i,now)?String(temperature[i],2):String("null"))+"}";
   }
   s+="],\"water\":{\"gpio\":15,\"pulses\":"+String(flowPulses());
