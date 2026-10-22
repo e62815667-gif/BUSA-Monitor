@@ -97,6 +97,13 @@ body.theme-light{background:#ebf3fa;color:#102b3f}
 .theme-light .schematic svg>rect:first-of-type{fill:#e6f4fc}
 @media(min-width:650px){main{padding:14px 16px 108px}.board{grid-template-columns:185px 1fr}.schematic svg{height:300px}}
 @media(max-width:355px){.board{grid-template-columns:minmax(113px,.86fr) minmax(140px,1.14fr);gap:5px}.tempmini .sym{width:25px;flex-basis:25px;font-size:20px}.tempmini strong{font-size:16px}.footer-nav button{font-size:8px}}
+/* Approved appearance is default; alternative dark is more neutral. */
+body.theme-mode-dark{background:#080d16}
+.theme-mode-dark .panel,.theme-mode-dark .schematic,.theme-mode-dark .statbox,.theme-mode-dark .tempmini{background:linear-gradient(150deg,#151e2d,#0a101c);border-color:#53647a}
+.theme-mode-dark .footer-nav,.theme-mode-dark header{background:#111925}
+.theme-mode-dark .footer-nav button.active{background:linear-gradient(#394c69,#263b5c)}
+[data-app-theme]{min-height:44px}
+.theme-light [data-app-theme]:not(.selected){background:#e2edf5;border-color:#8fb8d0;color:#193950}
 </style></head>
 <body>
 <header><div class="topline"><span class="brand">БУСА-1М №001</span>
@@ -170,14 +177,26 @@ body.theme-light{background:#ebf3fa;color:#102b3f}
 <div class="row"><span>♨ &nbsp; Температуры T1–T4</span><b>GPIO16–21 <span class="arr">›</span></b></div>
 <div class="row"><span>💧 &nbsp; Отбор жидкости</span><b>НЕТ ДАТЧИКА <span class="arr">›</span></b></div>
 <div class="row"><span>◉ &nbsp; Wi-Fi и Google</span><b>ESP32 <span class="arr">›</span></b></div>
-<div class="row"><span>▣ &nbsp; Экран и темы</span><b>iPhone <span class="arr">›</span></b></div>
+<div class="row"><span>▣ &nbsp; Оформление iPhone</span><b>Независимо от TFT</b></div>
+<div class="row"><span>▣ &nbsp; Экран БУСА TFT</span><b>Тёмная / светлая</b></div>
 <div class="row"><span>◈ &nbsp; Светодиоды PCA9685</span><b>11 КАНАЛОВ <span class="arr">›</span></b></div>
 <div class="row"><span>⚑ &nbsp; Реле K1–K4</span><b class="warning">БЛОК <span class="arr">›</span></b></div>
 <div class="row"><span>ⓘ &nbsp; О системе</span><b>V14.14 <span class="arr">›</span></b></div>
 </div>
-<div class="panel"><h2>Тема оформления iPhone</h2><button type="button" id="themeSettings" class="btn ghost">Переключить светлую / тёмную тему</button>
-<p class="muted">Тема сайта не меняет палитру TFT. Настройки контроллера — отдельно в локальной панели.</p></div>
-<a class="btn" href="http://192.168.4.1/">Открыть настройки ESP32 ↗</a>
+<div class="panel"><h2>1. Тема приложения на iPhone</h2>
+<p class="muted">Только оформление приложения iPhone 12 / 15 Pro / 16. По умолчанию — утверждённая тёмно-синяя графика с рисунков.</p>
+<div class="tabs" role="group" aria-label="Тема iPhone">
+<button type="button" class="selected" data-app-theme="approved">Как на рисунках</button>
+<button type="button" data-app-theme="dark">Тёмная</button>
+<button type="button" data-app-theme="light">Светлая</button></div>
+<div class="statusbar"><span>Тема iPhone</span><strong id="iphoneThemeLabel">Как на рисунках</strong></div></div>
+<div class="panel"><h2>2. Тема экрана БУСА (TFT)</h2>
+<p class="muted">Только физический ST7789 320×240. Тема iPhone не изменится. Подключись к Wi-Fi БУСА; выбор откроет локальную страницу для подтверждения.</p>
+<a class="btn" href="http://192.168.4.1/?tfttheme=dark">Установить ТЁМНУЮ тему БУСА ↗</a>
+<a class="btn ghost" href="http://192.168.4.1/?tfttheme=light">Установить СВЕТЛУЮ тему БУСА ↗</a>
+<div class="statusbar"><span>Текущая тема БУСА</span><strong>Состояние читает ESP32</strong></div>
+<p class="muted">HTTPS-приложение не может напрямую отправить POST в HTTP ESP32. Поэтому открывает локальную страницу с явным подтверждением выбора.</p></div>
+<a class="btn ghost" href="http://192.168.4.1/#settings">Открыть локальную панель ESP32 ↗</a>
 <div class="statusbar"><span>Версия сайта</span><strong>V14.14 · Approved UI</strong></div>
 </section>
 </main>
@@ -197,10 +216,31 @@ function selectPage(id){views.forEach(v=>v.hidden=v.id!==id);buttons.forEach(b=>
 buttons.forEach(b=>b.addEventListener('click',()=>selectPage(b.dataset.page)));
 const allowed=['home','temps','collection','graphs','events','settings'];const requested=location.hash.replace('#','');
 if(allowed.includes(requested))selectPage(requested);
-let light=false;try{light=localStorage.getItem('busa-ui-light')==='1'}catch(e){}
-function applyTheme(){document.body.classList.toggle('theme-light',light);const meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.content=light?'#e5f2fc':'#06172c';try{localStorage.setItem('busa-ui-light',light?'1':'0')}catch(e){}}
-applyTheme();function flip(){light=!light;applyTheme()}
-document.getElementById('themeSwitch').addEventListener('click',flip);document.getElementById('themeSettings').addEventListener('click',flip);
+let selectedAppTheme='approved';
+try{
+ const stored=localStorage.getItem('busa-app-theme');
+ if(['approved','dark','light'].includes(stored))selectedAppTheme=stored;
+ else if(localStorage.getItem('busa-ui-light')==='1')selectedAppTheme='light';
+}catch(e){}
+function applyAppTheme(){
+ document.body.classList.toggle('theme-light',selectedAppTheme==='light');
+ document.body.classList.toggle('theme-mode-dark',selectedAppTheme==='dark');
+ const meta=document.querySelector('meta[name="theme-color"]');
+ if(meta)meta.content=selectedAppTheme==='light'?'#e5f2fc':'#06172c';
+ const titles={approved:'Как на рисунках',dark:'Тёмная',light:'Светлая'};
+ document.getElementById('iphoneThemeLabel').textContent=titles[selectedAppTheme];
+ document.querySelectorAll('[data-app-theme]').forEach(b=>{
+  const selected=b.dataset.appTheme===selectedAppTheme;
+  b.classList.toggle('selected',selected);
+  b.setAttribute('aria-pressed',String(selected));
+ });
+ try{localStorage.setItem('busa-app-theme',selectedAppTheme)}catch(e){}
+}
+applyAppTheme();
+document.querySelectorAll('[data-app-theme]').forEach(b=>b.addEventListener('click',()=>{
+ selectedAppTheme=b.dataset.appTheme;applyAppTheme();
+}));
+document.getElementById('themeSwitch').addEventListener('click',()=>selectPage('settings'));
 function clock(){const d=new Date();document.getElementById('appClock').textContent=d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})}
 clock();setInterval(clock,30000);
 document.querySelectorAll('[data-graph]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-graph]').forEach(x=>x.classList.toggle('selected',x===b));const v=b.dataset.graph;document.getElementById('graphTitle').textContent=v==='temp'?'Температуры, °C':v==='water'?'Импульсы воды YF-S401':'Отбор, мл/мин';document.getElementById('graphEmpty').textContent=v==='temp'?'НЕТ ИЗМЕРЕНИЙ T1–T4':v==='water'?'ДАННЫЕ ТОЛЬКО В ЛОКАЛЬНОЙ БУСА':'ДАТЧИК ОТБОРА ОТСУТСТВУЕТ'}));
