@@ -1456,6 +1456,8 @@ if(s.keypad){
      device:s.device,firmware:s.firmware,uptime_ms:s.uptime_ms,
      temperatures:s.temperatures,modules:s.modules,diagnostics:d,
      station_connected:s.station?.connected,ap_enabled:s.ap?.enabled,
+     network_indicators:s.network_indicators,google:s.google,
+     water_calibration:s.water?.calibration,
      relay_outputs_enabled:s.relays_enabled
    },null,2);
    const report=get('diagReport');
