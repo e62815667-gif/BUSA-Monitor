@@ -21,6 +21,7 @@ static V14MetricCache v14Metrics[10];
 static uint8_t v14MetricCount=0;
 static void v14InvalidateLive(){v14MetricCount=0;v14FlowLast=UINT32_MAX;v14ClockLast="";}
 static void v14ApplyPalette(bool dark){
+ HQ_MONO_DARK=dark;
  if(dark){
    // Pure BLACK background, WHITE text: matches "BUSA 1M AI" boot splash.
    // Only gray contours and monochrome illustrations (no software inversion).
