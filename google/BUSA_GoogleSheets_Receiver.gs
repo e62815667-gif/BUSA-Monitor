@@ -43,6 +43,36 @@ function setupBusaSheet() {
   }
 }
 
+/**
+ * Publish verified READ-ONLY catalogue metadata in the same HTTPS ACK.
+ * This is NOT an OTA command, download URL or remote flashing capability.
+ * Metadata can never authorize flashing on its own.
+ * Run manually once after confirming the verified V14.11 artifact details.
+ * Re-deploy this Google Apps Script web app after changing the source.
+ */
+function setupBusaReadOnlyReleaseV1411() {
+  const cfg = PropertiesService.getScriptProperties();
+  cfg.setProperty('BUSA_RELEASE_VERSION', 'V14.11');
+  cfg.setProperty('BUSA_RELEASE_TARGET', 'ESP32-S3');
+  cfg.setProperty('BUSA_RELEASE_BUILD_FLASH', '8388608');
+  cfg.setProperty('BUSA_RELEASE_APP_BYTES', '1104224');
+  cfg.setProperty('BUSA_RELEASE_APP_SHA256', '1fc280130318c26bda982d48e5b2d2b3b3171c1697e79e7a9ea63b308860cc08');
+}
+function busaReleaseMetadata_() {
+  const props=PropertiesService.getScriptProperties();
+  const version=props.getProperty('BUSA_RELEASE_VERSION') || '';
+  const target=props.getProperty('BUSA_RELEASE_TARGET') || '';
+  const sha=props.getProperty('BUSA_RELEASE_APP_SHA256') || '';
+  const size=Number(props.getProperty('BUSA_RELEASE_APP_BYTES'));
+  const flash=Number(props.getProperty('BUSA_RELEASE_BUILD_FLASH'));
+  if(!/^V14\\.[0-9]{1,3}$/.test(version) || target!=='ESP32-S3' ||
+     !/^[a-f0-9]{64}$/.test(sha) || !Number.isInteger(size) ||
+     size<60000 || size>4000000 || ![8388608,16777216].includes(flash))
+    return null;
+  return {version:version,target:target,build_flash_bytes:flash,
+          app_size_bytes:size,app_sha256:sha};
+}
+
 function doPost(e) {
   try {
     if (!e || !e.postData || !e.postData.contents ||
@@ -102,7 +132,7 @@ function doPost(e) {
     } finally {
       lock.releaseLock();
     }
-    return busaJson_({stored: true});
+    return busaJson_({stored: true, release: busaReleaseMetadata_()});
   } catch (err) {
     // Do not log raw requests: they contain the token.
     return busaJson_({stored: false, error: String(err.message || 'Receiver error')});
