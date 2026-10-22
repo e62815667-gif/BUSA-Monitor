@@ -33,3 +33,15 @@
 6. При любых проблемах вернуться к проверенной V14.13 через ручное OTA при доступности локального интерфейса; не выполнять рискованные электрические испытания.
 
 Версии по умолчанию на действующем контроллере не менялись.
+
+## Итог реальной CI-сборки
+
+- Сборка: **SUCCESS**: https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/39829751284
+- Исходники собранного BIN: `446189fd868fe875a7ceb61019f903dfd8cc1c90`.
+- Конфигурация: `esp32:esp32:esp32s3:FlashSize=8M,PartitionScheme=default_8MB,PSRAM=disabled,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio`.
+- `БУСА 14.14v COMBINED APP OTA.bin` — **1 117 584 байта**; SHA-256 `fe552d0637911c08ea8634a3ea337672c1620fcd3e8d0f2c9c16e0ffc40f795d`.
+- `БУСА 14.14v COMBINED USB MERGED.bin` — **1 183 120 байт**; SHA-256 `3ab2fb3fc77cf65fbe72f05b8b5e24543cc6ced57755460ad2d530fb62e624b6`.
+- Оба файла имеют заголовок ESP32 `0xE9`, APP меньше OTA-раздела 3 342 336 байт; SHA-256 локально сверены с `SHA256SUMS.txt` из CI. Фактические испытания на оборудовании не проводились.
+- Архив размещён на Google Drive: https://drive.google.com/drive/folders/1x_KABBe5XkVYCVzyEHpGvReIE8CMF3wX
+
+**Тестовые реле остаются виртуальными**, их физическое включение в этой сборке невозможно через предложенный интерфейс.
