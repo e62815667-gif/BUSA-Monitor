@@ -1,0 +1,10 @@
+{
+  "name": "БУСА-1М №001 — Онлайн",
+  "short_name": "БУСА Онлайн",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1928",
+  "theme_color": "#112436",
+  "lang": "ru"
+}
