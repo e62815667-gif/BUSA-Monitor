@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix, lab/busa-v14-10-google-ack-fix, lab/busa-14-11-monitor-ui]
+    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix, lab/busa-v14-10-google-ack-fix, lab/busa-14-11-monitor-ui, lab/busa-v14-12-cloud-update-preflight]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -137,7 +137,7 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v11-UNIFIED-OTA' in main
+          assert '14v12-CLOUD-PREFLIGHT' in main
           assert 'TFT_DISPLAY_IDLE_MS' not in main
           assert 'class="appTabs"' in main
           assert '<div class="rigViewport">' in main
@@ -169,6 +169,8 @@ jobs:
           assert 'dataLed' in main and 'data-page="6"' in main, 'unified UI tabs/status missing'
           assert 'otaUiUploading' in main, 'OTA browser performance guard missing'
           assert 'v14DataLast' in landscape and 'googleEnabled?1:0' in landscape, 'TFT Google state LED missing'
+          assert 'cloudUpdateJSON()' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
+          assert 'remote_install_enabled\\":false' not in main, 'Cloud update must not be writable from main code'
           assert 'v14NetIndicators()' in landscape and '0x07e0' in landscape and '0x001f' in landscape
           assert 'WiFi.hostByName("script.google.com"' in google
           assert 'secure.setCACert(GOOGLE_TRUST_ANCHOR)' in google
