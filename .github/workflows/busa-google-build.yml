@@ -138,6 +138,7 @@ jobs:
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
           assert '14v14-N8R2-LED-TEST-SAFE' in main
+          leds=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_PCA9685_Leds.h').read_text()
           assert 'kOwnerConfirmedLedSupplyMv=3300' in leds
           assert 'kOwnerConfirmedIndividualLeds=true' in leds
           assert 'kSeriesCurrentLimitingVerified=false' in leds
