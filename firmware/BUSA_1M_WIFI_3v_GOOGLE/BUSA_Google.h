@@ -12,6 +12,7 @@ volatile uint32_t googleRestartAt=0,googleSent=0;
 volatile int googleHttp=0,googleState=0;
 // Diagnostics only: no tokens or passwords in logs or /api/status.
 volatile int googleDns=-1; // -1 not attempted, 0 failed, 1 resolved
+volatile int googleInternet=0; // 1 only if external TCP/443 connection succeeds
 volatile int googleTlsError=0;
 volatile int googleErrorStage=0; // 0 OK/idle, 1 DNS, 2 HTTPS, 3 HTTP
 
@@ -52,10 +53,26 @@ void googleWorker(void* unused){
   (void)unused;
   configTime(0,0,"pool.ntp.org","time.google.com");
   uint32_t last=millis()-30000;
+  uint32_t lastNetProbe=millis()-15000;
   while(true){
     vTaskDelay(pdMS_TO_TICKS(1250));
+    if(WiFi.status()!=WL_CONNECTED){
+      googleInternet=0;googleDns=0;
+      if(googleEnabled)googleState=1;
+      continue;
+    }
+    const uint32_t netNow=millis();
+    if((uint32_t)(netNow-lastNetProbe)>=15000){
+      lastNetProbe=netNow;
+      IPAddress remote;
+      int dns=WiFi.hostByName("script.google.com",remote)==1?1:0;
+      googleDns=dns;
+      WiFiClient probe;
+      // The probe tests Internet reachability only; Google POST remains TLS-verified.
+      googleInternet=(dns==1 && probe.connect(remote,443,1600))?1:0;
+      probe.stop();
+    }
     if(!googleEnabled)continue;
-    if(WiFi.status()!=WL_CONNECTED){googleState=1;continue;}
     if(time(nullptr)<1700000000){googleState=2;continue;}
     const uint32_t now=millis();
     if(!googleTestRequested && (uint32_t)(now-last)<30000)continue;
