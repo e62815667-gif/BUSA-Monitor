@@ -6,6 +6,7 @@
 extern volatile bool googleEnabled;
 extern volatile int googleState;
 extern volatile int googleInternet;
+extern uint8_t relaySimChannel; // definition follows this header in BUSA_Main.h
 static const uint8_t v14Order[6]={0,1,2,5,3,4};
 static const char* const v14Tabs[6]={"Глав","Т","Отбор","Настр","Граф","Событ"};
 // V14 palette is software-defined. DO NOT use ST7789 invertDisplay(): it
