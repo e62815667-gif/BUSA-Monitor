@@ -325,6 +325,9 @@ input::placeholder{color:#a3bdce}
 <div class="row"><span>Версия в каталоге</span><b id="cloudAvailableFw">—</b></div>
 <div class="row"><span>Сборка под Flash</span><b id="cloudBuildFlash">—</b></div>
 <div class="row"><span>Flash на устройстве (диагностика)</span><b id="cloudDeviceFlash">—</b></div>
+<div class="row"><span>Каталог получен контроллером</span><b id="cloudDeviceCatalog">Нет данных</b></div>
+<div class="row"><span>Облачная установка на контроллере</span><b id="cloudRemoteAllowed" class="warn">Отключена</b></div>
+<div class="row"><span>Разметка OTA проверена</span><b id="cloudPartitionCheck" class="warn">Нет</b></div>
 <div class="row"><span>Совместимость для OTA</span><b id="cloudCompatible" class="warn">Не подтверждена</b></div>
 <div class="row"><span>SHA-256 APP BIN</span><b id="cloudAppSha">—</b></div>
 <div class="row"><span>Обновление облачного каталога</span><b id="cloudCatalogState">Не загружен</b></div>
@@ -431,6 +434,10 @@ function renderCloudCompatibility(){
  const chip=telemetry?.diagnostics?.esp32||{};
  const bytes=chip.flash_bytes;
  el('cloudDeviceFlash').textContent=Number.isInteger(bytes)&&bytes>0?Math.round(bytes/1048576)+' МБ':'Не сообщается';
+ const update=telemetry?.google?.cloud_update||{};
+ el('cloudDeviceCatalog').textContent=update.catalog_seen===true?(update.available_version||'Получен'):'Нет подтверждения';
+ el('cloudRemoteAllowed').textContent=update.remote_install_enabled===true?'Запросить проверку':'ОТКЛЮЧЕНА';
+ el('cloudPartitionCheck').textContent=update.ota_partition_verified===true?'Отмечена (требуется аппаратная проверка)':'НЕ ПОДТВЕРЖДЕНА';
  let reason='';
  if(!release)reason='Каталог версий ещё не проверен.';
  else if(!telemetry || !Number.isFinite(cloudCurrentAt))reason='Нет отчёта ESP32 из Google.';
