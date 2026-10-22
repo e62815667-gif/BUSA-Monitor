@@ -1,10 +1,12 @@
 from pathlib import Path
+import os
 import subprocess, tempfile, sys
 src=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
 parsers=src[src.index('bool cloudShaIsValid('):src.index('// Sending is one-way HTTPS.')]
 helpers=parsers+src[src.index('class GoogleReplyBuffer'):src.index('void googleConfigureHttp')]
-roots=list(Path.home().glob('Arduino/libraries/ArduinoJson/src/ArduinoJson.h'))
-assert roots, 'ArduinoJson library missing'
+libraries=Path(os.environ.get('ARDUINO_LIBRARIES_DIR', Path.home()/'Arduino/libraries'))
+roots=list(libraries.glob('ArduinoJson/src/ArduinoJson.h'))
+assert roots, 'ArduinoJson library missing; set ARDUINO_LIBRARIES_DIR for a custom sketchbook'
 stub=r'''
 #include <string>
 #include <cstring>
