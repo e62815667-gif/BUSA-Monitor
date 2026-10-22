@@ -40,7 +40,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-ONEWIRE-FIX";
+const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-COMBINED-SIM";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -772,6 +772,38 @@ String quoteJson(const String &x){
   }
   return out+"\"";
 }
+// Safety-bounded virtual relay diagnostics ONLY. No GPIO writes, no PCA PWM.
+// This mode never energizes SRD-12VDC-SL-C coils; there is no feedback sensor.
+static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,
+              "Dry-run build cannot enable external control");
+constexpr uint32_t RELAY_SIM_MAX_MS=10000U;
+uint8_t relaySimChannel=0;
+uint32_t relaySimStart=0,relaySimUntil=0;
+String relaySimReason="IDLE";
+void relaySimStop(const char* why){
+  relaySimChannel=0;relaySimStart=0;relaySimUntil=0;
+  relaySimReason=why;
+}
+void relaySimTick(uint32_t now){
+  if(relaySimChannel && (int32_t)(now-relaySimUntil)>=0){
+    relaySimStop("TIME_LIMIT");
+  }
+  if(relaySimChannel && WiFi.softAPgetStationNum()==0){
+    relaySimStop("AP_CLIENT_LOST");
+  }
+}
+String relaySimJSON(){
+  relaySimTick(millis());
+  String s="{\"dry_run_only\":true,\"physical_gpio_enabled\":false";
+  s+=",\"pca_pwm_enabled\":false,\"coil_12v_measured\":false";
+  s+=",\"contact_feedback_available\":false,\"physical_contacts\":null";
+  s+=",\"simulated_channel\":"+String(relaySimChannel);
+  s+=",\"remaining_ms\":"+String(relaySimChannel?(uint32_t)(relaySimUntil-millis()):0);
+  s+=",\"reason\":"+quoteJson(relaySimReason);
+  s+=",\"simulated_channels\":[";
+  for(int i=0;i<4;i++){if(i)s+=",";s+=(relaySimChannel==i+1?"true":"false");}
+  return s+"]}";
+}
 // Read-only diagnostic of the ACTUAL installed ESP32 OTA partitions.
 // Not an authorization to flash: presence/size cannot prove image signatures,
 // compatibility of the current bootloader or a working rollback policy.
@@ -801,6 +833,7 @@ String statusJSON(){
   uint32_t now=millis();
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
+  s+=",\"relay_simulation\":"+relaySimJSON();
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"clock\":{\"synchronized\":"+(deviceClockValid()?String("true"):String("false"));
@@ -1279,6 +1312,19 @@ main>*{max-width:100%;min-width:0}
 <div class="row">Время работы <b id="uptime">—</b></div>
 <div class="row">PCF8575 <b id="pcf">—</b></div>
 <div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div>
+<h2>К1–К4 · виртуальная проверка (выходы отключены)</h2>
+<p class="hint">Только программная имитация на 10 секунд. Никаких сигналов на GPIO4–7 и PCA9685; фактические контакты и питание 12 В не измеряются.</p>
+<div class="row">Виртуальный канал <b id="relaySimChannel">0 / 4</b></div>
+<div class="row">Оставшееся время <b id="relaySimRemaining">0 с</b></div>
+<div class="row">Контакты реле <b>НЕ ПОДТВЕРЖДЕНЫ</b></div>
+<div class="grid">
+<button type="button" data-relay-sim="1">Тест К1</button>
+<button type="button" data-relay-sim="2">Тест К2</button>
+<button type="button" data-relay-sim="3">Тест К3</button>
+<button type="button" data-relay-sim="4">Тест К4</button>
+</div>
+<button type="button" class="full" id="relaySimStop">СТОП · отмена виртуального теста</button>
+<p id="relaySimResult" role="status" class="hint">Реле физически заблокированы.</p>
 <h2>Калибровка клавиатуры 5×4</h2><p class="hint">Назначения: ↑ вверх, ↓ вниз, ← влево, → вправо, Ent ОК, Esc назад, F1 удалить значение.</p>
 <p class="hint">Не переставляй провода. После запуска нажимай кнопки последовательно слева направо, сверху вниз по фотографии. Полностью отпускай клавишу между нажатиями. Карта сохраняется в ESP32.</p>
 <div class="row">Состояние <b id="keyState">—</b></div>
@@ -1574,8 +1620,27 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
+if(s.relay_simulation){
+ get('relaySimChannel').textContent=String(s.relay_simulation.simulated_channel||0)+' / 4 (ТОЛЬКО ИМИТАЦИЯ)';
+ get('relaySimRemaining').textContent=Math.ceil((s.relay_simulation.remaining_ms||0)/1000)+' с';
+}
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
+document.querySelectorAll('[data-relay-sim]').forEach(b=>b.onclick=async()=>{
+  if(!confirm('Только виртуальный тест K'+b.dataset.relaySim+' на 10 секунд. Физические реле не включатся. Продолжить?'))return;
+  try{
+    const r=await fetch('/api/relay/sim',{method:'POST',body:new URLSearchParams({
+      action:'single',channel:b.dataset.relaySim,confirm:'DRY_RUN_ONLY'})});
+    get('relaySimResult').textContent=await r.text();
+  }catch(e){get('relaySimResult').textContent='Ошибка симуляции: '+e.message}
+});
+get('relaySimStop').onclick=async()=>{
+ try{
+   const r=await fetch('/api/relay/sim',{method:'POST',
+      body:new URLSearchParams({action:'stop'})});
+   get('relaySimResult').textContent=await r.text();
+ }catch(e){get('relaySimResult').textContent='Ошибка остановки: '+e.message}
+};
 get('waterCalStart').onclick=async()=>{
  if(!confirm('Начать запись импульсов для будущей пробы обычной воды?'))return;
  try{const r=await fetch('/api/water/calibration/start',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
@@ -1693,6 +1758,7 @@ void readConsole(){
   }
 }
 void setup(){
+  relaySimStop("BOOT_SAFE");
   Serial0.begin(115200);
   Serial0.println("\nBUSA 1M WiFi V14.1 LIGHT-WATER; physical outputs LOCKED");
   Serial.begin(115200);
@@ -1777,6 +1843,29 @@ void setup(){
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",statusJSON());
   });
+  // Local Wi-Fi-only in-memory simulation. No direct GPIO, coil or PWM actuation.
+  server.on("/api/relay/sim",HTTP_POST,[]{
+    if(!apClient()){
+      server.send(403,"text/plain; charset=utf-8","Только защищённая локальная сеть");
+      return;
+    }
+    const String action=server.arg("action");
+    if(action=="stop"){
+      relaySimStop("EMERGENCY_STOP");
+      server.send(200,"application/json",relaySimJSON());return;
+    }
+    if(action!="single"||server.arg("confirm")!="DRY_RUN_ONLY"||otaActive){
+      server.send(403,"text/plain; charset=utf-8","Только подтверждённая симуляция без физических сигналов");return;
+    }
+    const String ch=server.arg("channel");
+    if(ch.length()!=1||ch[0]<'1'||ch[0]>'4'||relaySimChannel){
+      server.send(409,"text/plain; charset=utf-8","Только один виртуальный канал за раз");return;
+    }
+    relaySimChannel=(uint8_t)(ch[0]-'0');
+    relaySimStart=millis();relaySimUntil=relaySimStart+RELAY_SIM_MAX_MS;
+    relaySimReason="DRY_RUN_ONLY";
+    server.send(200,"application/json",relaySimJSON());
+  });
   // All calibration actions are low-voltage, read-only monitoring settings.
   // Never expose these write operations through the public Internet.
   server.on("/api/water/calibration/start",HTTP_POST,[]{
@@ -1830,6 +1919,7 @@ void setup(){
     server.send(200,"application/json",otaJSON());
   });
   server.on("/api/ota/prepare",HTTP_POST,[]{
+    relaySimStop("OTA_PREPARE");
     if(!apClient()||server.arg("confirm")!="YES"||otaActive){
       server.send(403,"text/plain","Требуется локальная сеть БУСА и согласие");return;
     }
@@ -2038,6 +2128,7 @@ void setup(){
 }
 void loop(){
   uint32_t now=millis();
+  relaySimTick(now);
   server.handleClient();
   if(stationSsid.length() && stationPass.length()>=8 && WiFi.status()!=WL_CONNECTED && elapsed(now,lastStationCheck,20000)){
     lastStationCheck=now;
@@ -2048,7 +2139,7 @@ void loop(){
   if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
-  if(otaActive){delay(0);return;}
+  if(otaActive){relaySimStop("OTA_TRANSFER");delay(0);return;}
   if(tftRebootPending && elapsed(now,tftRebootAt,3000))ESP.restart();
   if(googleRestart && elapsed(now,googleRestartAt,3500))ESP.restart();
   sampleTemperatures(now);
