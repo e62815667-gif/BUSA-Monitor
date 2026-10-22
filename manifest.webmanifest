@@ -1,1 +1,11 @@
-{"name":"БУСА-Монитор","short_name":"БУСА","start_url":"./index.html","scope":"./","display":"standalone","background_color":"#0b1220","theme_color":"#101827","lang":"ru"}
+{
+  "name": "БУСА-1М №001 · Монитор V14.14",
+  "short_name": "БУСА №001",
+  "description": "Шесть утверждённых графических экранов БУСА-1М с переходом к локальному ESP32-S3",
+  "start_url": "./index.html?v=14.14-approved",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#06172c",
+  "theme_color": "#06172c",
+  "lang": "ru"
+}
