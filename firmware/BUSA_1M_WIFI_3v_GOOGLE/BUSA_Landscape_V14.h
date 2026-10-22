@@ -1,5 +1,5 @@
 #pragma once
-// БУСА-1М №001 — V14.1: six approved-style screens, light horizontal ST7789 320×240.
+// БУСА-1М №001 — V14.6: six screens, anti-flicker TFT; dark mode is splash-like black/white.
 // THIS CODE ONLY DRAWS DATA. NO RELAY/POWER/PWM CONTROL.
 // No placeholder readings: water flow raw pulses only until calibrated.
 // Google transport is implemented later in BUSA_Google.h; TFT displays status only.
@@ -13,19 +13,27 @@ static uint16_t V14_TEXT=0x2104,V14_MUTED=0x632c,V14_WARN=0xa800,
  V14_GREEN=0x2644,V14_BLUE=0x0338,V14_ORANGE=0xfc60,V14_SEA=0x0578,
  V14_CARD=0xffff,V14_PALE=0xffdf,V14_RULE=0xd69a;
 static uint16_t v14SeriesColors[4]={0x037b,0xd980,0xb500,0x3685};
+static uint16_t V14_INFO=0xff16,V14_GRID=0xe71c,V14_BADGE=0xe7f8;
+static uint32_t v14FlowLast=UINT32_MAX;
+static String v14ClockLast="";
+struct V14MetricCache{int16_t x=-1,y=-1,width=-1;String value;uint16_t fg=0,bg=0;};
+static V14MetricCache v14Metrics[10];
+static uint8_t v14MetricCount=0;
+static void v14InvalidateLive(){v14MetricCount=0;v14FlowLast=UINT32_MAX;v14ClockLast="";}
 static void v14ApplyPalette(bool dark){
  if(dark){
-   // Charcoal surfaces, cream text, blue/teal water, orange highlights;
-   // all series and metallic hardware retain real contrasting colors.
-   HQ_NAVY=0x088f;HQ_DEEP=0x18f2;HQ_GLOW=0xfbe0;
-   HQ_AZURE=0x43f7;HQ_SKY=0x8dff;HQ_CYAN=0x5edf;HQ_LIGHT=0xf7be;
-   HQ_LIME=0x5e88;HQ_AQUA=0x2cfa;HQ_GLASS=0x31b4;HQ_STEEL=0x5b18;
-   HQ_SILVER=0xdefb;HQ_METAL=0x9cf6;HQ_DARKMETAL=0x424e;
-   V14_TEXT=0xf7be;V14_MUTED=0xb5b6;V14_WARN=0xfd60;
-   V14_GREEN=0x66ce;V14_BLUE=0x5ddf;V14_ORANGE=0xfc60;
-   V14_SEA=0x2d3a;V14_CARD=0x18f2;V14_PALE=0x088f;V14_RULE=0x5b18;
-   v14SeriesColors[0]=0x5ddf;v14SeriesColors[1]=0xfd60;
-   v14SeriesColors[2]=0xf3aa;v14SeriesColors[3]=0x76ce;
+   // Pure BLACK background, WHITE text: matches "BUSA 1M AI" boot splash.
+   // Only gray contours and monochrome illustrations (no software inversion).
+   HQ_NAVY=0x0000;HQ_DEEP=0x0000;HQ_GLOW=0xffff;
+   HQ_AZURE=0xbdf7;HQ_SKY=0xffff;HQ_CYAN=0xe71c;HQ_LIGHT=0xffff;
+   HQ_LIME=0xd69a;HQ_AQUA=0xbdf7;HQ_GLASS=0x4208;HQ_STEEL=0x8410;
+   HQ_SILVER=0xce59;HQ_METAL=0x9cf3;HQ_DARKMETAL=0x4208;
+   V14_TEXT=0xffff;V14_MUTED=0xbdf7;V14_WARN=0xffff;
+   V14_GREEN=0xffff;V14_BLUE=0xffff;V14_ORANGE=0xffff;
+   V14_SEA=0xbdf7;V14_CARD=0x0000;V14_PALE=0x0000;V14_RULE=0x8410;
+   V14_INFO=0x0000;V14_GRID=0x4208;V14_BADGE=0x4208;
+   v14SeriesColors[0]=0xffff;v14SeriesColors[1]=0xd69a;
+   v14SeriesColors[2]=0xbdf7;v14SeriesColors[3]=0x9cf3;
  }else{
    HQ_NAVY=0xffdf;HQ_DEEP=0xffff;HQ_GLOW=0xfca0;
    HQ_AZURE=0xd4a5;HQ_SKY=0x234c;HQ_CYAN=0x0519;HQ_LIGHT=0x2104;
@@ -34,6 +42,7 @@ static void v14ApplyPalette(bool dark){
    V14_TEXT=0x2104;V14_MUTED=0x632c;V14_WARN=0xa800;
    V14_GREEN=0x2644;V14_BLUE=0x0338;V14_ORANGE=0xfc60;
    V14_SEA=0x0578;V14_CARD=0xffff;V14_PALE=0xffdf;V14_RULE=0xd69a;
+   V14_INFO=0xff16;V14_GRID=0xe71c;V14_BADGE=0xe7f8;
    v14SeriesColors[0]=0x037b;v14SeriesColors[1]=0xd980;
    v14SeriesColors[2]=0xb500;v14SeriesColors[3]=0x3685;
  }
@@ -53,9 +62,23 @@ static void v14Big(const String& txt,int x,int y,uint16_t col=V14_TEXT){
   ru.setFont(u8g2_font_6x13_t_cyrillic);
 }
 static void v14Metric(const String& txt,int x,int y,int width,bool valid){
-  // Render on a clean WHITE stripe to prevent overlapping old text.
+  // Update only CHANGED glyphs. Never erase entire frame for live telemetry.
+  uint16_t color=valid?V14_GREEN:V14_WARN;
+  for(uint8_t i=0;i<v14MetricCount;i++){
+    V14MetricCache& m=v14Metrics[i];
+    if(m.x==x && m.y==y && m.width==width){
+      if(m.value==txt && m.fg==color && m.bg==V14_CARD)return;
+      m.value=txt;m.fg=color;m.bg=V14_CARD;
+      screen->fillRect(x,y-13,width,16,V14_CARD);
+      v14Big(txt,x,y,color);return;
+    }
+  }
+  if(v14MetricCount<10){
+    V14MetricCache& m=v14Metrics[v14MetricCount++];
+    m.x=x;m.y=y;m.width=width;m.value=txt;m.fg=color;m.bg=V14_CARD;
+  }
   screen->fillRect(x,y-13,width,16,V14_CARD);
-  v14Big(txt,x,y,valid?V14_GREEN:V14_WARN);
+  v14Big(txt,x,y,color);
 }
 static void v14FootArrow(int x,int direction,uint16_t color){
   // All four icons have identical centre and stroke proportions.
@@ -93,7 +116,7 @@ static void v14Frame(uint32_t now){
   static const char* labels[]={"Влево","Вверх","Вниз","Вправо","OK","Назад"};
   for(int i=0;i<6;i++){
     const int x=1+i*53;
-    screen->fillRoundRect(x,215,51,22,4,i==4?0xe7f8:V14_CARD);
+    screen->fillRoundRect(x,215,51,22,4,i==4?V14_BADGE:V14_CARD);
     screen->drawRoundRect(x,215,51,22,4,V14_RULE);
     if(i<4)v14FootArrow(x,i,V14_ORANGE);
     else if(i==4){screen->drawCircle(x+10,225,5,V14_GREEN);screen->fillCircle(x+10,225,2,V14_GREEN);}
@@ -105,6 +128,15 @@ static void v14MiniRig(){
   // Approved stylized installation; YF-S401 is on the cooling-water line.
   hqRig(123,52,113,142);
   v14Tiny("ВОДА YF",176,188,V14_BLUE);
+}
+
+static void v14DrawFlowBar(){
+  const uint32_t pulses=flowPulses();
+  if(v14FlowLast==pulses)return;
+  v14FlowLast=pulses;
+  screen->fillRoundRect(4,198,313,11,3,V14_INFO);
+  v14Tiny(String("YF-S401: ")+String(pulses)+
+     " имп. (не калибр.)    K1-K4: БЛОК",8,206,V14_TEXT);
 }
 static void v14Home(uint32_t now,bool layout){
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -124,9 +156,8 @@ static void v14Home(uint32_t now,bool layout){
   v14Tiny("СОБРАНО",247,136,V14_TEXT);
   v14Tiny("мл",247,182,V14_MUTED);
   v14Metric("Н/Д",247,163,64,false);
-  screen->fillRoundRect(4,198,313,11,3,0xff16);
-  v14Tiny(String("YF-S401: ")+String(flowPulses())+
-     " имп. (не калибр.)    K1-K4: БЛОК",8,206,V14_TEXT);
+  v14FlowLast=UINT32_MAX; // always draw once when page is rebuilt
+  v14DrawFlowBar();
 }
 static void v14Temperature(uint32_t now,bool layout){
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -291,7 +322,7 @@ static void v14Settings(bool layout){
         v14Print("К1–К4: БЛОК",48,126,V14_WARN);
         for(int i=0;i<4;i++){
           int x=49+i*53;
-          screen->fillRoundRect(x,140,46,29,4,0xff16);
+          screen->fillRoundRect(x,140,46,29,4,V14_INFO);
           v14Tiny("К"+String(i+1),x+5,151,V14_TEXT);
           v14Tiny("ВЫКЛ",x+5,164,V14_WARN);
         }
@@ -299,11 +330,11 @@ static void v14Settings(bool layout){
     v14Tiny("ESC: назад",190,190,V14_MUTED);
   }
 }
+// Called on TFT startup, page switch, theme change or keypad action.
 void renderLandscape(uint32_t now){
   v14ApplyPalette(tftThemeDark);
-  // Repaint every frame from scratch: fixes stale cached dark-field rectangles,
-  // clipped text remnants and displaced selection graphics in the previous V14.
   v13Collect(now);
+  v14InvalidateLive();
   tftFieldCount=0;
   v14Frame(now);
   switch(currentPage){
@@ -315,4 +346,29 @@ void renderLandscape(uint32_t now){
     case 5:v14Settings(true);break;
   }
   tftDirty=false;
+}
+
+// No full-screen erase in the live-update path. Only changed numerical fields
+// and the narrow clock/flow strips are repainted.
+void v14RefreshLive(uint32_t now){
+  v13Collect(now);
+  if(currentPage==0){
+    for(int i=0;i<4;i++)
+      v14Metric(v13Temp(i,now),21,52+i*36+30,94,hasTemp(i,now));
+    v14DrawFlowBar();
+  } else if(currentPage==1 && !editingTemp){
+    for(int i=0;i<4;i++){
+      int x=4+(i%2)*158,y=52+(i/2)*77;
+      v14Metric(v13Temp(i,now),x+11,y+40,133,hasTemp(i,now));
+    }
+  }
+  String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
+  if(dt.length()==16)dt=dt.substring(0,6)+dt.substring(8);
+  if(dt!=v14ClockLast){
+    v14ClockLast=dt;
+    screen->fillRect(220,1,100,19,V14_CARD);
+    ru.setFont(u8g2_font_6x13_t_cyrillic);
+    int tw=ru.getUTF8Width(dt.c_str());
+    v14Print(dt,max(220,317-tw),15,V14_TEXT);
+  }
 }
