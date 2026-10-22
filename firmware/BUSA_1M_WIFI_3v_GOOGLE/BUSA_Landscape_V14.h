@@ -115,7 +115,7 @@ static void v14Frame(uint32_t now){
   hqBackground();
   screen->fillRect(0,0,320,21,V14_CARD);
   screen->drawFastHLine(0,21,320,V14_ORANGE);
-  v14Big("БУСА-1М №001",5,15,V14_TEXT);
+  v14Big("BUSA 1M AI",5,15,V14_TEXT);
   v14NetIndicators();
   // DD.MM.YY HH:MM. Exact pixel width is measured; date cannot clip at 320.
   String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
