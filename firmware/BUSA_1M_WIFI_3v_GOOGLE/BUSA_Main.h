@@ -41,7 +41,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-LED-DIAG-LOCK";
+const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-LED-TEST-SAFE";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -235,6 +235,10 @@ String ledSimJSON(){
   const uint32_t now=millis();
   ledSimTick(now);
   String o="{\"physical_enabled\":false,\"current_limit_verified\":false";
+  o+=",\"owner_confirmed_supply_mv\":"+String(BusaLed::kOwnerConfirmedLedSupplyMv);
+  o+=",\"owner_confirmed_individual_leds\":"+(BusaLed::kOwnerConfirmedIndividualLeds?String("true"):String("false"));
+  o+=",\"physical_test_ready\":"+(BusaLed::physicalTestPreflight(0)?String("true"):String("false"));
+  o+=",\"physical_test_block_reason\":\"CURRENT_LIMIT_AND_OE_UNVERIFIED\"";
   o+=",\"oe_state_verified\":false,\"driver_connected\":"+(pcaDetected?String("true"):String("false"));
   o+=",\"mode1\":"+(pcaMode1>=0?String(pcaMode1):String("null"));
   o+=",\"mode2\":"+(pcaMode2>=0?String(pcaMode2):String("null"));
@@ -248,6 +252,7 @@ String ledSimJSON(){
     const auto &r=pcaLedRegs[ch];
     o+="{\"ch\":"+String(ch)+",\"name\":"+quoteJson(String(LED_CAPS[ch]));
     o+=",\"virtual_on\":"+(ledSimChannel==ch?String("true"):String("false"));
+    o+=",\"real_led_on\":null";
     o+=",\"read_ok\":"+(r.valid?String("true"):String("false"));
     o+=",\"pwm_on_full\":"+String(r.valid?((r.onH&0x10)?"true":"false"):"null");
     o+=",\"pwm_on_count\":"+(r.valid?String(((uint16_t)(r.onH&15)<<8)|r.onL):String("null"));
@@ -1409,8 +1414,10 @@ main>*{max-width:100%;min-width:0}
 </div>
 <button type="button" class="full" id="relaySimStop">СТОП · отмена виртуального теста</button>
 <p id="relaySimResult" role="status" class="hint">Реле физически заблокированы.</p>
-<h2>PCA9685 · 11 каналов · безопасный виртуальный тест</h2>
-<p class="hint">Физические LED выходы заблокированы до подтверждения токоограничения и OE. Кнопки меняют только программное состояние, лампочки не включают. Тест 8 секунд, по одному каналу.</p>
+<h2>PCA9685 · 11 светодиодных каналов · тест</h2>
+<p class="hint">Подтверждено владельцем: отдельные светодиоды на 3,3 В, 11 цветовых каналов. Для физического включения через PCA9685 ещё нужно подтвердить токоограничение и состояние OE. Ниже доступен виртуальный тест на 8 секунд; лампочки он не зажигает.</p>
+<div class="row">Тип и питание <b>Отдельные LED, 3,3 В</b></div>
+<div class="row">Физический тест <b id="ledPreflight">ЗАБЛОКИРОВАН</b></div>
 <div class="row">Проверка <b id="ledSimActive">НЕТ</b></div>
 <div class="row">Осталось <b id="ledSimRemaining">0 с</b></div>
 <div class="row">MODE1/MODE2 <b id="ledSimModes">—</b></div>
@@ -1730,6 +1737,7 @@ if(s.relay_simulation){
  get('relaySimRemaining').textContent=Math.ceil((s.relay_simulation.remaining_ms||0)/1000)+' с';
 }
 if(s.leds){
+  get('ledPreflight').textContent=s.leds.physical_test_ready?'РАЗРЕШЁН':'ЗАБЛОКИРОВАН: ТОК/OE НЕ ПОДТВЕРЖДЕНЫ';
   get('ledSimActive').textContent=s.leds.sim_channel>=0?('CH'+s.leds.sim_channel+' · ТОЛЬКО ИМИТАЦИЯ'):'НЕТ';
   get('ledSimRemaining').textContent=Math.ceil((s.leds.sim_remaining_ms||0)/1000)+' с';
   get('ledSimModes').textContent=String(s.leds.mode1??'—')+' / '+String(s.leds.mode2??'—');
