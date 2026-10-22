@@ -352,6 +352,15 @@ int scanKeyPair(){
   if(!pcfWrite(65535)){pcfScanError=2;return -2;}
   delayMicroseconds(160);
   if(!pcfRead(pcfIdleMask)){pcfScanError=3;return -2;}
+  // Record lines already low with all PCF8575 ports released.
+  // Such lines cannot be attributed to a newly driven matrix column.
+  const uint16_t idleLow=(uint16_t)~pcfIdleMask;
+  pcfObservedLow=idleLow;
+  if(idleLow){
+    pcfScanError=9; // stuck-low / idle-low wiring or simultaneous contact
+    pcfWrite(65535);
+    return -2;
+  }
   int found=-1;bool ambiguous=false;
   for(int a=0;a<16;a++){
     if(!pcfWrite((uint16_t)(65535u & ~(1u<<a)))){pcfScanError=4;ambiguous=true;break;}
