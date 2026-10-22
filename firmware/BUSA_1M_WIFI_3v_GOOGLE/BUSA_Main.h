@@ -33,15 +33,17 @@
 #include <U8g2_for_Adafruit_GFX.h>
 #include <math.h>
 
-constexpr uint8_t TPIN[4]={38,39,40,41};
+// DS18B20 T1-T4: four separate direct 1-Wire buses, each with its own 4.7k pull-up to 3.3V.
+// Old GPIO38-41 are no longer used for temperature sensors.
+constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Reference only: never configured as outputs
 constexpr uint8_t BUS_SDA=8,BUS_SCL=9;
 constexpr uint8_t TFT_CS=10,TFT_MOSI=11,TFT_SCK=12,TFT_DC=13,TFT_RST=14;
 constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
-static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-LED-TEST-SAFE";
+static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
+const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-T16-17-18-21";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -1453,7 +1455,7 @@ main>*{max-width:100%;min-width:0}
 <textarea id="diagReport" rows="9" readonly style="width:100%;font:11px ui-monospace,monospace;white-space:pre;overflow:auto">Ожидание диагностики...</textarea>
 <button type="button" id="diagCopy" class="full">Скопировать отчёт всех модулей</button>
 <p id="diagCopyResult" class="hint">—</p>
-<p class="hint">Температура: T1 GPIO38, T2 GPIO39, T3 GPIO40, T4 GPIO41. IDLE=1 — линия DATA высока в покое; IDLE=0 или LINE_LOW — линия низкая. AFTER — состояние после импульса сброса. NO_PRESENCE при IDLE=1 — нет ответа датчика, но это не доказывает, что сам датчик неисправен. NO_ROM — не найден адрес; ROM_CRC_BAD — неверная CRC.</p>
+<p class="hint">Температура: T1 GPIO16, T2 GPIO17, T3 GPIO18, T4 GPIO21. IDLE=1 — линия DATA высока в покое; IDLE=0 или LINE_LOW — линия низкая. AFTER — состояние после импульса сброса. NO_PRESENCE при IDLE=1 — нет ответа датчика, но это не доказывает, что сам датчик неисправен. NO_ROM — не найден адрес; ROM_CRC_BAD — неверная CRC.</p>
 <p class="hint">Клавиатура: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
 <p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
 <h2>Экран TFT · V14</h2>
