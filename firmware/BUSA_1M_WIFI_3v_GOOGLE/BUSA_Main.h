@@ -81,7 +81,12 @@ void sampleTemperatures(uint32_t now){
         sensors[i]->requestTemperatures();
       }else {temperature[i]=NAN;tempAt[i]=0;}
     }
-    tempConverting=true;tempRequestAt=now;
+    // A conversion cycle exists only if at least one DS18B20 was detected.
+    // Otherwise continue non-blocking bus diagnostics without a fake wait.
+    bool anyPresent=false;
+    for(int i=0;i<4;i++)if(tempPresent[i])anyPresent=true;
+    tempConverting=anyPresent;
+    tempRequestAt=anyPresent?now:0;
   }
   for(int i=0;i<4;i++)if(tempAt[i] && elapsed(now,tempAt[i],7000)){
     temperature[i]=NAN;tempAt[i]=0;
