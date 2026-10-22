@@ -23,6 +23,7 @@
 #include <sys/time.h>
 #include <esp_system.h>
 #include <Wire.h>
+#include "BUSA_PCA9685_Leds.h"
 #include <Preferences.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -40,7 +41,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-COMBINED-SIM";
+const char VERSION[]="БУСА 1М WiFi 14v14-N8R2-LED-DIAG-LOCK";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -208,6 +209,61 @@ uint8_t i2cFound[24]={0},i2cFoundCount=0;
 uint16_t i2cAckCount=0;
 uint32_t i2cFullScanAt=0;
 int pcaMode1=-1,pcaMode2=-1;
+// CH0..CH10: read-only register evidence plus independent virtual commands.
+// Never infer real LED light, current, OE state or 3.3V load protection.
+BusaLed::ChannelSnapshot pcaLedRegs[BusaLed::kCount];
+uint32_t pcaLedReadErrors=0,pcaLedReadOk=0,pcaLedScanAt=0;
+constexpr uint32_t LED_SIM_MAX_MS=8000U;
+int8_t ledSimChannel=-1; // -1 means all simulated channels off
+uint32_t ledSimUntil=0;
+String ledSimReason="BOOT_LOCKED";
+static const char* const LED_CAPS[BusaLed::kCount]={
+ "T1 Water Blue","T2 Column Green","T3 Cube Yellow","T4 Top Red",
+ "Installation Green","Installation Red","Valve Green","Valve Red",
+ "WiFi Green","WiFi Red","Alarm Red"};
+void ledSimStop(const char* reason){
+  ledSimChannel=-1;ledSimUntil=0;ledSimReason=reason;
+}
+void ledSimTick(uint32_t now){
+  if(ledSimChannel>=0 && (int32_t)(now-ledSimUntil)>=0)
+    ledSimStop("TIME_LIMIT");
+  if(ledSimChannel>=0 && WiFi.softAPgetStationNum()==0)
+    ledSimStop("AP_CLIENT_LOST");
+}
+String ledSimJSON(){
+  const uint32_t now=millis();
+  ledSimTick(now);
+  String o="{\\"physical_enabled\\":false,\\"current_limit_verified\\":false";
+  o+=",\\"oe_state_verified\\":false,\\"driver_connected\\":"+(pcaDetected?String("true"):String("false"));
+  o+=",\\"mode1\\":"+(pcaMode1>=0?String(pcaMode1):String("null"));
+  o+=",\\"mode2\\":"+(pcaMode2>=0?String(pcaMode2):String("null"));
+  o+=",\\"read_ok_total\\":"+String(pcaLedReadOk)+",\\"read_error_total\\":"+String(pcaLedReadErrors);
+  o+=",\\"register_scan_ms\\":"+String(pcaLedScanAt);
+  o+=",\\"sim_channel\\":"+String((int)ledSimChannel);
+  o+=",\\"sim_remaining_ms\\":"+String(ledSimChannel>=0?(uint32_t)(ledSimUntil-now):0);
+  o+=",\\"sim_reason\\":"+quoteJson(ledSimReason)+",\\"channels\\":[";
+  for(uint8_t ch=0;ch<BusaLed::kCount;ch++){
+    if(ch)o+=",";
+    const auto &r=pcaLedRegs[ch];
+    o+="{\\"ch\\":"+String(ch)+",\\"name\\":"+quoteJson(String(LED_CAPS[ch]));
+    o+=",\\"virtual_on\\":"+(ledSimChannel==ch?String("true"):String("false"));
+    o+=",\\"read_ok\\":"+(r.valid?String("true"):String("false"));
+    o+=",\\"pwm_on_full\\":"+(r.valid?((r.onH&0x10)?"true":"false"):"null");
+    o+=",\\"pwm_off_full\\":"+(r.valid?((r.offH&0x10)?"true":"false"):"null");
+    o+="}";
+  }
+  return o+"]}";
+}
+void probePcaLedRegisters(uint32_t now){
+  pcaLedScanAt=now;
+  for(uint8_t ch=0;ch<BusaLed::kCount;ch++){
+    if(!pcaDetected){pcaLedRegs[ch]=BusaLed::ChannelSnapshot();continue;}
+    pcaLedRegs[ch]=BusaLed::snapshot(ch);
+    if(pcaLedRegs[ch].valid)pcaLedReadOk++;
+    else pcaLedReadErrors++;
+  }
+}
+
 bool pcfIdleReadOk=false;
 uint16_t pcfIdleDirect=0xffff;
 uint32_t keyCount=0,lastKeyScan=0,pendingAt=0;
@@ -272,6 +328,7 @@ void probeI2c(uint32_t now){
   pcaDetected=ack(0x40);
   pcaMode1=readPcaReg(0x00);
   pcaMode2=readPcaReg(0x01);
+  probePcaLedRegisters(now);
   // PCF8575 keypad inputs: release scanning lines then sample idle state.
   pcfIdleReadOk=false;
   if(pcfDetected){
@@ -854,6 +911,7 @@ String statusJSON(){
   uint32_t now=millis();
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
+  s+=",\"leds\":"+ledSimJSON();
   s+=",\"relay_simulation\":"+relaySimJSON();
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
@@ -1348,6 +1406,27 @@ main>*{max-width:100%;min-width:0}
 </div>
 <button type="button" class="full" id="relaySimStop">СТОП · отмена виртуального теста</button>
 <p id="relaySimResult" role="status" class="hint">Реле физически заблокированы.</p>
+<h2>PCA9685 · 11 каналов · безопасный виртуальный тест</h2>
+<p class="hint">Физические LED выходы заблокированы до подтверждения токоограничения и OE. Кнопки меняют только программное состояние, лампочки не включают. Тест 8 секунд, по одному каналу.</p>
+<div class="row">Проверка <b id="ledSimActive">НЕТ</b></div>
+<div class="row">Осталось <b id="ledSimRemaining">0 с</b></div>
+<div class="row">MODE1/MODE2 <b id="ledSimModes">—</b></div>
+<div class="row">Чтение регистров <b id="ledSimRead">—</b></div>
+<div class="grid">
+<button type="button" data-led-channel="0">CH0 · T1 синий</button>
+<button type="button" data-led-channel="1">CH1 · T2 зелёный</button>
+<button type="button" data-led-channel="2">CH2 · T3 жёлтый</button>
+<button type="button" data-led-channel="3">CH3 · T4 красный</button>
+<button type="button" data-led-channel="4">CH4 · установка зел.</button>
+<button type="button" data-led-channel="5">CH5 · установка крас.</button>
+<button type="button" data-led-channel="6">CH6 · кран зелёный</button>
+<button type="button" data-led-channel="7">CH7 · кран красный</button>
+<button type="button" data-led-channel="8">CH8 · Wi-Fi зелёный</button>
+<button type="button" data-led-channel="9">CH9 · Wi-Fi красный</button>
+<button type="button" data-led-channel="10">CH10 · авария красный</button>
+</div>
+<button type="button" class="full" id="ledSimStop">Остановить виртуальную проверку LED</button>
+<p id="ledSimResult" class="hint">Физические выходы отключены. OE и токи не подтверждены.</p>
 <h2>Калибровка клавиатуры 5×4</h2><p class="hint">Назначения: ↑ вверх, ↓ вниз, ← влево, → вправо, Ent ОК, Esc назад, F1 удалить значение.</p>
 <p class="hint">Не переставляй провода. После запуска нажимай кнопки последовательно слева направо, сверху вниз по фотографии. Полностью отпускай клавишу между нажатиями. Карта сохраняется в ESP32.</p>
 <div class="row">Состояние <b id="keyState">—</b></div>
@@ -1647,6 +1726,12 @@ if(s.relay_simulation){
  get('relaySimChannel').textContent=String(s.relay_simulation.simulated_channel||0)+' / 4 (ТОЛЬКО ИМИТАЦИЯ)';
  get('relaySimRemaining').textContent=Math.ceil((s.relay_simulation.remaining_ms||0)/1000)+' с';
 }
+if(s.leds){
+  get('ledSimActive').textContent=s.leds.sim_channel>=0?('CH'+s.leds.sim_channel+' · ТОЛЬКО ИМИТАЦИЯ'):'НЕТ';
+  get('ledSimRemaining').textContent=Math.ceil((s.leds.sim_remaining_ms||0)/1000)+' с';
+  get('ledSimModes').textContent=String(s.leds.mode1??'—')+' / '+String(s.leds.mode2??'—');
+  get('ledSimRead').textContent=String(s.leds.read_ok_total)+' успешно / '+String(s.leds.read_error_total)+' ошибок';
+}
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
 document.querySelectorAll('[data-relay-sim]').forEach(b=>b.onclick=async()=>{
@@ -1663,6 +1748,19 @@ get('relaySimStop').onclick=async()=>{
       body:new URLSearchParams({action:'stop'})});
    get('relaySimResult').textContent=await r.text();
  }catch(e){get('relaySimResult').textContent='Ошибка остановки: '+e.message}
+};
+document.querySelectorAll('[data-led-channel]').forEach(b=>b.onclick=async()=>{
+  if(!confirm('Виртуальная проверка CH'+b.dataset.ledChannel+' на 8 секунд без подачи сигнала на лампочку?'))return;
+  try{
+    const r=await fetch('/api/led/sim',{method:'POST',body:new URLSearchParams({action:'test',channel:b.dataset.ledChannel,confirm:'DRY_RUN_ONLY'})});
+    get('ledSimResult').textContent=await r.text();
+  }catch(e){get('ledSimResult').textContent='Ошибка: '+e.message}
+});
+get('ledSimStop').onclick=async()=>{
+  try{
+    const r=await fetch('/api/led/sim',{method:'POST',body:new URLSearchParams({action:'stop'})});
+    get('ledSimResult').textContent=await r.text();
+  }catch(e){get('ledSimResult').textContent='Ошибка: '+e.message}
 };
 get('waterCalStart').onclick=async()=>{
  if(!confirm('Начать запись импульсов для будущей пробы обычной воды?'))return;
@@ -1782,6 +1880,7 @@ void readConsole(){
 }
 void setup(){
   relaySimStop("BOOT_SAFE");
+  ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
   Serial0.println("\nBUSA 1M WiFi V14.1 LIGHT-WATER; physical outputs LOCKED");
   Serial.begin(115200);
@@ -1889,6 +1988,33 @@ void setup(){
     relaySimReason="DRY_RUN_ONLY";
     server.send(200,"application/json",relaySimJSON());
   });
+  server.on("/api/led/sim",HTTP_POST,[]{
+    if(!apClient()){
+      server.send(403,"text/plain; charset=utf-8","Требуется защищённая локальная сеть БУСА");return;
+    }
+    const String action=server.arg("action");
+    if(action=="stop"){
+      ledSimStop("STOP_REQUESTED");
+      server.send(200,"application/json",ledSimJSON());return;
+    }
+    if(action!="test"||server.arg("confirm")!="DRY_RUN_ONLY"||otaActive){
+      server.send(403,"text/plain; charset=utf-8","Разрешена только виртуальная проверка LED");return;
+    }
+    const String arg=server.arg("channel");
+    if(arg.isEmpty()||arg.length()>2){
+      server.send(400,"text/plain","Неверный канал");return;
+    }
+    for(unsigned i=0;i<arg.length();i++)if(arg[i]<'0'||arg[i]>'9'){
+      server.send(400,"text/plain","Неверный номер");return;
+    }
+    const int ch=arg.toInt();
+    if(ch<0||ch>=BusaLed::kCount||ledSimChannel>=0){
+      server.send(409,"text/plain","Тест занят или канал недоступен");return;
+    }
+    ledSimChannel=(int8_t)ch;ledSimUntil=millis()+LED_SIM_MAX_MS;
+    ledSimReason="DRY_RUN_ONLY";
+    server.send(200,"application/json",ledSimJSON());
+  });
   // All calibration actions are low-voltage, read-only monitoring settings.
   // Never expose these write operations through the public Internet.
   server.on("/api/water/calibration/start",HTTP_POST,[]{
@@ -1943,6 +2069,7 @@ void setup(){
   });
   server.on("/api/ota/prepare",HTTP_POST,[]{
     relaySimStop("OTA_PREPARE");
+    ledSimStop("OTA_PREPARE");
     if(!apClient()||server.arg("confirm")!="YES"||otaActive){
       server.send(403,"text/plain","Требуется локальная сеть БУСА и согласие");return;
     }
@@ -2152,6 +2279,7 @@ void setup(){
 void loop(){
   uint32_t now=millis();
   relaySimTick(now);
+  ledSimTick(now);
   server.handleClient();
   if(stationSsid.length() && stationPass.length()>=8 && WiFi.status()!=WL_CONNECTED && elapsed(now,lastStationCheck,20000)){
     lastStationCheck=now;
@@ -2162,7 +2290,7 @@ void loop(){
   if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
-  if(otaActive){relaySimStop("OTA_TRANSFER");delay(0);return;}
+  if(otaActive){relaySimStop("OTA_TRANSFER");ledSimStop("OTA_TRANSFER");delay(0);return;}
   if(tftRebootPending && elapsed(now,tftRebootAt,3000))ESP.restart();
   if(googleRestart && elapsed(now,googleRestartAt,3500))ESP.restart();
   sampleTemperatures(now);
