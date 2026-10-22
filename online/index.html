@@ -165,8 +165,8 @@ input::placeholder{color:#a3bdce}
 :root[data-theme="light"] .connectionStrip{background:#fff;border-color:#bad1dc}
 
 
-.quickMenu{max-width:620px;margin:5px auto 11px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
-.quickMenu button{min-height:48px;border:1px solid #3d83aa;border-radius:11px;background:#17425b;color:#ecfaff;font-size:14px;font-weight:800}
+.quickMenu{max-width:620px;margin:5px auto 11px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.quickMenu button{min-height:48px;border:1px solid #3d83aa;border-radius:11px;background:#17425b;color:#ecfaff;font-size:clamp(11px,3vw,14px);font-weight:800;padding:8px 4px}
 .quickMenu button:focus-visible{outline:3px solid #4cdb94}
 .diagList{white-space:pre-line;color:#d9eef8;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;line-height:2}
 :root[data-theme="light"] .diagList{color:#173d51}
@@ -183,7 +183,7 @@ input::placeholder{color:#a3bdce}
 </div>
 <div class="connectionStrip"><span id="statusText" class="warn">Нет удалённых данных</span>
 <a href="http://192.168.4.1/">Локальная панель <span aria-hidden="true">›</span></a></div>
-<div class="quickMenu"><button type="button" data-open-page="connection">⌁ Связь</button><button type="button" data-open-page="diagnostics">⊞ Диагностика</button></div>
+<div class="quickMenu"><button type="button" data-open-page="connection">⌁ Связь</button><button type="button" data-open-page="diagnostics">⊞ Диагностика</button><button type="button" data-open-page="cloudUpdates">☁ Обновления</button></div>
 <section id="home">
 <div class="hero"><small>СИСТЕМА МОНИТОРИНГА</small><h2>Главная</h2><span class="status" id="heroStatus">● Ожидается соединение с БУСА</span></div>
 <div class="card"><h2>Четыре температуры</h2><div class="grid">
@@ -316,6 +316,26 @@ input::placeholder{color:#a3bdce}
 </div>
 <div class="card"><h2>Проверка передачи</h2><p id="diagCloud" class="muted">Пока нет данных из Google.</p></div>
 </section>
+<section id="cloudUpdates" hidden>
+<div class="card">
+<h2>Облачные обновления БУСА</h2>
+<p class="muted">Каталог версий через интернет. Удалённая установка пока не поддерживается: текущая прошивка БУСА не имеет облачного OTA-клиента. Этот экран ничего не записывает на ESP32.</p>
+<div class="row"><span>Текущая прошивка (последние данные Google)</span><b id="cloudCurrentFw">Не получено</b></div>
+<div class="row"><span>Последний отчёт устройства</span><b id="cloudLastSeen">—</b></div>
+<div class="row"><span>Версия в каталоге</span><b id="cloudAvailableFw">—</b></div>
+<div class="row"><span>Сборка под Flash</span><b id="cloudBuildFlash">—</b></div>
+<div class="row"><span>Flash на устройстве (диагностика)</span><b id="cloudDeviceFlash">—</b></div>
+<div class="row"><span>Совместимость для OTA</span><b id="cloudCompatible" class="warn">Не подтверждена</b></div>
+<div class="row"><span>SHA-256 APP BIN</span><b id="cloudAppSha">—</b></div>
+<div class="row"><span>Обновление облачного каталога</span><b id="cloudCatalogState">Не загружен</b></div>
+<div class="actions"><button type="button" id="refreshCloudCatalog" class="btn">Проверить версии</button></div>
+<p id="cloudReason" class="muted">Для безопасной установки требуется отдельная аппаратная проверка и первичная локальная прошивка облачного клиента.</p>
+</div>
+<div class="card"><h2>Возможности сейчас</h2>
+<p class="muted">Проверка версии и параметров сборки — доступна здесь. Прямое облачное обновление и команды устройству — не активированы. Для проекта ведётся отдельная проверка безопасности и совместимости.</p>
+<a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/issues/4" target="_blank" rel="noopener">Техническое задание Work</a>
+</div>
+</section>
 <section id="calculator" hidden><div class="card"><h2>Калькулятор</h2><div class="calcComing"><span aria-hidden="true">▦</span><strong>Запланирован</strong><p>Вкладка зарезервирована. Формулы, параметры и расчёты добавим позже по утверждённому заданию.</p></div></div></section>
 </main>
 <nav class="appTabs" aria-label="Разделы">
@@ -375,6 +395,7 @@ function remoteStatus(msg){
  byId('viewState').textContent=msg;
 }
 function clearRemoteNumbers(){
+ cloudCurrentTelemetry=null;cloudCurrentAt=null;renderCloudCompatibility();
  const placeholders=['connectionLast','connectionFresh','connectionInternet','connectionWifi','connectionRssi','connectionClients','connectionEnabled','connectionHttp','connectionSent','connectionTls','diagFw','diagUp','diagHeap','diagFlash','diagReset','diagTft','diagOutputs','diagPcf','diagKey','diagIdle','diagI2c','diagPca','diagPulses','diagCal'];
  placeholders.forEach(id=>{const v=byId(id);if(v)v.textContent='—'});
  byId('diagOneWireRemote').textContent='Нет данных';
@@ -398,6 +419,50 @@ function renderRemoteEvents(){
  const items=remoteErrors.filter(e=>eventFilter==='all'||e.kind===eventFilter);
  byId('remoteEvents').textContent=items.length?items.map(e=>e.text).join('\n'):'Событий выбранного типа нет';
 }
+let cloudRelease=null,cloudCurrentTelemetry=null,cloudCurrentAt=null;
+function renderCloudCompatibility(){
+ const release=cloudRelease,telemetry=cloudCurrentTelemetry;
+ const el=id=>document.getElementById(id);
+ el('cloudAvailableFw').textContent=release?.version||'—';
+ el('cloudBuildFlash').textContent=Number.isInteger(release?.build_flash_bytes)?Math.round(release.build_flash_bytes/1048576)+' МБ (сборка)':'—';
+ el('cloudAppSha').textContent=release?.app_sha256||'—';
+ el('cloudLastSeen').textContent=Number.isFinite(cloudCurrentAt)?stampRussian(cloudCurrentAt):'—';
+ el('cloudCurrentFw').textContent=typeof telemetry?.firmware==='string'?telemetry.firmware:'Нет телеметрии';
+ const chip=telemetry?.diagnostics?.esp32||{};
+ const bytes=chip.flash_bytes;
+ el('cloudDeviceFlash').textContent=Number.isInteger(bytes)&&bytes>0?Math.round(bytes/1048576)+' МБ':'Не сообщается';
+ let reason='';
+ if(!release)reason='Каталог версий ещё не проверен.';
+ else if(!telemetry || !Number.isFinite(cloudCurrentAt))reason='Нет отчёта ESP32 из Google.';
+ else if(Date.now()-cloudCurrentAt>150000)reason='Последний отчёт ESP32 устарел.';
+ else if(!(Number.isInteger(bytes)&&bytes>0))reason='Объём Flash на контроллере не подтверждён телеметрией.';
+ else if(bytes!==release.build_flash_bytes)reason='Размер Flash отличается от настроек сборки ('+Math.round(bytes/1048576)+' МБ против '+Math.round(release.build_flash_bytes/1048576)+' МБ).';
+ else reason='Объём Flash совпадает, но OTA-разметка, текущий слот, подпись образа и возможность отката дистанционно не проверены.';
+ el('cloudCompatible').textContent='Не подтверждена';
+ el('cloudReason').textContent=reason+' Облачная установка отключена.';
+}
+async function checkCloudRelease(){
+ const state=document.getElementById('cloudCatalogState');
+ state.textContent='Проверяю…';
+ try{
+  const response=await fetch('./releases.json',{cache:'no-store'});
+  if(!response.ok)throw new Error('HTTP '+response.status);
+  const catalog=await response.json();
+  const release=catalog?.releases?.[0];
+  if(catalog?.device!=='BUSA-1M-001'||!release||
+     !/^V14\.[0-9]{1,3}$/.test(release.version)||
+     !/^[a-f0-9]{64}$/.test(release.app_sha256)||
+     !Number.isInteger(release.build_flash_bytes)||release.build_flash_bytes<1048576)
+     throw new Error('Некорректный каталог версий');
+  cloudRelease=release;
+  state.textContent='Каталог загружен';
+ }catch(error){
+  cloudRelease=null;
+  state.textContent='Ошибка: '+error.message;
+ }
+ renderCloudCompatibility();
+}
+document.getElementById('refreshCloudCatalog').addEventListener('click',checkCloudRelease);
 function renderDiagnostics(d,at,fresh){
  const val=(id,text)=>{const el=byId(id);if(el)el.textContent=String(text)};
  const diag=d.diagnostics||{},cloud=d.google||{},chip=diag.esp32||{},wire=Array.isArray(diag.onewire)?diag.onewire:[],wifi=diag.wifi||{},i2c=diag.i2c||{},key=diag.keyboard||{},modules=d.modules||{},pca=diag.pca9685||{},net=d.network_indicators||{};
@@ -433,6 +498,7 @@ function renderDiagnostics(d,at,fresh){
  byId('diagCloud').textContent='Google: '+(cloud.configured?'передача включена':'выключена')+', HTTP '+String(cloud.http??'—')+', подтверждений ESP32 '+String(cloud.sent??'—')+'. Записи в Google Таблице могут сохраняться и при HTTP 302.';
 }
 function renderRemote(d,history,receivedAt){
+ cloudCurrentTelemetry=d;cloudCurrentAt=receivedAt;renderCloudCompatibility();
  const age=Date.now()-receivedAt;
  const fresh=age>=0&&age<150000;
  renderDiagnostics(d,receivedAt,fresh);
@@ -597,6 +663,7 @@ try{
  if(savedUrl&&savedToken)connectRemote(savedUrl,savedToken,false);
 }catch(ignore){}
 drawRemoteCharts();
+checkCloudRelease();
 
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 </script></body></html>
