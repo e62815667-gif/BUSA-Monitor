@@ -48,10 +48,13 @@ nav button.active{background:#f7d5a9;border-color:#e8b274;color:#354b55;font-wei
 :root[data-theme="dark"] a.btn,:root[data-theme="dark"] button.btn{background:#d99652;color:#1a2f3f;border-color:#ffb56f}
 :root[data-theme="dark"] a.btn.secondary{background:#254f68;color:#e0f6ff;border-color:#66a8c8}
 :root[data-theme="dark"] .rigs svg rect:first-of-type{fill:#183046}
-#themeSwitch{margin:7px 0 1px;padding:9px 13px;border:1px solid #cda275;border-radius:9px;background:#fff0d9;color:#3b5a69;font-size:13px;font-weight:600}
+#connectStatus{display:flex;flex-wrap:wrap;gap:8px;margin:9px 0 3px;font-size:12px}\n.netChip{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;background:var(--paper);border-radius:9px;border:1px solid var(--border);font-weight:650}\n.netBulb{width:11px;height:11px;display:inline-block;flex-shrink:0;border-radius:50%;background:#d83b35}\n.netBulb.internetUp{background:#16a653}\n.netBulb.localUp{background:#137ee9}\n#themeSwitch{margin:7px 0 1px;padding:9px 13px;border:1px solid #cda275;border-radius:9px;background:#fff0d9;color:#3b5a69;font-size:13px;font-weight:600}
 :root[data-theme="dark"] #themeSwitch{background:#3b576b;color:#e1f4ff;border-color:#75a3bc}
 </style></head><body>
-<header><h1>БУСА-1М №001</h1><small>Монитор · iPhone · две цветные темы V14.4</small><div><button type="button" id="themeSwitch">Тёмная цветная тема</button></div></header>
+<header><h1>БУСА-1М №001</h1><small>Монитор · iPhone · две цветные темы</small>
+<div id="connectStatus" role="status"><span class="netChip"><span id="netInternet" class="netBulb"></span>ИНТЕРНЕТ <span id="netInternetText">проверка</span></span>
+<span class="netChip"><span id="netLocal" class="netBulb"></span>БУСА Wi-Fi <span id="netLocalText">нет прямой связи</span></span></div>
+<div><button type="button" id="themeSwitch">Тёмная цветная тема</button></div></header>
 <main>
 <div class="card"><div class="row"><span>Подключение</span><b id="statusText" class="warn">Не подключено</b></div>
 <p class="muted">Живые показания открываются непосредственно из локальной сети ESP32-S3. Эта страница сохранит знакомые вкладки даже без интернета.</p>
@@ -139,5 +142,28 @@ document.querySelectorAll('[data-chart]').forEach(b=>b.addEventListener('click',
  document.querySelectorAll('[data-chart]').forEach(t=>t.classList.toggle('on',t===b));
  document.querySelectorAll('[data-chart-panel]').forEach(p=>p.hidden=p.dataset.chartPanel!==b.dataset.chart);
 }));
+// Standalone GitHub Pages page is HTTPS, so it cannot inspect 192.168.4.1
+// over insecure HTTP due to mixed-content rules. Never fake local connectivity.
+async function networkCheck(){
+  const local=window.location.hostname==='192.168.4.1';
+  let online=false;
+  try{
+    const url=local?'http://192.168.4.1/api/status':'./manifest.webmanifest';
+    const resp=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(4000)});
+    if(local && resp.ok){
+      const s=await resp.json();
+      const a=s.network_indicators||{};
+      online=a.internet===true;
+      document.getElementById('netLocal').classList.toggle('localUp',a.local_client===true);
+      document.getElementById('netLocalText').textContent=a.local_client?'подключён':'нет клиентов';
+    } else if(resp.ok){online=true;}
+  }catch(e){}
+  document.getElementById('netInternet').classList.toggle('internetUp',online);
+  document.getElementById('netInternetText').textContent=online?'доступен':'нет связи';
+  if(!local){
+    document.getElementById('netLocalText').textContent='открой локальную панель';
+  }
+}
+networkCheck();setInterval(networkCheck,15000);
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 </script></body></html>
