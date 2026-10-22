@@ -211,6 +211,9 @@ int pendingPair=-1;bool keyHeld=false;
 String keyMessage="NO DATA";
 uint16_t pcfIdleMask=65535,pcfObservedLow=0;
 uint8_t pcfPairCount=0,pcfScanError=0;
+int8_t pcfConflictDrive=-1;
+uint16_t pcfConflictMask=0;
+uint32_t pcfError6Total=0,pcfIdleLowTotal=0,pcfValidPairTotal=0;
 uint32_t pcfLastScanAt=0;
 Preferences prefs;
 // Wall clock: phone supplies UTC epoch and local UTC offset via protected AP;
@@ -350,10 +353,20 @@ void loadKeymap(){
 int scanKeyPair(){
   if(!pcfDetected){pcfScanError=1;return -1;}
   pcfLastScanAt=millis();
-  pcfScanError=0;pcfPairCount=0;pcfObservedLow=0;
+  pcfScanError=0;pcfPairCount=0;pcfObservedLow=0;pcfConflictDrive=-1;pcfConflictMask=0;
   if(!pcfWrite(65535)){pcfScanError=2;return -2;}
   delayMicroseconds(160);
   if(!pcfRead(pcfIdleMask)){pcfScanError=3;return -2;}
+  // Record lines already low with all PCF8575 ports released.
+  // Such lines cannot be attributed to a newly driven matrix column.
+  const uint16_t idleLow=(uint16_t)~pcfIdleMask;
+  pcfObservedLow=idleLow;
+  if(idleLow){
+    pcfScanError=9; // stuck-low / idle-low wiring or simultaneous contact
+    pcfConflictMask=idleLow;pcfIdleLowTotal++;
+    pcfWrite(65535);
+    return -2;
+  }
   int found=-1;bool ambiguous=false;
   for(int a=0;a<16;a++){
     if(!pcfWrite((uint16_t)(65535u & ~(1u<<a)))){pcfScanError=4;ambiguous=true;break;}
@@ -363,15 +376,16 @@ int scanKeyPair(){
     uint16_t lows=(uint16_t)(~v) & (uint16_t)~(1u<<a);
     pcfObservedLow|=lows;
     if(!lows)continue;
-    if(lows&(lows-1)){pcfScanError=6;ambiguous=true;break;}
+    if(lows&(lows-1)){pcfScanError=6;pcfError6Total++;pcfConflictDrive=a;pcfConflictMask=lows;ambiguous=true;break;}
     int b=0;while(b<16 && !(lows&(1u<<b)))b++;
     if(b>=16)continue;
     int p=(min(a,b)<<4)|max(a,b);
-    if(found>=0 && found!=p){pcfScanError=7;ambiguous=true;break;}
+    if(found>=0 && found!=p){pcfScanError=7;pcfConflictDrive=a;pcfConflictMask=lows;ambiguous=true;break;}
     if(found<0)pcfPairCount=1;
     found=p;
   }
   if(!pcfWrite(65535)){pcfScanError=8;ambiguous=true;}
+  if(!ambiguous&&found>=0)pcfValidPairTotal++;
   return ambiguous?-2:found;
 }
 String pairName(int p){
@@ -853,6 +867,11 @@ String statusJSON(){
   s+=",\"low_hex\":"+quoteJson(String(pcfObservedLow,HEX));
   s+=",\"pairs\":"+String(pcfPairCount);
   s+=",\"scan_error\":"+String(pcfScanError);
+  s+=",\"conflict_drive\":"+String((int)pcfConflictDrive);
+  s+=",\"conflict_mask_hex\":"+quoteJson(String(pcfConflictMask,HEX));
+  s+=",\"error6_total\":"+String(pcfError6Total);
+  s+=",\"idle_low_total\":"+String(pcfIdleLowTotal);
+  s+=",\"valid_pair_total\":"+String(pcfValidPairTotal);
   s+=",\"raw_pair\":"+quoteJson(rawPair)+"}";
   s+=",\"i2c\":{\"sda_gpio\":8,\"scl_gpio\":9,\"controller_started\":"+(i2cOnline?String("true"):String("false"));
   s+=",\"last_scan_ms\":"+String(i2cFullScanAt);
