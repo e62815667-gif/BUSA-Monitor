@@ -47,16 +47,16 @@ function setupBusaSheet() {
  * Publish verified READ-ONLY catalogue metadata in the same HTTPS ACK.
  * This is NOT an OTA command, download URL or remote flashing capability.
  * Metadata can never authorize flashing on its own.
- * Run manually once after confirming the verified V14.11 artifact details.
+ * Run manually once after verifying the SHA-256 of the V14.13 artifact. The original receiver tokens remain untouched.
  * Re-deploy this Google Apps Script web app after changing the source.
  */
-function setupBusaReadOnlyReleaseV1411() {
+function setupBusaReadOnlyReleaseV1413() {
   const cfg = PropertiesService.getScriptProperties();
-  cfg.setProperty('BUSA_RELEASE_VERSION', 'V14.11');
+  cfg.setProperty('BUSA_RELEASE_VERSION', 'V14.13');
   cfg.setProperty('BUSA_RELEASE_TARGET', 'ESP32-S3');
   cfg.setProperty('BUSA_RELEASE_BUILD_FLASH', '8388608');
-  cfg.setProperty('BUSA_RELEASE_APP_BYTES', '1104224');
-  cfg.setProperty('BUSA_RELEASE_APP_SHA256', '1fc280130318c26bda982d48e5b2d2b3b3171c1697e79e7a9ea63b308860cc08');
+  cfg.setProperty('BUSA_RELEASE_APP_BYTES', '1110768');
+  cfg.setProperty('BUSA_RELEASE_APP_SHA256', 'b6880028bc17e2b549a082d89f0828b855ac8723b447adafe31705ec27a54396');
 }
 function busaReleaseMetadata_() {
   const props=PropertiesService.getScriptProperties();
