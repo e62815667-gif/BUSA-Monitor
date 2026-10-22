@@ -65,7 +65,7 @@ function busaReleaseMetadata_() {
   const sha=props.getProperty('BUSA_RELEASE_APP_SHA256') || '';
   const size=Number(props.getProperty('BUSA_RELEASE_APP_BYTES'));
   const flash=Number(props.getProperty('BUSA_RELEASE_BUILD_FLASH'));
-  if(!/^V14\\.[0-9]{1,3}$/.test(version) || target!=='ESP32-S3' ||
+  if(!/^V14\.[0-9]{1,3}$/.test(version) || target!=='ESP32-S3' ||
      !/^[a-f0-9]{64}$/.test(sha) || !Number.isInteger(size) ||
      size<60000 || size>4000000 || ![8388608,16777216].includes(flash))
     return null;
