@@ -249,8 +249,10 @@ String ledSimJSON(){
     o+="{\"ch\":"+String(ch)+",\"name\":"+quoteJson(String(LED_CAPS[ch]));
     o+=",\"virtual_on\":"+(ledSimChannel==ch?String("true"):String("false"));
     o+=",\"read_ok\":"+(r.valid?String("true"):String("false"));
-    o+=",\"pwm_on_full\":"+(r.valid?((r.onH&0x10)?"true":"false"):"null");
-    o+=",\"pwm_off_full\":"+(r.valid?((r.offH&0x10)?"true":"false"):"null");
+    o+=",\"pwm_on_full\":"+String(r.valid?((r.onH&0x10)?"true":"false"):"null");
+    o+=",\"pwm_on_count\":"+(r.valid?String(((uint16_t)(r.onH&15)<<8)|r.onL):String("null"));
+    o+=",\"pwm_off_full\":"+String(r.valid?((r.offH&0x10)?"true":"false"):"null");
+    o+=",\"pwm_off_count\":"+(r.valid?String(((uint16_t)(r.offH&15)<<8)|r.offL):String("null"));
     o+="}";
   }
   return o+"]}";
