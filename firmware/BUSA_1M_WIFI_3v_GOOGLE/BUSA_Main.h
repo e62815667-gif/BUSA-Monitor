@@ -38,7 +38,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==38 && TPIN[3]==41 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v6-MONO-NOFLICKER-TLS";
+const char VERSION[]="БУСА 1М WiFi 14v7-NET-LEDS-MONO-TLS";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -732,6 +732,7 @@ String quoteJson(const String &x){
 }
 String otaJSON(); // forward declaration
 String cloudJSON(); // forward declaration; read-only Google status
+extern volatile int googleInternet; // external TCP health, no credentials
 String statusJSON(){
   uint32_t now=millis();
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
@@ -839,6 +840,9 @@ String statusJSON(){
   s+=",\"ota\":"+otaJSON();
   s+=",\"bluetooth_enabled\":false";
   s+=",\"google\":"+cloudJSON();
+  s+=",\"network_indicators\":{\"internet\":"+(googleInternet==1?String("true"):String("false"));
+  s+=",\"local_client\":"+(WiFi.softAPgetStationNum()>0?String("true"):String("false"));
+  s+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"))+"}";
   s+=",\"station\":{\"ssid\":"+quoteJson(stationSsid);
   s+=",\"connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():String(""))+"}";
@@ -1006,11 +1010,22 @@ main>*{max-width:100%;min-width:0}
 :root[data-theme="dark"] .appTabs .on .tabIcon{color:#1c3c4b}
 @media(min-width:650px){.appTabs{max-width:620px;margin:auto;border-left:1px solid var(--line);border-right:1px solid var(--line)}}
 @media(max-width:350px){.appTabs button{font-size:9px!important}.tabIcon{font-size:16px}.card{padding:10px}}
+
+/* Two always-visible independent network badges; fixed colors in every theme. */
+.netIndicators{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:5px auto 3px;max-width:620px;font-size:11px;line-height:1.3}
+.netPill{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-weight:700;color:var(--ink);max-width:100%}
+.netDot{display:inline-block;width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:#d33a32;box-shadow:0 0 0 1px #73737355}
+.netDot.internetOn{background:#13a44c}.netDot.localOn{background:#168de3}
+.netText{font-size:10px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:145px}
 </style></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
 <span class="readOnlyLabel">● МОНИТОРИНГ</span></div>
 <div id="clockDisplay" class="clockBar" aria-live="off">Время синхронизируется…</div>
+<div class="netIndicators" role="status" aria-label="Два подключения БУСА">
+<span class="netPill"><span id="internetLed" class="netDot"></span>ИНТЕРНЕТ <span id="internetLabel" class="netText">нет связи</span></span>
+<span class="netPill"><span id="localLed" class="netDot"></span>БУСА Wi-Fi <span id="localLabel" class="netText">нет клиента</span></span>
+</div>
 <nav class="appTabs" aria-label="Разделы">
 <button data-page="0" class="on"><span class="tabIcon">⌂</span><span>Главная</span></button>
 <button data-page="1"><span class="tabIcon">♨</span><span>Температуры</span></button>
@@ -1182,6 +1197,15 @@ const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[
 let lastWaterPulse=null,themeInitialized=false;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
+function networkLeds(info,ssid){
+ const online=info&&info.internet===true;
+ const local=info&&info.local_client===true;
+ get('internetLed').classList.toggle('internetOn',!!online);
+ get('localLed').classList.toggle('localOn',!!local);
+ get('internetLabel').textContent=online?(ssid||'есть сеть'):'нет связи';
+ get('localLabel').textContent=local?'клиент подключён':'нет клиента';
+}
+
 let lastDiagnosticReport='';
 function showPhoneClock(){
   get('clockDisplay').textContent='Дата и время: '+
@@ -1324,7 +1348,8 @@ function graphAllTemperatures(){
  if(!tlog4.some(a=>a.some(v=>v!==null))){x.fillStyle='#a43c24';x.fillText('НЕТ ИЗМЕРЕНИЙ T1–T4',180,107)}
 }
 function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
-async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;if(Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
+async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;
+networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
  get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';
  const a=tlog4[i];a.push(t.c===null?null:Number(t.c));if(a.length>80)a.shift();
@@ -1356,7 +1381,7 @@ if(!themeInitialized && typeof s.tft_theme_dark==='boolean'){
   themeInitialized=true;
 }
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
-get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent;
+get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent+' · DNS '+(cs.dns??'?')+' · TLS '+(cs.tls_error??'?')+' · этап '+(cs.error_stage??'?');
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
 if(s.keypad){
  get('keyState').textContent=s.keypad.learning?
@@ -1400,7 +1425,7 @@ if(s.keypad){
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
-}catch(e){if(connected)message('Потеряна связь с ESP32');connected=false}finally{pollBusy=false}}
+}catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
 get('googleSave').onclick=async()=>{
 const url=get('googleUrl').value.trim(),token=get('googleToken').value.trim();
 if(!url.startsWith('https://script.google.com/macros/s/')||!url.endsWith('/exec')||!/^[a-fA-F0-9]{64}$/.test(token)){
