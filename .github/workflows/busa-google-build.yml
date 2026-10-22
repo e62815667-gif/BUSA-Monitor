@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-r03-recovery-monitor, lab/busa-v10-diag, lab/busa-v11-tft, lab/busa-v12-boot-status, lab/busa-v12-full-diagnostics, lab/busa-v13-approved-six-screens, lab/busa-v14-landscape-ui-ota, lab/busa-v14-approved-hq-graphics, lab/busa-v14-1-ui-water-fixes, lab/busa-v14-2-font-readable, lab/busa-v14-3-final-display-google, lab/busa-v14-4-manual-display, lab/busa-v14-5-iphone-layout-repair, lab/busa-v14-6-tft-no-flicker-https-diag, lab/busa-v14-7-dual-network-indicators, lab/busa-v14-8-calibration-readiness, lab/busa-v14-9-google-tls-trust-fix, lab/busa-v14-10-google-ack-fix, lab/busa-14-11-monitor-ui, lab/busa-v14-12-cloud-update-preflight, lab/busa-v14-13-n8r2-cloud-ota-diagnostics, lab/busa-v14-14-n8r2-onewire-fix-wifi-ota, lab/busa-v14-14-combined-display-keypad-relay-sim, lab/busa-v14-14-combined-pca9685-led-diagnostics, lab/busa-v14-14-led-test-preflight-safe, lab/busa-v14-14-ds18b20-gpio16-17-18-21, lab/busa-v14-14-dual-independent-themes, lab/busa-v14-14-google-readonly-audit-20261023]
+    branches: [lab/busa-v14-14-google-readonly-audit-20261023]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -130,6 +130,8 @@ jobs:
         run: |
           cp google/BUSA_GoogleSheets_Receiver.gs /tmp/BUSA_GoogleSheets_Receiver.js
           node --check /tmp/BUSA_GoogleSheets_Receiver.js
+      - name: Verify read-only V14.14 Google release and token safety
+        run: node tests/test_google_release_v1414.js
       - name: Validate both iPhone app scripts and manual-only screen behavior
         run: |
           python3 - <<'PY'
