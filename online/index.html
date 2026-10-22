@@ -323,6 +323,7 @@ input::placeholder{color:#a3bdce}
 <div class="row"><span>Текущая прошивка (последние данные Google)</span><b id="cloudCurrentFw">Не получено</b></div>
 <div class="row"><span>Последний отчёт устройства</span><b id="cloudLastSeen">—</b></div>
 <div class="row"><span>Версия в каталоге</span><b id="cloudAvailableFw">—</b></div>
+<div class="row"><span>Сравнение версий</span><b id="cloudVersionRelation">Нет данных</b></div>
 <div class="row"><span>Сборка под Flash</span><b id="cloudBuildFlash">—</b></div>
 <div class="row"><span>Flash на устройстве (диагностика)</span><b id="cloudDeviceFlash">—</b></div>
 <div class="row"><span>Каталог получен контроллером</span><b id="cloudDeviceCatalog">Нет данных</b></div>
@@ -431,6 +432,14 @@ function renderCloudCompatibility(){
  const release=cloudRelease,telemetry=cloudCurrentTelemetry;
  const el=id=>document.getElementById(id);
  el('cloudAvailableFw').textContent=release?.version||'—';
+ const installedMinor=typeof telemetry?.firmware==='string'?telemetry.firmware.match(/14v([0-9]{1,3})(?![0-9])/i):null;
+ const availableMinor=typeof release?.version==='string'?release.version.match(/^V14\.([0-9]{1,3})$/):null;
+ let relation='Нет данных для сравнения';
+ if(installedMinor&&availableMinor){
+   const x=Number(installedMinor[1]),y=Number(availableMinor[1]);
+   relation=x===y?'Установлена версия из каталога':x>y?'Установленная версия новее каталога':'Есть более новый релиз (установка отключена)';
+ }
+ el('cloudVersionRelation').textContent=relation;
  el('cloudBuildFlash').textContent=Number.isInteger(release?.build_flash_bytes)?Math.round(release.build_flash_bytes/1048576)+' МБ (сборка)':'—';
  el('cloudAppSha').textContent=release?.app_sha256||'—';
  el('cloudLastSeen').textContent=Number.isFinite(cloudCurrentAt)?stampRussian(cloudCurrentAt):'—';
