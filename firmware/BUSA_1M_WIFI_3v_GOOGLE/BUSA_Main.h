@@ -44,127 +44,13 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v25-N8R2-LOCAL-WIFI-PRIORITY";
+const char VERSION[]="БУСА 1М WiFi 14v26-N8R2-TEMP-ROM-BINDING-APP";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
-DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
-DallasTemperature* sensors[4]={&ds1,&ds2,&ds3,&ds4};
-float temperature[4]={NAN,NAN,NAN,NAN};
-bool tempPresent[4]={false,false,false,false};
-uint32_t tempAt[4]={0,0,0,0},tempCycle=0,tempRequestAt=0;
-bool tempConverting=false;
-// Read-only health checks; run only between conversion cycles.
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
-struct OneWireProbe {
-  bool presence=false,romFound=false,crcOk=false,familyOk=false,multiple=false,searchNoise=false,secondFound=false;
-  int8_t idleLevel=-1,afterResetLevel=-1; // GPIO state; not proof of sensor health
-  uint8_t rom[8]={0},secondRom[8]={0};
-  uint32_t checkedAt=0;
-};
-OneWireProbe wireProbe[4];
-uint32_t lastWireProbe=0;
-uint32_t oneWireNoPresenceCount[4]={0,0,0,0};
-uint32_t oneWireDetectedCount[4]={0,0,0,0};
 bool elapsed(uint32_t now,uint32_t then,uint32_t ms){return (uint32_t)(now-then)>=ms;}
-bool oneWireVerified(int n); // Defined below. Each conversion must use its verified ROM.
-void sampleTemperatures(uint32_t now){
-  if(tempConverting && elapsed(now,tempRequestAt,825)){
-    for(int i=0;i<4;i++){
-      const float v=(tempPresent[i] && oneWireVerified(i))
-        ? sensors[i]->getTempC(wireProbe[i].rom) : DEVICE_DISCONNECTED_C;
-      if(tempPresent[i] && isfinite(v) && v>=-55 && v<=125 && v!=DEVICE_DISCONNECTED_C){
-        temperature[i]=v;tempAt[i]=now;
-      }else{temperature[i]=NAN;tempAt[i]=0;}
-    }
-    tempConverting=false;
-  }
-  if(!tempConverting && (tempCycle==0||elapsed(now,tempCycle,2500))){
-    tempCycle=now;
-    bool anyPresent=false;
-    for(int i=0;i<4;i++){
-      // Never treat DallasTemperature index zero as proof that the expected
-      // sensor belongs to this bus. Use the independently validated ROM.
-      sensors[i]->begin();
-      tempPresent[i]=oneWireVerified(i) &&
-                     sensors[i]->isConnected(wireProbe[i].rom);
-      if(tempPresent[i]){
-        sensors[i]->setResolution(wireProbe[i].rom,12);
-        sensors[i]->setWaitForConversion(false);
-        sensors[i]->requestTemperaturesByAddress(wireProbe[i].rom);
-        anyPresent=true;
-      }else {temperature[i]=NAN;tempAt[i]=0;}
-    }
-    tempConverting=anyPresent;
-    tempRequestAt=anyPresent?now:0;
-  }
-  for(int i=0;i<4;i++)if(tempAt[i] && elapsed(now,tempAt[i],7000)){
-    temperature[i]=NAN;tempAt[i]=0;
-  }
-}
-void probeOneWire(uint32_t now){
-  if(tempConverting||(lastWireProbe && !elapsed(now,lastWireProbe,12000)))return;
-  lastWireProbe=now;
-  for(int i=0;i<4;i++){
-    OneWireProbe &p=wireProbe[i];
-    p=OneWireProbe();
-    p.checkedAt=now;
-    OneWire* bus=temperatureBuses[i];
-    p.idleLevel=digitalRead(TPIN[i]);
-    p.presence=bus->reset()!=0;
-    if(p.presence)oneWireDetectedCount[i]++;
-    else oneWireNoPresenceCount[i]++;
-    p.afterResetLevel=digitalRead(TPIN[i]);
-    bus->reset_search();
-    uint8_t first[8]={0},second[8]={0};
-    p.romFound=bus->search(first);
-    if(p.romFound){
-      memcpy(p.rom,first,8);
-      p.crcOk=OneWire::crc8(first,7)==first[7];
-      p.familyOk=first[0]==0x28; // DS18B20 family
-      p.secondFound=bus->search(second);
-      if(p.secondFound){
-        memcpy(p.secondRom,second,8);
-        const bool secondValid=(OneWire::crc8(second,7)==second[7] && second[0]==0x28);
-        p.multiple=secondValid && memcmp(first,second,8)!=0;
-        p.searchNoise=!secondValid;
-      }
-    }
-    bus->reset_search();
-  }
-}
-String romHex(const uint8_t rom[8]){
-  char hex[17];for(int j=0;j<8;j++)snprintf(hex+2*j,3,"%02X",(unsigned)rom[j]);
-  return String(hex);
-}
-bool hasTemp(int n,uint32_t now);
-String wireError(int i,uint32_t now){
-  const OneWireProbe& p=wireProbe[i];
-  if(!p.checkedAt)return "WAIT_DIAG";
-  if(!p.presence && p.idleLevel==0)return "LINE_LOW";
-  if(!p.presence)return "NO_PRESENCE";
-  if(!p.romFound)return "NO_ROM";
-  if(!p.crcOk)return "ROM_CRC_BAD";
-  if(!p.familyOk)return "NOT_DS18B20";
-  if(p.multiple)return "MULTIPLE_ROM";
-  if(p.searchNoise)return "ROM_SEARCH_NOISE";
-  if(!tempPresent[i])return "LIBRARY_NOT_DETECTED";
-  if(!hasTemp(i,now))return "NO_VALID_READING";
-  return "OK";
-}
-// V14.15: do not publish a temperature as valid if the independent
-// bus diagnostic has not confirmed a unique, CRC-valid DS18B20 ROM.
-// This prevents the misleading T2/T3 mirrored-value case from looking OK.
-// This is a conservative display/telemetry filter, not a wiring repair.
-bool oneWireVerified(int n){
-  if(n<0||n>=4)return false;
-  const OneWireProbe& p=wireProbe[n];
-  return p.checkedAt && p.presence && p.romFound && p.crcOk && p.familyOk && !p.multiple && !p.searchNoise;
-}
-bool hasTemp(int n,uint32_t now){
-  if(n<0||n>=4)return false;
-  return tempAt[n] && !elapsed(now,tempAt[n],7000) &&
-         isfinite(temperature[n]) && oneWireVerified(n);
-}
+String quoteJson(const String &x);
+#include "BUSA_Temperature.h"
 
 // YF-S401 pulse reader for ordinary cooling WATER only. No process control.
 // Until a real measured-volume calibration, only raw pulses are factual.
@@ -967,8 +853,11 @@ String statusJSON(){
   for(int i=0;i<4;i++){
     if(i)s+=",";
     s+="{\"name\":"+quoteJson(String(i==0?"Вода":i==1?"Колонна":i==2?"Куб":"Верх колонны"));
-    s+=",\"gpio\":"+String(TPIN[i])+",\"present\":"+(wireProbe[i].presence?"true":"false");
+    s+=",\"gpio\":"+String(TPIN[tempBusForLogical(i)])+",\"present\":"+(tempPresent[i]?"true":"false");
     s+=",\"verified\":";s+=(hasTemp(i,now)?"true":"false");
+    s+=",\"error\":"+quoteJson(wireError(i,now));
+    s+=",\"binding\":"+quoteJson(tempBindings[i].explicitRom?String(tempBindings[i].bus)+":"+romHex(tempBindings[i].rom):String("auto"));
+    s+=",\"sample_age_ms\":"+(hasTemp(i,now)?String((uint32_t)(now-tempAt[i])):String("null"));
     s+=",\"c\":"+(hasTemp(i,now)?String(temperature[i],2):String("null"))+"}";
   }
   s+="],\"water\":{\"gpio\":15,\"pulses\":"+String(flowPulses());
@@ -997,28 +886,9 @@ String statusJSON(){
   s+=",\"expected\":"+quoteJson(keypadLearning&&learnStep<20?String(KEY_CAPS[learnStep]):String(""));
   s+=",\"raw_pair\":"+quoteJson(rawPair);
   s+=",\"message\":"+quoteJson(keypadMessage)+"}";
-  s+=",\"diagnostics\":{\"onewire\":[";
-  for(int i=0;i<4;i++){
-    if(i)s+=",";
-    const OneWireProbe& p=wireProbe[i];
-    s+="{\"gpio\":"+String(TPIN[i]);
-    s+=",\"probe_ms\":"+String(p.checkedAt);
-    s+=",\"presence\":"+(p.presence?String("true"):String("false"));
-    s+=",\"measurement_verified\":"+(hasTemp(i,now)?String("true"):String("false"));
-    s+=",\"no_presence_count\":"+String(oneWireNoPresenceCount[i]);
-    s+=",\"detected_count\":"+String(oneWireDetectedCount[i]);
-    s+=",\"rom_found\":"+(p.romFound?String("true"):String("false"));
-    s+=",\"idle_gpio\":"+String(p.idleLevel);
-    s+=",\"after_reset_gpio\":"+String(p.afterResetLevel);
-    s+=",\"rom_crc_ok\":"+(p.crcOk?String("true"):String("false"));
-    s+=",\"family_ds18b20\":"+(p.familyOk?String("true"):String("false"));
-    s+=",\"multiple_rom\":"+(p.multiple?String("true"):String("false"));
-    s+=",\"rom\":"+quoteJson(p.romFound?romHex(p.rom):String(""));
-    s+=",\"second_rom\":"+quoteJson(p.secondFound?romHex(p.secondRom):String(""));
-    s+=",\"rom_search_noise\":"+(p.searchNoise?String("true"):String("false"));
-    s+=",\"result\":"+quoteJson(wireError(i,now))+"}";
-  }
-  s+="],\"keyboard\":{\"pcf_address\":"+String(pcfAddr);
+  s+=",\"temperature_inventory\":"+temperatureInventoryJSON(now);
+  s+=",\"diagnostics\":{\"onewire\":"+temperatureDiagnosticsJSON(now);
+  s+=",\"keyboard\":{\"pcf_address\":"+String(pcfAddr);
   s+=",\"last_scan_ms\":"+String(pcfLastScanAt);
   s+=",\"idle_hex\":"+quoteJson(String(pcfIdleMask,HEX));
   s+=",\"low_hex\":"+quoteJson(String(pcfObservedLow,HEX));
@@ -1075,7 +945,8 @@ String statusJSON(){
   s+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"))+"}";
   s+=",\"wifi_recovery\":"+wifiRecoveryJSON();
   s+=",\"web_health\":{\"max_service_ms\":"+String(webMaxServiceMs)+",\"max_loop_gap_ms\":"+String(loopMaxGapMs)+"}";
-  s+=",\"station\":{\"ssid\":"+quoteJson(stationSsid);
+  s+=",\"station\":{\"ssid\":"+quoteJson(WiFi.status()==WL_CONNECTED?WiFi.SSID():stationSsid);
+  s+=",\"target_ssid\":"+quoteJson(stationSsid);
   s+=",\"connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():String(""))+"}";
   s+="}";
@@ -1316,10 +1187,10 @@ main>*{max-width:100%;min-width:0}
   <div class="homeHero"><div class="heroEyebrow">БУСА-1М №001 · ПАНЕЛЬ МОНИТОРИНГА</div>
   <h2>Главная</h2><div class="heroStatus"><span>● Только показания</span><span id="mainwifi">Wi-Fi: ожидание</span></div></div>
   <div class="card"><h2>Температура · T1–T4</h2><div class="grid temps">
-    <div class="tile"><small><span class="tempDot t1"></span>T1 · Вода</small><strong id="t0">Н/Д</strong></div>
-    <div class="tile"><small><span class="tempDot t2"></span>T2 · Колонна</small><strong id="t1">Н/Д</strong></div>
-    <div class="tile"><small><span class="tempDot t3"></span>T3 · Куб</small><strong id="t2">Н/Д</strong></div>
-    <div class="tile"><small><span class="tempDot t4"></span>T4 · Верх колонны</small><strong id="t3">Н/Д</strong></div>
+    <div class="tile"><small><span class="tempDot t1"></span>T1 · Вода</small><strong id="t0">Н/Д</strong><small id="ts0">Ожидание измерения</small></div>
+    <div class="tile"><small><span class="tempDot t2"></span>T2 · Колонна</small><strong id="t1">Н/Д</strong><small id="ts1">Ожидание измерения</small></div>
+    <div class="tile"><small><span class="tempDot t3"></span>T3 · Куб</small><strong id="t2">Н/Д</strong><small id="ts2">Ожидание измерения</small></div>
+    <div class="tile"><small><span class="tempDot t4"></span>T4 · Верх колонны</small><strong id="t3">Н/Д</strong><small id="ts3">Ожидание измерения</small></div>
   </div></div>
   <div class="card rigCard"><h2>Схема установки</h2><div class="rigViewport">
   <svg viewBox="0 0 360 225" role="img" aria-label="Схема установки БУСА с датчиком YF-S401 на линии охлаждающей воды" preserveAspectRatio="xMidYMid meet">
@@ -1360,7 +1231,18 @@ main>*{max-width:100%;min-width:0}
    <div class="relayGrid"><span>K1 <b>БЛОК</b></span><span>K2 <b>БЛОК</b></span><span>K3 <b>БЛОК</b></span><span>K4 <b>БЛОК</b></span></div>
    <p class="hint">Состояние информационное. Физические выходы ESP32 отключены.</p>
   </div></section>
-<section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div>
+<section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div><p id="lastTUpdate" class="hint">Данных от ESP32 пока нет.</p>
+<div id="temperatureDetails"></div>
+<h3>Привязка найденных датчиков</h3>
+<p class="hint">Если на одной линии несколько датчиков, назначь каждый по ROM. Идентифицируй датчик по изменению его температуры при лёгком нагреве рукой. Один ROM нельзя назначить двум каналам.</p>
+<div class="grid">
+<label>T1 Вода<select id="bind0"><option value="auto">Авто GPIO16</option></select></label>
+<label>T2 Колонна<select id="bind1"><option value="auto">Авто GPIO17</option></select></label>
+<label>T3 Куб<select id="bind2"><option value="auto">Авто GPIO18</option></select></label>
+<label>T4 Верх<select id="bind3"><option value="auto">Авто GPIO21</option></select></label></div>
+<button type="button" class="full" id="saveBindings">Сохранить привязку T1–T4</button>
+<p id="bindingResult" class="hint">Названия каналов автоматически не переставляются.</p>
+<pre id="temperatureInventory" style="white-space:pre-wrap;word-break:break-word">Поиск ROM датчиков...</pre>
 <p class="hint">Информационные поля для отображения на TFT. Не управляют реле и не заменяют защиту.</p>
 <div class="grid">
 <div><label>T1 Вода · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref0"></div>
@@ -1727,6 +1609,49 @@ function graphAllTemperatures(){
  if(!tlog4.some(a=>a.some(v=>v!==null))){x.fillStyle='#a43c24';x.fillText('НЕТ ИЗМЕРЕНИЙ T1–T4',180,107)}
 }
 function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
+const temperatureErrors={OK:'Измерение подтверждено',WAIT_DIAG:'Поиск датчика',WAIT_CONVERSION:'Ожидание измерения',NO_PRESENCE:'Нет ответа датчика',LINE_LOW:'Линия удерживается в нуле',NO_ROM:'ROM не прочитан',ROM_CRC_BAD:'Ошибка CRC адреса',ROM_SEARCH_NOISE:'Нестабильный поиск ROM',MULTIPLE_ROM:'Несколько ROM — выбери датчик',BOUND_ROM_MISSING:'Назначенный ROM не найден',ROM_ON_MULTIPLE_BUSES:'Один ROM найден на разных линиях',PARASITE_POWER_UNSUPPORTED:'Требуется отдельное питание датчика',BUS_POWER_UNSUPPORTED:'На общей линии есть датчик без отдельного питания',SCRATCHPAD_CRC_BAD:'Ошибка CRC измерения',POWER_ON_RESET:'Датчик перезапустился — ожидание новой конверсии',INSUFFICIENT_POWER:'Недостаточное питание датчика',CONFIG_INVALID:'Неверный ответ датчика',OUT_OF_RANGE:'Значение вне диапазона',STALE_READING:'Показание устарело',TOO_MANY_ROMS:'Превышен предел ROM на линии'};
+function temperatureView(t,d={}){
+ const valid=t?.verified===true&&typeof t.c==='number'&&Number.isFinite(t.c)&&t.c>=-55&&t.c<=125;
+ const error=valid?'OK':t?.error||d?.result||'NO_VALID_READING';
+ return {valid,value:valid?t.c:null,text:valid?t.c.toFixed(1)+' °C':'Н/Д',detail:'GPIO'+t?.gpio+' · '+(temperatureErrors[error]||error),error};
+}
+let bindingFingerprint='',bindingsDirty=false;
+function renderTemperatureBindings(s){
+ const inventory=Array.isArray(s.temperature_inventory)?s.temperature_inventory:[];
+ const fingerprint=inventory.map(x=>x.bus+':'+x.rom).join('|');
+ if(fingerprint!==bindingFingerprint){
+  for(let i=0;i<4;i++){
+   const select=get('bind'+i),previous=select.value;
+   select.replaceChildren(new Option('Авто GPIO'+[16,17,18,21][i],'auto'));
+   inventory.forEach(x=>select.add(new Option('GPIO'+x.gpio+' · '+x.rom,x.bus+':'+x.rom)));
+   if(Array.from(select.options).some(x=>x.value===previous))select.value=previous;
+  }
+  bindingFingerprint=fingerprint;
+ }
+ if(!bindingsDirty)for(let i=0;i<4;i++){
+  const select=get('bind'+i),value=s.temperatures[i]?.binding||'auto';
+  if(!Array.from(select.options).some(x=>x.value===value))select.add(new Option(value+' · не обнаружен',value));
+  select.value=value;
+ }
+ get('temperatureInventory').textContent=inventory.length?inventory.map(x=>'GPIO'+x.gpio+' · '+x.rom+' · '+(x.verified===true&&typeof x.c==='number'?x.c.toFixed(2)+' °C':temperatureErrors[x.error]||x.error)).join('\n'):'Найденных ROM пока нет.';
+ get('temperatureDetails').textContent=s.temperatures.map((t,i)=>'T'+(i+1)+' '+(t.name||'')+': '+temperatureView(t,s.diagnostics?.onewire?.[i]).detail+(t.sample_age_ms===null?'':' · возраст '+Math.round(t.sample_age_ms/1000)+' с')).join(' | ');
+}
+function temperatureConnectionLost(){
+ for(let i=0;i<4;i++){get('t'+i).textContent='НЕТ СВЯЗИ';get('ts'+i).textContent='Измерение не обновляется';get('t'+i).classList.add('warn');}
+ get('lastTUpdate').textContent='Связь потеряна. Показания не подтверждены.';
+ const dot=get('dataLed');if(dot)dot.classList.remove('dataOn');
+}
+for(let i=0;i<4;i++)get('bind'+i).onchange=()=>{bindingsDirty=true;};
+get('saveBindings').onclick=async function(){
+ if(!window.confirm('Сохранить выбранные ROM для T1–T4? Проверь соответствие датчиков названиям каналов.'))return;
+ this.disabled=true;
+ try{
+  const body=new URLSearchParams({confirm:'BIND_TEMPERATURES'});for(let i=0;i<4;i++)body.set('t'+i,get('bind'+i).value);
+  const r=await localFetch('/api/temperature/bind',{method:'POST',body});
+  if(!r.ok)throw Error(await r.text());const j=await r.json();if(j.saved!==true)throw Error('Нет подтверждения сохранения');
+  bindingsDirty=false;get('bindingResult').textContent='Привязка сохранена. Ожидание свежих измерений.';message('Привязка T1–T4 сохранена');
+ }catch(e){get('bindingResult').textContent='Ошибка: '+e.message;}finally{this.disabled=false;}
+};
 let otaUiUploading=false;
 async function update(){if(pollBusy||otaUiUploading)return;pollBusy=true;try{let r=await localFetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();get('tftThemeSelect').value=s.tft_theme_dark?'dark':'light';if(!connected)message('Связь с ESP32 восстановлена');connected=true;
 get('appHealth').classList.remove('failed');
@@ -1735,10 +1660,14 @@ networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');
 // The TFT and iPhone use independent navigation; never switch iPhone screens during background polling.
 let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
- get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';
- const a=tlog4[i];a.push(t.c===null?null:Number(t.c));if(a.length>80)a.shift();
- if(i===0){tlog.push(t.c===null?null:Number(t.c));if(tlog.length>80)tlog.shift();}
+ const v=temperatureView(t,s.diagnostics?.onewire?.[i]);
+ get('t'+i).textContent=v.text;get('ts'+i).textContent=v.detail;
+ get('t'+i).classList.toggle('warn',!v.valid);
+ const a=tlog4[i];a.push(v.valid?v.value:null);if(a.length>80)a.shift();
+ if(i===0){tlog.push(v.valid?v.value:null);if(tlog.length>80)tlog.shift();}
 });
+renderTemperatureBindings(s);
+get('lastTUpdate').textContent='Обновлено '+new Date().toLocaleTimeString('ru-RU')+' · показаны только подтверждённые измерения';
 get('temperatures').textContent=names.map((v,i)=>v+': '+get('t'+i).textContent).join(' | ');
 if(!refsInit && Array.isArray(s.display_references)){
   s.display_references.forEach((r,i)=>{get('ref'+i).value=r.target===null?'':r.target;get('nt'+i).value=r.notice===null?'':r.notice});
@@ -1774,8 +1703,9 @@ get('cloudOtaNext').textContent=Number.isInteger(part.next_address)?'0x'+part.ne
 get('cloudOtaFits').textContent=part.slot_available!==true?'Нет второго раздела':!cloud.catalog_seen?'Нет каталога':part.candidate_fits_slot===true?'По размеру да':'По размеру нет';
 get('cloudSafety').textContent=cloud.catalog_seen&&!cloud.flash_size_matches?'Размер Flash устройства отличается от каталога. Установка запрещена.':'Облачная установка отключена. Реальные разделы OTA отображаются выше, но подпись, совместимость и безопасный откат пока не проверены.';
 const dataDot=get('dataLed'),dataLabel=get('dataLabel');
-if(dataDot)dataDot.classList.toggle('dataOn',cs?.configured===true);
-if(dataLabel)dataLabel.textContent=cs?.configured===true?'включено':'выключено';
+const delivered=cs?.configured===true&&cs.state===5&&cs.http===200&&cs.sent>0;
+if(dataDot)dataDot.classList.toggle('dataOn',delivered);
+if(dataLabel)dataLabel.textContent=delivered?'подтверждено':cs?.configured===true?'ожидание':'выключено';
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
 if(!themeInitialized && typeof s.tft_theme_dark==='boolean'){
   document.documentElement.dataset.theme=s.tft_theme_dark?'dark':'light';
@@ -1816,7 +1746,7 @@ if(s.keypad){
        ' pulses='+d.water_flow?.pulses+' '+d.water_flow?.status+' (not calibrated)';
    lastDiagnosticReport=JSON.stringify({
      device:s.device,firmware:s.firmware,uptime_ms:s.uptime_ms,
-     temperatures:s.temperatures,modules:s.modules,diagnostics:d,
+     temperatures:s.temperatures,temperature_inventory:s.temperature_inventory,modules:s.modules,diagnostics:d,
      station_connected:s.station?.connected,ap_enabled:s.ap?.enabled,
      network_indicators:s.network_indicators,google:s.google,
      water_calibration:s.water?.calibration,
@@ -1844,6 +1774,7 @@ get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_
   lastStatusError=e?.message||String(e);
   if(connected)message('Потеряна связь с ESP32');
   connected=false;networkLeds(null,'');
+  temperatureConnectionLost();
   get('appHealth').classList.add('failed');
   get('appHealth').textContent='Нет ответа /api/status: '+lastStatusError+'. Проверь сеть БУСА или открой «Проверка связи».';
 }finally{pollBusy=false}}
@@ -2036,6 +1967,11 @@ void setup(){
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   prefs.begin("busa-r04",false);
+  TempBindingRecord bindings={};
+  if(prefs.getBytesLength("temp_bind")==sizeof(bindings) &&
+     prefs.getBytes("temp_bind",&bindings,sizeof(bindings))==sizeof(bindings) && tempBindingRecordValid(bindings)){
+    memcpy(tempBindings,bindings.bindings,sizeof(tempBindings));
+  }
   waterPulsesPerLiter=prefs.getFloat("wf_ppl",NAN);
   waterCalibrated=prefs.getBool("wf_ready",false) && isfinite(waterPulsesPerLiter) && waterPulsesPerLiter>=10.0f && waterPulsesPerLiter<=500000.0f;
   if(!waterCalibrated)waterPulsesPerLiter=NAN;
@@ -2133,6 +2069,26 @@ void setup(){
     // V14.6 live clock refreshes its own header strip; no full-screen flash.
     if(screen && screen->width()<300)tftDirty=true;
     server.send(200,"application/json",String("{\"datetime\":")+quoteJson(clockStamp(false))+"}");
+  });
+  server.on("/api/temperature/bind",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="BIND_TEMPERATURES"||otaActive||otaRestart){
+      server.send(403,"text/plain; charset=utf-8","Нужны локальная сеть и подтверждение привязки");return;
+    }
+    TempBindingRecord record={};record.magic=0x42544D50U;record.version=1;
+    for(int i=0;i<4;i++){
+      if(!tempParseSelection(server.arg(String("t")+String(i)),record.bindings[i])){
+        server.send(400,"text/plain; charset=utf-8","Неверный GPIO или ROM датчика");return;
+      }
+    }
+    if(!tempValidateBindings(record.bindings)){
+      server.send(409,"text/plain; charset=utf-8","Датчик не найден или один ROM назначен двум каналам. Обнови список.");return;
+    }
+    record.crc=OneWire::crc8((const uint8_t*)&record,offsetof(TempBindingRecord,crc));
+    if(prefs.putBytes("temp_bind",&record,sizeof(record))!=sizeof(record)){
+      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить привязку");return;
+    }
+    memcpy(tempBindings,record.bindings,sizeof(tempBindings));tempSyncLogical(millis());tftDirty=true;
+    server.send(200,"application/json","{\"saved\":true}");
   });
   server.on("/api/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
@@ -2473,8 +2429,7 @@ void loop(){
   if(tftRebootPending && elapsed(now,tftRebootAt,3000))ESP.restart();
   if(googleRestart && elapsed(now,googleRestartAt,3500))ESP.restart();
   publishGoogleSnapshot(now);
-  sampleTemperatures(now);
-  probeOneWire(now); // Diagnose on idle 1-Wire bus only
+  temperatureTick(millis()); // One bounded temperature bus operation per iteration
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
   // Wi-Fi AP and HTTP server initialize during the splash.
   // Missing sensors must not delay the user interface.
