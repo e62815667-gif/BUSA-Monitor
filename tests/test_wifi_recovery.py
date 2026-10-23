@@ -21,7 +21,7 @@ String quoteJson(const String&s){return "\""+s+"\"";}
 struct MockWiFi{
 int state=0,startResult=-1,complete=-1,starts=0,begins=0,disconnects=0;
 int status(){return state;}void disconnect(bool off,bool erase){assert(!off&&!erase);++disconnects;state=0;}
-void scanDelete(){}int scanNetworks(bool a,bool h,bool p,int ms){assert(a&&!h&&!p&&ms==120);++starts;return startResult;}
+void scanDelete(){}int scanNetworks(bool a,bool h,bool p,int ms){assert(a&&!h&&!p&&ms==240);++starts;return startResult;}
 int scanComplete(){return complete;}String SSID(int){return "iPhone 12";}int RSSI(int){return -51;}
 void begin(const char*,const char*){++begins;}
 }WiFi;
@@ -31,24 +31,31 @@ tests=r'''
 int main(){
  wifiScheduleConnect(0);wifiRecoveryTick(499);assert(WiFi.begins==0);
  wifiRecoveryTick(500);assert(WiFi.begins==1);
- wifiRequestScan(20000);wifiRequestScan(20001);wifiRecoveryTick(20499);assert(WiFi.starts==0);
- wifiRecoveryTick(20500);assert(WiFi.starts==1&&WiFi.begins==1);
+ wifiRequestScan(20000);wifiRequestScan(20001);wifiRecoveryTick(20749);assert(WiFi.starts==0);
+ wifiRecoveryTick(20750);assert(WiFi.starts==1&&WiFi.begins==1);
  wifiRecoveryTick(21000);assert(WiFi.begins==1);
  WiFi.complete=1;wifiRecoveryTick(22000);assert(!wifiScanBusy());assert(wifiScanJSON().find("iPhone 12")!=std::string::npos);
  auto cached=wifiScanJSON();assert(cached==wifiScanJSON());
- wifiRecoveryTick(22499);assert(WiFi.begins==1);wifiRecoveryTick(22500);assert(WiFi.begins==2);
+ wifiRecoveryTick(22749);assert(WiFi.begins==1);wifiRecoveryTick(22750);assert(WiFi.begins==2);
  WiFi.startResult=-2;wifiRequestScan(30000);
- wifiRecoveryTick(30500);wifiRecoveryTick(31000);wifiRecoveryTick(31500);
+ wifiRecoveryTick(30750);wifiRecoveryTick(31500);wifiRecoveryTick(32250);wifiRecoveryTick(33000);
  assert(!wifiScanBusy()&&wifiScanJSON().find("scan_start_failed")!=std::string::npos);
- WiFi.startResult=-1;WiFi.complete=-1;wifiRequestScan(40000);wifiRecoveryTick(40500);
- wifiRecoveryTick(55000);assert(!wifiScanBusy()&&stops==1);
- wifiRecoveryTick(55500);assert(WiFi.begins==3);
+ WiFi.startResult=-1;WiFi.complete=-1;wifiRequestScan(40000);wifiRecoveryTick(40750);
+ wifiRecoveryTick(59000);assert(!wifiScanBusy()&&stops==1);
+ wifiRecoveryTick(59750);assert(WiFi.begins==3);
  WiFi.state=WL_CONNECTED;int dc=WiFi.disconnects;wifiRequestScan(60000);assert(WiFi.disconnects==dc);
- wifiRecoveryTick(60500);WiFi.complete=0;wifiRecoveryTick(61000);assert(!wifiConnectPending);
+ wifiRecoveryTick(60750);WiFi.complete=0;wifiRecoveryTick(61000);assert(!wifiConnectPending);
  otaActive=true;int b=WiFi.begins;WiFi.state=0;wifiRecoveryTick(90000);assert(WiFi.begins==b);
  otaActive=false;wifiRecoveryTick(90001);wifiRecoveryTick(90501);assert(WiFi.begins==b+1);
  wifiCancelScan();wifiScheduleConnect(UINT32_MAX-100);wifiRecoveryTick(400);assert(WiFi.begins==b+2);
  wifiRecoveryEvent(5,{{201}});assert(wifiDisconnectReason==201&&wifiDisconnectCount==1);
+ // A transient scanComplete failure must be retried, not returned to the UI immediately.
+ WiFi.state=0;WiFi.startResult=-1;WiFi.complete=-2;
+ wifiRequestScan(100000);wifiRecoveryTick(100750);
+ assert(wifiScanBusy()&&wifiScanTries==1);
+ wifiRecoveryTick(101500);assert(wifiScanBusy()&&wifiScanTries==2);
+ wifiRecoveryTick(102250);wifiRecoveryTick(103000);
+ assert(!wifiScanBusy()&&wifiScanJSON().find("scan_failed_after_retries")!=std::string::npos);
  uint8_t hdr[36]={};hdr[0]=0xe9;hdr[1]=3;hdr[12]=9;hdr[32]=0x32;hdr[33]=0x54;hdr[34]=0xcd;hdr[35]=0xab;
  assert(busaAppHeaderValid(hdr,36));assert(!busaAppHeaderValid(hdr,35));
  hdr[32]=0;assert(!busaAppHeaderValid(hdr,36));hdr[32]=0x32;hdr[12]=0;assert(!busaAppHeaderValid(hdr,36));
