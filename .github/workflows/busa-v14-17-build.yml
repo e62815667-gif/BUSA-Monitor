@@ -1,0 +1,50 @@
+name: BUSA V14.17 ESP32-S3 N8R2 build
+on:
+  push:
+    branches:
+      - fix/busa-v14-17-temperature-diagnostics-20261023
+  pull_request:
+    branches:
+      - lab/busa-v14-14-google-readonly-audit-20261023
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install ESP32 board and libraries
+        run: |
+          arduino-cli config init
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32@3.0.7 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli lib install "OneWire" "DallasTemperature" "Adafruit GFX Library" "Adafruit ST7735 and ST7789 Library" "Adafruit ILI9341" "U8g2_for_Adafruit_GFX"
+      - name: Compile firmware for N8R2
+        run: |
+          mkdir -p out
+          arduino-cli compile --fqbn 'esp32:esp32:esp32s3:FlashSize=8M,PSRAM=opi,PartitionScheme=default_8MB' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE --warnings all --verbose
+      - name: Package app and merged images
+        run: |
+          python3 - <<'PY'
+          import glob,os,shutil,subprocess
+          files=glob.glob('out/*.bin')
+          print('Generated:',files)
+          apps=[x for x in files if x.endswith('.ino.bin')]
+          if len(apps)!=1: raise RuntimeError('Expected exactly one APP image: '+str(files))
+          shutil.copyfile(apps[0],'out/BUSA_1M_V14_17_iPhone_APP_OTA.bin')
+          boot=next((x for x in files if x.endswith('.bootloader.bin')),None)
+          part=next((x for x in files if x.endswith('.partitions.bin')),None)
+          if not boot or not part: raise RuntimeError('Missing bootloader/partitions: '+str(files))
+          esptool=glob.glob(os.path.expanduser('~/.arduino15/packages/esp32/tools/esptool_py/*/esptool.py'))
+          if not esptool: raise RuntimeError('esptool.py missing')
+          subprocess.check_call(['python3',esptool[-1],'--chip','esp32s3','merge_bin','-o','out/BUSA_1M_V14_17_USB_MERGED_0x000000.bin','--flash_mode','dio','--flash_freq','80m','--flash_size','8MB','0x0000',boot,'0x8000',part,'0x10000',apps[0]])
+          PY
+          sha256sum out/BUSA_1M_V14_17_*.bin > out/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA-1M-V14.17-N8R2-BIN
+          path: |
+            out/BUSA_1M_V14_17_*.bin
+            out/SHA256SUMS.txt
