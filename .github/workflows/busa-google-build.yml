@@ -145,13 +145,14 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v19-N8R2-V149-STA-DS18B20-IDF-SCAN' in main
+          assert '14v20-N8R2-BOUNDED-SSID-SCAN' in main
           scan=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_WifiRecovery.h').read_text()
-          assert 'esp_wifi_scan_start(&config,true)' in scan and 'scan_start_error' in scan, 'V14.19 ESP-IDF discovery must remain'
+          assert 'esp_wifi_scan_start(&config,true)' in scan and 'scan_start_error' in scan, 'ESP-IDF discovery must remain'
+          assert 'memcpy(ssidBytes,records[i].ssid,32)' in scan and 'visible_ssid_count' in scan, 'bounded SSID extraction diagnostics missing'
           assert 'WiFi.reconnect()' in scan and 'WiFi.setAutoReconnect(false)' in scan, 'V14.9 reconnect/scan interlock missing'
           assert 'void check(uint32_t t)' in Path('tests/test_wifi_recovery.py').read_text(), 'V14.18 simulated clock missing'
           assert 'check(398)' in Path('tests/test_wifi_recovery.py').read_text(), 'Clock-wrap boundary test missing'
-          assert 'BUSA_BUILD=141901' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_CloudPolicy.h').read_text(), 'V14.19 OTA build counter missing'
+          assert 'BUSA_BUILD=142001' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_CloudPolicy.h').read_text(), 'V14.20 OTA build counter missing'
           assert 'Найти сеть Wi-Fi' in main and 'manualSsid' not in main, 'V14.17 Wi-Fi form regression'
           assert 'tft_theme_mode' in main
           assert 'server.arg("theme")' in main

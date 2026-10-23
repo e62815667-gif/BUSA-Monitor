@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v19-N8R2-V149-STA-DS18B20-IDF-SCAN";
+const char VERSION[]="БУСА 1М WiFi 14v20-N8R2-BOUNDED-SSID-SCAN";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -2001,7 +2001,8 @@ get('scan').onclick=async function(){
     const count=sel.options.length-1;
     get('response').textContent=j.scanning?'Поиск продолжается. Повторите через несколько секунд.':
       j.error?'Поиск Wi-Fi не завершился: '+j.error+'. Повторите поиск.':
-      count?'Найдено сетей: '+count:'Сети не найдены. Проверьте точку доступа и повторите поиск.';
+      count?'Найдено сетей: '+count:
+      (Number(j.visible_ssid_count||0)>0?'ESP32 нашёл точки доступа ('+(j.ap_count||j.visible_ssid_count)+'), но имена сетей не получены. Повторите поиск.':'Сети не найдены. Проверьте точку доступа и повторите поиск.');
   }catch(e){get('response').textContent='Ошибка поиска: '+e.message+'. Повторите поиск.';}
   finally{this.disabled=false;}
 };

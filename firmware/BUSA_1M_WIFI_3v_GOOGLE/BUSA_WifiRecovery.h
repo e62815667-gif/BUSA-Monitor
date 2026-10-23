@@ -16,7 +16,7 @@ uint32_t wifiConnectAttempts=0,wifiScanFailures=0,wifiScanSuccesses=0;
 volatile uint32_t wifiDisconnectCount=0;
 volatile uint8_t wifiDisconnectReason=0;
 int wifiLastScanErr=0,wifiLastRecordsErr=0;
-uint16_t wifiLastApCount=0;
+uint16_t wifiLastApCount=0,wifiLastRecordCount=0,wifiLastVisibleCount=0;
 String wifiScanCache="{\"scanning\":false,\"networks\":[]}";
 bool wifiScanBusy(){return wifiScanPhase!=BusaScanPhase::Idle;}
 void wifiRecoveryEvent(WiFiEvent_t event,WiFiEventInfo_t info){
@@ -49,7 +49,7 @@ void wifiRequestScan(uint32_t now){
   // Prevent auto-reconnect from pre-empting the Wi-Fi scan.
   WiFi.setAutoReconnect(false);
   if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
-  wifiScanTries=0;wifiLastScanErr=0;wifiLastRecordsErr=0;wifiLastApCount=0;
+  wifiScanTries=0;wifiLastScanErr=0;wifiLastRecordsErr=0;wifiLastApCount=0;wifiLastRecordCount=0;wifiLastVisibleCount=0;
   wifiScanPhase=BusaScanPhase::Settling;wifiPhaseAt=now;wifiScanAt=now;
 }
 String wifiScanJSON(){
@@ -65,6 +65,8 @@ String wifiRecoveryJSON(){
     ",\"scan_start_error\":"+String(wifiLastScanErr)+
     ",\"scan_result_error\":"+String(wifiLastRecordsErr)+
     ",\"ap_count\":"+String((unsigned)wifiLastApCount)+
+    ",\"record_count\":"+String((unsigned)wifiLastRecordCount)+
+    ",\"visible_ssid_count\":"+String((unsigned)wifiLastVisibleCount)+
     ",\"disconnects\":"+String((uint32_t)wifiDisconnectCount)+
     ",\"last_disconnect_reason\":"+String((unsigned)wifiDisconnectReason)+"}";
 }
@@ -111,11 +113,14 @@ void wifiRecoveryTick(uint32_t now){
     err=limit?esp_wifi_scan_get_ap_records(&used,records):esp_wifi_clear_ap_list();
     wifiLastRecordsErr=(int)err;
     if(err!=ESP_OK){delete[] records;wifiScanRetryOrFail(now,"scan_records_read_failed");return;}
-    nearbyCount=0;
-    String out="{\"scanning\":false,\"networks\":[";
+    wifiLastRecordCount=used;wifiLastVisibleCount=0;nearbyCount=0;
+    for(uint16_t i=0;i<used;i++){char ssidBytes[33];memcpy(ssidBytes,records[i].ssid,32);ssidBytes[32]=0;if(ssidBytes[0])++wifiLastVisibleCount;}
+    String out="{\"scanning\":false,\"ap_count\":"+String((unsigned)wifiLastApCount)+",\"record_count\":"+String((unsigned)used)+",\"visible_ssid_count\":"+String((unsigned)wifiLastVisibleCount)+",\"networks\":[";
     for(uint16_t i=0;i<used;i++){
-      String ssid=String((const char*)records[i].ssid);
+      char ssidBytes[33];memcpy(ssidBytes,records[i].ssid,32);ssidBytes[32]=0;
+      String ssid(ssidBytes);
       if(ssid.isEmpty())continue;
+
       if(nearbyCount<5)nearbyNames[nearbyCount++]=ssid;
       if(out[out.length()-1]!='[')out+=",";
       out+="{\"ssid\":"+quoteJson(ssid)+",\"rssi\":"+String((int)records[i].rssi)+"}";
