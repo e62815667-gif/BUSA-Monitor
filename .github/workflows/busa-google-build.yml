@@ -148,6 +148,7 @@ jobs:
           assert '14v18-N8R2-WIFI-IDF-SCAN-CLOUD-OTA' in main
           scan=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_WifiRecovery.h').read_text()
           assert 'esp_wifi_scan_start(&config,true)' in scan and 'scan_start_error' in scan, 'V14.18 driver scan diagnostics missing'
+          assert 'void check(uint32_t t)' in Path('tests/test_wifi_recovery.py').read_text(), 'V14.18 simulated clock missing'
           assert 'BUSA_BUILD=141801' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_CloudPolicy.h').read_text(), 'V14.18 OTA build counter missing'
           assert 'Найти сеть Wi-Fi' in main and 'manualSsid' not in main, 'V14.17 Wi-Fi form regression'
           assert 'tft_theme_mode' in main
