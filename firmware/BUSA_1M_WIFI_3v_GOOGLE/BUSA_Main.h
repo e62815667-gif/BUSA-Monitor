@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v16-N8R2-WIRE-DIAG-WIFI-R2-CLOUD-OTA";
+const char VERSION[]="БУСА 1М WiFi 14v17-N8R2-TEMP-ROM-DIAG-SAFE";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -56,7 +56,7 @@ bool tempConverting=false;
 // Read-only health checks; run only between conversion cycles.
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
 struct OneWireProbe {
-  bool presence=false,romFound=false,crcOk=false,familyOk=false,multiple=false,searchNoise=false,secondFound=false;
+  bool presence=false,romFound=false,crcOk=false,familyOk=false,multiple=false,searchNoise=false,secondFound=false,secondCrcOk=false,secondFamilyOk=false;
   int8_t idleLevel=-1,afterResetLevel=-1; // GPIO state; not proof of sensor health
   uint8_t rom[8]={0},secondRom[8]={0};
   uint32_t checkedAt=0;
@@ -123,7 +123,9 @@ void probeOneWire(uint32_t now){
       p.secondFound=bus->search(second);
       if(p.secondFound){
         memcpy(p.secondRom,second,8);
-        const bool secondValid=(OneWire::crc8(second,7)==second[7] && second[0]==0x28);
+        p.secondCrcOk=OneWire::crc8(second,7)==second[7];
+        p.secondFamilyOk=second[0]==0x28;
+        const bool secondValid=p.secondCrcOk && p.secondFamilyOk;
         p.multiple=secondValid && memcmp(first,second,8)!=0;
         p.searchNoise=!secondValid;
       }
@@ -1026,6 +1028,9 @@ String statusJSON(){
     s+=",\"multiple_rom\":"+(p.multiple?String("true"):String("false"));
     s+=",\"rom\":"+quoteJson(p.romFound?romHex(p.rom):String(""));
     s+=",\"second_rom\":"+quoteJson(p.secondFound?romHex(p.secondRom):String(""));
+    s+=",\"second_rom_crc_ok\":"+(p.secondCrcOk?String("true"):String("false"));
+    s+=",\"second_rom_family_ds18b20\":"+(p.secondFamilyOk?String("true"):String("false"));
+    s+=",\"rom_devices_seen\":"+String((p.romFound?1:0)+(p.secondFound?1:0));
     s+=",\"rom_search_noise\":"+(p.searchNoise?String("true"):String("false"));
     s+=",\"result\":"+quoteJson(wireError(i,now))+"}";
   }
