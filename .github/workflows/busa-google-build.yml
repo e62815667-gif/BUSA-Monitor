@@ -4,6 +4,7 @@ on:
     branches: [lab/busa-v14-14-google-readonly-audit-20261023, lab/busa-v14-17-wifi-scan-20261023, lab/busa-v14-18-wifi-driver-scan-20261023, lab/busa-v14-19-v149-wifi-temperature-20261023]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+      - 'tests/**'
       - '.github/workflows/busa-google-build.yml'
   workflow_dispatch:
 permissions:
