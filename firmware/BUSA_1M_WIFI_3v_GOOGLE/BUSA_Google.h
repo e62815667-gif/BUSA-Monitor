@@ -167,7 +167,7 @@ void googleWorker(void* unused){
       if(googleEnabled)googleState=1;
       continue;
     }
-    if(otaActive)continue;
+    if(otaActive||cloudBusy)continue;
     const uint32_t netNow=millis();
     if((uint32_t)(netNow-lastNetProbe)>=15000){
       lastNetProbe=netNow;

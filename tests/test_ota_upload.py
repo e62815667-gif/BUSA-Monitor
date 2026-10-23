@@ -21,6 +21,7 @@ struct Updater{
  bool end(bool partial){assert(!partial);++ends;return data.size()==expected;}
  void abort(){aborted=true;}void printError(int){}
 }Update;
+bool cloudBusy=false;
 bool otaWriteAllowed=false,otaActive=false,otaSuccess=false,otaRestart=false,otaUploadCompleted=false;
 uint32_t otaBytes=0,otaExpectedBytes=60000,otaTokenIssued=0,otaRestartAt=0;
 uint8_t otaPrefix[36];size_t otaPrefixUsed=0;String otaMessage,otaToken="0123456789abcdef";

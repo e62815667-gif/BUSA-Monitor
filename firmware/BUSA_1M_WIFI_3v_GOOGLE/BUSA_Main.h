@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v16-N8R2-WIRE-DIAG-WIFI-R2";
+const char VERSION[]="БУСА 1М WiFi 14v16-N8R2-WIRE-DIAG-WIFI-R2-CLOUD-OTA";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -869,7 +869,8 @@ void renderScreen(uint32_t now){
 }
 
 WebServer server(80);
-volatile bool otaActive=false;
+volatile bool otaActive=false,cloudBusy=false;
+String cloudOtaJSON();
 bool otaSuccess=false,otaRestart=false,otaWriteAllowed=false,otaUploadCompleted=false;
 uint32_t otaExpectedBytes=0;
 uint8_t otaPrefix[36]={0};
@@ -1077,6 +1078,7 @@ String statusJSON(){
   s+=",\"ap\":{\"enabled\":"+(wifiRunning?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.softAPIP().toString())+"}";
   s+=",\"ota\":"+otaJSON();
+  s+=",\"internet_ota\":"+cloudOtaJSON();
   s+=",\"ota_preflight\":"+otaPartitionPreflightJSON();
   s+=",\"bluetooth_enabled\":false";
   s+=",\"google\":"+cloudJSON();
@@ -1097,8 +1099,10 @@ String otaJSON(){
    +",\"bytes\":"+String(otaBytes)+",\"message\":"+quoteJson(otaMessage)+"}";
 }
 void uploadOTA(){
+ if(cloudBusy)return; // A rejected local request must not alter cloud transfer state.
  HTTPUpload &u=server.upload();
  if(u.status==UPLOAD_FILE_START){
+  if(otaActive||cloudBusy||otaRestart){return;}
   otaWriteAllowed=false;otaActive=false;otaSuccess=false;otaBytes=0;otaPrefixUsed=0;otaUploadCompleted=false;
   if(otaRestart||wifiScanBusy()||otaExpectedBytes<60000||!apClient()||otaToken.length()<16||(uint32_t)(millis()-otaTokenIssued)>90000
      ||server.header("X-Busa-Token")!=otaToken||!u.filename.endsWith(".bin")){
@@ -1148,6 +1152,7 @@ void uploadOTA(){
  }
 }
 #include "BUSA_Google.h"
+#include "BUSA_CloudOTA.h"
 const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>БУСА-1М №001</title>
 <style>
@@ -1442,7 +1447,7 @@ main>*{max-width:100%;min-width:0}
 <button id="googleStop" type="button" class="full">Отключить передачу в Google</button>
 <p id="googleResult" role="status" class="hint">Отправка выключена до настройки.</p>
 </div><div class="card settingCard" data-stab="2" hidden><h2>Обновления · Google и локально</h2>
-<p class="hint">Облачная проверка версии поступает в проверенном HTTPS-ответе Google вместе с подтверждением телеметрии. Дистанционная установка НЕ включена.</p>
+<p class="hint">Google передаёт справочный каталог вместе с телеметрией. Для установки используйте облачное обновление ниже: ESP32 скачивает APP из репозитория по HTTPS после вашего подтверждения.</p>
 <div class="row"><span>Каталог Google</span><b id="cloudCatalogue">Ожидание</b></div>
 <div class="row"><span>Новая версия</span><b id="cloudVersion">—</b></div>
 <div class="row"><span>Flash на ESP32</span><b id="cloudFlash">—</b></div>
@@ -1450,8 +1455,13 @@ main>*{max-width:100%;min-width:0}
 <div class="row"><span>Активный раздел OTA</span><b id="cloudOtaRunning">—</b></div>
 <div class="row"><span>Резервный раздел OTA</span><b id="cloudOtaNext">—</b></div>
 <div class="row"><span>Образ помещается</span><b id="cloudOtaFits">Неизвестно</b></div>
-<div class="row"><span>OTA через интернет</span><b>ЗАБЛОКИРОВАНО</b></div>
+<div class="row"><span>OTA через интернет</span><b>ПО ПОДТВЕРЖДЕНИЮ</b></div>
 <p class="hint" id="cloudSafety">Совпадение Flash не подтверждает совместимость разделов OTA и откат. Не устанавливайте непроверенную прошивку.</p>
+<h2>Установить из облака</h2>
+<p class="hint">Подключите БУСА к Интернету и откройте эту панель через сеть БУСА. Телефон отправляет подтверждение, а ESP32 скачивает APP напрямую. Требуется Flash 8 МБ и стандартные два OTA-раздела.</p>
+<button id="cloudCheck" type="button" class="full">Проверить обновление</button>
+<button id="cloudInstall" type="button" class="full" disabled>Установить из облака</button>
+<p id="cloudProgress" role="status">Нажмите «Проверить обновление»</p>
 <h2>Ручное обновление через локальный Wi-Fi</h2>
 <p class="hint">Только через локальную сеть БУСА. Выберите APP BIN для ESP32-S3 N8R2,
 НЕ объединённый merged BIN. Только проверенные диагностические сборки.
@@ -1774,7 +1784,7 @@ const part=s.ota_preflight||{};
 get('cloudOtaRunning').textContent=Number.isInteger(part.running_address)?'0x'+part.running_address.toString(16)+' · '+Math.round(part.running_size/1024)+' КБ':'—';
 get('cloudOtaNext').textContent=Number.isInteger(part.next_address)?'0x'+part.next_address.toString(16)+' · '+Math.round(part.next_size/1024)+' КБ':'—';
 get('cloudOtaFits').textContent=part.slot_available!==true?'Нет второго раздела':!cloud.catalog_seen?'Нет каталога':part.candidate_fits_slot===true?'По размеру да':'По размеру нет';
-get('cloudSafety').textContent=cloud.catalog_seen&&!cloud.flash_size_matches?'Размер Flash устройства отличается от каталога. Установка запрещена.':'Облачная установка отключена. Реальные разделы OTA отображаются выше, но подпись, совместимость и безопасный откат пока не проверены.';
+get('cloudSafety').textContent=cloud.catalog_seen&&!cloud.flash_size_matches?'Размер Flash устройства отличается от каталога. Установка запрещена.':'Каталог Google справочный. Обновление из репозитория проверяет HTTPS, SHA-256 и разделы. Аппаратный откат не проверен.';
 const dataDot=get('dataLed'),dataLabel=get('dataLabel');
 if(dataDot)dataDot.classList.toggle('dataOn',cs?.configured===true);
 if(dataLabel)dataLabel.textContent=cs?.configured===true?'включено':'выключено';
@@ -1839,6 +1849,13 @@ if(s.leds){
   get('ledSimRemaining').textContent=Math.ceil((s.leds.sim_remaining_ms||0)/1000)+' с';
   get('ledSimModes').textContent=String(s.leds.mode1??'—')+' / '+String(s.leds.mode2??'—');
   get('ledSimRead').textContent=String(s.leds.read_ok_total)+' успешно / '+String(s.leds.read_error_total)+' ошибок';
+}
+if(s.internet_ota){
+ const c=s.internet_ota, errors={1:'Нет подключения к Интернету',2:'Ожидается синхронизация времени',3:'HTTPS или каталог недоступен',4:'Неверный каталог',5:'Не совпадают Flash или OTA-разделы',6:'Неверный HTTP-ответ или размер APP',7:'Передача прервана или истёк тайм-аут',8:'Это не APP ESP32-S3',9:'Ошибка записи Flash',10:'SHA-256 не совпал',11:'Образ не прошёл проверку ESP32',12:'Недостаточно памяти для задачи'};
+ const states=['Ожидание','Проверка HTTPS','Установлена актуальная или более новая версия','Доступна '+c.version,'Загрузка '+(c.size?Math.floor(c.bytes*100/c.size):0)+'%','Проверено. Перезапуск...','Ошибка: '+(errors[c.error]||c.error)];
+ get('cloudProgress').textContent=states[c.phase]||'Ожидание';
+ get('cloudInstall').disabled=!c.enabled||c.phase!==3;
+ get('cloudCheck').disabled=!c.enabled||[1,4,5].includes(c.phase);
 }
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
@@ -1911,6 +1928,22 @@ get('googleStop').onclick=async()=>{
 if(!confirm('Отключить отправку диагностических данных в Google?'))return;
 const resp=await localFetch('/api/google/off',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
 get('googleResult').textContent=await resp.text();
+};
+get('cloudCheck').onclick=async function(){
+ this.disabled=true;
+ try{const r=await localFetch('/api/cloud/check',{method:'POST'});if(!r.ok)throw Error(await r.text());get('cloudProgress').textContent='Проверяю каталог по HTTPS...';}
+ catch(e){get('cloudProgress').textContent='Ошибка: '+e.message}
+ finally{this.disabled=false;}
+};
+get('cloudInstall').onclick=async function(){
+ if(!confirm('Установить проверенную облачную версию? Не отключайте питание БУСА до перезапуска.'))return;
+ this.disabled=true;
+ try{
+  const r=await localFetch('/api/cloud/prepare',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+  if(!r.ok)throw Error(await r.text());const grant=await r.json();
+  const install=await localFetch('/api/cloud/install',{method:'POST',headers:{'X-Busa-Token':grant.token},body:new URLSearchParams({confirm:'YES'})});
+  if(!install.ok)throw Error(await install.text());get('cloudProgress').textContent='ESP32 скачивает и проверяет APP...';
+ }catch(e){get('cloudProgress').textContent='Ошибка: '+e.message;this.disabled=false;}
 };
 get('manualUpdate').onclick=async function(){
   const file=get('firmwareFile').files[0];
@@ -2208,6 +2241,7 @@ void setup(){
   });
 
   addGoogleRoutes();
+  addCloudOtaRoutes();
   server.on("/api/ota/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json",otaJSON());
@@ -2215,7 +2249,7 @@ void setup(){
   server.on("/api/ota/prepare",HTTP_POST,[]{
     relaySimStop("OTA_PREPARE");
     ledSimStop("OTA_PREPARE");
-    if(!apClient()||server.arg("confirm")!="YES"||otaActive||otaRestart||wifiScanBusy()){
+    if(!apClient()||server.arg("confirm")!="YES"||otaActive||otaRestart||cloudBusy||wifiScanBusy()){
       server.send(403,"text/plain","Требуется локальная сеть БУСА и согласие");return;
     }
     const String sizeText=server.arg("size");
@@ -2244,7 +2278,7 @@ void setup(){
     if(server.client().localIP()!=WiFi.softAPIP()){
       server.send(403,"application/json","{\"error\":\"Only protected local AP\"}");return;
     }
-    if(otaActive || otaRestart){
+    if(otaActive || otaRestart || cloudBusy){
       server.send(409,"application/json","{\"error\":\"ota_busy\"}");return;
     }
     if(server.hasArg("start") && server.arg("start")=="1")wifiRequestScan(millis());
@@ -2256,7 +2290,7 @@ void setup(){
     if(server.client().localIP()!=WiFi.softAPIP()){
       server.send(403,"text/plain; charset=utf-8","Настройка Wi-Fi доступна только через сеть БУСА.");return;
     }
-    if(otaActive||otaRestart){server.send(409,"text/plain","OTA busy");return;}
+    if(otaActive||otaRestart||cloudBusy){server.send(409,"text/plain","OTA busy");return;}
     String ssid=server.arg("ssid"),pass=server.arg("pass");
     ssid.trim();
     if(ssid.isEmpty()||ssid.length()>32||pass.length()<8||pass.length()>63){
@@ -2424,12 +2458,14 @@ void setup(){
   Serial0.printf("I2C=%d PCF=%d PCA=%d\n",(int)i2cOnline,(int)pcfDetected,(int)pcaDetected);
   updateBootStage(3);
   launchGoogleCloud();
+  launchCloudOta();
   Serial0.println("SETUP DONE: relay GPIO4/5/6/7 NEVER configured/driven");
 }
 void loop(){
   uint32_t now=millis();
   relaySimTick(now);
   ledSimTick(now);
+  cloudOtaTick();
   server.handleClient();
   wifiRecoveryTick(millis());
   readConsole();
