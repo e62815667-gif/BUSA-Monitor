@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v22-N8R2-V1414-WIFI-SCAN";
+const char VERSION[]="БУСА 1М WiFi 14v23-N8R2-LOCAL-APP-RECOVERY";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -1171,6 +1171,8 @@ main{max-width:680px;margin:auto;padding-bottom:23px}
 input,select{width:100%;background:#fff;border:1px solid #b2c4cf;color:#263d50;font:inherit;padding:12px;border-radius:9px}
 label{display:block;margin:12px 0 5px}.full{width:100%;margin:12px 0}
 #response{color:#a74429;white-space:pre-wrap}
+#appHealth{font-size:12px;padding:8px 12px;margin:7px 0;border-radius:9px;background:#e9f8f2;color:#11684e}
+#appHealth.failed{background:#fff0e9;color:#9a371e}
 canvas{width:100%;height:180px;border:1px solid #d2dee5;border-radius:10px;background:#fff}
 pre,textarea{background:#f5f7f8;color:#253d50;border:1px solid #d3dfe4;border-radius:9px;padding:8px}
 a{color:#0a709a}
@@ -1297,7 +1299,8 @@ main>*{max-width:100%;min-width:0}
 <span class="netPill"><span id="localLed" class="netDot"></span>БУСА Wi-Fi <span id="localLabel" class="netText">нет клиента</span></span>
 <span class="netPill"><span id="dataLed" class="netDot"></span>ДАН <span id="dataLabel" class="netText">не настроено</span></span>
 </div>
-<div class="localShortcuts"><button type="button" data-quick-local="wifi">⌁ Связь</button><button type="button" data-quick-local="diagnostics">⊞ Диагностика</button></div>
+<div id="appHealth" role="status">Связь с ESP32 проверяется...</div>
+<div class="localShortcuts"><button type="button" data-quick-local="wifi">⌁ Связь</button><button type="button" data-quick-local="diagnostics">⊞ Диагностика</button><a href="/recovery" style="padding:10px;display:inline-flex;align-items:center">Проверка связи</a></div>
 <nav class="appTabs" aria-label="Разделы">
 <button data-page="0" class="on"><span class="tabIcon">⌂</span><span>Главная</span></button>
 <button data-page="1"><span class="tabIcon">♨</span><span>Температуры</span></button>
@@ -1545,6 +1548,7 @@ async function localFetch(url,options={}){
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let lastWaterPulse=null,themeInitialized=false;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
+let lastStatusError="",successfulStatusReads=0;
 let eventCategory="all",eventRecords=[];
 function networkLeds(info,ssid){
  const online=info&&info.internet===true;
@@ -1722,7 +1726,11 @@ function graphAllTemperatures(){
 function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
 let otaUiUploading=false;
 async function update(){if(pollBusy||otaUiUploading)return;pollBusy=true;try{let r=await localFetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();get('tftThemeSelect').value=s.tft_theme_dark?'dark':'light';if(!connected)message('Связь с ESP32 восстановлена');connected=true;
-networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(active!==6&&Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
+get('appHealth').classList.remove('failed');
+get('appHealth').textContent='ESP32 отвечает · '+s.firmware+' · обновлений: '+(++successfulStatusReads);
+networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');
+// The TFT and iPhone use independent navigation; never switch iPhone screens during background polling.
+let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
  get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';
  const a=tlog4[i];a.push(t.c===null?null:Number(t.c));if(a.length>80)a.shift();
@@ -1809,6 +1817,7 @@ if(s.keypad){
      station_connected:s.station?.connected,ap_enabled:s.ap?.enabled,
      network_indicators:s.network_indicators,google:s.google,
      water_calibration:s.water?.calibration,
+     wifi_recovery:s.wifi_recovery,
      relay_outputs_enabled:s.relays_enabled
    },null,2);
    const report=get('diagReport');
@@ -1828,7 +1837,13 @@ if(s.leds){
   get('ledSimRead').textContent=String(s.leds.read_ok_total)+' успешно / '+String(s.leds.read_error_total)+' ошибок';
 }
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
-}catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
+}catch(e){
+  lastStatusError=e?.message||String(e);
+  if(connected)message('Потеряна связь с ESP32');
+  connected=false;networkLeds(null,'');
+  get('appHealth').classList.add('failed');
+  get('appHealth').textContent='Нет ответа /api/status: '+lastStatusError+'. Проверь сеть БУСА или открой «Проверка связи».';
+}finally{pollBusy=false}}
 document.querySelectorAll('[data-relay-sim]').forEach(b=>b.onclick=async()=>{
   if(!confirm('Только виртуальный тест K'+b.dataset.relaySim+' на 10 секунд. Физические реле не включатся. Продолжить?'))return;
   try{
@@ -2068,7 +2083,33 @@ void setup(){
     lastStationCheck=millis();++wifiConnectAttempts;wifiConnectPending=false;
     Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
   }else Serial0.println("STA config missing: preprovision NVS before use; AP stays available");
-  server.on("/",HTTP_GET,[]{server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
+  server.on("/",HTTP_GET,[]{
+    server.sendHeader("Cache-Control","no-store, max-age=0");
+    server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);
+  });
+  // Minimal independent endpoints for diagnosing an unreachable main app.
+  server.on("/api/ping",HTTP_GET,[]{
+    String out="{\\"device\\":\\"BUSA-1M-001\\",\\"version\\":"+quoteJson(String(VERSION));
+    out+=",\\"uptime_ms\\":"+String(millis());
+    out+=",\\"ap_running\\":"+(wifiRunning?String("true"):String("false"));
+    out+=",\\"ap_clients\\":"+String(WiFi.softAPgetStationNum());
+    out+=",\\"sta_connected\\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
+    out+=",\\"free_heap\\":"+String(ESP.getFreeHeap())+"}";
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json; charset=utf-8",out);
+  });
+  server.on("/recovery",HTTP_GET,[]{
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"text/html; charset=utf-8",
+      String("<!doctype html><html lang='ru'><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>")
+      +"<title>БУСА · проверка связи</title><body style='font:17px system-ui;padding:16px'>"
+      +"<h2>БУСА-1М · Проверка связи</h2><p>Версия: "+String(VERSION)+"</p>"
+      +"<p>Локальная сеть: "+(wifiRunning?String("работает"):String("нет"))+"</p>"
+      +"<p>Клиентов: "+String(WiFi.softAPgetStationNum())+"</p>"
+      +"<p>Подключение к интернету: "+(WiFi.status()==WL_CONNECTED?String("да"):String("нет"))+"</p>"
+      +"<p><a href='/api/ping'>Ответ ESP32 (JSON)</a></p>"
+      +"<p><a href='/'>Открыть приложение</a></p></body></html>");
+  });
   server.on("/api/time/sync",HTTP_POST,[]{
     if(!apClient()){
       server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;
