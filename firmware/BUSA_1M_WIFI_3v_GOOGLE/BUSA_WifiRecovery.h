@@ -18,21 +18,28 @@ void wifiRecoveryEvent(WiFiEvent_t event,WiFiEventInfo_t info){
   }
 }
 void wifiScheduleConnect(uint32_t now){
+  WiFi.setAutoReconnect(false); // Manual recovery owns the next connection attempt.
   WiFi.disconnect(false,false);
   wifiConnectPending=true;wifiConnectAt=now;
 }
 void wifiCancelScan(){
   if(wifiScanPhase==BusaScanPhase::Running)esp_wifi_scan_stop();
   WiFi.scanDelete();wifiScanPhase=BusaScanPhase::Idle;
+  WiFi.setAutoReconnect(!stationSsid.isEmpty() && stationPass.length()>=8);
 }
 void wifiFinishScan(uint32_t now,const String& result){
   wifiScanCache=result;
   WiFi.scanDelete();wifiScanPhase=BusaScanPhase::Idle;
-  if(WiFi.status()!=WL_CONNECTED){wifiConnectPending=true;wifiConnectAt=now;}
+  WiFi.setAutoReconnect(!stationSsid.isEmpty() && stationPass.length()>=8);
+  if(WiFi.status()!=WL_CONNECTED && !stationSsid.isEmpty() && stationPass.length()>=8){
+    wifiConnectPending=true;wifiConnectAt=now;
+  }else wifiConnectPending=false;
 }
 void wifiRequestScan(uint32_t now){
   if(wifiScanBusy())return; // Idempotent: polling/repeated taps cannot reset the scan.
   wifiConnectPending=false;
+  // Prevent auto-reconnect from interrupting the scan and causing scan_start_failed.
+  WiFi.setAutoReconnect(false);
   // A connection attempt takes precedence over scan_start in ESP-IDF.
   // End the attempt before scanning; an established connection can stay up.
   if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
@@ -92,6 +99,7 @@ void wifiRecoveryTick(uint32_t now){
   if(wifiConnectPending){
     if(!elapsed(now,wifiConnectAt,500))return;
     wifiConnectPending=false;lastStationCheck=now;++wifiConnectAttempts;
+    WiFi.setAutoReconnect(true);
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
   }else if(elapsed(now,lastStationCheck,20000)){
     wifiScheduleConnect(now); // Bounded attempts; leave an idle gap for user scans.
