@@ -1,68 +1,129 @@
 from pathlib import Path
-import subprocess,tempfile
+import subprocess, tempfile
 root=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE').resolve()
+source=(root/'BUSA_WifiRecovery.h').read_text()
+assert 'esp_wifi_scan_start(&config,true)' in source
+assert 'WiFi.scanNetworks(' not in source and 'WiFi.scanComplete(' not in source
+assert 'WiFi.disconnect(false,false)' in source
 stub=r'''
 #include <string>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
-class String:public std::string{
-public:using std::string::string;String(const std::string&s):std::string(s){};
-String(int v):std::string(std::to_string(v)){} String(unsigned v):std::string(std::to_string(v)){}
-bool isEmpty()const{return empty();}
+#include <new>
+#include <algorithm>
+class String : public std::string {
+public:
+ using std::string::string;
+ String(const std::string&s):std::string(s){}
+ String(int x):std::string(std::to_string(x)){}
+ String(unsigned x):std::string(std::to_string(x)){}
+ bool isEmpty()const{return empty();}
 };
-const int WL_CONNECTED=3,WIFI_SCAN_RUNNING=-1,WIFI_SCAN_FAILED=-2;
-const int ARDUINO_EVENT_WIFI_STA_DISCONNECTED=5;
-using WiFiEvent_t=int;struct WiFiEventInfo_t{struct{uint8_t reason;}wifi_sta_disconnected;};
-bool otaActive=false,otaRestart=false;uint32_t lastStationCheck=0;
-String stationSsid="iPhone 16",stationPass="testpass",nearbyNames[5];uint8_t nearbyCount=0;
-bool elapsed(uint32_t a,uint32_t b,uint32_t d){return uint32_t(a-b)>=d;}
-String quoteJson(const String&s){return "\""+s+"\"";}
-struct MockWiFi{
-int state=0,startResult=-1,complete=-1,starts=0,begins=0,disconnects=0;
-int status(){return state;}void disconnect(bool off,bool erase){assert(!off&&!erase);++disconnects;state=0;}
-void scanDelete(){}int scanNetworks(bool a,bool h,bool p,int ms){assert(a&&!h&&!p&&ms==240);++starts;return startResult;}
-int scanComplete(){return complete;}String SSID(int){return "iPhone 12";}int RSSI(int){return -51;}
-void begin(const char*,const char*){++begins;}
-}WiFi;
-int stops=0;void esp_wifi_scan_stop(){++stops;}
+using WiFiEvent_t=int;
+struct WiFiEventInfo_t{struct{uint8_t reason;}wifi_sta_disconnected;};
+constexpr int ARDUINO_EVENT_WIFI_STA_DISCONNECTED=5;
+constexpr int WL_CONNECTED=3;
+constexpr int WIFI_SCAN_TYPE_ACTIVE=1;
+using esp_err_t=int;
+constexpr int ESP_OK=0;
+struct wifi_scan_config_t{
+ bool show_hidden=false;int scan_type=0;
+ struct {struct{int min=0,max=0;}active;}scan_time;
+};
+struct wifi_ap_record_t{uint8_t ssid[33]={0};int8_t rssi=0;};
+unsigned tick=0;unsigned millis(){return tick;}
+bool elapsed(uint32_t now,uint32_t then,uint32_t delta){return uint32_t(now-then)>=delta;}
+String quoteJson(const String& s){return String("\"")+s+"\"";}
+struct FakeWifi {
+ int state=0,connects=0,disconnects=0,staEnable=0;
+ int status(){return state;}
+ void disconnect(bool off,bool erase){assert(!off&&!erase);disconnects++;state=0;}
+ void begin(const char*,const char*){connects++;}
+ bool enableSTA(bool value){assert(value);staEnable++;return true;}
+} WiFi;
+bool otaActive=false,otaRestart=false;
+uint32_t lastStationCheck=0;
+String stationSsid="iPhone 16",stationPass="testpass",nearbyNames[5];
+uint8_t nearbyCount=0;
+int fakeScanCode=0,fakeRecordCode=0,starts=0,clears=0;
+unsigned detected=2;
+esp_err_t esp_wifi_scan_start(const wifi_scan_config_t*c,bool block){
+ assert(block);assert(c->scan_type==WIFI_SCAN_TYPE_ACTIVE);
+ assert(c->scan_time.active.min==100&&c->scan_time.active.max==160);
+ starts++;return fakeScanCode;
+}
+esp_err_t esp_wifi_scan_get_ap_num(uint16_t*count){*count=(uint16_t)detected;return 0;}
+esp_err_t esp_wifi_scan_get_ap_records(uint16_t*count,wifi_ap_record_t*out){
+ if(fakeRecordCode)return fakeRecordCode;
+ for(unsigned i=0;i<*count;i++){
+  const char*name=i==0?"iPhone 16":"Home 2G";
+  std::strcpy(reinterpret_cast<char*>(out[i].ssid),name);
+  out[i].rssi=(int8_t)(-43-(int)i);
+ }
+ return 0;
+}
+esp_err_t esp_wifi_clear_ap_list(){clears++;return 0;}
 '''
 tests=r'''
 int main(){
- wifiScheduleConnect(0);wifiRecoveryTick(499);assert(WiFi.begins==0);
- wifiRecoveryTick(500);assert(WiFi.begins==1);
- wifiRequestScan(20000);wifiRequestScan(20001);wifiRecoveryTick(20749);assert(WiFi.starts==0);
- wifiRecoveryTick(20750);assert(WiFi.starts==1&&WiFi.begins==1);
- wifiRecoveryTick(21000);assert(WiFi.begins==1);
- WiFi.complete=1;wifiRecoveryTick(22000);assert(!wifiScanBusy());assert(wifiScanJSON().find("iPhone 12")!=std::string::npos);
- auto cached=wifiScanJSON();assert(cached==wifiScanJSON());
- wifiRecoveryTick(22499);assert(WiFi.begins==1);wifiRecoveryTick(22500);assert(WiFi.begins==2);
- WiFi.startResult=-2;wifiRequestScan(30000);
- wifiRecoveryTick(30750);wifiRecoveryTick(31500);wifiRecoveryTick(32250);wifiRecoveryTick(33000);
- assert(!wifiScanBusy()&&wifiScanJSON().find("scan_start_failed")!=std::string::npos);
- WiFi.startResult=-1;WiFi.complete=-1;wifiRequestScan(40000);wifiRecoveryTick(40750);
- wifiRecoveryTick(59000);assert(!wifiScanBusy()&&stops==1);
- wifiRecoveryTick(59750);assert(WiFi.begins==3);
- WiFi.state=WL_CONNECTED;int dc=WiFi.disconnects;wifiRequestScan(60000);assert(WiFi.disconnects==dc);
- wifiRecoveryTick(60750);WiFi.complete=0;wifiRecoveryTick(61000);assert(!wifiConnectPending);
- otaActive=true;int b=WiFi.begins;WiFi.state=0;wifiRecoveryTick(90000);assert(WiFi.begins==b);
- otaActive=false;wifiRecoveryTick(90001);wifiRecoveryTick(90501);assert(WiFi.begins==b+1);
- wifiCancelScan();wifiScheduleConnect(UINT32_MAX-100);wifiRecoveryTick(400);assert(WiFi.begins==b+2);
- wifiRecoveryEvent(5,{{201}});assert(wifiDisconnectReason==201&&wifiDisconnectCount==1);
- // A transient scanComplete failure must be retried, not returned to the UI immediately.
- WiFi.state=0;WiFi.startResult=-1;WiFi.complete=-2;
- wifiRequestScan(100000);wifiRecoveryTick(100750);
- assert(wifiScanBusy()&&wifiScanTries==1);
- wifiRecoveryTick(101500);assert(wifiScanBusy()&&wifiScanTries==2);
- wifiRecoveryTick(102250);wifiRecoveryTick(103000);
- assert(!wifiScanBusy()&&wifiScanJSON().find("scan_failed_after_retries")!=std::string::npos);
- uint8_t hdr[36]={};hdr[0]=0xe9;hdr[1]=3;hdr[12]=9;hdr[32]=0x32;hdr[33]=0x54;hdr[34]=0xcd;hdr[35]=0xab;
- assert(busaAppHeaderValid(hdr,36));assert(!busaAppHeaderValid(hdr,35));
- hdr[32]=0;assert(!busaAppHeaderValid(hdr,36));hdr[32]=0x32;hdr[12]=0;assert(!busaAppHeaderValid(hdr,36));
+ // Missing credentials must not prevent discovery and must not fake a connect.
+ stationSsid="";stationPass="";
+ wifiRequestScan(1000);
+ wifiRecoveryTick(1649);assert(starts==0);
+ wifiRecoveryTick(1650);assert(starts==1);
+ assert(!wifiScanBusy() && wifiScanSuccesses==1 && !wifiConnectPending);
+ assert(wifiScanJSON().find("iPhone 16")!=std::string::npos);
+ assert(wifiScanJSON().find("Home 2G")!=std::string::npos);
+ assert(WiFi.connects==0);
+ assert(wifiRecoveryJSON().find("scan_start_error")!=std::string::npos);
+ // No APs is successful discovery, not a false driver failure.
+ detected=0;wifiRequestScan(2000);wifiRecoveryTick(2650);
+ assert(!wifiScanBusy()&&wifiScanSuccesses==2);
+ assert(wifiScanJSON().find("\"networks\":[]")!=std::string::npos);
+ // Transient error reports exact IDF code, retries with a bounded pause.
+ detected=1;fakeScanCode=0x3006;
+ wifiRequestScan(3000);wifiRecoveryTick(3650);
+ assert(wifiScanBusy()&&wifiScanTries==1&&wifiLastScanErr==0x3006);
+ wifiRecoveryTick(4299);assert(starts==3);
+ fakeScanCode=0;wifiRecoveryTick(4300);
+ assert(!wifiScanBusy()&&wifiScanTries==2&&wifiScanSuccesses==3);
+ // Complete repeated failure is visible to the browser and diagnosable.
+ fakeScanCode=0x3006;wifiRequestScan(5000);
+ wifiRecoveryTick(5650);wifiRecoveryTick(6300);wifiRecoveryTick(6950);
+ assert(!wifiScanBusy()&&wifiScanTries==3);
+ assert(wifiScanJSON().find("scan_driver_start_failed")!=std::string::npos);
+ assert(wifiRecoveryJSON().find("12294")!=std::string::npos);
+ // Results error gets its own code and never leaves stale list.
+ fakeScanCode=0;fakeRecordCode=0x1002;
+ wifiRequestScan(8000);wifiRecoveryTick(8650);
+ wifiRecoveryTick(9300);wifiRecoveryTick(9950);
+ assert(!wifiScanBusy() && wifiScanJSON().find("scan_records_read_failed")!=std::string::npos);
+ fakeRecordCode=0;
+ // Previously saved credentials reconnect after a successful scan.
+ stationSsid="iPhone 16";stationPass="secret123";
+ wifiRequestScan(12000);wifiRecoveryTick(12650);
+ assert(wifiConnectPending);
+ wifiRecoveryTick(13149);assert(WiFi.connects==0);
+ wifiRecoveryTick(13150);assert(WiFi.connects==1);
+ // Disconnected event reason and OTA pause remain functional.
+ wifiRecoveryEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,{{201}});
+ assert(wifiDisconnectReason==201&&wifiDisconnectCount==1);
+ wifiScheduleConnect(14000);otaActive=true;
+ wifiRecoveryTick(14500);assert(WiFi.connects==1);
+ otaActive=false;wifiRecoveryTick(14500);assert(WiFi.connects==2);
+ // Clock wrap around must not block reconnection forever.
+ wifiScheduleConnect(UINT32_MAX-100);
+ wifiRecoveryTick(399);assert(WiFi.connects==2);
+ wifiRecoveryTick(400);assert(WiFi.connects==3);
+ uint8_t hdr[36]={};hdr[0]=0xe9;hdr[1]=3;hdr[12]=9;
+ hdr[32]=0x32;hdr[33]=0x54;hdr[34]=0xcd;hdr[35]=0xab;
+ assert(busaAppHeaderValid(hdr,36)&&!busaAppHeaderValid(hdr,35));
 }
 '''
 with tempfile.TemporaryDirectory() as d:
- p=Path(d)/'test.cpp';p.write_text(stub+'\n#include "BUSA_WifiRecovery.h"\n#include "BUSA_AppHeader.h"\n'+tests)
+ p=Path(d)/'test.cpp'
+ p.write_text(stub+'\n#include "BUSA_WifiRecovery.h"\n#include "BUSA_AppHeader.h"\n'+tests)
  subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-I'+str(root),str(p),'-o',d+'/test'],check=True)
  subprocess.run([d+'/test'],check=True)
-print('PASS: real WiFi scheduler: scan/connect exclusion, idempotence, cached results, retry exhaustion, timeout, reconnect, OTA pause, clock wrap; APP target/header checks')
+print('PASS V14.18: synchronous IDF scan, empty credentials, retries, driver errors, STA reconnect, OTA pause, APP header')
