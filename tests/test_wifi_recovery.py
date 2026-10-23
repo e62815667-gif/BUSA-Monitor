@@ -115,8 +115,8 @@ int main(){
  otaActive=false;check(14500);assert(WiFi.connects==2);
  // Clock wrap around must not block reconnection forever.
  wifiScheduleConnect(UINT32_MAX-100);
- check(399);assert(WiFi.connects==2);
- check(400);assert(WiFi.connects==3);
+ check(398);assert(WiFi.connects==2);
+ check(399);assert(WiFi.connects==3);
  uint8_t hdr[36]={};hdr[0]=0xe9;hdr[1]=3;hdr[12]=9;
  hdr[32]=0x32;hdr[33]=0x54;hdr[34]=0xcd;hdr[35]=0xab;
  assert(busaAppHeaderValid(hdr,36)&&!busaAppHeaderValid(hdr,35));
