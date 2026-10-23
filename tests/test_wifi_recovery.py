@@ -36,7 +36,7 @@ int main(){
  wifiRecoveryTick(21000);assert(WiFi.begins==1);
  WiFi.complete=1;wifiRecoveryTick(22000);assert(!wifiScanBusy());assert(wifiScanJSON().find("iPhone 12")!=std::string::npos);
  auto cached=wifiScanJSON();assert(cached==wifiScanJSON());
- wifiRecoveryTick(22749);assert(WiFi.begins==1);wifiRecoveryTick(22750);assert(WiFi.begins==2);
+ wifiRecoveryTick(22499);assert(WiFi.begins==1);wifiRecoveryTick(22500);assert(WiFi.begins==2);
  WiFi.startResult=-2;wifiRequestScan(30000);
  wifiRecoveryTick(30750);wifiRecoveryTick(31500);wifiRecoveryTick(32250);wifiRecoveryTick(33000);
  assert(!wifiScanBusy()&&wifiScanJSON().find("scan_start_failed")!=std::string::npos);
