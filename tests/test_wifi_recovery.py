@@ -47,7 +47,7 @@ int stopScans=0,clearBits=0;
 int esp_wifi_scan_stop(){++stopScans;return ESP_OK;}
 int esp_wifi_get_channel(uint8_t*p,wifi_second_chan_t*s){*p=6;*s=0;return ESP_OK;}
 int esp_wifi_get_country(wifi_country_t*c){c->schan=1;c->nchan=3;return ESP_OK;}
-struct WiFiGenericClass{static void clearStatusBits(int bits){assert(bits==WIFI_SCANNING_BIT);++clearBits;}};
+struct WiFiGenericClass{protected:static void clearStatusBits(int bits){assert(bits==WIFI_SCANNING_BIT);++clearBits;}};
 '''
 tests=r'''
 void tick(uint32_t t){nowMs=t;wifiRecoveryTick(t);}

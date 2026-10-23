@@ -1,5 +1,9 @@
 #pragma once
 #include <atomic>
+class BusaWiFiScanControl : public WiFiGenericClass {
+public:
+  static void clearScanBusy(){clearStatusBits(WIFI_SCANNING_BIT);}
+};
 // V14.25: one radio owner (loop), Arduino asynchronous scans only.
 // A local AP client prevents NEW STA connections/channel migration. A working
 // STA link is retained. Manual discovery visits one legal channel at a time.
@@ -52,7 +56,7 @@ void wifiStopScan(){
   // scanDelete alone does not stop the IDF radio scan or clear SCANNING_BIT.
   if(wifiScanPhase==BusaScanPhase::Running){
     esp_wifi_scan_stop();
-    WiFiGenericClass::clearStatusBits(WIFI_SCANNING_BIT);
+    BusaWiFiScanControl::clearScanBusy();
   }
   WiFi.scanDelete();wifiScanPhase=BusaScanPhase::Idle;
 }
@@ -165,7 +169,7 @@ void wifiRecoveryTick(uint32_t now){
         wifiLastScanErr=rc;
         if(wifiScanTries>=BUSA_SCAN_MAX_TRIES){wifiFinishScan("scan_start_failed");return;}
         // Stop any leftover radio scan; do not start another scan engine.
-        esp_wifi_scan_stop();WiFiGenericClass::clearStatusBits(WIFI_SCANNING_BIT);
+        esp_wifi_scan_stop();BusaWiFiScanControl::clearScanBusy();
         if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
         WiFi.scanDelete();wifiPhaseAt=now;return;
       }
