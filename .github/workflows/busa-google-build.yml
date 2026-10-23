@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-v14-14-google-readonly-audit-20261023]
+    branches: [lab/busa-v14-14-google-readonly-audit-20261023, lab/busa-v14-17-wifi-scan-20261023]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -145,7 +145,8 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v16-N8R2-WIRE-DIAG-WIFI-R2-CLOUD-OTA' in main
+          assert '14v17-N8R2-WIFI-SCAN-R3-CLOUD-OTA' in main
+          assert 'Найти сеть Wi-Fi' in main and 'manualSsid' not in main, 'V14.17 Wi-Fi form regression'
           assert 'tft_theme_mode' in main
           assert 'server.arg("theme")' in main
           assert 'setTftPhysicalTheme(theme)' in main
