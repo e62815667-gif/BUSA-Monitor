@@ -4,18 +4,18 @@ class BusaWiFiScanControl : public WiFiGenericClass {
 public:
   static void clearScanBusy(){clearStatusBits(WIFI_SCANNING_BIT);}
 };
-// V14.25: one radio owner (loop), Arduino asynchronous scans only.
-// A local AP client prevents NEW STA connections/channel migration. A working
-// STA link is retained. Manual discovery visits one legal channel at a time.
+// V14.27: AP+STA coexistence; local clients never block STA association.
+// One loop owns radio work; no AP restart or forced home-channel reset.
+// IDF migrates AP to STA channel using CSA. Manual scans visit one channel at a time.
 enum class BusaScanPhase : uint8_t { Idle, Requested, Settling, Running, HomePause };
 BusaScanPhase wifiScanPhase=BusaScanPhase::Idle;
 constexpr uint8_t BUSA_AP_CHANNEL=6;
-constexpr uint32_t BUSA_LOCAL_QUIET_MS=10000U,BUSA_BOOT_GRACE_MS=15000U;
+constexpr uint32_t BUSA_BOOT_GRACE_MS=3000U,BUSA_HTTP_REPLY_GRACE_MS=1500U;
 constexpr uint32_t BUSA_CONNECT_TIMEOUT_MS=12000U,BUSA_SCAN_TIMEOUT_MS=12000U;
 constexpr uint32_t BUSA_SCAN_SETTLE_MS=1200U,BUSA_SCAN_HOME_MS=200U;
 constexpr uint8_t BUSA_SCAN_MAX_TRIES=2;
 uint32_t wifiScanAt=0,wifiPhaseAt=0,wifiConnectAt=0,wifiPolicyAt=0;
-uint32_t wifiLastLocalAt=0,wifiRetryAt=0,wifiRetryDelay=0,wifiLastScanRequest=0;
+uint32_t wifiRetryAt=0,wifiRetryDelay=0,wifiLastScanRequest=0;
 bool wifiConnectPending=false,wifiConnecting=false,wifiJoinSettling=false,wifiHadScan=false;
 bool wifiDeferredForLocal=false,wifiCancelRequested=false;
 uint8_t wifiScanTries=0,wifiScanChannel=1,wifiScanLastChannel=11,wifiFailureStreak=0;
@@ -45,11 +45,11 @@ void wifiRecoveryEvent(WiFiEvent_t event, WiFiEventInfo_t info){
 bool wifiHasCredentials(){return !stationSsid.isEmpty() && stationPass.length()>=8;}
 void wifiScheduleConnect(uint32_t now){
   // Called by HTTP/setup: schedule only; response is sent before radio work.
-  wifiConnectPending=wifiHasCredentials();wifiRetryAt=now;wifiRetryDelay=0;
-  wifiFailureStreak=0;
+  wifiConnectPending=wifiHasCredentials();wifiRetryAt=now;wifiRetryDelay=BUSA_HTTP_REPLY_GRACE_MS;
+  wifiConnecting=wifiJoinSettling=false;wifiFailureStreak=0;
 }
 void wifiStartPolicy(uint32_t now){
-  wifiPolicyAt=wifiLastLocalAt=now;WiFi.setAutoReconnect(false);
+  wifiPolicyAt=now;WiFi.setAutoReconnect(false);
   wifiScheduleConnect(now);
 }
 void wifiStopScan(){
@@ -77,7 +77,7 @@ void wifiFinishScan(const char* error=nullptr){
     if(nearbyCount<5)nearbyNames[nearbyCount++]=wifiNetworks[i].ssid;
   }
   out+="]}";wifiStopScan();wifiScanCache=out;wifiCloudPaused.store(false);
-  // No immediate reconnect: normal local-client/quiet-time policy decides.
+  // Resume queued STA work through the normal bounded retry policy.
 }
 void wifiRequestScan(uint32_t now){
   if(wifiScanBusy()||otaActive||otaRestart)return;
@@ -94,7 +94,7 @@ String wifiScanJSON(){
   return wifiScanBusy()?String("{\"scanning\":true,\"networks\":[]}"):wifiScanCache;
 }
 String wifiRecoveryJSON(){
-  return String("{\"local_priority\":true,\"scan_active\":")+(wifiScanBusy()?"true":"false")+
+  return String("{\"local_priority\":true,\"ap_sta_simultaneous\":true,\"scan_active\":")+(wifiScanBusy()?"true":"false")+
     ",\"connect_pending\":"+(wifiConnectPending?"true":"false")+
     ",\"connecting\":"+(wifiConnecting?"true":"false")+
     ",\"sta_deferred_for_local\":"+(wifiDeferredForLocal?"true":"false")+
@@ -126,8 +126,7 @@ void wifiQueueRetry(uint32_t now,bool failure){
   wifiCloudPaused.store(false);
 }
 void wifiRecoveryTick(uint32_t now){
-  const bool local=WiFi.softAPgetStationNum()>0;
-  if(local)wifiLastLocalAt=now;
+  wifiDeferredForLocal=false; // Compatibility field: local clients no longer defer STA.
   // No radio mutation while receiving OTA. prepare rejects an active scan.
   if(otaActive||otaRestart){wifiCloudPaused.store(true);return;}
   if(wifiCancelRequested){wifiCancelRequested=false;wifiCancelScan();}
@@ -203,8 +202,6 @@ void wifiRecoveryTick(uint32_t now){
     wifiConnecting=false;wifiFailureStreak=0;wifiCloudPaused.store(false);
   }
   if(wifiConnecting){
-    // A client arrived during STA association: stop that attempt, keep AP.
-    if(local){WiFi.disconnect(false,false);wifiQueueRetry(now,false);wifiDeferredForLocal=true;return;}
     if(elapsed(now,wifiConnectAt,BUSA_CONNECT_TIMEOUT_MS) ||
        wifiDisconnectCount.load()!=wifiAttemptDisconnects){
       WiFi.disconnect(false,false);wifiQueueRetry(now,true);
@@ -214,8 +211,6 @@ void wifiRecoveryTick(uint32_t now){
   if(connected && !wifiConnectPending){wifiDeferredForLocal=false;wifiCloudPaused.store(false);return;}
   if(!wifiHasCredentials()){wifiConnectPending=false;wifiCloudPaused.store(false);return;}
   if(!connected && !wifiConnectPending)wifiQueueRetry(now,true);
-  wifiDeferredForLocal=local || !elapsed(now,wifiLastLocalAt,BUSA_LOCAL_QUIET_MS);
-  if(wifiDeferredForLocal){wifiJoinSettling=false;wifiCloudPaused.store(false);return;}
   if(!elapsed(now,wifiPolicyAt,BUSA_BOOT_GRACE_MS) || !elapsed(now,wifiRetryAt,wifiRetryDelay))return;
   if(!wifiJoinSettling){
     WiFi.setAutoReconnect(false);WiFi.disconnect(false,false);

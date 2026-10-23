@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v26-N8R2-TEMP-ROM-BINDING-APP";
+const char VERSION[]="БУСА 1М WiFi 14v27-N8R2-SIMULTANEOUS-AP-STA";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -1299,7 +1299,7 @@ main>*{max-width:100%;min-width:0}
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net"><option value="">Выберите сеть из списка</option></select>
 <label for="manualSsid">Имя сети вручную (если её нет в списке)</label><input id="manualSsid" maxlength="32" placeholder="Точное имя точки доступа">
-<p class="hint">Для iPhone 16 включи «Максимальная совместимость» в режиме модема и оставь этот экран открытым во время поиска. Локальная сеть БУСА имеет приоритет: новое подключение к интернету ждёт отключения локального телефона.</p>
+<p class="hint">Для iPhone 16 включи «Максимальная совместимость» в режиме модема и оставь этот экран открытым во время поиска. Локальная сеть и подключение БУСА к интернету работают одновременно. Отключать телефон или ноутбук от БУСА не нужно.</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна при подключении к защищённой сети БУСА. Пароль остаётся на контроллере.</p></div>
@@ -1688,7 +1688,7 @@ if(Number.isFinite(currentPulse)){
  lastWaterPulse=currentPulse;waterPulseLog.push(delta);
  if(waterPulseLog.length>80)waterPulseLog.shift();
 }
-let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');if(s.wifi_recovery?.sta_deferred_for_local)ss='Локальная сеть работает. Подключение к интернету отложено до отключения локального телефона.';get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
+let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');if(s.wifi_recovery?.connecting)ss='Подключение к интернету: '+(s.station.target_ssid||s.station.ssid)+' · локальная сеть включена';else if(s.wifi_recovery?.connect_pending&&!s.station.connected)ss='Ожидание попытки подключения: '+(s.station.target_ssid||s.station.ssid)+' · локальная сеть включена';get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
 if(s.station.connected&&s.station.ssid){
  let select=get('net'),found=Array.from(select.options).some(o=>o.value===s.station.ssid);
  if(!found)select.add(new Option(s.station.ssid+' (подключена)',s.station.ssid));
@@ -2021,7 +2021,7 @@ void setup(){
   updateBootStage(1);
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str());
-  wifiStartPolicy(millis()); // Boot grace permits the local phone to attach first.
+  wifiStartPolicy(millis()); // Brief startup grace; local clients do not block internet association.
   server.on("/",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store, max-age=0");
     server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);
@@ -2255,7 +2255,7 @@ void setup(){
     stationSsid=ssid;stationPass=pass;
     wifiCancelRequested=true;
     wifiScheduleConnect(millis());
-    server.send(202,"text/plain; charset=utf-8","Wi-Fi сохранён. Локальная сеть имеет приоритет. Для подключения к интернету отключи телефон от сети БУСА минимум на 25 секунд, затем подключись снова.");
+    server.send(202,"text/plain; charset=utf-8","Wi-Fi сохранён. БУСА подключится к интернету автоматически; оставайся в локальной сети. При смене радиоканала возможна краткая пауза, приложение повторит запрос.");
   });
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();

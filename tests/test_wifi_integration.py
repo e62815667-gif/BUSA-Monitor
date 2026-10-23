@@ -9,8 +9,11 @@ assert 'WiFi.reconnect(' not in m+w
 assert 'WiFi.setAutoReconnect(true)' not in m+w
 assert 'esp_wifi_scan_start(' not in m+w # only Arduino owns asynchronous results
 assert 'scanNetworks(true,true,false,120,wifiScanChannel)' in w
-assert 'if(local){WiFi.disconnect(false,false);wifiQueueRetry(now,false)' in w
-assert 'BUSA_BOOT_GRACE_MS=15000U' in w and 'BUSA_LOCAL_QUIET_MS=10000U' in w
+assert 'if(local)' not in w and 'BUSA_LOCAL_QUIET_MS' not in w
+assert 'BUSA_BOOT_GRACE_MS=3000U' in w and 'BUSA_HTTP_REPLY_GRACE_MS=1500U' in w
+assert 'ap_sta_simultaneous' in w
+assert 'отключи телефон от сети БУСА минимум' not in m
+assert 'esp_wifi_set_channel(' not in w
 assert 'wifiScheduleConnect(millis());' in m and 'server.send(202,' in m
 assert 'if(otaActive||otaRestart)' in w
 assert 'wifiScanBusy()' in m[m.index('void uploadOTA()'):m.index('#include "BUSA_Google.h"')]

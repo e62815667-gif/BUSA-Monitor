@@ -25,6 +25,7 @@ String stationSsid="iPhone 16",stationPass="testpass",nearbyNames[5];uint8_t nea
 struct MockWifi{
 int statusCode=0,startRc=WIFI_SCAN_RUNNING,complete=WIFI_SCAN_RUNNING;
 int scans=0,deletes=0,disconnects=0,begins=0,clients=0,channelNow=1;
+String lastSsid,lastPass;
 bool autoreconnect=true;
 int status(){return statusCode;}
 int softAPgetStationNum(){return clients;}
@@ -38,14 +39,14 @@ int scanComplete(){return complete;}
 String SSID(int i){return i==0?"":(i==1?"iPhone 16":"iPhone 12");}
 int RSSI(int i){return -50-i;}
 int channel(int){return channelNow;}
-void begin(const char*,const char*){assert(!autoreconnect);++begins;}
+void begin(const char*s,const char*p){assert(!autoreconnect);lastSsid=s;lastPass=p;++begins;}
 }WiFi;
 using esp_err_t=int;const esp_err_t ESP_OK=0;
 using wifi_second_chan_t=int;
 struct wifi_country_t{uint8_t schan=1,nchan=3;};
-int stopScans=0,clearBits=0;
+int stopScans=0,clearBits=0,radioChannel=6;
 int esp_wifi_scan_stop(){++stopScans;return ESP_OK;}
-int esp_wifi_get_channel(uint8_t*p,wifi_second_chan_t*s){*p=6;*s=0;return ESP_OK;}
+int esp_wifi_get_channel(uint8_t*p,wifi_second_chan_t*s){*p=radioChannel;*s=0;return ESP_OK;}
 int esp_wifi_get_country(wifi_country_t*c){c->schan=1;c->nchan=3;return ESP_OK;}
 struct WiFiGenericClass{protected:static void clearStatusBits(int bits){assert(bits==WIFI_SCANNING_BIT);++clearBits;}};
 '''
@@ -62,10 +63,17 @@ void completeScan(uint32_t t,int n=3){
 }
 int main(){
  wifiStartPolicy(0);assert(!WiFi.autoreconnect);
- // AP client wins over boot saved credentials indefinitely.
- WiFi.clients=1;tick(16000);tick(60000);assert(WiFi.begins==0&&wifiDeferredForLocal);
- // Queue-only HTTP request; discovery still works with a local client attached.
- nowMs=61000;int d=WiFi.disconnects;wifiRequestScan(nowMs);
+ // Saved credentials connect even with an AP client from boot.
+ WiFi.clients=1;tick(2999);assert(WiFi.begins==0);
+ tick(3000);tick(4199);assert(WiFi.begins==0);
+ tick(4200);assert(WiFi.begins==1&&wifiConnecting&&!wifiDeferredForLocal);
+ // Additional local clients must never cancel association.
+ int d=WiFi.disconnects;WiFi.clients=2;tick(4300);
+ assert(wifiConnecting&&WiFi.disconnects==d);
+ WiFi.statusCode=WL_CONNECTED;tick(4400);
+ assert(!wifiConnecting&&!wifiConnectPending&&!wifiCloudPaused.load());
+ // Queue-only discovery with local clients AND a live STA preserves that link.
+ nowMs=61000;d=WiFi.disconnects;wifiRequestScan(nowMs);
  assert(WiFi.disconnects==d&&WiFi.scans==0);
  wifiRequestScan(nowMs);assert(WiFi.scans==0);
  tick(61000);tick(62199);assert(WiFi.scans==0);
@@ -73,56 +81,76 @@ int main(){
  assert(wifiScanSuccesses==1&&wifiLastVisibleCount==2);
  assert(wifiScanJSON().find("iPhone 16")!=std::string::npos);
  assert(wifiScanJSON().find("[,")==std::string::npos);
- tick(70000);assert(WiFi.begins==0&&!WiFi.autoreconnect);
- // A failed start is retried finitely, and never reported as an empty successful scan.
+ assert(WiFi.disconnects==d&&WiFi.statusCode==WL_CONNECTED);
+ // A failed start is bounded and not reported as an empty successful scan.
  WiFi.startRc=-2;wifiRequestScan(80000);tick(80000);tick(81200);tick(82400);
  assert(!wifiScanBusy()&&wifiLastScanErr==-2&&wifiScanFailures==1);
  assert(wifiScanJSON().find("scan_start_failed")!=std::string::npos);
- assert(stopScans&&clearBits);
- // Client leaves: 10 s quiet interval + 1.2 s settling before a single association.
- WiFi.clients=0;tick(90000);assert(WiFi.begins==0);
- tick(92400);assert(WiFi.begins==0);tick(93600);assert(WiFi.begins==1&&wifiConnecting);
- // Local client arriving during association cancels it without resetting the AP.
- WiFi.clients=1;tick(93700);assert(!wifiConnecting&&wifiConnectPending);
- tick(190000);assert(WiFi.begins==1);
- // Existing good STA connection is preserved with a local client, including during scans.
- WiFi.statusCode=WL_CONNECTED;wifiConnectPending=false;tick(191000);
- WiFi.startRc=-1;int before=WiFi.disconnects;wifiRequestScan(192000);tick(192000);
- completeScan(193200);assert(WiFi.disconnects==before&&WiFi.statusCode==WL_CONNECTED);
- tick(194000);assert(!wifiConnectPending&&!wifiConnecting);
- // With no local client, failure 201 imposes a 60 s backoff; timeout then 120 s.
- WiFi.clients=0;WiFi.statusCode=0;tick(200000);
+ assert(stopScans&&clearBits&&WiFi.statusCode==WL_CONNECTED);
+ // Loss of internet retries with local clients present; no retry storm.
+ WiFi.statusCode=0;tick(90000);
  assert(wifiRetryDelay==60000&&wifiConnectFailures==1);
- tick(259999);assert(WiFi.begins==1);
- tick(260000);tick(261200);assert(WiFi.begins==2);
- wifiRecoveryEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,{{201}});tick(261201);
+ tick(149999);assert(WiFi.begins==1);
+ tick(150000);tick(151200);assert(WiFi.begins==2&&WiFi.clients==2);
+ wifiRecoveryEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,{{201}});tick(151201);
  assert(wifiRetryDelay==120000&&!wifiConnecting);
- tick(381201);tick(382401);assert(WiFi.begins==3);
- tick(394401);assert(!wifiConnecting&&wifiConnectFailures==3&&wifiRetryDelay==240000);
- // Asynchronous scan timeout stops the radio scan and releases Arduino busy bits.
- WiFi.complete=-1;wifiRequestScan(400000);tick(400000);tick(401200);
+ tick(271201);tick(272401);assert(WiFi.begins==3);
+ tick(284401);assert(!wifiConnecting&&wifiConnectFailures==3&&wifiRetryDelay==240000);
+ // Saving credentials bypasses previous backoff but lets HTTP response finish.
+ d=WiFi.disconnects;wifiScheduleConnect(300000);
+ assert(WiFi.disconnects==d&&WiFi.begins==3);
+ tick(301499);assert(WiFi.disconnects==d);
+ tick(301500);tick(302700);assert(WiFi.begins==4&&wifiConnecting);
+ // A second save during association retargets exactly once through the loop.
+ stationSsid="iPhone 12";stationPass="newtestpass";d=WiFi.disconnects;
+ wifiScheduleConnect(302750);assert(WiFi.disconnects==d&&WiFi.begins==4);
+ tick(304250);tick(305450);
+ assert(WiFi.begins==5&&WiFi.lastSsid==stationSsid&&WiFi.lastPass==stationPass);
+ WiFi.statusCode=WL_CONNECTED;tick(305451);
+ assert(!wifiConnecting&&wifiFailureStreak==0&&!wifiDeferredForLocal);
+ // IDF reports migrated home channel; controller observes it without a reset.
+ radioChannel=11;tick(306800);assert(wifiRadioChannel==11&&wifiChannelChanges==1);
+ // Working AP+STA remains untouched over many polls; no forced channel reset.
+ d=WiFi.disconnects;
+ for(uint32_t t=307000;t<310000;t+=200)tick(t);
+ assert(WiFi.begins==5&&WiFi.disconnects==d);
+ // Scan timeout stops radio scan and releases Arduino busy bits.
+ WiFi.startRc=-1;WiFi.complete=-1;wifiRequestScan(400000);tick(400000);tick(401200);
  int stops=stopScans;tick(412000);assert(!wifiScanBusy()&&stopScans==stops+1);
  assert(wifiScanJSON().find("scan_timeout")!=std::string::npos);
- // Cancel is handled by the loop, does not resume STA while client is present.
  wifiRequestScan(430000);tick(430000);tick(431200);
- WiFi.clients=1;wifiCancelRequested=true;tick(431201);assert(!wifiScanBusy());
+ wifiCancelRequested=true;tick(431201);assert(!wifiScanBusy());
  assert(wifiScanJSON().find("scan_cancelled")!=std::string::npos);
- // OTA rejection/lock: no new scan, association, or disconnect during upload.
- otaActive=true;int scans=WiFi.scans,joins=WiFi.begins;before=WiFi.disconnects;
- wifiRequestScan(450000);tick(450000);
- assert(!wifiScanBusy()&&WiFi.scans==scans&&WiFi.begins==joins&&WiFi.disconnects==before);
+ // OTA locks all new radio mutations.
+ otaActive=true;int scans=WiFi.scans,joins=WiFi.begins;d=WiFi.disconnects;
+ wifiRequestScan(450000);wifiScheduleConnect(450000);tick(455000);
+ assert(!wifiScanBusy()&&WiFi.scans==scans&&WiFi.begins==joins&&WiFi.disconnects==d);
  otaActive=false;
- // Unsigned arithmetic handles millis rollover in the quiet/boot/settle checks.
- WiFi.clients=0;wifiStartPolicy(UINT32_MAX-20000);wifiScheduleConnect(UINT32_MAX-2000);
- tick(0);tick(1200);assert(WiFi.begins==joins+1);
- // Empty scans are valid; repeated request during cooldown performs no radio work.
+ // Millis rollover during response grace with a local AP client attached.
+ WiFi.statusCode=0;wifiStartPolicy(UINT32_MAX-20000);wifiScheduleConnect(UINT32_MAX-1000);
+ tick(498);assert(WiFi.begins==joins);tick(499);tick(1699);
+ assert(WiFi.begins==joins+1&&wifiConnecting);
+ // Empty scans are valid; cooldown does no radio work.
  WiFi.statusCode=WL_CONNECTED;wifiConnectPending=false;wifiConnecting=false;
  wifiHadScan=false;wifiRequestScan(20000);tick(20000);completeScan(21200,0);
  assert(wifiLastVisibleCount==0&&wifiScanJSON().find("error")==std::string::npos);
  scans=WiFi.scans;wifiRequestScan(22000);assert(!wifiScanBusy()&&WiFi.scans==scans);
  assert(wifiScanJSON().find("scan_cooldown")!=std::string::npos);
- std::cout<<"PASS: shipped radio controller: local priority, async scans, -2, 201, retries, OTA, cancellation, rollover"<<std::endl;
+ // Repeated failures cap at five minutes even while local clients stay attached.
+ WiFi.statusCode=0;wifiScheduleConnect(600000);uint32_t retry=601500;
+ for(int i=0;i<5;++i){
+  tick(retry);tick(retry+1200);assert(wifiConnecting);
+  wifiRecoveryEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,{{201}});tick(retry+1201);
+  assert(!wifiConnecting&&wifiRetryDelay<=300000);
+  retry=wifiRetryAt+wifiRetryDelay;
+ }
+ assert(wifiRetryDelay==300000);
+ stationPass="";joins=WiFi.begins;wifiScheduleConnect(retry);tick(retry+5000);
+ assert(!wifiConnectPending&&WiFi.begins==joins&&!wifiCloudPaused.load());
+ assert(wifiRecoveryJSON().find("ap_sta_simultaneous")!=std::string::npos);
+ std::cout<<"PASS: shipped AP+STA: local clients during boot/join/retry, HTTP grace, -2, 201, backoff, OTA, scans, rollover"<<std::endl;
 }
+
 '''
 with tempfile.TemporaryDirectory() as d:
     p=Path(d)/'test.cpp';p.write_text(stub+'\n#include "BUSA_WifiRecovery.h"\n'+tests)
