@@ -35,7 +35,7 @@ struct Updater{std::vector<uint8_t> data;int begins=0,ends=0,aborts=0;bool fail=
 bool begin(size_t,int){++begins;data.clear();return true;}size_t write(uint8_t*p,size_t n){if(fail)return 0;data.insert(data.end(),p,p+n);return n;}bool end(bool b){assert(!b);++ends;return true;}void abort(){++aborts;}}Update;
 void reset(){source.assign(60000,0);source[0]=0xe9;source[1]=3;source[12]=9;source[32]=0x32;source[33]=0x54;source[34]=0xcd;source[35]=0xab;
 strcpy(cloudCandidate.url,"https://raw.githubusercontent.com/e62815667-gif/BUSA-Monitor/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/releases/cloud/APP.bin");
-strcpy(cloudCandidate.version,"V14.17");cloudCandidate.size=60000;cloudCandidate.build=141700;
+strcpy(cloudCandidate.version,"V14.17");cloudCandidate.size=60000;cloudCandidate.build=BUSA_BUILD+1;
 uint8_t digest[32];SHA256(source.data(),source.size(),digest);for(int i=0;i<32;++i)sprintf(cloudCandidate.sha+2*i,"%02x",digest[i]);
 httpCode=200;declaredSize=60000;slotOK=true;Update=Updater{};errorCode=0;phase=0;tick=100;}
 '''
