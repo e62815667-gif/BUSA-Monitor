@@ -146,6 +146,8 @@ jobs:
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
           assert '14v17-N8R2-WIFI-SCAN-R3-CLOUD-OTA' in main
+          scan=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_WifiRecovery.h').read_text()
+          assert 'WIFI_SCAN_MAX_TRIES=4' in scan and 'scan_failed_after_retries' in scan, 'Wi-Fi scan retry patch missing'
           assert 'Найти сеть Wi-Fi' in main and 'manualSsid' not in main, 'V14.17 Wi-Fi form regression'
           assert 'tft_theme_mode' in main
           assert 'server.arg("theme")' in main
