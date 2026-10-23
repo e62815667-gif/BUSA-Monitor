@@ -32,10 +32,13 @@ void wifiScheduleConnect(uint32_t now){
 void wifiCancelScan(){
   // No scan runs after wifiRecoveryTick returns; no concurrent cancellation.
   wifiScanPhase=BusaScanPhase::Idle;
+  WiFi.setAutoReconnect(!stationSsid.isEmpty() && stationPass.length()>=8);
 }
 void wifiFinishScan(uint32_t now,const String& result){
   wifiScanCache=result;
   wifiScanPhase=BusaScanPhase::Idle;
+  // V14.9 reconnect resumes only after the scan has fully completed.
+  WiFi.setAutoReconnect(!stationSsid.isEmpty() && stationPass.length()>=8);
   if(WiFi.status()!=WL_CONNECTED && !stationSsid.isEmpty() && stationPass.length()>=8){
     wifiConnectPending=true;wifiConnectAt=now;
   }else wifiConnectPending=false;
@@ -43,6 +46,8 @@ void wifiFinishScan(uint32_t now,const String& result){
 void wifiRequestScan(uint32_t now){
   if(wifiScanBusy())return;
   wifiConnectPending=false;
+  // Prevent auto-reconnect from pre-empting the Wi-Fi scan.
+  WiFi.setAutoReconnect(false);
   if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
   wifiScanTries=0;wifiLastScanErr=0;wifiLastRecordsErr=0;wifiLastApCount=0;
   wifiScanPhase=BusaScanPhase::Settling;wifiPhaseAt=now;wifiScanAt=now;
@@ -124,6 +129,7 @@ void wifiRecoveryTick(uint32_t now){
   if(wifiConnectPending){
     if(!elapsed(now,wifiConnectAt,500))return;
     wifiConnectPending=false;lastStationCheck=now;++wifiConnectAttempts;
+    WiFi.setAutoReconnect(true);
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
   }else if(elapsed(now,lastStationCheck,20000)){
     // V14.9: reconnect saved credentials without repeated disconnect/start.
