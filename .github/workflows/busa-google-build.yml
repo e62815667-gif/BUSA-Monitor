@@ -144,7 +144,7 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v15-N8R2-MODULE-DIAG' in main
+          assert '14v16-N8R2-WIRE-DIAG-WIFI-R2' in main, 'V14.16 firmware version missing'
           assert 'tft_theme_mode' in main
           assert 'server.arg("theme")' in main
           assert 'setTftPhysicalTheme(theme)' in main
