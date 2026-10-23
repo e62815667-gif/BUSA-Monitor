@@ -36,11 +36,13 @@ unsigned tick=0;unsigned millis(){return tick;}
 bool elapsed(uint32_t now,uint32_t then,uint32_t delta){return uint32_t(now-then)>=delta;}
 String quoteJson(const String& s){return String("\"")+s+"\"";}
 struct FakeWifi {
- int state=0,connects=0,disconnects=0,staEnable=0;
+ int state=0,connects=0,disconnects=0,staEnable=0,reconnects=0;bool autoReconnect=false;
  int status(){return state;}
  void disconnect(bool off,bool erase){assert(!off&&!erase);disconnects++;state=0;}
  void begin(const char*,const char*){connects++;}
  bool enableSTA(bool value){assert(value);staEnable++;return true;}
+ bool setAutoReconnect(bool value){autoReconnect=value;return true;}
+ bool reconnect(){reconnects++;return true;}
 } WiFi;
 bool otaActive=false,otaRestart=false;
 uint32_t lastStationCheck=0;
@@ -71,6 +73,7 @@ int main(){
  // Missing credentials must not prevent discovery and must not fake a connect.
  stationSsid="";stationPass="";
  wifiRequestScan(1000);
+ assert(!WiFi.autoReconnect);
  check(1649);assert(starts==0);
  check(1650);assert(starts==1);
  assert(!wifiScanBusy() && wifiScanSuccesses==1 && !wifiConnectPending);
@@ -113,6 +116,10 @@ int main(){
  wifiScheduleConnect(14000);otaActive=true;
  check(14500);assert(WiFi.connects==1);
  otaActive=false;check(14500);assert(WiFi.connects==2);
+ // V14.9 reconnect policy: retry saved station without a fresh disconnect.
+ wifiConnectPending=false;lastStationCheck=1000;
+ check(20999);assert(WiFi.reconnects==0);
+ check(21000);assert(WiFi.reconnects==1);
  // Clock wrap around must not block reconnection forever.
  wifiScheduleConnect(UINT32_MAX-100);
  check(398);assert(WiFi.connects==2);
@@ -127,4 +134,4 @@ with tempfile.TemporaryDirectory() as d:
  p.write_text(stub+'\n#include "BUSA_WifiRecovery.h"\n#include "BUSA_AppHeader.h"\n'+tests)
  subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-I'+str(root),str(p),'-o',d+'/test'],check=True)
  subprocess.run([d+'/test'],check=True)
-print('PASS V14.18: synchronous IDF scan, empty credentials, retries, driver errors, STA reconnect, OTA pause, APP header')
+print('PASS V14.19: V14.9 STA reconnect and V14.18 IDF scan, empty credentials, retry, OTA pause, APP header')
