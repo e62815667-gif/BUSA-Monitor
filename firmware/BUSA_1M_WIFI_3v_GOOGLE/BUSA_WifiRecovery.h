@@ -1,6 +1,6 @@
 #pragma once
 #include <new>
-// V14.18: use an ESP-IDF *blocking* scan in the loop task.
+// V14.19: preserve the proven V14.18 ESP-IDF scan; restore V14.9 STA connection lifecycle.
 // Arduino ESP32 2.0.17 already consumes async WIFI_SCAN_DONE internally;
 // fetching its AP records again would race that callback. With block=true
 // IDF does not emit SCAN_DONE and the scan caller owns the results.
@@ -98,7 +98,8 @@ void wifiRecoveryTick(uint32_t now){
     wifiLastRecordsErr=(int)err;
     if(err!=ESP_OK){wifiScanRetryOrFail(now,"scan_records_count_failed");return;}
     wifiLastApCount=discovered;
-    const uint16_t limit=discovered>20?20:discovered;
+    // V14.9 displayed 28 access points; V14.18 unexpectedly capped at 20.
+    const uint16_t limit=discovered>28?28:discovered;
     wifi_ap_record_t* records=limit?new(std::nothrow) wifi_ap_record_t[limit]:nullptr;
     if(limit&&!records){wifiScanRetryOrFail(now,"scan_memory_unavailable");return;}
     uint16_t used=limit;
@@ -125,6 +126,9 @@ void wifiRecoveryTick(uint32_t now){
     wifiConnectPending=false;lastStationCheck=now;++wifiConnectAttempts;
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
   }else if(elapsed(now,lastStationCheck,20000)){
-    wifiScheduleConnect(now);
+    // V14.9: reconnect saved credentials without repeated disconnect/start.
+    lastStationCheck=now;
+    ++wifiConnectAttempts;
+    WiFi.reconnect();
   }
 }
