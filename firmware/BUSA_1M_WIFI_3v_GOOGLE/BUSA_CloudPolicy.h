@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include <string.h>
-constexpr uint32_t BUSA_BUILD=141601;
+constexpr uint32_t BUSA_BUILD=141701;
 inline bool busaSlotOK(uint32_t address,uint32_t size){return (address==0x10000||address==0x340000)&&size==0x330000;}
 inline bool busaHexLower(const char* s,size_t n){
   if(!s||strlen(s)!=n)return false;
