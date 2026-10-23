@@ -1,15 +1,18 @@
 #pragma once
 #include <new>
-// V14.19: preserve the proven V14.18 ESP-IDF scan; restore V14.9 STA connection lifecycle.
+// V14.21: try the ESP-IDF scan first, then fall back to Arduino's scan-result cache
+// if IDF reports APs but returns no visible records. The fallback uses the same
+// WiFiGeneric callback/cache path as the proven V14.9 scanner.
 // Arduino ESP32 2.0.17 already consumes async WIFI_SCAN_DONE internally;
 // fetching its AP records again would race that callback. With block=true
 // IDF does not emit SCAN_DONE and the scan caller owns the results.
 // Keep the existing protected AP up and preserve STA/Google credentials.
-enum class BusaScanPhase : uint8_t { Idle, Settling };
+enum class BusaScanPhase : uint8_t { Idle, Settling, ArduinoSettling, ArduinoRunning };
 BusaScanPhase wifiScanPhase=BusaScanPhase::Idle;
 uint32_t wifiPhaseAt=0,wifiConnectAt=0,wifiScanAt=0;
 bool wifiConnectPending=false;
 uint8_t wifiScanTries=0;
+bool wifiLastUsedFallback=false;
 constexpr uint8_t WIFI_SCAN_MAX_TRIES=3;
 constexpr uint32_t WIFI_SCAN_SETTLE_MS=650,WIFI_SCAN_TIMEOUT_MS=25000;
 uint32_t wifiConnectAttempts=0,wifiScanFailures=0,wifiScanSuccesses=0;
@@ -49,7 +52,7 @@ void wifiRequestScan(uint32_t now){
   // Prevent auto-reconnect from pre-empting the Wi-Fi scan.
   WiFi.setAutoReconnect(false);
   if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
-  wifiScanTries=0;wifiLastScanErr=0;wifiLastRecordsErr=0;wifiLastApCount=0;wifiLastRecordCount=0;wifiLastVisibleCount=0;
+  wifiScanTries=0;wifiLastScanErr=0;wifiLastRecordsErr=0;wifiLastApCount=0;wifiLastRecordCount=0;wifiLastVisibleCount=0;wifiLastUsedFallback=false;
   wifiScanPhase=BusaScanPhase::Settling;wifiPhaseAt=now;wifiScanAt=now;
 }
 String wifiScanJSON(){
@@ -67,6 +70,7 @@ String wifiRecoveryJSON(){
     ",\"ap_count\":"+String((unsigned)wifiLastApCount)+
     ",\"record_count\":"+String((unsigned)wifiLastRecordCount)+
     ",\"visible_ssid_count\":"+String((unsigned)wifiLastVisibleCount)+
+    ",\"arduino_fallback\":"+(wifiLastUsedFallback?"true":"false")+
     ",\"disconnects\":"+String((uint32_t)wifiDisconnectCount)+
     ",\"last_disconnect_reason\":"+String((unsigned)wifiDisconnectReason)+"}";
 }
@@ -86,8 +90,39 @@ void wifiRecoveryTick(uint32_t now){
       wifiFinishScan(now,"{\"scanning\":false,\"error\":\"scan_timeout\",\"networks\":[]}");
       return;
     }
+    if(wifiScanPhase==BusaScanPhase::ArduinoRunning){
+      const int n=WiFi.scanComplete();
+      if(n==WIFI_SCAN_RUNNING)return;
+      if(n<0){
+        wifiLastRecordsErr=n;
+        ++wifiScanFailures;
+        if(wifiScanTries<WIFI_SCAN_MAX_TRIES){wifiScanPhase=BusaScanPhase::ArduinoSettling;wifiPhaseAt=now;return;}
+        wifiFinishScan(now,"{\"scanning\":false,\"error\":\"arduino_scan_results_failed\",\"networks\":[]}");return;
+      }
+      wifiLastApCount=(uint16_t)n;wifiLastRecordCount=(uint16_t)n;wifiLastVisibleCount=0;nearbyCount=0;
+      String out="{\"scanning\":false,\"ap_count\":"+String(n)+",\"record_count\":"+String(n)+",\"visible_ssid_count\":";
+      for(int i=0;i<n&&i<28;i++)if(WiFi.SSID(i).length())++wifiLastVisibleCount;
+      out+=String((unsigned)wifiLastVisibleCount)+",\"networks\":[";
+      for(int i=0;i<n&&i<28;i++){
+        const String ssid=WiFi.SSID(i);if(ssid.isEmpty())continue;
+        if(nearbyCount<5)nearbyNames[nearbyCount++]=ssid;
+        if(out[out.length()-1]!='[')out+=",";
+        out+="{\"ssid\":"+quoteJson(ssid)+",\"rssi\":"+String(WiFi.RSSI(i))+"}";
+      }
+      WiFi.scanDelete();out+="]}";++wifiScanSuccesses;wifiFinishScan(now,out);return;
+    }
     if(!elapsed(now,wifiPhaseAt,WIFI_SCAN_SETTLE_MS))return;
     ++wifiScanTries;
+    if(wifiScanPhase==BusaScanPhase::ArduinoSettling){
+      WiFi.scanDelete();
+      const int rc=WiFi.scanNetworks(true,false,false,160);
+      if(rc==WIFI_SCAN_FAILED){
+        wifiLastRecordsErr=rc;++wifiScanFailures;
+        if(wifiScanTries<WIFI_SCAN_MAX_TRIES){wifiPhaseAt=now;return;}
+        wifiFinishScan(now,"{\"scanning\":false,\"error\":\"arduino_scan_start_failed\",\"networks\":[]}");return;
+      }
+      wifiScanPhase=BusaScanPhase::ArduinoRunning;return;
+    }
     WiFi.enableSTA(true);
     wifi_scan_config_t config={};
     config.show_hidden=false;
@@ -115,6 +150,10 @@ void wifiRecoveryTick(uint32_t now){
     if(err!=ESP_OK){delete[] records;wifiScanRetryOrFail(now,"scan_records_read_failed");return;}
     wifiLastRecordCount=used;wifiLastVisibleCount=0;nearbyCount=0;
     for(uint16_t i=0;i<used;i++){char ssidBytes[33];memcpy(ssidBytes,records[i].ssid,32);ssidBytes[32]=0;if(ssidBytes[0])++wifiLastVisibleCount;}
+    if(discovered>0 && wifiLastVisibleCount==0){
+      delete[] records;WiFi.scanDelete();wifiLastUsedFallback=true;
+      wifiScanPhase=BusaScanPhase::ArduinoSettling;wifiPhaseAt=now;return;
+    }
     String out="{\"scanning\":false,\"ap_count\":"+String((unsigned)wifiLastApCount)+",\"record_count\":"+String((unsigned)used)+",\"visible_ssid_count\":"+String((unsigned)wifiLastVisibleCount)+",\"networks\":[";
     for(uint16_t i=0;i<used;i++){
       char ssidBytes[33];memcpy(ssidBytes,records[i].ssid,32);ssidBytes[32]=0;

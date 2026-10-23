@@ -6,7 +6,8 @@ assert 'esp_wifi_scan_start(&config,true)' in source
 assert 'memcpy(ssidBytes,records[i].ssid,32)' in source
 assert 'wifiLastVisibleCount' in source
 assert 'record_count' in source and 'visible_ssid_count' in source
-assert 'WiFi.scanNetworks(' not in source and 'WiFi.scanComplete(' not in source
+assert 'WiFi.scanNetworks(true,false,false,160)' in source and 'WiFi.scanComplete()' in source
+assert 'wifiLastUsedFallback' in source and 'ArduinoSettling' in source
 assert 'WiFi.disconnect(false,false)' in source
 stub=r'''
 #include <string>
@@ -27,6 +28,7 @@ using WiFiEvent_t=int;
 struct WiFiEventInfo_t{struct{uint8_t reason;}wifi_sta_disconnected;};
 constexpr int ARDUINO_EVENT_WIFI_STA_DISCONNECTED=5;
 constexpr int WL_CONNECTED=3;
+constexpr int WIFI_SCAN_RUNNING=-1,WIFI_SCAN_FAILED=-2;
 constexpr int WIFI_SCAN_TYPE_ACTIVE=1;
 using esp_err_t=int;
 constexpr int ESP_OK=0;
@@ -40,12 +42,20 @@ bool elapsed(uint32_t now,uint32_t then,uint32_t delta){return uint32_t(now-then
 String quoteJson(const String& s){return String("\"")+s+"\"";}
 struct FakeWifi {
  int state=0,connects=0,disconnects=0,staEnable=0,reconnects=0;bool autoReconnect=false;
+ int fallbackStarts=0,fallbackComplete=WIFI_SCAN_RUNNING;
  int status(){return state;}
  void disconnect(bool off,bool erase){assert(!off&&!erase);disconnects++;state=0;}
  void begin(const char*,const char*){connects++;}
  bool enableSTA(bool value){assert(value);staEnable++;return true;}
  bool setAutoReconnect(bool value){autoReconnect=value;return true;}
  bool reconnect(){reconnects++;return true;}
+ int scanNetworks(bool async,bool hidden,bool passive,int maxMs){
+  assert(async&&!hidden&&!passive&&maxMs==160);fallbackStarts++;return WIFI_SCAN_RUNNING;
+ }
+ int scanComplete(){return fallbackComplete;}
+ String SSID(int i){return i==0?String("iPhone 16"):String("Home 2G");}
+ int RSSI(int i){return i==0?-48:-55;}
+ void scanDelete(){}
 } WiFi;
 bool otaActive=false,otaRestart=false;
 uint32_t lastStationCheck=0;
@@ -53,6 +63,7 @@ String stationSsid="iPhone 16",stationPass="testpass",nearbyNames[5];
 uint8_t nearbyCount=0;
 int fakeScanCode=0,fakeRecordCode=0,starts=0,clears=0;
 unsigned detected=2;
+bool forceEmptyRecords=false;
 esp_err_t esp_wifi_scan_start(const wifi_scan_config_t*c,bool block){
  assert(block);assert(c->scan_type==WIFI_SCAN_TYPE_ACTIVE);
  assert(c->scan_time.active.min==100&&c->scan_time.active.max==160);
@@ -61,6 +72,7 @@ esp_err_t esp_wifi_scan_start(const wifi_scan_config_t*c,bool block){
 esp_err_t esp_wifi_scan_get_ap_num(uint16_t*count){*count=(uint16_t)detected;return 0;}
 esp_err_t esp_wifi_scan_get_ap_records(uint16_t*count,wifi_ap_record_t*out){
  if(fakeRecordCode)return fakeRecordCode;
+ if(forceEmptyRecords){*count=0;return 0;}
  for(unsigned i=0;i<*count;i++){
   const char*name=i==0?"iPhone 16":"Home 2G";
   std::strcpy(reinterpret_cast<char*>(out[i].ssid),name);
@@ -86,27 +98,38 @@ int main(){
  assert(wifiRecoveryJSON().find("record_count")!=std::string::npos);
  assert(WiFi.connects==0);
  assert(wifiRecoveryJSON().find("scan_start_error")!=std::string::npos);
- // No APs is successful discovery, not a false driver failure.
- detected=0;wifiRequestScan(2000);check(2650);
+ // IDF can count APs but return no visible records; use Arduino's proven result cache.
+ detected=25;forceEmptyRecords=true;
+ wifiRequestScan(1800);check(2450);
+ assert(wifiScanBusy()&&wifiLastUsedFallback&&WiFi.fallbackStarts==0);
+ check(3100);assert(WiFi.fallbackStarts==1&&wifiScanBusy());
+ WiFi.fallbackComplete=2;check(3150);
  assert(!wifiScanBusy()&&wifiScanSuccesses==2);
+ assert(wifiScanJSON().find("iPhone 16")!=std::string::npos);
+ assert(wifiRecoveryJSON().find("\"record_count\":2")!=std::string::npos);
+ assert(wifiRecoveryJSON().find("\"visible_ssid_count\":2")!=std::string::npos);
+ forceEmptyRecords=false;WiFi.fallbackComplete=WIFI_SCAN_RUNNING;
+ // No APs is successful discovery, not a false driver failure.
+ detected=0;wifiRequestScan(4000);check(4650);
+ assert(!wifiScanBusy()&&wifiScanSuccesses==3);
  assert(wifiScanJSON().find("\"networks\":[]")!=std::string::npos);
  // Transient error reports exact IDF code, retries with a bounded pause.
  detected=1;fakeScanCode=0x3006;
- wifiRequestScan(3000);check(3650);
+ wifiRequestScan(5000);check(5650);
  assert(wifiScanBusy()&&wifiScanTries==1&&wifiLastScanErr==0x3006);
- check(4299);assert(starts==3);
- fakeScanCode=0;check(4300);
- assert(!wifiScanBusy()&&wifiScanTries==2&&wifiScanSuccesses==3);
+ check(6299);assert(starts==4);
+ fakeScanCode=0;check(6300);
+ assert(!wifiScanBusy()&&wifiScanTries==2&&wifiScanSuccesses==4);
  // Complete repeated failure is visible to the browser and diagnosable.
- fakeScanCode=0x3006;wifiRequestScan(5000);
- check(5650);check(6300);check(6950);
+ fakeScanCode=0x3006;wifiRequestScan(7000);
+ check(7650);check(8300);check(8950);
  assert(!wifiScanBusy()&&wifiScanTries==3);
  assert(wifiScanJSON().find("scan_driver_start_failed")!=std::string::npos);
  assert(wifiRecoveryJSON().find("12294")!=std::string::npos);
  // Results error gets its own code and never leaves stale list.
  fakeScanCode=0;fakeRecordCode=0x1002;
- wifiRequestScan(8000);check(8650);
- check(9300);check(9950);
+ wifiRequestScan(9500);check(10150);
+ check(10800);check(11450);
  assert(!wifiScanBusy() && wifiScanJSON().find("scan_records_read_failed")!=std::string::npos);
  fakeRecordCode=0;
  // Previously saved credentials reconnect after a successful scan.
@@ -139,4 +162,4 @@ with tempfile.TemporaryDirectory() as d:
  p.write_text(stub+'\n#include "BUSA_WifiRecovery.h"\n#include "BUSA_AppHeader.h"\n'+tests)
  subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-I'+str(root),str(p),'-o',d+'/test'],check=True)
  subprocess.run([d+'/test'],check=True)
-print('PASS V14.19: V14.9 STA reconnect and V14.18 IDF scan, empty credentials, retry, OTA pause, APP header')
+print('PASS V14.21: IDF scan plus V14.9 Arduino result-cache fallback, STA reconnect, empty credentials, retries, OTA pause, APP header')
