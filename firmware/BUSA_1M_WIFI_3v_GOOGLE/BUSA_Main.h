@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v16-N8R2-WIRE-DIAG-WIFI-R2-CLOUD-OTA";
+const char VERSION[]="БУСА 1М WiFi 14v17-N8R2-WIFI-SCAN-R3-CLOUD-OTA";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -1425,11 +1425,9 @@ main>*{max-width:100%;min-width:0}
 <div class="grid"><button type="button" id="tftUp">TFT ↑</button><button type="button" id="tftDown">TFT ↓</button></div>
 <p class="hint">Управление видом TFT; физические выходы не затрагиваются.</p></div>
 <div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
-<div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
+<div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сеть Wi-Fi</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net"><option value="">Выберите сеть из списка</option></select>
-<p class="hint">Поиск может временно не видеть точку доступа телефона. В этом случае укажите имя сети вручную, без сканирования.</p>
-<label for="manualSsid">Имя сети Wi-Fi вручную (SSID)</label>
-<input id="manualSsid" type="text" maxlength="32" autocomplete="off" placeholder="Например, iPhone 16">
+<p class="hint">Выберите сеть из списка после поиска. Если список пуст, повторите поиск после включения точки доступа на телефоне.</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна при подключении к защищённой сети БУСА. Пароль остаётся на контроллере.</p></div>
@@ -1769,9 +1767,9 @@ if(Number.isFinite(currentPulse)){
  if(waterPulseLog.length>80)waterPulseLog.shift();
 }
 let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');if(!s.station.connected&&s.wifi_recovery)ss+=' · попыток: '+s.wifi_recovery.attempts+' · код Wi-Fi: '+s.wifi_recovery.last_disconnect_reason;get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
-if(s.station.connected&&s.station.ssid){
+if(s.station.ssid){
  let select=get('net'),found=Array.from(select.options).some(o=>o.value===s.station.ssid);
- if(!found)select.add(new Option(s.station.ssid+' (подключена)',s.station.ssid));
+ if(!found)select.add(new Option(s.station.ssid+(s.station.connected?' (подключена)':' (сохранена)'),s.station.ssid));
  if(!select.value)select.value=s.station.ssid;
 }
 const cs=s.google;
@@ -1985,8 +1983,7 @@ get('manualUpdate').onclick=async function(){
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
   finally{otaUiUploading=false;this.disabled=false;}
 };
-get('net').onchange=()=>{if(get('net').value){get('manualSsid').value='';get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.';}};
-get('manualSsid').oninput=()=>{if(get('manualSsid').value.trim())get('net').value='';};
+get('net').onchange=()=>{if(get('net').value)get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.';};
 get('scan').onclick=async function(){
   this.disabled=true;get('response').textContent='Идёт поиск сетей...';
   try{
@@ -2005,17 +2002,17 @@ get('scan').onclick=async function(){
     (j.networks||[]).forEach(w=>{if(!w.ssid||seen.has(w.ssid))return;seen.add(w.ssid);sel.add(new Option(w.ssid+' ('+w.rssi+' dBm)',w.ssid));});
     if(previous&&seen.has(previous))sel.value=previous;
     const count=sel.options.length-1;
-    get('response').textContent=j.scanning?'Поиск не завершился. Введи имя сети вручную.':
-      j.error?'Поиск Wi-Fi недоступен: '+j.error+'. Введи имя сети вручную.':
-      count?'Найдено сетей: '+count:'Найдено: 0. Введи имя Wi-Fi вручную ниже.';
-  }catch(e){get('response').textContent='Ошибка поиска: '+e.message+'. Введи имя сети вручную.';}
+    get('response').textContent=j.scanning?'Поиск продолжается. Повторите через несколько секунд.':
+      j.error?'Поиск Wi-Fi не завершился: '+j.error+'. Повторите поиск.':
+      count?'Найдено сетей: '+count:'Сети не найдены. Проверьте точку доступа и повторите поиск.';
+  }catch(e){get('response').textContent='Ошибка поиска: '+e.message+'. Повторите поиск.';}
   finally{this.disabled=false;}
 };
 get('save').onclick=async function(){
-  const ssid=(get('manualSsid').value.trim()||get('net').value).trim(),pass=get('pass').value;
+  const ssid=get('net').value.trim(),pass=get('pass').value;
   const nameBytes=new TextEncoder().encode(ssid).length;
   if(!ssid||nameBytes>32||pass.length<8||pass.length>63){
-    get('response').textContent='Введите имя сети (до 32 байт) и пароль (8–63 символа).';return;
+    get('response').textContent='Выберите сеть из списка и введите пароль (8–63 символа).';return;
   }
   this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
   try{
