@@ -1371,7 +1371,7 @@ main>*{max-width:100%;min-width:0}
 <div><label>T4 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
 </div><button id="refsSave" type="button" class="full">Сохранить значения отображения</button>
 <p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div></section>
-<section class="page" data-section="2" hidden><div class="card"><h2>Отбор · ручной режим</h2><p class="hint">Блок 220 В и электропривод крана исключены. ESP32 не управляет ими.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
+<section class="page" data-section="2" hidden><div class="card"><h2>Отбор · информационный раздел</h2><p class="hint">В этом разделе только отображение данных. Команды физическим выходам не передаются.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden>
  <div class="card"><h2>Графики · реальные измерения</h2>
  <div class="settingsTabs" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-graph-tft="0" class="on">T1–T4</button><button type="button" data-graph-tft="1">Вода</button><button type="button" data-graph-tft="2">Отбор</button></div>
@@ -2089,12 +2089,12 @@ void setup(){
   });
   // Minimal independent endpoints for diagnosing an unreachable main app.
   server.on("/api/ping",HTTP_GET,[]{
-    String out="{\\"device\\":\\"BUSA-1M-001\\",\\"version\\":"+quoteJson(String(VERSION));
-    out+=",\\"uptime_ms\\":"+String(millis());
-    out+=",\\"ap_running\\":"+(wifiRunning?String("true"):String("false"));
-    out+=",\\"ap_clients\\":"+String(WiFi.softAPgetStationNum());
-    out+=",\\"sta_connected\\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
-    out+=",\\"free_heap\\":"+String(ESP.getFreeHeap())+"}";
+    String out="{\"device\":\"BUSA-1M-001\",\"version\":"+quoteJson(String(VERSION));
+    out+=",\"uptime_ms\":"+String(millis());
+    out+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"));
+    out+=",\"ap_clients\":"+String(WiFi.softAPgetStationNum());
+    out+=",\"sta_connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
+    out+=",\"free_heap\":"+String(ESP.getFreeHeap())+"}";
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",out);
   });
