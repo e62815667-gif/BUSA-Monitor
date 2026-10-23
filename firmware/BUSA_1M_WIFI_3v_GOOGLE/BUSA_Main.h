@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v15-N8R2-MODULE-DIAG-WIFI-R2";
+const char VERSION[]="БУСА 1М WiFi 14v16-N8R2-WIRE-DIAG-WIFI-R2";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -56,9 +56,9 @@ bool tempConverting=false;
 // Read-only health checks; run only between conversion cycles.
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
 struct OneWireProbe {
-  bool presence=false,romFound=false,crcOk=false,familyOk=false,multiple=false;
+  bool presence=false,romFound=false,crcOk=false,familyOk=false,multiple=false,searchNoise=false,secondFound=false;
   int8_t idleLevel=-1,afterResetLevel=-1; // GPIO state; not proof of sensor health
-  uint8_t rom[8]={0};
+  uint8_t rom[8]={0},secondRom[8]={0};
   uint32_t checkedAt=0;
 };
 OneWireProbe wireProbe[4];
@@ -120,7 +120,13 @@ void probeOneWire(uint32_t now){
       memcpy(p.rom,first,8);
       p.crcOk=OneWire::crc8(first,7)==first[7];
       p.familyOk=first[0]==0x28; // DS18B20 family
-      p.multiple=bus->search(second);
+      p.secondFound=bus->search(second);
+      if(p.secondFound){
+        memcpy(p.secondRom,second,8);
+        const bool secondValid=(OneWire::crc8(second,7)==second[7] && second[0]==0x28);
+        p.multiple=secondValid && memcmp(first,second,8)!=0;
+        p.searchNoise=!secondValid;
+      }
     }
     bus->reset_search();
   }
@@ -139,6 +145,7 @@ String wireError(int i,uint32_t now){
   if(!p.crcOk)return "ROM_CRC_BAD";
   if(!p.familyOk)return "NOT_DS18B20";
   if(p.multiple)return "MULTIPLE_ROM";
+  if(p.searchNoise)return "ROM_SEARCH_NOISE";
   if(!tempPresent[i])return "LIBRARY_NOT_DETECTED";
   if(!hasTemp(i,now))return "NO_VALID_READING";
   return "OK";
@@ -150,7 +157,7 @@ String wireError(int i,uint32_t now){
 bool oneWireVerified(int n){
   if(n<0||n>=4)return false;
   const OneWireProbe& p=wireProbe[n];
-  return p.checkedAt && p.presence && p.romFound && p.crcOk && p.familyOk && !p.multiple;
+  return p.checkedAt && p.presence && p.romFound && p.crcOk && p.familyOk && !p.multiple && !p.searchNoise;
 }
 bool hasTemp(int n,uint32_t now){
   if(n<0||n>=4)return false;
@@ -1017,6 +1024,8 @@ String statusJSON(){
     s+=",\"family_ds18b20\":"+(p.familyOk?String("true"):String("false"));
     s+=",\"multiple_rom\":"+(p.multiple?String("true"):String("false"));
     s+=",\"rom\":"+quoteJson(p.romFound?romHex(p.rom):String(""));
+    s+=",\"second_rom\":"+quoteJson(p.secondFound?romHex(p.secondRom):String(""));
+    s+=",\"rom_search_noise\":"+(p.searchNoise?String("true"):String("false"));
     s+=",\"result\":"+quoteJson(wireError(i,now))+"}";
   }
   s+="],\"keyboard\":{\"pcf_address\":"+String(pcfAddr);
