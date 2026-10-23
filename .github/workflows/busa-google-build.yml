@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-v14-14-google-readonly-audit-20261023, lab/busa-v14-17-wifi-scan-20261023, lab/busa-v14-18-wifi-driver-scan-20261023]
+    branches: [lab/busa-v14-14-google-readonly-audit-20261023, lab/busa-v14-17-wifi-scan-20261023, lab/busa-v14-18-wifi-driver-scan-20261023, lab/busa-v14-19-v149-wifi-temperature-20261023]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-google-build.yml'
@@ -145,12 +145,13 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v18-N8R2-WIFI-IDF-SCAN-CLOUD-OTA' in main
+          assert '14v19-N8R2-V149-STA-DS18B20-IDF-SCAN' in main
           scan=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_WifiRecovery.h').read_text()
-          assert 'esp_wifi_scan_start(&config,true)' in scan and 'scan_start_error' in scan, 'V14.18 driver scan diagnostics missing'
+          assert 'esp_wifi_scan_start(&config,true)' in scan and 'scan_start_error' in scan, 'V14.19 ESP-IDF discovery must remain'
+          assert 'WiFi.reconnect()' in scan and 'WiFi.setAutoReconnect(false)' in scan, 'V14.9 reconnect/scan interlock missing'
           assert 'void check(uint32_t t)' in Path('tests/test_wifi_recovery.py').read_text(), 'V14.18 simulated clock missing'
           assert 'check(398)' in Path('tests/test_wifi_recovery.py').read_text(), 'Clock-wrap boundary test missing'
-          assert 'BUSA_BUILD=141801' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_CloudPolicy.h').read_text(), 'V14.18 OTA build counter missing'
+          assert 'BUSA_BUILD=141901' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_CloudPolicy.h').read_text(), 'V14.19 OTA build counter missing'
           assert 'Найти сеть Wi-Fi' in main and 'manualSsid' not in main, 'V14.17 Wi-Fi form regression'
           assert 'tft_theme_mode' in main
           assert 'server.arg("theme")' in main
@@ -195,8 +196,8 @@ jobs:
           assert 'if(keypadReady && scanCounts[a]!=5)continue;' in main
           assert 'oneWireNoPresenceCount' in main
           assert 'hqRig(97,52,141,142)' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Landscape_V14.h').read_text()
-          assert 'tempConverting=anyPresent' in main
-          assert 'tempRequestAt=anyPresent?now:0' in main
+          assert 'tempConverting=true;tempRequestAt=now;' in main, 'V14.9 sensor conversion cadence missing'
+          assert 'oneWireVerified(n)' in main, 'Sensor ROM verification must remain'
           assert 'TFT_DISPLAY_IDLE_MS' not in main
           assert 'class="appTabs"' in main
           assert '<div class="rigViewport">' in main
