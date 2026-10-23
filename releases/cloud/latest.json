@@ -1,0 +1,11 @@
+{
+  "device": "BUSA-1M-001",
+  "target": "ESP32-S3",
+  "partition_scheme": "default_8MB",
+  "flash_bytes": 8388608,
+  "version": "V14.16",
+  "build": 141601,
+  "size": 1158928,
+  "sha256": "6197f3da0423a45e42c536e2c98c870bd6652baf54fe7cd3623b0c7b38e4f4fa",
+  "url": "https://raw.githubusercontent.com/e62815667-gif/BUSA-Monitor/32b3606f101890777ad5cf4a2650fdc5a21740e4/releases/cloud/BUSA_V14_16_N8R2_CLOUD_OTA_APP.bin"
+}
