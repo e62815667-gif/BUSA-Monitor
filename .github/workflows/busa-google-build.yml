@@ -50,7 +50,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           m=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          assert '14v23-N8R2-LOCAL-APP-RECOVERY' in m
+          assert '14v24-N8R2-IP16-SCAN-ISOLATED' in m or '14v23-N8R2-LOCAL-APP-RECOVERY' in m
           assert 'server.on("/api/ping"' in m and 'server.on("/recovery"' in m
           assert 'wifi_recovery:s.wifi_recovery' in m
           assert 'id="appHealth"' in m
