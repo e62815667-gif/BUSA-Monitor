@@ -1,9 +1,10 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-v14-14-google-readonly-audit-20261023]
+    branches: [lab/busa-v14-14-google-readonly-audit-20261023, fix/busa-v14-20-verified-sensors-keypad-wifi-20261023]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+      - 'tests/**'
       - '.github/workflows/busa-google-build.yml'
   workflow_dispatch:
 permissions:
@@ -27,6 +28,23 @@ jobs:
           arduino-cli lib install "Adafruit ST7735 and ST7789 Library"
           arduino-cli lib install "Adafruit ILI9341"
           arduino-cli lib install "U8g2_for_Adafruit_GFX"
+      - name: Test DS18B20 address-specific reads and inactive keypad conflict
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
+          if '14v20-N8R2-VERIFIED-ROM-KEYPAD-WIFI' in src:
+              for expected in ('getTempC(wireProbe[i].rom)',
+                               'requestTemperaturesByAddress(wireProbe[i].rom)',
+                               'sensors[i]->isConnected(wireProbe[i].rom)',
+                               'p.searchNoise=!secondValid',
+                               'second_rom', 'rom_search_noise',
+                               'if(pair<0||keyHeld'):
+                  assert expected in src, expected
+              assert 'getTempCByIndex(0)' not in src
+              assert 'return ambiguous?-2:found;' in src
+              assert 'RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false' in src
+          PY
       - name: Test Wi-Fi recovery and Safari timeouts
         run: |
           python3 tests/test_wifi_recovery.py
@@ -143,7 +161,7 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v15-N8R2-MODULE-DIAG' in main
+          assert '14v20-N8R2-VERIFIED-ROM-KEYPAD-WIFI' in main or '14v15-N8R2-MODULE-DIAG' in main
           assert 'tft_theme_mode' in main
           assert 'server.arg("theme")' in main
           assert 'setTftPhysicalTheme(theme)' in main
@@ -251,16 +269,17 @@ jobs:
       - name: Package full recovery BIN plus app-only BIN
         run: |
           SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 80m --flash_size 8MB -o build/BUSA_1M_WIFI_3v_GOOGLE_8MB_merged.bin 0x0 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 80m --flash_size 8MB -o build/BUSA_1M_V14_20_8MB_USB_merged.bin 0x0 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build/BUSA_1M_V14_20_APP_OTA.bin
           cp firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h build/
           git rev-parse HEAD > build/SOURCE_COMMIT.txt
           arduino-cli lib list > build/LIBRARIES.txt
-          test -s build/BUSA_1M_WIFI_3v_GOOGLE_8MB_merged.bin
+          test -s build/BUSA_1M_V14_20_8MB_USB_merged.bin
           test -s build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          (cd build && sha256sum BUSA_1M_WIFI_3v_GOOGLE_8MB_merged.bin BUSA_1M_WIFI_3v_GOOGLE.ino.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd build && sha256sum BUSA_1M_V14_20_8MB_USB_merged.bin BUSA_1M_V14_20_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_GOOGLE_3V_COMPILATION
+          name: BUSA_V14_20_N8R2_BIN_AND_SHA256
           path: |
             build/
 
