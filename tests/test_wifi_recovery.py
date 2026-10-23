@@ -38,7 +38,7 @@ struct MockWiFi{
 '''
 test=r'''
 int main(){
- wifiRequestScan(1000);
+ nowMs=1000;wifiRequestScan(1000);
  assert(WiFi.scanStarted==1 && wifiScanBusy());
  wifiRequestScan(1001);assert(WiFi.scanStarted==1);
  assert(wifiScanJSON().find("scanning")!=std::string::npos);
