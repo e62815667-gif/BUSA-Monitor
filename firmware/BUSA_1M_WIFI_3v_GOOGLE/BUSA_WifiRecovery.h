@@ -1,202 +1,224 @@
 #pragma once
-#include <new>
-#include <cstring>
-// V14.24: isolate SSID discovery from STA auto-reconnect (reason 201 on iPhone).
-// The local access point remains active throughout. NVS credentials are retained.
-// All radio mutations take place in the main Arduino loop, not in Wi-Fi events.
-enum class BusaScanPhase : uint8_t { Idle, Settling, ArduinoRunning, DriverSettling };
+#include <atomic>
+// V14.25: one radio owner (loop), Arduino asynchronous scans only.
+// A local AP client prevents NEW STA connections/channel migration. A working
+// STA link is retained. Manual discovery visits one legal channel at a time.
+enum class BusaScanPhase : uint8_t { Idle, Requested, Settling, Running, HomePause };
 BusaScanPhase wifiScanPhase=BusaScanPhase::Idle;
-uint32_t wifiScanAt=0,wifiPhaseAt=0,wifiConnectAt=0;
-bool wifiConnectPending=false,wifiScanUsedDriver=false;
-uint8_t wifiScanTries=0;
-uint32_t wifiConnectAttempts=0,wifiScanFailures=0,wifiScanSuccesses=0;
-volatile uint32_t wifiDisconnectCount=0;
-volatile uint8_t wifiDisconnectReason=0;
-int wifiLastScanErr=0,wifiLastRecordsErr=0;
-uint16_t wifiLastApCount=0,wifiLastRecordCount=0,wifiLastVisibleCount=0;
+constexpr uint8_t BUSA_AP_CHANNEL=6;
+constexpr uint32_t BUSA_LOCAL_QUIET_MS=10000U,BUSA_BOOT_GRACE_MS=15000U;
+constexpr uint32_t BUSA_CONNECT_TIMEOUT_MS=12000U,BUSA_SCAN_TIMEOUT_MS=12000U;
+constexpr uint32_t BUSA_SCAN_SETTLE_MS=1200U,BUSA_SCAN_HOME_MS=200U;
+constexpr uint8_t BUSA_SCAN_MAX_TRIES=2;
+uint32_t wifiScanAt=0,wifiPhaseAt=0,wifiConnectAt=0,wifiPolicyAt=0;
+uint32_t wifiLastLocalAt=0,wifiRetryAt=0,wifiRetryDelay=0,wifiLastScanRequest=0;
+bool wifiConnectPending=false,wifiConnecting=false,wifiJoinSettling=false,wifiHadScan=false;
+bool wifiDeferredForLocal=false,wifiCancelRequested=false;
+uint8_t wifiScanTries=0,wifiScanChannel=1,wifiScanLastChannel=11,wifiFailureStreak=0;
+uint8_t wifiRadioChannel=0;
+uint32_t wifiConnectAttempts=0,wifiConnectFailures=0,wifiScanFailures=0,wifiScanSuccesses=0;
+uint32_t wifiAttemptDisconnects=0,wifiChannelChanges=0,wifiLastChannelCheck=0;
+std::atomic<uint32_t> wifiDisconnectCount{0},wifiDisconnectReason{0};
+std::atomic<uint32_t> wifiApStarts{0},wifiApStops{0},wifiApJoins{0},wifiApLeaves{0};
+std::atomic<bool> wifiCloudPaused{false};
+int wifiLastScanErr=0;
+uint16_t wifiLastApCount=0,wifiLastVisibleCount=0;
+struct BusaNetwork {String ssid;int32_t rssi=0;uint8_t channel=0;};
+BusaNetwork wifiNetworks[28];
+uint8_t wifiNetworkCount=0;
 String wifiScanCache="{\"scanning\":false,\"networks\":[]}";
-constexpr uint32_t BUSA_SCAN_SETTLE_MS=1200U;
-constexpr uint32_t BUSA_SCAN_TOTAL_TIMEOUT_MS=35000U;
-constexpr uint8_t BUSA_SCAN_ARDUINO_TRIES=3;
 bool wifiScanBusy(){return wifiScanPhase!=BusaScanPhase::Idle;}
 void wifiRecoveryEvent(WiFiEvent_t event, WiFiEventInfo_t info){
+  // Event task records facts only. No begin/reconnect/scan/reset here.
   if(event==ARDUINO_EVENT_WIFI_STA_DISCONNECTED){
-    wifiDisconnectReason=info.wifi_sta_disconnected.reason;
-    ++wifiDisconnectCount;
-  }
+    wifiDisconnectReason.store(info.wifi_sta_disconnected.reason);
+    wifiDisconnectCount.fetch_add(1);
+  }else if(event==ARDUINO_EVENT_WIFI_AP_START)wifiApStarts.fetch_add(1);
+  else if(event==ARDUINO_EVENT_WIFI_AP_STOP)wifiApStops.fetch_add(1);
+  else if(event==ARDUINO_EVENT_WIFI_AP_STACONNECTED)wifiApJoins.fetch_add(1);
+  else if(event==ARDUINO_EVENT_WIFI_AP_STADISCONNECTED)wifiApLeaves.fetch_add(1);
 }
+bool wifiHasCredentials(){return !stationSsid.isEmpty() && stationPass.length()>=8;}
 void wifiScheduleConnect(uint32_t now){
-  wifiConnectPending=true;wifiConnectAt=now;
+  // Called by HTTP/setup: schedule only; response is sent before radio work.
+  wifiConnectPending=wifiHasCredentials();wifiRetryAt=now;wifiRetryDelay=0;
+  wifiFailureStreak=0;
 }
-void wifiRestoreStationAfterScan(uint32_t now){
-  if(!stationSsid.isEmpty() && stationPass.length()>=8){
-    // Do not resume STA while scan results are still owned by the driver.
-    WiFi.setAutoReconnect(true);
-    if(WiFi.status()!=WL_CONNECTED){
-      wifiConnectPending=true;wifiConnectAt=now;
-    }else wifiConnectPending=false;
-  }else{wifiConnectPending=false;WiFi.setAutoReconnect(false);}
+void wifiStartPolicy(uint32_t now){
+  wifiPolicyAt=wifiLastLocalAt=now;WiFi.setAutoReconnect(false);
+  wifiScheduleConnect(now);
 }
-void wifiFinishScan(uint32_t now,const String& result){
-  wifiScanCache=result;
+void wifiStopScan(){
+  // scanDelete alone does not stop the IDF radio scan or clear SCANNING_BIT.
+  if(wifiScanPhase==BusaScanPhase::Running){
+    esp_wifi_scan_stop();
+    WiFiGenericClass::clearStatusBits(WIFI_SCANNING_BIT);
+  }
   WiFi.scanDelete();wifiScanPhase=BusaScanPhase::Idle;
-  lastStationCheck=now;
-  wifiRestoreStationAfterScan(now);
 }
 void wifiCancelScan(){
-  if(wifiScanPhase==BusaScanPhase::ArduinoRunning)WiFi.scanDelete();
-  // No dedicated esp_wifi_scan_stop here: a blocking IDF scan runs in loop().
-  wifiScanPhase=BusaScanPhase::Idle;
-  wifiRestoreStationAfterScan(millis());
+  wifiStopScan();
+  wifiScanCache="{\"scanning\":false,\"error\":\"scan_cancelled\",\"networks\":[]}";
+  wifiCloudPaused.store(false);
+}
+void wifiFinishScan(const char* error=nullptr){
+  String out="{\"scanning\":false";
+  if(error){out+=",\"error\":"+quoteJson(String(error));++wifiScanFailures;}
+  else ++wifiScanSuccesses;
+  out+=",\"networks\":[";nearbyCount=0;
+  for(uint8_t i=0;i<wifiNetworkCount;++i){
+    if(i)out+=",";
+    out+="{\"ssid\":"+quoteJson(wifiNetworks[i].ssid)+",\"rssi\":"+String(wifiNetworks[i].rssi)+
+      ",\"channel\":"+String((unsigned)wifiNetworks[i].channel)+"}";
+    if(nearbyCount<5)nearbyNames[nearbyCount++]=wifiNetworks[i].ssid;
+  }
+  out+="]}";wifiStopScan();wifiScanCache=out;wifiCloudPaused.store(false);
+  // No immediate reconnect: normal local-client/quiet-time policy decides.
 }
 void wifiRequestScan(uint32_t now){
-  if(wifiScanBusy() || otaActive || otaRestart)return;
+  if(wifiScanBusy()||otaActive||otaRestart)return;
+  if(wifiHadScan && !elapsed(now,wifiLastScanRequest,15000U)){
+    wifiScanCache="{\"scanning\":false,\"error\":\"scan_cooldown\",\"networks\":[]}";return;
+  }
+  wifiHadScan=true;wifiLastScanRequest=now;
   wifiScanCache="{\"scanning\":true,\"networks\":[]}";
-  wifiScanTries=0;wifiScanUsedDriver=false;
-  wifiLastScanErr=wifiLastRecordsErr=0;
-  wifiLastApCount=wifiLastRecordCount=wifiLastVisibleCount=0;
-  wifiConnectPending=false;
-  WiFi.setAutoReconnect(false);
-  // A pending Wi-Fi reconnect can make scanNetworks() return WIFI_SCAN_FAILED(-2).
-  // Release the STA connection attempt while leaving WIFI_AP_STA and the local AP up.
-  if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
-  WiFi.scanDelete();
-  wifiScanAt=wifiPhaseAt=now;wifiScanPhase=BusaScanPhase::Settling;
+  wifiLastScanErr=0;wifiLastApCount=wifiLastVisibleCount=0;wifiNetworkCount=0;
+  wifiScanTries=0;wifiScanAt=wifiPhaseAt=now;wifiScanPhase=BusaScanPhase::Requested;
+  // No radio API here: this function also runs inside HTTP handlers.
 }
 String wifiScanJSON(){
   return wifiScanBusy()?String("{\"scanning\":true,\"networks\":[]}"):wifiScanCache;
 }
 String wifiRecoveryJSON(){
-  return String("{\"scan_active\":")+(wifiScanBusy()?"true":"false")+
+  return String("{\"local_priority\":true,\"scan_active\":")+(wifiScanBusy()?"true":"false")+
     ",\"connect_pending\":"+(wifiConnectPending?"true":"false")+
+    ",\"connecting\":"+(wifiConnecting?"true":"false")+
+    ",\"sta_deferred_for_local\":"+(wifiDeferredForLocal?"true":"false")+
     ",\"attempts\":"+String(wifiConnectAttempts)+
+    ",\"connect_failures\":"+String(wifiConnectFailures)+
     ",\"scan_failures\":"+String(wifiScanFailures)+
     ",\"scan_successes\":"+String(wifiScanSuccesses)+
     ",\"scan_start_error\":"+String(wifiLastScanErr)+
-    ",\"scan_result_error\":"+String(wifiLastRecordsErr)+
     ",\"scan_attempt\":"+String((unsigned)wifiScanTries)+
+    ",\"scan_channel\":"+String((unsigned)wifiScanChannel)+
     ",\"ap_count\":"+String((unsigned)wifiLastApCount)+
-    ",\"record_count\":"+String((unsigned)wifiLastRecordCount)+
     ",\"visible_ssid_count\":"+String((unsigned)wifiLastVisibleCount)+
-    ",\"driver_fallback\":"+(wifiScanUsedDriver?"true":"false")+
-    ",\"scan_engine\":\"arduino_with_idf_fallback\""+
-    ",\"disconnects\":"+String((uint32_t)wifiDisconnectCount)+
-    ",\"last_disconnect_reason\":"+String((unsigned)wifiDisconnectReason)+"}";
+    ",\"scan_engine\":\"arduino_async_channel_steps\""+
+    ",\"radio_channel\":"+String((unsigned)wifiRadioChannel)+
+    ",\"channel_changes\":"+String(wifiChannelChanges)+
+    ",\"retry_delay_ms\":"+String(wifiRetryDelay)+
+    ",\"disconnects\":"+String(wifiDisconnectCount.load())+
+    ",\"last_disconnect_reason\":"+String(wifiDisconnectReason.load())+
+    ",\"ap_starts\":"+String(wifiApStarts.load())+
+    ",\"ap_stops\":"+String(wifiApStops.load())+
+    ",\"ap_client_joins\":"+String(wifiApJoins.load())+
+    ",\"ap_client_leaves\":"+String(wifiApLeaves.load())+"}";
 }
-void wifiStartDriverFallback(uint32_t now,int reason){
-  wifiLastScanErr=reason;wifiScanUsedDriver=true;++wifiScanFailures;
-  WiFi.scanDelete();
-  wifiScanPhase=BusaScanPhase::DriverSettling;wifiPhaseAt=now;
+void wifiQueueRetry(uint32_t now,bool failure){
+  wifiConnecting=wifiJoinSettling=false;wifiConnectPending=wifiHasCredentials();
+  if(failure){++wifiConnectFailures;if(wifiFailureStreak<4)++wifiFailureStreak;}
+  wifiRetryAt=now;
+  wifiRetryDelay=failure?((wifiFailureStreak<4)?(30000U<<wifiFailureStreak):300000U):0;
+  wifiCloudPaused.store(false);
 }
 void wifiRecoveryTick(uint32_t now){
-  if(otaActive||otaRestart)return;
+  const bool local=WiFi.softAPgetStationNum()>0;
+  if(local)wifiLastLocalAt=now;
+  // No radio mutation while receiving OTA. prepare rejects an active scan.
+  if(otaActive||otaRestart){wifiCloudPaused.store(true);return;}
+  if(wifiCancelRequested){wifiCancelRequested=false;wifiCancelScan();}
+  if(elapsed(now,wifiLastChannelCheck,1000U) && !wifiScanBusy()){
+    wifiLastChannelCheck=now;uint8_t primary=0;wifi_second_chan_t secondary;
+    if(esp_wifi_get_channel(&primary,&secondary)==ESP_OK){
+      if(wifiRadioChannel && primary!=wifiRadioChannel)++wifiChannelChanges;
+      wifiRadioChannel=primary;
+    }
+  }
   if(wifiScanBusy()){
-    if(elapsed(now,wifiScanAt,BUSA_SCAN_TOTAL_TIMEOUT_MS)){
-      ++wifiScanFailures;
-      wifiFinishScan(now,"{\"scanning\":false,\"error\":\"scan_timeout\",\"networks\":[]}");
-      return;
+    wifiCloudPaused.store(true);
+    if(elapsed(now,wifiScanAt,BUSA_SCAN_TIMEOUT_MS)){
+      wifiFinishScan("scan_timeout");return;
+    }
+    if(wifiScanPhase==BusaScanPhase::Requested){
+      WiFi.setAutoReconnect(false);
+      if(wifiConnecting || wifiJoinSettling || WiFi.status()!=WL_CONNECTED){
+        WiFi.disconnect(false,false);wifiConnecting=wifiJoinSettling=false;
+        wifiConnectPending=wifiHasCredentials();
+      }
+      wifi_country_t country={};
+      if(esp_wifi_get_country(&country)==ESP_OK && country.schan>=1 && country.nchan &&
+         country.schan+country.nchan-1<=14){
+        wifiScanChannel=country.schan;wifiScanLastChannel=country.schan+country.nchan-1;
+      }else{wifiScanChannel=1;wifiScanLastChannel=11;}
+      WiFi.scanDelete();wifiPhaseAt=now;wifiScanPhase=BusaScanPhase::Settling;return;
+    }
+    if(wifiScanPhase==BusaScanPhase::HomePause){
+      if(!elapsed(now,wifiPhaseAt,BUSA_SCAN_HOME_MS))return;
+      wifiScanPhase=BusaScanPhase::Settling;
+      wifiPhaseAt=now-BUSA_SCAN_SETTLE_MS;
     }
     if(wifiScanPhase==BusaScanPhase::Settling){
       if(!elapsed(now,wifiPhaseAt,BUSA_SCAN_SETTLE_MS))return;
-      WiFi.enableSTA(true);
       ++wifiScanTries;
-      const int rc=WiFi.scanNetworks(true,false,false,160);
+      const int rc=WiFi.scanNetworks(true,true,false,120,wifiScanChannel);
       if(rc==WIFI_SCAN_FAILED){
-        wifiLastScanErr=rc;++wifiScanFailures;
-        if(wifiScanTries<BUSA_SCAN_ARDUINO_TRIES){
-          // Leave the driver's busy state before the next attempt.
-          if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
-          WiFi.scanDelete();
-          wifiPhaseAt=now;return;
-        }
-        wifiStartDriverFallback(now,rc);return;
+        wifiLastScanErr=rc;
+        if(wifiScanTries>=BUSA_SCAN_MAX_TRIES){wifiFinishScan("scan_start_failed");return;}
+        // Stop any leftover radio scan; do not start another scan engine.
+        esp_wifi_scan_stop();WiFiGenericClass::clearStatusBits(WIFI_SCANNING_BIT);
+        if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
+        WiFi.scanDelete();wifiPhaseAt=now;return;
       }
-      wifiScanPhase=BusaScanPhase::ArduinoRunning;
-      return;
+      wifiLastScanErr=0;wifiScanPhase=BusaScanPhase::Running;return;
     }
-    if(wifiScanPhase==BusaScanPhase::ArduinoRunning){
+    if(wifiScanPhase==BusaScanPhase::Running){
       const int n=WiFi.scanComplete();
       if(n==WIFI_SCAN_RUNNING)return;
-      if(n<0){wifiStartDriverFallback(now,n);return;}
-      wifiLastApCount=(uint16_t)n;wifiLastRecordCount=(uint16_t)n;
-      wifiLastVisibleCount=0;nearbyCount=0;
-      String out="{\"scanning\":false,\"networks\":[";
-      for(int i=0;i<n&&i<28;++i){
+      if(n<0){wifiLastScanErr=n;wifiFinishScan("scan_result_failed");return;}
+      wifiLastApCount+=(uint16_t)n;
+      for(int i=0;i<n;++i){
         const String ssid=WiFi.SSID(i);if(ssid.isEmpty())continue;
-        ++wifiLastVisibleCount;
-        if(nearbyCount<5)nearbyNames[nearbyCount++]=ssid;
-        if(out[out.length()-1]!='[')out+=",";
-        out+="{\"ssid\":"+quoteJson(ssid)+",\"rssi\":"+String(WiFi.RSSI(i))+"}";
+        uint8_t k=0;while(k<wifiNetworkCount && wifiNetworks[k].ssid!=ssid)++k;
+        if(k>=28)continue;
+        if(k==wifiNetworkCount || WiFi.RSSI(i)>wifiNetworks[k].rssi){
+          wifiNetworks[k].ssid=ssid;wifiNetworks[k].rssi=WiFi.RSSI(i);
+          wifiNetworks[k].channel=(uint8_t)WiFi.channel(i);
+        }
+        if(k==wifiNetworkCount)++wifiNetworkCount;
       }
-      out+="]}";
-      if(!wifiLastVisibleCount){wifiStartDriverFallback(now,0);return;}
-      ++wifiScanSuccesses;wifiFinishScan(now,out);return;
-    }
-    if(wifiScanPhase==BusaScanPhase::DriverSettling){
-      if(!elapsed(now,wifiPhaseAt,BUSA_SCAN_SETTLE_MS))return;
-      WiFi.enableSTA(true);
-      wifi_scan_config_t cfg={};
-      cfg.show_hidden=false;cfg.scan_type=WIFI_SCAN_TYPE_ACTIVE;
-      cfg.scan_time.active.min=100;cfg.scan_time.active.max=160;
-      // Blocking IDF scan keeps result ownership in this call, avoiding async callback races.
-      const esp_err_t rc=esp_wifi_scan_start(&cfg,true);
-      now=millis();wifiLastScanErr=(int)rc;
-      if(rc!=ESP_OK){
-        ++wifiScanFailures;
-        wifiFinishScan(now,"{\"scanning\":false,\"error\":\"scan_driver_start_failed\",\"networks\":[]}");
-        return;
-      }
-      uint16_t discovered=0;
-      esp_err_t err=esp_wifi_scan_get_ap_num(&discovered);
-      wifiLastRecordsErr=(int)err;
-      if(err!=ESP_OK){
-        ++wifiScanFailures;esp_wifi_clear_ap_list();
-        wifiFinishScan(now,"{\"scanning\":false,\"error\":\"scan_driver_count_failed\",\"networks\":[]}");
-        return;
-      }
-      wifiLastApCount=discovered;
-      const uint16_t limit=discovered>28?28:discovered;
-      wifi_ap_record_t* records=limit?new(std::nothrow) wifi_ap_record_t[limit]:nullptr;
-      if(limit && !records){
-        ++wifiScanFailures;esp_wifi_clear_ap_list();
-        wifiFinishScan(now,"{\"scanning\":false,\"error\":\"scan_no_memory\",\"networks\":[]}");
-        return;
-      }
-      uint16_t used=limit;
-      err=limit?esp_wifi_scan_get_ap_records(&used,records):esp_wifi_clear_ap_list();
-      wifiLastRecordsErr=(int)err;
-      if(err!=ESP_OK){
-        delete[] records;++wifiScanFailures;esp_wifi_clear_ap_list();
-        wifiFinishScan(now,"{\"scanning\":false,\"error\":\"scan_driver_results_failed\",\"networks\":[]}");
-        return;
-      }
-      wifiLastRecordCount=used;wifiLastVisibleCount=0;nearbyCount=0;
-      String out="{\"scanning\":false,\"networks\":[";
-      for(uint16_t i=0;i<used;++i){
-        char name[33];memcpy(name,records[i].ssid,32);name[32]=0;
-        String ssid(name);if(ssid.isEmpty())continue;
-        ++wifiLastVisibleCount;
-        if(nearbyCount<5)nearbyNames[nearbyCount++]=ssid;
-        if(out[out.length()-1]!='[')out+=",";
-        out+="{\"ssid\":"+quoteJson(ssid)+",\"rssi\":"+String((int)records[i].rssi)+"}";
-      }
-      delete[] records;
-      out+="]}";++wifiScanSuccesses;wifiFinishScan(now,out);return;
+      wifiLastVisibleCount=wifiNetworkCount;WiFi.scanDelete();
+      // Empty channel is valid, not an error and not a reason to reconnect.
+      if(wifiScanChannel>=wifiScanLastChannel){wifiFinishScan();return;}
+      ++wifiScanChannel;wifiScanTries=0;wifiPhaseAt=now;
+      wifiScanPhase=BusaScanPhase::HomePause;return;
     }
     return;
   }
-  if(WiFi.status()==WL_CONNECTED){
-    wifiConnectPending=false;lastStationCheck=now;return;
+  const bool connected=WiFi.status()==WL_CONNECTED;
+  if(wifiConnecting && connected){
+    wifiConnecting=false;wifiFailureStreak=0;wifiCloudPaused.store(false);
   }
-  if(stationSsid.isEmpty()||stationPass.length()<8){wifiConnectPending=false;return;}
-  if(wifiConnectPending){
-    if(!elapsed(now,wifiConnectAt,1500))return;
-    wifiConnectPending=false;lastStationCheck=now;++wifiConnectAttempts;
-    WiFi.setAutoReconnect(true);
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-  }else if(elapsed(now,lastStationCheck,30000)){
-    lastStationCheck=now;++wifiConnectAttempts;
-    WiFi.setAutoReconnect(true);
-    WiFi.reconnect();
+  if(wifiConnecting){
+    // A client arrived during STA association: stop that attempt, keep AP.
+    if(local){WiFi.disconnect(false,false);wifiQueueRetry(now,false);wifiDeferredForLocal=true;return;}
+    if(elapsed(now,wifiConnectAt,BUSA_CONNECT_TIMEOUT_MS) ||
+       wifiDisconnectCount.load()!=wifiAttemptDisconnects){
+      WiFi.disconnect(false,false);wifiQueueRetry(now,true);
+    }
+    return;
   }
+  if(connected && !wifiConnectPending){wifiDeferredForLocal=false;wifiCloudPaused.store(false);return;}
+  if(!wifiHasCredentials()){wifiConnectPending=false;wifiCloudPaused.store(false);return;}
+  if(!connected && !wifiConnectPending)wifiQueueRetry(now,true);
+  wifiDeferredForLocal=local || !elapsed(now,wifiLastLocalAt,BUSA_LOCAL_QUIET_MS);
+  if(wifiDeferredForLocal){wifiJoinSettling=false;wifiCloudPaused.store(false);return;}
+  if(!elapsed(now,wifiPolicyAt,BUSA_BOOT_GRACE_MS) || !elapsed(now,wifiRetryAt,wifiRetryDelay))return;
+  if(!wifiJoinSettling){
+    WiFi.setAutoReconnect(false);WiFi.disconnect(false,false);
+    wifiJoinSettling=true;wifiPhaseAt=now;wifiCloudPaused.store(true);return;
+  }
+  if(!elapsed(now,wifiPhaseAt,BUSA_SCAN_SETTLE_MS))return;
+  wifiJoinSettling=false;wifiConnectPending=false;wifiConnecting=true;
+  wifiConnectAt=now;wifiAttemptDisconnects=wifiDisconnectCount.load();++wifiConnectAttempts;
+  WiFi.begin(stationSsid.c_str(),stationPass.c_str());
 }

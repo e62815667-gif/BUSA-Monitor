@@ -1,9 +1,9 @@
 from pathlib import Path
-import subprocess, tempfile, sys
+import subprocess, tempfile, sys, os
 src=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
 parsers=src[src.index('bool cloudShaIsValid('):src.index('// Sending is one-way HTTPS.')]
 helpers=parsers+src[src.index('class GoogleReplyBuffer'):src.index('void googleConfigureHttp')]
-roots=list(Path.home().glob('Arduino/libraries/ArduinoJson/src/ArduinoJson.h'))
+roots=([Path(os.environ['BUSA_ARDUINOJSON_SRC'])/'ArduinoJson.h'] if os.getenv('BUSA_ARDUINOJSON_SRC') else list(Path.home().glob('Arduino/libraries/ArduinoJson/src/ArduinoJson.h')))
 assert roots, 'ArduinoJson library missing'
 stub=r'''
 #include <string>

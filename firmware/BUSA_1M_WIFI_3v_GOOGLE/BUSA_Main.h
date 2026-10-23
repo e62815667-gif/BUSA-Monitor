@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v24-N8R2-IP16-SCAN-ISOLATED";
+const char VERSION[]="БУСА 1М WiFi 14v25-N8R2-LOCAL-WIFI-PRIORITY";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -872,7 +872,8 @@ bool apClient(){return server.client().localIP()==WiFi.softAPIP();}
 
 String apPassword="";
 bool wifiRunning=false;
-uint32_t lastRender=0,lastUart=0,lastStationCheck=0;
+uint32_t lastRender=0,lastUart=0;
+uint32_t webMaxServiceMs=0,loopMaxGapMs=0,lastLoopStart=0;
 String consoleLine="",stationSsid="",stationPass="";
 String quoteJson(const String &x){
   String out="\"";
@@ -1073,6 +1074,7 @@ String statusJSON(){
   s+=",\"local_client\":"+(WiFi.softAPgetStationNum()>0?String("true"):String("false"));
   s+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"))+"}";
   s+=",\"wifi_recovery\":"+wifiRecoveryJSON();
+  s+=",\"web_health\":{\"max_service_ms\":"+String(webMaxServiceMs)+",\"max_loop_gap_ms\":"+String(loopMaxGapMs)+"}";
   s+=",\"station\":{\"ssid\":"+quoteJson(stationSsid);
   s+=",\"connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():String(""))+"}";
@@ -1414,7 +1416,8 @@ main>*{max-width:100%;min-width:0}
 <div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net"><option value="">Выберите сеть из списка</option></select>
-<p class="hint">Найди Wi-Fi сети 2,4 ГГц, выбери сеть из списка и введи пароль.</p>
+<label for="manualSsid">Имя сети вручную (если её нет в списке)</label><input id="manualSsid" maxlength="32" placeholder="Точное имя точки доступа">
+<p class="hint">Для iPhone 16 включи «Максимальная совместимость» в режиме модема и оставь этот экран открытым во время поиска. Локальная сеть БУСА имеет приоритет: новое подключение к интернету ждёт отключения локального телефона.</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна при подключении к защищённой сети БУСА. Пароль остаётся на контроллере.</p></div>
@@ -1753,7 +1756,7 @@ if(Number.isFinite(currentPulse)){
  lastWaterPulse=currentPulse;waterPulseLog.push(delta);
  if(waterPulseLog.length>80)waterPulseLog.shift();
 }
-let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
+let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');if(s.wifi_recovery?.sta_deferred_for_local)ss='Локальная сеть работает. Подключение к интернету отложено до отключения локального телефона.';get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
 if(s.station.connected&&s.station.ssid){
  let select=get('net'),found=Array.from(select.options).some(o=>o.value===s.station.ssid);
  if(!found)select.add(new Option(s.station.ssid+' (подключена)',s.station.ssid));
@@ -1817,7 +1820,7 @@ if(s.keypad){
      station_connected:s.station?.connected,ap_enabled:s.ap?.enabled,
      network_indicators:s.network_indicators,google:s.google,
      water_calibration:s.water?.calibration,
-     wifi_recovery:s.wifi_recovery,
+     wifi_recovery:s.wifi_recovery,web_health:s.web_health,
      relay_outputs_enabled:s.relays_enabled
    },null,2);
    const report=get('diagReport');
@@ -1980,10 +1983,10 @@ get('scan').onclick=async function(){
   finally{this.disabled=false;}
 };
 get('save').onclick=async function(){
-  const ssid=get('net').value,pass=get('pass').value;
+  const ssid=get('manualSsid').value.trim()||get('net').value,pass=get('pass').value;
   const nameBytes=new TextEncoder().encode(ssid).length;
   if(!ssid||nameBytes>32||pass.length<8||pass.length>63){
-    get('response').textContent='Выбери сеть из списка и введи пароль (8–63 символа).';return;
+    get('response').textContent='Выбери сеть или введи её имя и пароль (8–63 символа).';return;
   }
   this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
   try{
@@ -2065,7 +2068,7 @@ void setup(){
   }
   setupGoogleCloud();
   WiFi.persistent(false); // Credentials live only in application Preferences.
-  WiFi.setAutoReconnect(true); // Same STA connection policy as V14.14.
+  WiFi.setAutoReconnect(false); // Only wifiRecoveryTick owns STA attempts.
   WiFi.onEvent(wifiRecoveryEvent);
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
@@ -2074,15 +2077,12 @@ void setup(){
   // Private STA password must be provisioned into NVS after public GitHub build;
   // no STA password is embedded in this public source. Local AP fallback remains.
   apPassword="BUSA"+String((uint32_t)ESP.getEfuseMac(),HEX);
-  wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
+  wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),BUSA_AP_CHANNEL,false,4);
+  esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
   updateBootStage(1);
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str());
-  if(stationSsid.length() && stationPass.length()>=8){
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-    lastStationCheck=millis();++wifiConnectAttempts;wifiConnectPending=false;
-    Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
-  }else Serial0.println("STA config missing: preprovision NVS before use; AP stays available");
+  wifiStartPolicy(millis()); // Boot grace permits the local phone to attach first.
   server.on("/",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store, max-age=0");
     server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);
@@ -2294,13 +2294,9 @@ void setup(){
     bool ok=(prefs.putString("ssid",ssid)>0 && prefs.putString("pass",pass)>0);
     if(!ok){server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;}
     stationSsid=ssid;stationPass=pass;
-    wifiCancelScan();
-    // Restore V14.14 immediate STA connection, AP remains active.
-    WiFi.disconnect(false,false);
-    WiFi.setAutoReconnect(true);
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-    lastStationCheck=millis();++wifiConnectAttempts;wifiConnectPending=false;
-    server.send(200,"text/plain; charset=utf-8","Wi-Fi сохранён. Подключение к сети запущено.");
+    wifiCancelRequested=true;
+    wifiScheduleConnect(millis());
+    server.send(202,"text/plain; charset=utf-8","Wi-Fi сохранён. Локальная сеть имеет приоритет. Для подключения к интернету отключи телефон от сети БУСА минимум на 25 секунд, затем подключись снова.");
   });
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
@@ -2462,8 +2458,13 @@ void loop(){
   uint32_t now=millis();
   relaySimTick(now);
   ledSimTick(now);
+  if(lastLoopStart){const uint32_t gap=now-lastLoopStart;if(gap>loopMaxGapMs)loopMaxGapMs=gap;}
+  lastLoopStart=now;
+  wifiRecoveryTick(now);
+  const uint32_t webStart=millis();
   server.handleClient();
-  wifiRecoveryTick(millis());
+  const uint32_t webElapsed=millis()-webStart;
+  if(webElapsed>webMaxServiceMs)webMaxServiceMs=webElapsed;
   readConsole();
   if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.

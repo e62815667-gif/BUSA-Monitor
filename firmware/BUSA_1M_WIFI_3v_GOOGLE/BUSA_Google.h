@@ -167,7 +167,7 @@ void googleWorker(void* unused){
       if(googleEnabled)googleState=1;
       continue;
     }
-    if(otaActive)continue;
+    if(otaActive || wifiCloudPaused.load())continue;
     const uint32_t netNow=millis();
     if((uint32_t)(netNow-lastNetProbe)>=15000){
       lastNetProbe=netNow;
@@ -179,7 +179,7 @@ void googleWorker(void* unused){
       googleInternet=(dns==1 && probe.connect(remote,443,1600))?1:0;
       probe.stop();
     }
-    if(!googleEnabled || otaActive)continue;
+    if(!googleEnabled || otaActive || wifiCloudPaused.load())continue;
     if(time(nullptr)<1700000000){googleState=2;continue;}
     const uint32_t now=millis();
     if(!googleTestRequested && (uint32_t)(now-last)<30000)continue;
