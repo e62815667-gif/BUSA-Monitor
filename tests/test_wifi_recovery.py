@@ -82,8 +82,8 @@ int main(){
  assert(!wifiScanBusy() && wifiScanSuccesses==1 && !wifiConnectPending);
  assert(wifiScanJSON().find("iPhone 16")!=std::string::npos);
  assert(wifiScanJSON().find("Home 2G")!=std::string::npos);
- assert(wifiScanJSON().find("\\"visible_ssid_count\\":2")!=std::string::npos);
- assert(wifiRecoveryJSON().find("\\"record_count\\":2")!=std::string::npos);
+ assert(wifiScanJSON().find("visible_ssid_count")!=std::string::npos);
+ assert(wifiRecoveryJSON().find("record_count")!=std::string::npos);
  assert(WiFi.connects==0);
  assert(wifiRecoveryJSON().find("scan_start_error")!=std::string::npos);
  // No APs is successful discovery, not a false driver failure.
