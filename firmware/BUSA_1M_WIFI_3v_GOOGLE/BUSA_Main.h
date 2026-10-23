@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v18-N8R2-WIFI-IDF-SCAN-CLOUD-OTA";
+const char VERSION[]="БУСА 1М WiFi 14v19-N8R2-V149-STA-DS18B20-IDF-SCAN";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -87,14 +87,11 @@ void sampleTemperatures(uint32_t now){
         sensors[i]->requestTemperatures();
       }else {temperature[i]=NAN;tempAt[i]=0;}
     }
-    // A conversion cycle exists only if at least one DS18B20 was detected.
-    // Otherwise continue non-blocking bus diagnostics without a fake wait.
-    bool anyPresent=false;
-    for(int i=0;i<4;i++)if(tempPresent[i])anyPresent=true;
-    // When all 1-Wire buses are absent, do not create a conversion wait.
-    // Keep the diagnostic probes free to sample their bus state.
-    tempConverting=anyPresent;
-    tempRequestAt=anyPresent?now:0;
+    // V14.9 acquisition cadence: each cycle is 2.5s; use 12-bit
+    // nonblocking conversion followed by an 825ms readout window.
+    // Keep V14.18 unique-ROM validation in hasTemp() to avoid falsely
+    // accepting measurements from miswired or ambiguous channels.
+    tempConverting=true;tempRequestAt=now;
   }
   for(int i=0;i<4;i++)if(tempAt[i] && elapsed(now,tempAt[i],7000)){
     temperature[i]=NAN;tempAt[i]=0;
@@ -2094,7 +2091,7 @@ void setup(){
   }
   setupGoogleCloud();
   WiFi.persistent(false); // Credentials live only in application Preferences.
-  WiFi.setAutoReconnect(false); // One owner: wifiRecoveryTick, including during scans.
+  WiFi.setAutoReconnect(true); // Restore the proven V14.9 STA reconnect policy.
   WiFi.onEvent(wifiRecoveryEvent);
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
@@ -2108,7 +2105,9 @@ void setup(){
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str());
   if(stationSsid.length() && stationPass.length()>=8){
-    wifiScheduleConnect(millis());
+    // V14.9 starts STA immediately for saved credentials (no deferred state).
+    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    lastStationCheck=millis();++wifiConnectAttempts;wifiConnectPending=false;
     Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
   }else Serial0.println("STA config missing: preprovision NVS before use; AP stays available");
   server.on("/",HTTP_GET,[]{server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
@@ -2298,7 +2297,10 @@ void setup(){
     if(!ok){server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;}
     stationSsid=ssid;stationPass=pass;
     wifiCancelScan();
-    wifiScheduleConnect(millis()); // Begin in loop after the HTTP response, with a settle delay.
+    // V14.9: initiate STA connection immediately after saving selected SSID.
+    WiFi.disconnect(false,false);
+    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    lastStationCheck=millis();++wifiConnectAttempts;wifiConnectPending=false;
     server.send(200,"text/plain; charset=utf-8","Wi-Fi сохранён. Подключение к сети запущено.");
   });
   server.on("/api/page",HTTP_GET,[]{
