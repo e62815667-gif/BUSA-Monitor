@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v21-N8R2-WIFI-DUAL-SCAN-DIAG";
+const char VERSION[]="БУСА 1М WiFi 14v22-N8R2-V1414-WIFI-SCAN";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -1411,9 +1411,7 @@ main>*{max-width:100%;min-width:0}
 <div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net"><option value="">Выберите сеть из списка</option></select>
-<p class="hint">Поиск может временно не видеть точку доступа телефона. В этом случае укажите имя сети вручную, без сканирования.</p>
-<label for="manualSsid">Имя сети Wi-Fi вручную (SSID)</label>
-<input id="manualSsid" type="text" maxlength="32" autocomplete="off" placeholder="Например, iPhone 16">
+<p class="hint">Найди Wi-Fi сети 2,4 ГГц, выбери сеть из списка и введи пароль.</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна при подключении к защищённой сети БУСА. Пароль остаётся на контроллере.</p></div>
@@ -1941,8 +1939,7 @@ get('manualUpdate').onclick=async function(){
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
   finally{otaUiUploading=false;this.disabled=false;}
 };
-get('net').onchange=()=>{if(get('net').value){get('manualSsid').value='';get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.';}};
-get('manualSsid').oninput=()=>{if(get('manualSsid').value.trim())get('net').value='';};
+get('net').onchange=()=>{if(get('net').value)get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.';};
 get('scan').onclick=async function(){
   this.disabled=true;get('response').textContent='Идёт поиск сетей...';
   try{
@@ -1961,17 +1958,17 @@ get('scan').onclick=async function(){
     (j.networks||[]).forEach(w=>{if(!w.ssid||seen.has(w.ssid))return;seen.add(w.ssid);sel.add(new Option(w.ssid+' ('+w.rssi+' dBm)',w.ssid));});
     if(previous&&seen.has(previous))sel.value=previous;
     const count=sel.options.length-1;
-    get('response').textContent=j.scanning?'Поиск не завершился. Введи имя сети вручную.':
-      j.error?'Поиск Wi-Fi недоступен: '+j.error+'. Введи имя сети вручную.':
-      count?'Найдено сетей: '+count:'Найдено: 0. Введи имя Wi-Fi вручную ниже.';
-  }catch(e){get('response').textContent='Ошибка поиска: '+e.message+'. Введи имя сети вручную.';}
+    get('response').textContent=j.scanning?'Поиск ещё выполняется. Нажми повторно через несколько секунд.':
+      j.error?'Ошибка поиска: '+j.error+'. Открой Диагностику и скопируй отчёт.':
+      count?'Найдено сетей: '+count:'Найдено 0 сетей. Проверь 2,4 ГГц и скопируй диагностику.';
+  }catch(e){get('response').textContent='Ошибка поиска: '+e.message+'. Скопируй диагностику.';}
   finally{this.disabled=false;}
 };
 get('save').onclick=async function(){
-  const ssid=(get('manualSsid').value.trim()||get('net').value).trim(),pass=get('pass').value;
+  const ssid=get('net').value,pass=get('pass').value;
   const nameBytes=new TextEncoder().encode(ssid).length;
   if(!ssid||nameBytes>32||pass.length<8||pass.length>63){
-    get('response').textContent='Введите имя сети (до 32 байт) и пароль (8–63 символа).';return;
+    get('response').textContent='Выбери сеть из списка и введи пароль (8–63 символа).';return;
   }
   this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
   try{
@@ -2053,7 +2050,7 @@ void setup(){
   }
   setupGoogleCloud();
   WiFi.persistent(false); // Credentials live only in application Preferences.
-  WiFi.setAutoReconnect(false); // One owner: wifiRecoveryTick, including during scans.
+  WiFi.setAutoReconnect(true); // Same STA connection policy as V14.14.
   WiFi.onEvent(wifiRecoveryEvent);
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
@@ -2067,7 +2064,8 @@ void setup(){
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str());
   if(stationSsid.length() && stationPass.length()>=8){
-    wifiScheduleConnect(millis());
+    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    lastStationCheck=millis();++wifiConnectAttempts;wifiConnectPending=false;
     Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
   }else Serial0.println("STA config missing: preprovision NVS before use; AP stays available");
   server.on("/",HTTP_GET,[]{server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
@@ -2256,7 +2254,11 @@ void setup(){
     if(!ok){server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;}
     stationSsid=ssid;stationPass=pass;
     wifiCancelScan();
-    wifiScheduleConnect(millis()); // Begin in loop after the HTTP response, with a settle delay.
+    // Restore V14.14 immediate STA connection, AP remains active.
+    WiFi.disconnect(false,false);
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    lastStationCheck=millis();++wifiConnectAttempts;wifiConnectPending=false;
     server.send(200,"text/plain; charset=utf-8","Wi-Fi сохранён. Подключение к сети запущено.");
   });
   server.on("/api/page",HTTP_GET,[]{
