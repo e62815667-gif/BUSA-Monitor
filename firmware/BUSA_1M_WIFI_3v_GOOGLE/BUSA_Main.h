@@ -1639,6 +1639,9 @@ function renderTemperatureBindings(s){
 function temperatureConnectionLost(){
  for(let i=0;i<4;i++){get('t'+i).textContent='НЕТ СВЯЗИ';get('ts'+i).textContent='Измерение не обновляется';get('t'+i).classList.add('warn');}
  get('lastTUpdate').textContent='Связь потеряна. Показания не подтверждены.';
+ get('temperatures').textContent='Текущие измерения недоступны';
+ get('temperatureDetails').textContent='Нет ответа ESP32';
+ get('temperatureInventory').textContent='Нет связи. Для обновления ROM и показаний подключись к БУСА.';
  const dot=get('dataLed');if(dot)dot.classList.remove('dataOn');
 }
 for(let i=0;i<4;i++)get('bind'+i).onchange=()=>{bindingsDirty=true;};

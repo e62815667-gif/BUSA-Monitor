@@ -8,7 +8,7 @@ for(const t of [{c:25,verified:false},{c:null,verified:true},{c:'25',verified:tr
 for(const c of [-55,-12.5,0,85,125])assert(context.temperatureView({c,verified:true,gpio:16}).valid);
 assert(context.temperatureView({c:null,verified:false,gpio:18,error:'NO_PRESENCE'}).detail.includes('Нет ответа'));
 const fields={};for(let i=0;i<4;i++){fields['t'+i]={textContent:'26',classList:{add(){}}};fields['ts'+i]={textContent:'OK'};}
-fields.lastTUpdate={};fields.dataLed={classList:{remove(){}}};
+fields.lastTUpdate={};fields.temperatures={};fields.temperatureDetails={};fields.temperatureInventory={};fields.dataLed={classList:{remove(){}}};
 const lost=src.slice(src.indexOf('function temperatureConnectionLost(){'),src.indexOf("for(let i=0;i<4;i++)get('bind'",src.indexOf('function temperatureConnectionLost(){')));
 context.get=id=>fields[id];vm.runInContext(lost,context);context.temperatureConnectionLost();
 assert.equal(fields.t0.textContent,'НЕТ СВЯЗИ');assert(fields.lastTUpdate.textContent.includes('потеряна'));
