@@ -199,7 +199,12 @@ String temperatureInventoryJSON(uint32_t now){
     const bool valid=tempProbeClean(wireProbe[b])&&tempRomUniqueAcrossBuses(d.rom)&&d.hasSample&&d.external&&!elapsed(now,d.sampledAt,TEMP_STALE_MS);
     s+="{\"bus\":"+String(b)+",\"gpio\":"+String(TPIN[b])+",\"rom\":"+quoteJson(romHex(d.rom));
     s+=",\"verified\":"+String(valid?"true":"false")+",\"c\":"+(valid?String(d.value,2):String("null"));
-    s+=",\"error\":"+quoteJson(valid?String("OK"):String(d.error))+"}";
+    String error=valid?String("OK"):String(d.error);
+    if(wireProbe[b].overflow)error="TOO_MANY_ROMS";
+    else if(wireProbe[b].searchNoise)error="ROM_SEARCH_NOISE";
+    else if(!tempRomUniqueAcrossBuses(d.rom))error="ROM_ON_MULTIPLE_BUSES";
+    else if(d.hasSample && elapsed(now,d.sampledAt,TEMP_STALE_MS))error="STALE_READING";
+    s+=",\"error\":"+quoteJson(error)+"}";
   }
   return s+"]";
 }

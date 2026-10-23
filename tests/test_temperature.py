@@ -66,7 +66,7 @@ int main(){
  assert(!tempParseSelection("4:28FF641E23973CAB",parsed));assert(!tempParseSelection("1:28FF641E23973CA0",parsed));assert(tempParseSelection("auto",parsed)&&!parsed.explicitRom);
  TempBindingRecord r={};r.magic=0x42544D50;r.version=1;memcpy(r.bindings,binds,sizeof binds);r.crc=OneWire::crc8((uint8_t*)&r,offsetof(TempBindingRecord,crc));assert(tempBindingRecordValid(r));r.bindings[1].rom[1]^=1;assert(!tempBindingRecordValid(r));
  // A stale cached sample must not be published; bad scratchpad invalidates it.
- assert(!hasTemp(0,nowMs+7000));buses[0].devices[0].scratch[8]^=1;run(3000);assert(wireError(0,nowMs)=="SCRATCHPAD_CRC_BAD"&&!hasTemp(0,nowMs));
+ assert(!hasTemp(0,nowMs+7000));assert(temperatureInventoryJSON(nowMs+7000).find("STALE_READING")!=std::string::npos);buses[0].devices[0].scratch[8]^=1;run(3000);assert(wireError(0,nowMs)=="SCRATCHPAD_CRC_BAD"&&!hasTemp(0,nowMs));
  buses[0].devices[0]=sensor(1,-12.5);run(3000);assert(hasTemp(0,nowMs)&&temperature[0]==-12.5f);
  // Real 85 C is allowed after a conversion; the documented POR signature is rejected.
  buses[0].devices[0]=sensor(1,85);run(3000);assert(hasTemp(0,nowMs)&&temperature[0]==85);
@@ -74,7 +74,7 @@ int main(){
  run(3000);assert(wireError(0,nowMs)=="POWER_ON_RESET");
  // Disconnected buses recover through periodic discovery; cross-bus ROM aliases fail closed.
  buses[0].devices={sensor(1,30)};buses[2].devices={sensor(1,30)};restart();run(3000);
- assert(wireError(0,nowMs)=="ROM_ON_MULTIPLE_BUSES"&&!hasTemp(0,nowMs));
+ assert(wireError(0,nowMs)=="ROM_ON_MULTIPLE_BUSES"&&!hasTemp(0,nowMs));assert(temperatureInventoryJSON(nowMs).find("ROM_ON_MULTIPLE_BUSES")!=std::string::npos);
  buses[2].devices.clear();buses[0].devices[0].external=false;restart();run(3000);
  assert(wireError(0,nowMs)=="PARASITE_POWER_UNSUPPORTED"&&!hasTemp(0,nowMs));
  buses[0].devices[0].external=true;buses[0].low=true;wireProbe[0]=OneWireProbe();tempBus[0]=TempBusState();run(1500);assert(wireError(0,nowMs)=="LINE_LOW");
