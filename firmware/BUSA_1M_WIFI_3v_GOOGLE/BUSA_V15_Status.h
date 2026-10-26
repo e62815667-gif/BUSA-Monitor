@@ -3,9 +3,10 @@
 String statusJSON(){
   uint32_t now=millis();
   String s;
-  s.reserve(6000);
+  s.reserve(8192);
   s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
-  s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
+  s+=",\"mode\":\"TEMPERATURE_SOUND_MONITOR\",\"relays_enabled\":true,\"pwm_enabled\":false";
+  s+=",\"sound_alarms\":"+alarmStatusJSON(now);
   s+=",\"architecture\":"+v15ArchitectureJSON();
   s+=",\"leds\":"+ledSimJSON();
   s+=",\"relay_simulation\":"+relaySimJSON();
