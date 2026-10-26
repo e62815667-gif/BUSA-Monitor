@@ -154,7 +154,12 @@ void temperatureTick(uint32_t now){
     if(elapsed(now,p.checkedAt,TEMP_PROBE_MS) || (!p.presence && elapsed(now,p.checkedAt,2000U)))st.phase=TempPhase::Probe;
     else if(elapsed(now,st.cycleAt,TEMP_CYCLE_MS) && tempProbeClean(p))st.phase=TempPhase::Start;
   }
-  tempSyncLogical(millis());
+  // A 500 ms UI snapshot period avoids redundant ROM/CRC/memcmp work every loop.
+  static uint32_t lastSync=0;
+  if(!lastSync || elapsed(now,lastSync,500U)){
+    tempSyncLogical(now);
+    lastSync=now;
+  }
 }
 // Atomic persisted record: no automatic assignment of two ROMs to named roles.
 struct TempBindingRecord {uint32_t magic;uint8_t version,reserved[3];TempBinding bindings[4];uint8_t crc;};
@@ -193,7 +198,7 @@ bool tempParseSelection(const String& selection,TempBinding& b){
   return tempRomValid(b.rom);
 }
 String temperatureInventoryJSON(uint32_t now){
-  String s="[";
+  String s;s.reserve(2300);s="[";
   for(int b=0;b<4;b++)for(int k=0;k<wireProbe[b].count;k++){
     const auto& d=wireProbe[b].devices[k];if(s.length()>1)s+=",";
     const bool valid=tempProbeClean(wireProbe[b])&&tempRomUniqueAcrossBuses(d.rom)&&d.hasSample&&d.external&&!elapsed(now,d.sampledAt,TEMP_STALE_MS);
@@ -209,7 +214,7 @@ String temperatureInventoryJSON(uint32_t now){
   return s+"]";
 }
 String temperatureDiagnosticsJSON(uint32_t now){
-  String s="[";
+  String s;s.reserve(1800);s="[";
   for(int i=0;i<4;i++){
     const int b=tempBusForLogical(i),k=tempDeviceForLogical(i);const auto& p=wireProbe[b];if(i)s+=",";
     s+="{\"gpio\":"+String(TPIN[b])+",\"probe_ms\":"+String(p.checkedAt);
