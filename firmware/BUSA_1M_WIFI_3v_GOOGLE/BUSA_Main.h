@@ -1,8 +1,8 @@
 #pragma once
 /*
   BUSA-1M-001 БУСА 1М WiFi 3v-GOOGLE
-  ESP32-S3 N8R2 44-pin, TFT GMT028-05 V1.1 320x240 landscape, monitoring-only.
-  LOW-VOLTAGE MONITORING ONLY. DO NOT DRIVE RELAYS OR POWER OUTPUTS.
+  ESP32-S3 N8R2 44-pin, TFT GMT028-05 V1.1 320x240; temperature monitoring with low-voltage audio alerts.
+  Four relay channels are dedicated to 12 V sound annunciators only.
   Approved hardware scope: mains power controller and motorized valve are
   REMOVED from this project; they are operated manually, outside ESP32.
   Approved informational section "Отбор" is retained without actuator control.
@@ -1196,8 +1196,8 @@ main>*{max-width:100%;min-width:0}
 <div class="row">Время работы <b id="uptime">—</b></div>
 <div class="row">PCF8575 <b id="pcf">—</b></div>
 <div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div>
-<h2>К1–К4 · виртуальная проверка (выходы отключены)</h2>
-<p class="hint">Только программная имитация на 10 секунд. Никаких сигналов на GPIO4–7 и PCA9685; фактические контакты и питание 12 В не измеряются.</p>
+<h2>К1–К4 · отдельная виртуальная проверка</h2>
+<p class="hint">Эти кнопки запускают только программный тест на 10 секунд. Настоящие К1–К4 управляют звуковыми сигналами по температурным порогам, настроенным на вкладке «Температуры».</p>
 <div class="row">Виртуальный канал <b id="relaySimChannel">0 / 4</b></div>
 <div class="row">Оставшееся время <b id="relaySimRemaining">0 с</b></div>
 <div class="row">Контакты реле <b>НЕ ПОДТВЕРЖДЕНЫ</b></div>
@@ -1208,7 +1208,7 @@ main>*{max-width:100%;min-width:0}
 <button type="button" data-relay-sim="4">Тест К4</button>
 </div>
 <button type="button" class="full" id="relaySimStop">СТОП · отмена виртуального теста</button>
-<p id="relaySimResult" role="status" class="hint">Реле физически заблокированы.</p>
+<p id="relaySimResult" role="status" class="hint">Виртуальный тест не изменяет состояние звуковых сигналов K1–K4.</p>
 <h2>PCA9685 · 11 светодиодных каналов · тест</h2>
 <p class="hint">Подтверждено владельцем: отдельные светодиоды на 3,3 В, 11 цветовых каналов. Для физического включения через PCA9685 ещё нужно подтвердить токоограничение и состояние OE. Ниже доступен виртуальный тест на 8 секунд; лампочки он не зажигает.</p>
 <div class="row">Тип и питание <b>Отдельные LED, 3,3 В</b></div>
@@ -1369,7 +1369,7 @@ get('screenWake').onclick=()=>setScreenPower('wake');
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
 get('keyNext').onclick=()=>keyCommand('next');
 get('tftSave').onclick=async()=>{
- if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Реле остаются отключены.'))return;
+ if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Звуковые каналы временно отключаются при перезагрузке.'))return;
  try{
   const r=await localFetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value,rotation:get('tftRotation').value})});
   get('tftProfileStatus').textContent=await r.text();
