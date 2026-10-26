@@ -2,10 +2,11 @@
 from pathlib import Path
 root=Path("firmware/BUSA_1M_WIFI_3v_GOOGLE")
 main=(root/"BUSA_Main.h").read_text(encoding="utf-8")
+main+="".join((root/n).read_text(encoding="utf-8") for n in ("BUSA_V15_Board.h","BUSA_V15_RelayModel.h","BUSA_V15_Status.h","BUSA_V15_Runtime.h"))
 temps=(root/"BUSA_Temperature.h").read_text(encoding="utf-8")
 wifi=(root/"BUSA_WifiRecovery.h").read_text(encoding="utf-8")
 google=(root/"BUSA_Google.h").read_text(encoding="utf-8")
-assert "14v27-N8R2-USER-PATCH-FINAL" in main
+assert "15v0-N8R2-MODULAR-MONITOR" in main
 assert 'String statusJSON(){' in main
 assert 's.reserve(6000);' in main
 assert 's.reserve(800);' in temps
@@ -23,4 +24,4 @@ assert 'RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false' in main
 assert 'kPhysicalOutputsApproved=false' in (root/'BUSA_PCA9685_Leds.h').read_text()
 assert 'digitalWrite(' not in main and 'ledcWrite(' not in main
 assert 'setInsecure(' not in main+google
-print('PASS V14.27 patch: exact user reserves/stack/TLS parser/AP password/Wi-Fi timeouts/frontend and safe output lock')
+print('PASS V15 migrated V14.27 fixes: reserve/stack/TLS/AP/Wi-Fi/front-end and unchanged physical output lock')
