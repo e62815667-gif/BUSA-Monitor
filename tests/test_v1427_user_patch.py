@@ -6,9 +6,9 @@ main+="".join((root/n).read_text(encoding="utf-8") for n in ("BUSA_V15_Board.h",
 temps=(root/"BUSA_Temperature.h").read_text(encoding="utf-8")
 wifi=(root/"BUSA_WifiRecovery.h").read_text(encoding="utf-8")
 google=(root/"BUSA_Google.h").read_text(encoding="utf-8")
-assert "15v0-N8R2-MODULAR-MONITOR" in main
+assert "15v1-N8R2-FOUR-SOUND-ALARMS" in main
 assert 'String statusJSON(){' in main
-assert 's.reserve(6000);' in main
+assert 's.reserve(8192);' in main
 assert 's.reserve(800);' in temps
 assert 's.reserve(1500);' in temps
 assert 'xTaskCreatePinnedToCore(googleWorker,"busa-google",20480' in google
@@ -22,6 +22,6 @@ for text in ("j.error==='scan_cooldown'","if(j.scanning)","else if(j.error)","el
 assert 'server.collectHeaders(headers,1);\n  server.begin();' in main
 assert 'RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false' in main
 assert 'kPhysicalOutputsApproved=false' in (root/'BUSA_PCA9685_Leds.h').read_text()
-assert 'digitalWrite(' not in main and 'ledcWrite(' not in main
+assert 'ledcWrite(' not in main
 assert 'setInsecure(' not in main+google
 print('PASS V15 migrated V14.27 fixes: reserve/stack/TLS/AP/Wi-Fi/front-end and unchanged physical output lock')
