@@ -44,7 +44,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v27-N8R2-SIMULTANEOUS-AP-STA";
+const char VERSION[]="БУСА 1М WiFi 14v27-N8R2-USER-PATCH-1";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -833,7 +833,9 @@ String cloudJSON(); // forward declaration; read-only Google status
 extern volatile int googleInternet; // external TCP health, no credentials
 String statusJSON(){
   uint32_t now=millis();
-  String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
+  String s;
+  s.reserve(6000);
+  s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
   s+=",\"leds\":"+ledSimJSON();
   s+=",\"relay_simulation\":"+relaySimJSON();
@@ -1898,7 +1900,7 @@ get('scan').onclick=async function(){
     let r=await localFetch('/api/wifi/scan?start=1',{cache:'no-store'});
     if(!r.ok)throw Error('сервер поиска вернул HTTP '+r.status);
     let j=await r.json();
-    for(let i=0;i<20&&j.scanning;i++){
+    for(let i=0;i<25&&j.scanning;i++){
       await new Promise(done=>setTimeout(done,1000));
       r=await localFetch('/api/wifi/scan',{cache:'no-store'});
       if(!r.ok)throw Error('сервер поиска вернул HTTP '+r.status);
@@ -1910,9 +1912,17 @@ get('scan').onclick=async function(){
     (j.networks||[]).forEach(w=>{if(!w.ssid||seen.has(w.ssid))return;seen.add(w.ssid);sel.add(new Option(w.ssid+' ('+w.rssi+' dBm)',w.ssid));});
     if(previous&&seen.has(previous))sel.value=previous;
     const count=sel.options.length-1;
-    get('response').textContent=j.scanning?'Поиск ещё выполняется. Нажми повторно через несколько секунд.':
-      j.error?'Ошибка поиска: '+j.error+'. Открой Диагностику и скопируй отчёт.':
-      count?'Найдено сетей: '+count:'Найдено 0 сетей. Проверь 2,4 ГГц и скопируй диагностику.';
+    if(j.scanning){
+      get('response').textContent='Поиск ещё выполняется. Подожди 5–10 секунд и проверь результат.';
+    }else if(j.error==='scan_cooldown'){
+      get('response').textContent='Подожди 3 секунды и нажми «Найти» снова.';
+    }else if(j.error){
+      get('response').textContent='Ошибка поиска: '+j.error+'. Открой «Диагностику» и скопируй отчёт.';
+    }else if(count){
+      get('response').textContent='Найдено сетей: '+count+'. Выбери сеть ниже, введи пароль и нажми «Сохранить и подключить».';
+    }else{
+      get('response').textContent='Сетей 2,4 ГГц не найдено. Введи имя сети вручную в поле выше.';
+    }
   }catch(e){get('response').textContent='Ошибка поиска: '+e.message+'. Скопируй диагностику.';}
   finally{this.disabled=false;}
 };
@@ -2015,7 +2025,12 @@ void setup(){
   clockNtpStarted=true;
   // Private STA password must be provisioned into NVS after public GitHub build;
   // no STA password is embedded in this public source. Local AP fallback remains.
-  apPassword="BUSA"+String((uint32_t)ESP.getEfuseMac(),HEX);
+  {
+    uint64_t mac=ESP.getEfuseMac();
+    char pwd[24];
+    snprintf(pwd,sizeof(pwd),"BUSA%016llX",(unsigned long long)mac);
+    apPassword=String(pwd);
+  }
   wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),BUSA_AP_CHANNEL,false,4);
   esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
   updateBootStage(1);
