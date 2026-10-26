@@ -1,10 +1,11 @@
 #pragma once
 // V15 boot and cooperative runtime. Included after all component declarations.
 void setup(){
+  alarmInitPins(); // GPIO7/6/5/4 inactive before radio/display boot
   relaySimStop("BOOT_SAFE");
   ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V14.1 LIGHT-WATER; physical outputs LOCKED");
+  Serial0.println("\nBUSA 1M WiFi V15.1: independent four-channel 12V sound alerts");
   Serial.begin(115200);
   delay(400);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
@@ -46,6 +47,7 @@ void setup(){
     if(!isfinite(refTemp[i])||refTemp[i]<0||refTemp[i]>125)refTemp[i]=NAN;
     if(!isfinite(noticeTemp[i])||noticeTemp[i]<0||noticeTemp[i]>125)noticeTemp[i]=NAN;
   }
+  alarmLoadSettings();
   setupGoogleCloud();
   WiFi.persistent(false); // Credentials live only in application Preferences.
   WiFi.setAutoReconnect(false); // Only wifiRecoveryTick owns STA attempts.
@@ -144,6 +146,39 @@ void setup(){
     server.send(200,"application/json; charset=utf-8",statusJSON());
   });
   // Local Wi-Fi-only in-memory simulation. No direct GPIO, coil or PWM actuation.
+  // Sound-only K1..K4 are intentionally independent of the legacy virtual test.
+  server.on("/api/alarm/config",HTTP_POST,[]{
+    if(!apClient() || server.arg("confirm")!="SOUND_ALARMS_ONLY" || otaActive || otaRestart){
+      server.send(403,"text/plain; charset=utf-8","Настройка звуковой сигнализации доступна только из локальной сети БУСА");
+      return;
+    }
+    bool requested[4]={false,false,false,false};
+    for(int i=0;i<4;i++){
+      const String value=server.arg(String("enable")+String(i));
+      if(value!="0" && value!="1"){
+        server.send(400,"text/plain; charset=utf-8","Нужен выбор каждого из четырёх каналов");return;
+      }
+      requested[i]=value=="1";
+      if(requested[i] && !BusaAlarm::validPair(refTemp[i],noticeTemp[i])){
+        server.send(422,"text/plain; charset=utf-8",
+          String("К")+String(i+1)+": сначала укажи Твкл и Тоткл с разницей от 0,5 °C");
+        return;
+      }
+    }
+    // Conservative on settings update: cut all outputs before saving.
+    alarmOutputsOff();
+    for(int i=0;i<4;i++){
+      alarmEnabled[i]=false;
+      const String key=String("aen")+String(i);
+      if(!prefs.putBool(key.c_str(),requested[i])){
+        alarmOutputsOff();
+        server.send(500,"text/plain; charset=utf-8","Не удалось сохранить настройки");return;
+      }
+      alarmEnabled[i]=requested[i];
+    }
+    alarmLastPoll=0;
+    server.send(200,"application/json; charset=utf-8",alarmStatusJSON(millis()));
+  });
   server.on("/api/relay/sim",HTTP_POST,[]{
     if(!apClient()){
       server.send(403,"text/plain; charset=utf-8","Только защищённая локальная сеть");
@@ -246,6 +281,7 @@ void setup(){
     server.send(200,"application/json",otaJSON());
   });
   server.on("/api/ota/prepare",HTTP_POST,[]{
+    alarmOutputsOff();
     relaySimStop("OTA_PREPARE");
     ledSimStop("OTA_PREPARE");
     if(!apClient()||server.arg("confirm")!="YES"||otaActive||otaRestart||wifiScanBusy()){
@@ -426,8 +462,10 @@ void setup(){
       if(isfinite(notice[i]))storeTempReference(i,1,notice[i]);
       else{prefs.remove(j.c_str());noticeTemp[i]=NAN;}
     }
+    alarmOutputsOff(); // no outdated setpoints can keep a buzzer energized
+    alarmLastPoll=0;
     tftDirty=true;
-    server.send(200,"text/plain; charset=utf-8","Справочные значения сохранены. Реле не затронуты.");
+    server.send(200,"text/plain; charset=utf-8","Пороги звуковой сигнализации сохранены.");
   });
   server.on("/api/graph-view",HTTP_GET,[]{
     int n=server.arg("view").toInt();
@@ -457,10 +495,11 @@ void setup(){
   Serial0.printf("I2C=%d PCF=%d PCA=%d\n",(int)i2cOnline,(int)pcfDetected,(int)pcaDetected);
   updateBootStage(3);
   launchGoogleCloud();
-  Serial0.println("SETUP DONE: relay GPIO4/5/6/7 NEVER configured/driven");
+  Serial0.println("SETUP DONE: K1-K4 only for 12V sound annunciators; no equipment control");
 }
 void loop(){
   uint32_t now=millis();
+  alarmPoll(now);
   relaySimTick(now);
   ledSimTick(now);
   if(lastLoopStart){const uint32_t gap=now-lastLoopStart;if(gap>loopMaxGapMs)loopMaxGapMs=gap;}
@@ -474,7 +513,7 @@ void loop(){
   if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
-  if(otaActive){relaySimStop("OTA_TRANSFER");ledSimStop("OTA_TRANSFER");delay(0);return;}
+  if(otaActive){alarmOutputsOff();relaySimStop("OTA_TRANSFER");ledSimStop("OTA_TRANSFER");delay(0);return;}
   if(tftRebootPending && elapsed(now,tftRebootAt,3000))ESP.restart();
   if(googleRestart && elapsed(now,googleRestartAt,3500))ESP.restart();
   publishGoogleSnapshot(now);
