@@ -5,7 +5,7 @@ main=(root/"BUSA_Main.h").read_text(encoding="utf-8")
 temps=(root/"BUSA_Temperature.h").read_text(encoding="utf-8")
 wifi=(root/"BUSA_WifiRecovery.h").read_text(encoding="utf-8")
 google=(root/"BUSA_Google.h").read_text(encoding="utf-8")
-assert "14v27-N8R2-USER-PATCH-1" in main
+assert "14v27-N8R2-USER-PATCH-FINAL" in main
 assert 'String statusJSON(){' in main
 assert 's.reserve(6000);' in main
 assert 's.reserve(800);' in temps
