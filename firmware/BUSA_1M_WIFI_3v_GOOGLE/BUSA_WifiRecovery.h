@@ -12,7 +12,7 @@ BusaScanPhase wifiScanPhase=BusaScanPhase::Idle;
 constexpr uint8_t BUSA_AP_CHANNEL=6;
 constexpr uint32_t BUSA_BOOT_GRACE_MS=3000U,BUSA_HTTP_REPLY_GRACE_MS=1500U;
 constexpr uint32_t BUSA_CONNECT_TIMEOUT_MS=12000U,BUSA_SCAN_TIMEOUT_MS=12000U;
-constexpr uint32_t BUSA_SCAN_SETTLE_MS=1200U,BUSA_SCAN_HOME_MS=200U;
+constexpr uint32_t BUSA_SCAN_SETTLE_MS=500U,BUSA_SCAN_HOME_MS=100U;
 constexpr uint8_t BUSA_SCAN_MAX_TRIES=2;
 uint32_t wifiScanAt=0,wifiPhaseAt=0,wifiConnectAt=0,wifiPolicyAt=0;
 uint32_t wifiRetryAt=0,wifiRetryDelay=0,wifiLastScanRequest=0;
@@ -81,7 +81,7 @@ void wifiFinishScan(const char* error=nullptr){
 }
 void wifiRequestScan(uint32_t now){
   if(wifiScanBusy()||otaActive||otaRestart)return;
-  if(wifiHadScan && !elapsed(now,wifiLastScanRequest,15000U)){
+  if(wifiHadScan && !elapsed(now,wifiLastScanRequest,3000U)){
     wifiScanCache="{\"scanning\":false,\"error\":\"scan_cooldown\",\"networks\":[]}";return;
   }
   wifiHadScan=true;wifiLastScanRequest=now;
