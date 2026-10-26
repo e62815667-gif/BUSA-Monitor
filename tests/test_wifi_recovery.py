@@ -65,8 +65,8 @@ int main(){
  wifiStartPolicy(0);assert(!WiFi.autoreconnect);
  // Saved credentials connect even with an AP client from boot.
  WiFi.clients=1;tick(2999);assert(WiFi.begins==0);
- tick(3000);tick(4199);assert(WiFi.begins==0);
- tick(4200);assert(WiFi.begins==1&&wifiConnecting&&!wifiDeferredForLocal);
+ tick(3000);tick(3499);assert(WiFi.begins==0);
+ tick(3500);assert(WiFi.begins==1&&wifiConnecting&&!wifiDeferredForLocal);
  // Additional local clients must never cancel association.
  int d=WiFi.disconnects;WiFi.clients=2;tick(4300);
  assert(wifiConnecting&&WiFi.disconnects==d);
