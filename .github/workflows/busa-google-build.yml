@@ -1,7 +1,7 @@
 name: BUSA Google Build
 on:
   push:
-    branches: [lab/busa-v14-14-google-readonly-audit-20261023, fix/busa-v14-20-verified-sensors-keypad-wifi-20261023, fix/busa-v14-21-wifi-20261023, fix/busa-v14-22-wifi-v1414-20261023, fix/busa-v14-23-local-app-recovery-20261023, fix/busa-v14-24-iphone16-scan-reconnect-20261023, fix/busa-v14-25-local-wifi-priority-20261023, fix/busa-v14-26-temperature-binding-app-20261023, fix/busa-v14-27-simultaneous-ap-sta-20261023]
+    branches: [lab/busa-v14-14-google-readonly-audit-20261023, fix/busa-v14-20-verified-sensors-keypad-wifi-20261023, fix/busa-v14-21-wifi-20261023, fix/busa-v14-22-wifi-v1414-20261023, fix/busa-v14-23-local-app-recovery-20261023, fix/busa-v14-24-iphone16-scan-reconnect-20261023, fix/busa-v14-25-local-wifi-priority-20261023, fix/busa-v14-26-temperature-binding-app-20261023, fix/busa-v14-27-simultaneous-ap-sta-20261023, fix/busa-v14-28-memory-tls-json-20261027]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - 'tests/**'
@@ -54,7 +54,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           m=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          assert '14v27-N8R2-SIMULTANEOUS-AP-STA' in m or '14v25-N8R2-LOCAL-WIFI-PRIORITY' in m or '14v24-N8R2-IP16-SCAN-ISOLATED' in m or '14v23-N8R2-LOCAL-APP-RECOVERY' in m
+          assert '14v28-N8R2-HEAP-GOOGLE-AUDIT' in m or '14v27-N8R2-SIMULTANEOUS-AP-STA' in m or '14v25-N8R2-LOCAL-WIFI-PRIORITY' in m or '14v24-N8R2-IP16-SCAN-ISOLATED' in m or '14v23-N8R2-LOCAL-APP-RECOVERY' in m
           assert 'server.on("/api/ping"' in m and 'server.on("/recovery"' in m
           assert 'wifi_recovery:s.wifi_recovery' in m
           assert 'id="appHealth"' in m
@@ -66,6 +66,8 @@ jobs:
           PY
       - name: Verify radio ownership and local-first integration
         run: python3 tests/test_wifi_integration.py
+      - name: Regression check heap, cloud race and parser fixes
+        run: python3 tests/test_memory_guards_v1428.py
       - name: Test Wi-Fi recovery and Safari timeouts
         run: |
           python3 tests/test_wifi_recovery.py
@@ -124,7 +126,7 @@ jobs:
           for term in ('TPIN[4]={16,17,18,21}','KPIN[4]={7,6,5,4}', 'FLOW_GPIO=15',
                        'RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false',
                        'WiFi.mode(WIFI_AP_STA)','/api/google/config',
-                       'setInterval(update,1500)'):
+                       ('setInterval(update,3000)' if '14v28-N8R2-HEAP-GOOGLE-AUDIT' in a else 'setInterval(update,1500)')):
               assert term in a, term
           assert "WiFiClientSecure" in b and "setCACert" in b
           roots=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h').read_text()
@@ -184,7 +186,7 @@ jobs:
           import re
           main=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
           app=Path('index.html').read_text()
-          assert '14v27-N8R2-SIMULTANEOUS-AP-STA' in main or '14v25-N8R2-LOCAL-WIFI-PRIORITY' in main or '14v24-N8R2-IP16-SCAN-ISOLATED' in main or '14v23-N8R2-LOCAL-APP-RECOVERY' in main or '14v22-N8R2-V1414-WIFI-SCAN' in main or '14v21-N8R2-WIFI-DUAL-SCAN-DIAG' in main or '14v20-N8R2-VERIFIED-ROM-KEYPAD-WIFI' in main or '14v15-N8R2-MODULE-DIAG' in main
+          assert '14v28-N8R2-HEAP-GOOGLE-AUDIT' in main or '14v27-N8R2-SIMULTANEOUS-AP-STA' in main or '14v25-N8R2-LOCAL-WIFI-PRIORITY' in main or '14v24-N8R2-IP16-SCAN-ISOLATED' in main or '14v23-N8R2-LOCAL-APP-RECOVERY' in main or '14v22-N8R2-V1414-WIFI-SCAN' in main or '14v21-N8R2-WIFI-DUAL-SCAN-DIAG' in main or '14v20-N8R2-VERIFIED-ROM-KEYPAD-WIFI' in main or '14v15-N8R2-MODULE-DIAG' in main
           assert 'tft_theme_mode' in main
           assert 'server.arg("theme")' in main
           assert 'setTftPhysicalTheme(theme)' in main
@@ -295,18 +297,18 @@ jobs:
       - name: Package full recovery BIN plus app-only BIN
         run: |
           SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 80m --flash_size 8MB -o build/BUSA_1M_V14_27_8MB_USB_merged.bin 0x0 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          cp build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build/BUSA_1M_V14_27_APP_OTA.bin
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 80m --flash_size 8MB -o build/BUSA_1M_V14_28_8MB_USB_merged.bin 0x0 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build/BUSA_1M_V14_28_APP_OTA.bin
           cp firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h build/
           git rev-parse HEAD > build/SOURCE_COMMIT.txt
           sha256sum "$SDK/hardware/esp32/2.0.17/libraries/WiFi/src/WiFiGeneric.cpp" "$SDK/hardware/esp32/2.0.17/libraries/WebServer/src/WebServer.h" > build/NETWORK_CORE_SHA256.txt
           arduino-cli lib list > build/LIBRARIES.txt
-          test -s build/BUSA_1M_V14_27_8MB_USB_merged.bin
+          test -s build/BUSA_1M_V14_28_8MB_USB_merged.bin
           test -s build/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          (cd build && sha256sum BUSA_1M_V14_27_8MB_USB_merged.bin BUSA_1M_V14_27_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd build && sha256sum BUSA_1M_V14_28_8MB_USB_merged.bin BUSA_1M_V14_28_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_V14_27_N8R2_BIN_AND_SHA256
+          name: BUSA_V14_28_N8R2_BIN_AND_SHA256
           path: |
             build/
 
