@@ -193,7 +193,9 @@ bool tempParseSelection(const String& selection,TempBinding& b){
   return tempRomValid(b.rom);
 }
 String temperatureInventoryJSON(uint32_t now){
-  String s="[";
+  String s;
+  s.reserve(800);
+  s="[";
   for(int b=0;b<4;b++)for(int k=0;k<wireProbe[b].count;k++){
     const auto& d=wireProbe[b].devices[k];if(s.length()>1)s+=",";
     const bool valid=tempProbeClean(wireProbe[b])&&tempRomUniqueAcrossBuses(d.rom)&&d.hasSample&&d.external&&!elapsed(now,d.sampledAt,TEMP_STALE_MS);
@@ -209,7 +211,9 @@ String temperatureInventoryJSON(uint32_t now){
   return s+"]";
 }
 String temperatureDiagnosticsJSON(uint32_t now){
-  String s="[";
+  String s;
+  s.reserve(1500);
+  s="[";
   for(int i=0;i<4;i++){
     const int b=tempBusForLogical(i),k=tempDeviceForLogical(i);const auto& p=wireProbe[b];if(i)s+=",";
     s+="{\"gpio\":"+String(TPIN[b])+",\"probe_ms\":"+String(p.checkedAt);
