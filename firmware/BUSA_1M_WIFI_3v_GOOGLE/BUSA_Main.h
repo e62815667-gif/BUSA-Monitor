@@ -36,7 +36,7 @@
 #include <math.h>
 
 #include "BUSA_V15_Board.h"
-const char VERSION[]="БУСА 1М WiFi 15v0-N8R2-MODULAR-MONITOR";
+const char VERSION[]="БУСА 1М WiFi 15v1-N8R2-FOUR-SOUND-ALARMS";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -270,7 +270,7 @@ uint8_t approvedSettingsItem=0; // The six approved settings rows on the physica
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 bool tftDirty=true;
 float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
-// Informational display preferences. Never used for physical outputs.
+// Existing rf0..rf3 / nt0..nt3 are now sound-alert ON/OFF setpoints.
 int selectedTemp=0,selectedField=0;
 bool editingTemp=false;
 String editTempBuffer="";
@@ -768,6 +768,7 @@ String quoteJson(const String &x){
 }
 #include "BUSA_WifiRecovery.h"
 #include "BUSA_V15_RelayModel.h"
+#include "BUSA_V15_Alarm.h"
 // Read-only diagnostic of the ACTUAL installed ESP32 OTA partitions.
 // Not an authorization to flash: presence/size cannot prove image signatures,
 // compatibility of the current bootloader or a working rollback policy.
@@ -1072,8 +1073,8 @@ main>*{max-width:100%;min-width:0}
    <p class="hint">Датчик охлаждающей воды не измеряет отбор.</p></div>
   </div>
   <div class="card"><h2>Состояние K1–K4</h2>
-   <div class="relayGrid"><span>K1 <b>БЛОК</b></span><span>K2 <b>БЛОК</b></span><span>K3 <b>БЛОК</b></span><span>K4 <b>БЛОК</b></span></div>
-   <p class="hint">Состояние информационное. Физические выходы ESP32 отключены.</p>
+   <div class="relayGrid"><span>K1 <b id="alarmState0">ОЖИД.</b></span><span>K2 <b id="alarmState1">ОЖИД.</b></span><span>K3 <b id="alarmState2">ОЖИД.</b></span><span>K4 <b id="alarmState3">ОЖИД.</b></span></div>
+   <p class="hint">Звуковые сигналы через K1–K4: GPIO 7, 6, 5, 4. Каждый канал работает по собственной температуре, настройке ВКЛ и ОТКЛ.</p>
   </div></section>
 <section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div><p id="lastTUpdate" class="hint">Данных от ESP32 пока нет.</p>
 <div id="temperatureDetails"></div>
@@ -1087,17 +1088,26 @@ main>*{max-width:100%;min-width:0}
 <button type="button" class="full" id="saveBindings">Сохранить привязку T1–T4</button>
 <p id="bindingResult" class="hint">Названия каналов автоматически не переставляются.</p>
 <pre id="temperatureInventory" style="white-space:pre-wrap;word-break:break-word">Поиск ROM датчиков...</pre>
-<p class="hint">Информационные поля для отображения на TFT. Не управляют реле и не заменяют защиту.</p>
+<p class="hint">Пороги звуковой сигнализации: Твкл и Тоткл. Включение каждого канала настраивается отдельно. При неисправном датчике звуковой выход выключен.</p>
 <div class="grid">
-<div><label>T1 Вода · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref0"></div>
-<div><label>T1 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt0"></div>
-<div><label>T2 Колонна · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref1"></div>
-<div><label>T2 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt1"></div>
-<div><label>T3 Куб · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref2"></div>
-<div><label>T3 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt2"></div>
-<div><label>T4 Верх · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref3"></div>
-<div><label>T4 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
-</div><button id="refsSave" type="button" class="full">Сохранить значения отображения</button>
+<div><label>T1 Вода · Звук ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref0"></div>
+<div><label>T1 · Звук ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt0"></div>
+<div><label>T2 Колонна · Звук ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref1"></div>
+<div><label>T2 · Звук ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt1"></div>
+<div><label>T3 Куб · Звук ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref2"></div>
+<div><label>T3 · Звук ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt2"></div>
+<div><label>T4 Верх · Звук ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref3"></div>
+<div><label>T4 · Звук ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
+</div><p class="hint">Для включения канала нужны два разных порога с разницей не менее 0,5 °C. Состояние каналов по умолчанию — выключено.</p>
+<div class="grid">
+<label><input id="alarmEnable0" type="checkbox"> K1 — звуковой сигнал T1</label>
+<label><input id="alarmEnable1" type="checkbox"> K2 — звуковой сигнал T2</label>
+<label><input id="alarmEnable2" type="checkbox"> K3 — звуковой сигнал T3</label>
+<label><input id="alarmEnable3" type="checkbox"> K4 — звуковой сигнал T4</label>
+</div>
+<button id="refsSave" type="button" class="full">Сохранить пороги звуковой сигнализации</button>
+<button id="alarmSave" type="button" class="full">Применить включение звуковых каналов</button>
+<p id="alarmResult" role="status" class="hint">Звуковые каналы после первой установки выключены.</p>
 <p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div></section>
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор · информационный раздел</h2><p class="hint">В этом разделе только отображение данных. Команды физическим выходам не передаются.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden>
@@ -1415,6 +1425,14 @@ if(requestedTftTheme==='dark'||requestedTftTheme==='light'){
 }
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
+get('alarmSave').onclick=async()=>{
+  let body=new URLSearchParams({confirm:'SOUND_ALARMS_ONLY'});
+  for(let i=0;i<4;i++)body.set('enable'+i,get('alarmEnable'+i).checked?'1':'0');
+  try{
+    const r=await localFetch('/api/alarm/config',{method:'POST',body});
+    get('alarmResult').textContent=await r.text();
+  }catch(e){get('alarmResult').textContent='Ошибка настройки: '+e.message;}
+};
 get('refsSave').onclick=async()=>{
  let body=new URLSearchParams();
  for(let i=0;i<4;i++){
@@ -1516,6 +1534,14 @@ s.temperatures.forEach((t,i)=>{
 renderTemperatureBindings(s);
 get('lastTUpdate').textContent='Обновлено '+new Date().toLocaleTimeString('ru-RU')+' · показаны только подтверждённые измерения';
 get('temperatures').textContent=names.map((v,i)=>v+': '+get('t'+i).textContent).join(' | ');
+if(s.sound_alarms && Array.isArray(s.sound_alarms.channels)){
+  s.sound_alarms.channels.forEach((ch,i)=>{
+    let state=get('alarmState'+i);
+    if(state)state.textContent=ch.sound_on?'ЗВУК':'ВЫКЛ';
+    const control=get('alarmEnable'+i);
+    if(control && document.activeElement!==control)control.checked=ch.enabled===true;
+  });
+}
 if(!refsInit && Array.isArray(s.display_references)){
   s.display_references.forEach((r,i)=>{get('ref'+i).value=r.target===null?'':r.target;get('nt'+i).value=r.notice===null?'':r.notice});
   refsInit=true;
