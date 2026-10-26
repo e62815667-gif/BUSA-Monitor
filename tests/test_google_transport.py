@@ -1,8 +1,9 @@
 from pathlib import Path
 import subprocess, tempfile, sys, os
 src=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
+declarations=src[src.index('struct BusaCloudRelease'):src.index('String cloudUpdateJSON()')]
 parsers=src[src.index('bool cloudShaIsValid('):src.index('// Sending is one-way HTTPS.')]
-helpers=parsers+src[src.index('class GoogleReplyBuffer'):src.index('void googleConfigureHttp')]
+helpers=declarations+parsers+src[src.index('class GoogleReplyBuffer'):src.index('void googleConfigureHttp')]
 roots=([Path(os.environ['BUSA_ARDUINOJSON_SRC'])/'ArduinoJson.h'] if os.getenv('BUSA_ARDUINOJSON_SRC') else list(Path.home().glob('Arduino/libraries/ArduinoJson/src/ArduinoJson.h')))
 assert roots, 'ArduinoJson library missing'
 stub=r'''
@@ -20,8 +21,10 @@ class Stream {
  virtual void flush()=0;virtual size_t write(uint8_t)=0;
  virtual size_t write(const uint8_t*,size_t)=0;
 };
-int cloudReleaseMinor=-1;uint32_t cloudReleaseFlash=0,cloudReleaseSize=0;
-bool cloudReleaseShaValid=false,cloudReleasePresent=false,cloudReleaseTargetValid=false;
+using portMUX_TYPE=int;
+#define portMUX_INITIALIZER_UNLOCKED 0
+#define portENTER_CRITICAL(p) ((void)0)
+#define portEXIT_CRITICAL(p) ((void)0)
 class HTTPClient {
  public: std::string body;int known=-1;bool fail=false;
  int getSize(){return known;}
@@ -36,10 +39,10 @@ int main(){
  for(auto s:{"{\"stored\":true}","{ \"stored\" : true }"}){h.body=s;assert(googleStoredReply(h));}
  for(auto s:{"{\"stored\":false}","{\"stored\":\"true\"}","{\"stored\":1}","{\"nested\":{\"stored\":true}}","<html>login</html>","{\"stored\":tru","{}","[]"}){h.body=s;assert(!googleStoredReply(h));}
  h.body=R"release({"stored":true,"release":{"version":"V14.11","target":"ESP32-S3","app_sha256":"1fc280130318c26bda982d48e5b2d2b3b3171c1697e79e7a9ea63b308860cc08","app_size_bytes":1104224,"build_flash_bytes":8388608}})release";
- assert(googleStoredReply(h) && cloudReleasePresent && cloudReleaseMinor==11 && cloudReleaseFlash==8388608 && cloudReleaseSize==1104224);
- cloudReleasePresent=false;
+ assert(googleStoredReply(h) && cloudReleaseSnapshot().present && cloudReleaseSnapshot().minor==11 && cloudReleaseSnapshot().flash==8388608 && cloudReleaseSnapshot().size==1104224);
+ cloudReleaseData.present=false;
  h.body=R"release({"stored":true,"release":{"version":"V14.11","target":"ESP32-S3","app_sha256":"INVALID","app_size_bytes":1104224,"build_flash_bytes":8388608}})release";
- assert(googleStoredReply(h) && !cloudReleasePresent); // bad metadata cannot enable update
+ assert(googleStoredReply(h) && !cloudReleaseSnapshot().present); // bad metadata cannot enable update
  h.body=std::string(2049,'x');assert(!googleStoredReply(h));
  h.body="{\"stored\":true}";h.fail=true;assert(!googleStoredReply(h));h.fail=false;h.known=2049;assert(!googleStoredReply(h));
  GoogleReplyBuffer b;std::string full(2048,'x');assert(b.write((const uint8_t*)full.data(),2048)==2048);assert(b.write('x')==0);assert(b.overflow);
