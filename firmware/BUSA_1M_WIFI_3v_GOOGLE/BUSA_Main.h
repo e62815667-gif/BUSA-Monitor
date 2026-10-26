@@ -23,6 +23,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <esp_system.h>
+#include <esp_heap_caps.h>
 #include <Wire.h>
 #include "BUSA_PCA9685_Leds.h"
 #include <Preferences.h>
@@ -44,7 +45,7 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
 static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"Temperature GPIO mapping changed unexpectedly");
-const char VERSION[]="БУСА 1М WiFi 14v27-N8R2-SIMULTANEOUS-AP-STA";
+const char VERSION[]="БУСА 1М WiFi 14v28-N8R2-HEAP-GOOGLE-AUDIT";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -142,7 +143,8 @@ String quoteJson(const String &x); // forward declaration
 String ledSimJSON(){
   const uint32_t now=millis();
   ledSimTick(now);
-  String o="{\"physical_enabled\":false,\"current_limit_verified\":false";
+  String o; o.reserve(2300);
+  o="{\"physical_enabled\":false,\"current_limit_verified\":false";
   o+=",\"owner_confirmed_supply_mv\":"+String(BusaLed::kOwnerConfirmedLedSupplyMv);
   o+=",\"owner_confirmed_individual_leds\":"+(BusaLed::kOwnerConfirmedIndividualLeds?String("true"):String("false"));
   o+=",\"physical_test_ready\":"+(BusaLed::physicalTestPreflight(0)?String("true"):String("false"));
@@ -796,7 +798,8 @@ void relaySimTick(uint32_t now){
 }
 String relaySimJSON(){
   relaySimTick(millis());
-  String s="{\"dry_run_only\":true,\"physical_gpio_enabled\":false";
+  String s; s.reserve(550);
+  s="{\"dry_run_only\":true,\"physical_gpio_enabled\":false";
   s+=",\"pca_pwm_enabled\":false,\"coil_12v_measured\":false";
   s+=",\"contact_feedback_available\":false,\"physical_contacts\":null";
   s+=",\"simulated_channel\":"+String(relaySimChannel);
@@ -809,15 +812,16 @@ String relaySimJSON(){
 // Read-only diagnostic of the ACTUAL installed ESP32 OTA partitions.
 // Not an authorization to flash: presence/size cannot prove image signatures,
 // compatibility of the current bootloader or a working rollback policy.
-extern volatile uint32_t cloudReleaseSize; // declared in BUSA_Google.h
+uint32_t cloudReleaseAppSize(); // Read-only coherent snapshot in BUSA_Google.h
 String otaPartitionPreflightJSON(){
   const esp_partition_t* running=esp_ota_get_running_partition();
   const esp_partition_t* next=esp_ota_get_next_update_partition(nullptr);
   const esp_partition_t* boot=esp_ota_get_boot_partition();
-  const uint32_t candidate=cloudReleaseSize;
+  const uint32_t candidate=cloudReleaseAppSize();
   const bool hasSlot=running && next && (running->address!=next->address);
   const bool fits=hasSlot && candidate>=60000U && candidate<=next->size;
-  String out="{\"running_address\":";
+  String out; out.reserve(400);
+  out="{\"running_address\":";
   out+=running?String((uint32_t)running->address):String("null");
   out+=",\"running_size\":"+(running?String((uint32_t)running->size):String("null"));
   out+=",\"next_address\":"+(next?String((uint32_t)next->address):String("null"));
@@ -833,7 +837,11 @@ String cloudJSON(); // forward declaration; read-only Google status
 extern volatile int googleInternet; // external TCP health, no credentials
 String statusJSON(){
   uint32_t now=millis();
-  String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
+  String s;
+  // Reserve a single buffer for the full diagnostic tree, avoiding repeated
+  // geometric growth while Safari polls status. Failure remains non-fatal.
+  s.reserve(8192);
+  s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
   s+=",\"leds\":"+ledSimJSON();
   s+=",\"relay_simulation\":"+relaySimJSON();
@@ -925,6 +933,7 @@ String statusJSON(){
   s+=",\"esp32\":{\"chip\":"+quoteJson(ESP.getChipModel());
   s+=",\"free_heap_bytes\":"+String(ESP.getFreeHeap());
   s+=",\"min_free_heap_bytes\":"+String(ESP.getMinFreeHeap());
+  s+=",\"largest_free_8bit_block\":"+String(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
   s+=",\"flash_bytes\":"+String(ESP.getFlashChipSize());
   s+=",\"reset_reason_code\":"+String((int)esp_reset_reason());
   s+=",\"uptime_ms\":"+String(now)+"}";
@@ -1933,7 +1942,7 @@ get('save').onclick=async function(){
 message('Веб-приложение запущено');
 showPhoneClock();setInterval(showPhoneClock,1000);
 syncClock();setInterval(syncClock,300000);
-update();setInterval(update,1500);
+update();setInterval(update,3000);
 </script></body></html>
 )HTMLBUSA";
 
