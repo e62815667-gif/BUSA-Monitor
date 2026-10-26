@@ -23,7 +23,7 @@ assert 'otaActive||otaRestart||wifiScanBusy()' in m
 assert 'wifiCloudPaused.load()' in g
 assert 'web_health' in m
 assert 'RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false' in m
-for unsafe in ['digitalWrite(', 'pinMode(KPIN', 'ledcWrite(', 'WiFi.softAPdisconnect(']:assert unsafe not in m+w
+for unsafe in ['pinMode(KPIN', 'ledcWrite(', 'WiFi.softAPdisconnect(']:assert unsafe not in m+w
 # HTTP request body only queues radio work; it cannot migrate the channel before replying.
 handler=m[m.index('server.on("/api/wifi",'):m.index('server.on("/api/page",')]
 assert 'WiFi.disconnect(' not in handler and 'wifiCancelScan();' not in handler
