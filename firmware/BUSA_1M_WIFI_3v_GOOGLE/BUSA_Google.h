@@ -21,20 +21,34 @@ volatile int googleErrorStage=0; // 0 OK/idle, 1 DNS, 2 HTTPS, 3 HTTP/response, 
 String googleEndpoint,googleSecret;
 // Cloud update PRE-FLIGHT: metadata only, no installer, no flash writes.
 // Fixed-size integral fields avoid sharing dynamic Strings between FreeRTOS tasks.
-volatile int cloudReleaseMinor=-1;
-volatile uint32_t cloudReleaseFlash=0,cloudReleaseSize=0;
-volatile bool cloudReleaseShaValid=false,cloudReleasePresent=false,cloudReleaseTargetValid=false;
+// Publish all release metadata together: statusJSON() executes on another core.
+struct BusaCloudRelease {
+  int minor=-1;
+  uint32_t flash=0,size=0;
+  bool shaValid=false,present=false,targetValid=false;
+};
+portMUX_TYPE cloudReleaseMux=portMUX_INITIALIZER_UNLOCKED;
+BusaCloudRelease cloudReleaseData;
+BusaCloudRelease cloudReleaseSnapshot(){
+  portENTER_CRITICAL(&cloudReleaseMux);
+  const BusaCloudRelease snapshot=cloudReleaseData;
+  portEXIT_CRITICAL(&cloudReleaseMux);
+  return snapshot;
+}
+uint32_t cloudReleaseAppSize(){return cloudReleaseSnapshot().size;}
 String cloudUpdateJSON(){
-  const int minor=cloudReleaseMinor;
-  return String("{\"catalog_seen\":")+(cloudReleasePresent?"true":"false")+
-    ",\"available_version\":"+(minor>=0?quoteJson(String("V14.")+String(minor)):String("null"))+
-    ",\"target_valid\":"+(cloudReleaseTargetValid?"true":"false")+
-    ",\"sha_format_valid\":"+(cloudReleaseShaValid?"true":"false")+
-    ",\"build_flash_bytes\":"+String((uint32_t)cloudReleaseFlash)+
-    ",\"app_size_bytes\":"+String((uint32_t)cloudReleaseSize)+
-    ",\"device_flash_bytes\":"+String((uint32_t)ESP.getFlashChipSize())+
-    ",\"flash_size_matches\":"+(cloudReleasePresent&&cloudReleaseFlash==ESP.getFlashChipSize()?"true":"false")+
-    ",\"remote_install_enabled\":false,\"ota_partition_verified\":false}";
+  const BusaCloudRelease r=cloudReleaseSnapshot();
+  String out;out.reserve(290);
+  out=String("{\\"catalog_seen\\":")+(r.present?"true":"false")+
+    ",\\"available_version\\":"+(r.minor>=0?quoteJson(String("V14.")+String(r.minor)):String("null"))+
+    ",\\"target_valid\\":"+(r.targetValid?"true":"false")+
+    ",\\"sha_format_valid\\":"+(r.shaValid?"true":"false")+
+    ",\\"build_flash_bytes\\":"+String(r.flash)+
+    ",\\"app_size_bytes\\":"+String(r.size)+
+    ",\\"device_flash_bytes\\":"+String((uint32_t)ESP.getFlashChipSize())+
+    ",\\"flash_size_matches\\":"+(r.present&&r.flash==ESP.getFlashChipSize()?"true":"false")+
+    ",\\"remote_install_enabled\\":false,\\"ota_partition_verified\\":false}";
+  return out;
 }
 bool cloudShaIsValid(const char* hex){
   if(!hex || strlen(hex)!=64)return false;
@@ -54,10 +68,15 @@ void cloudReleaseFromReply(JsonVariantConst obj){
   int minor=0;
   while(*digits){if(*digits<'0'||*digits>'9')return;minor=minor*10+(*digits++-'0');}
   if(size<60000||size>4000000 || (flash!=8388608UL&&flash!=16777216UL))return;
-  cloudReleaseTargetValid=strcmp(target,"ESP32-S3")==0;
-  cloudReleaseShaValid=cloudShaIsValid(sha);
-  if(!cloudReleaseTargetValid||!cloudReleaseShaValid)return;
-  cloudReleaseMinor=minor;cloudReleaseSize=size;cloudReleaseFlash=flash;cloudReleasePresent=true;
+  const bool validTarget=strcmp(target,"ESP32-S3")==0;
+  const bool validSha=cloudShaIsValid(sha);
+  if(!validTarget||!validSha)return;
+  BusaCloudRelease next;
+  next.minor=minor;next.flash=flash;next.size=size;
+  next.targetValid=validTarget;next.shaValid=validSha;next.present=true;
+  portENTER_CRITICAL(&cloudReleaseMux);
+  cloudReleaseData=next;
+  portEXIT_CRITICAL(&cloudReleaseMux);
 }
 // Sending is one-way HTTPS. No remote command endpoint is ever accepted.
 bool googleURLValid(const String &s){
@@ -114,7 +133,7 @@ bool googleStoredReply(HTTPClient& request){
   if(request.getSize()>2048)return false;
   GoogleReplyBuffer body;
   if(request.writeToStream(&body)<0 || body.overflow || !body.used)return false;
-  StaticJsonDocument<1024> doc;
+  StaticJsonDocument<2048> doc;
   DeserializationError err=deserializeJson(doc,body.data,body.used);
   if(err || !doc.is<JsonObject>() || !doc["stored"].is<bool>())return false;
   const bool confirmed=doc["stored"].as<bool>();
@@ -191,7 +210,8 @@ void googleWorker(void* unused){
     // The full read-only status object includes every OneWire diagnostic error,
     // keypad scan_error, I2C, PCA9685, YF-S401 pulse counts and Wi-Fi state.
     // Never save the authentication token inside telemetry/raw sheet rows.
-    String packet=String("{\"version\":3,\"kind\":\"monitor_diagnostics\",\"device_id\":\"BUSA-1M-001\",\"sent_epoch\":")
+    String packet;packet.reserve(snapshot.length()+256);
+    packet=String("{\"version\":3,\"kind\":\"monitor_diagnostics\",\"device_id\":\"BUSA-1M-001\",\"sent_epoch\":")
       +String((uint32_t)time(nullptr))
       +",\"telemetry\":"+snapshot
       +",\"token\":"+quoteJson(googleSecret)+"}";
@@ -295,7 +315,7 @@ void addGoogleRoutes(){
 void launchGoogleCloud(){
   googleSnapshotMutex=xSemaphoreCreateMutex();
   if(!googleSnapshotMutex){googleEnabled=false;googleState=6;return;}
-  if(xTaskCreatePinnedToCore(googleWorker,"busa-google",12288,nullptr,1,nullptr,0)!=pdPASS){
+  if(xTaskCreatePinnedToCore(googleWorker,"busa-google",20480,nullptr,1,nullptr,0)!=pdPASS){
     googleEnabled=false;googleState=6;
     Serial0.println("GOOGLE TASK FAILED; LOCAL AP STILL AVAILABLE");
   }
