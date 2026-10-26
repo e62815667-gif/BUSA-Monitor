@@ -114,7 +114,7 @@ bool googleStoredReply(HTTPClient& request){
   if(request.getSize()>2048)return false;
   GoogleReplyBuffer body;
   if(request.writeToStream(&body)<0 || body.overflow || !body.used)return false;
-  StaticJsonDocument<1024> doc;
+  StaticJsonDocument<2048> doc;
   DeserializationError err=deserializeJson(doc,body.data,body.used);
   if(err || !doc.is<JsonObject>() || !doc["stored"].is<bool>())return false;
   const bool confirmed=doc["stored"].as<bool>();
@@ -295,7 +295,7 @@ void addGoogleRoutes(){
 void launchGoogleCloud(){
   googleSnapshotMutex=xSemaphoreCreateMutex();
   if(!googleSnapshotMutex){googleEnabled=false;googleState=6;return;}
-  if(xTaskCreatePinnedToCore(googleWorker,"busa-google",12288,nullptr,1,nullptr,0)!=pdPASS){
+  if(xTaskCreatePinnedToCore(googleWorker,"busa-google",20480,nullptr,1,nullptr,0)!=pdPASS){
     googleEnabled=false;googleState=6;
     Serial0.println("GOOGLE TASK FAILED; LOCAL AP STILL AVAILABLE");
   }
