@@ -22,7 +22,7 @@ assert 'wifiScanBusy()' in m[m.index('void uploadOTA()'):m.index('#include "BUSA
 assert 'otaActive||otaRestart||wifiScanBusy()' in m
 assert 'wifiCloudPaused.load()' in g
 assert 'web_health' in m
-assert 'RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false' in m
+assert 'RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false' in m
 for unsafe in ['pinMode(KPIN', 'ledcWrite(', 'WiFi.softAPdisconnect(']:assert unsafe not in m+w
 # HTTP request body only queues radio work; it cannot migrate the channel before replying.
 handler=m[m.index('server.on("/api/wifi",'):m.index('server.on("/api/page",')]
