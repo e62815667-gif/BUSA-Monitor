@@ -19,7 +19,7 @@ assert "void relaySimTick(" in parts["BUSA_V15_RelayModel.h"]
 assert "TPIN[4]={16,17,18,21}" in parts["BUSA_V15_Board.h"]
 assert "KPIN[4]={7,6,5,4}" in parts["BUSA_V15_Board.h"]
 assert "BUS_SDA=8,BUS_SCL=9" in parts["BUSA_V15_Board.h"]
-assert "RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false" in parts["BUSA_V15_Board.h"]
+assert "RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false" in parts["BUSA_V15_Board.h"]
 assert '#include "BUSA_V15_Alarm.h"' in main
 assert "physical_relay_driver_implemented" in parts["BUSA_V15_Architecture.h"]
 assert "v15ArchitectureJSON()" in parts["BUSA_V15_Status.h"]
