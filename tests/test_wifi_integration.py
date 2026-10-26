@@ -1,7 +1,9 @@
 """Integration guards for radio ownership, OTA and the pinned framework fixes."""
 from pathlib import Path
 import importlib.util,tempfile
-m=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
+root=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE')
+m=(root/'BUSA_Main.h').read_text()
+m+=''.join((root/name).read_text() for name in ('BUSA_V15_Board.h','BUSA_V15_RelayModel.h','BUSA_V15_Status.h','BUSA_V15_Runtime.h'))
 w=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_WifiRecovery.h').read_text()
 g=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
 assert 'WiFi.begin(' not in m and w.count('WiFi.begin(')==1
