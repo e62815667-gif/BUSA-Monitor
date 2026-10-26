@@ -1,0 +1,129 @@
+name: Package BUSA V14.27 Arduino IDE INO source
+
+on:
+  push:
+    branches: [package/busa-v14-27-arduino-ino-20261027]
+    paths:
+      - '.github/workflows/busa-v14-27-arduino-source-zip.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate and validate GTS Root R1–R4 trust anchors
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          roots = {}
+          expected_sha256 = {
+            'R1':'D947432ABDE7B7FA90FC2E6B59101B1280E0E1C7E4E40FA3C6887FFF57A7F4CF',
+            'R2':'8D25CD97229DBF70356BDA4EB3CC734031E24CF00FAFCFD32DC76EB5841C7EA8',
+            'R3':'34D8A73EE208D9BCDB0D956520934B4E40E69482596E8B6F73C8426B010A6F48',
+            'R4':'349DFA4058C5E263123B398AE795573C4E1313C83FE68F93556CD5E8031B3C7D',
+          }
+          for n in ('R1','R2','R3','R4'):
+            file = Path('/etc/ssl/certs/GTS_Root_'+n+'.pem')
+            if file.is_file():
+              pem=file.read_text()
+            else:
+              # Hosted Ubuntu runners do not guarantee every GTS root exists.
+              # Fetch ONLY from Google's official CA repository, then pin SHA256.
+              import urllib.request
+              url='https://pki.goog/repo/certs/gtsr'+n[1]+'.pem'
+              try:
+                with urllib.request.urlopen(url,timeout=25) as response:
+                  pem=response.read(12000).decode('ascii')
+              except Exception as ex:
+                raise RuntimeError('Unable to obtain GTS '+n+' from verified repository') from ex
+              file=Path('/tmp/BUSA_GTS_Root_'+n+'.pem')
+              file.write_text(pem)
+            assert pem.count('-----BEGIN CERTIFICATE-----')==1, n
+            fingerprint=subprocess.check_output(['openssl','x509','-in',str(file),'-noout','-fingerprint','-sha256'],text=True).strip().split('=',1)[1].replace(':','').upper()
+            assert fingerprint==expected_sha256[n], f'{n}: unexpected trust anchor {fingerprint}'
+            roots[n]=pem.strip()
+          bundle='\n'.join(roots[n] for n in ('R1','R2','R3','R4'))+'\n'
+          assert bundle.count('-----BEGIN CERTIFICATE-----')==4
+          p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h')
+          p.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+bundle+')GOOGLECERT";\n')
+          print('Verified trust anchors: GTS R1, R2, R3, R4. TLS verification is mandatory.')
+          PY
+      - name: Validate and pack complete Arduino project
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE')
+          expected=[
+            'BUSA_1M_WIFI_3v_GOOGLE.ino',
+            'BUSA_Main.h',
+            'BUSA_AppHeader.h',
+            'BUSA_ApprovedGraphics_HQ_V14.h',
+            'BUSA_ApprovedUI_V13.h',
+            'BUSA_Google.h',
+            'BUSA_GoogleCA.h',
+            'BUSA_Landscape_V14.h',
+            'BUSA_PCA9685_Leds.h',
+            'BUSA_Temperature.h',
+            'BUSA_WifiRecovery.h',
+          ]
+          for p in expected:
+            assert (root/p).is_file() and (root/p).stat().st_size>0, p
+          sketch=(root/expected[0]).read_text()
+          main=(root/'BUSA_Main.h').read_text()
+          assert '#include "BUSA_Main.h"' in sketch
+          assert '14v27-N8R2-SIMULTANEOUS-AP-STA' in main
+          assert 'RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false' in main
+          assert 'digitalWrite(' not in main
+          assert (root/'BUSA_GoogleCA.h').read_text().count('-----BEGIN CERTIFICATE-----')==4
+          readme="""# БУСА-1М №001 — Arduino IDE исходники V14.27
+          
+          **Открытие**: распакуй архив целиком и открой
+          `BUSA_1M_WIFI_3v_GOOGLE/BUSA_1M_WIFI_3v_GOOGLE.ino`.
+          Все .h файлы должны лежать рядом с .ino в одной папке.
+          Основной код в `BUSA_Main.h`: короткий .ino — это правильная структура
+          проекта, необходимая для корректного разбора встроенного JavaScript.
+          
+          **Плата**: ESP32-S3 N8R2 (Flash 8 MB, PSRAM Disabled).
+          **Пакет плат**: Espressif ESP32 Arduino core 2.0.17.
+          **Настройки**: Flash Size 8MB, Partition Scheme Default 8MB,
+          PSRAM Disabled, Flash Mode DIO, USB CDC On Boot Enabled, USB Mode Hardware CDC.
+          
+          **Библиотеки**, версии из успешной сборки:
+          ArduinoJson 6.21.5; OneWire 2.3.8; DallasTemperature 4.0.6;
+          Adafruit BusIO 1.17.4; Adafruit GFX Library 1.13.0;
+          Adafruit ST7735 and ST7789 Library 1.12.0;
+          Adafruit ILI9341 1.7.0; U8g2_for_Adafruit_GFX 1.8.0.
+          
+          CLI (для проверки компиляции):
+          
+          ```sh
+          arduino-cli compile --fqbn 'esp32:esp32:esp32s3:FlashSize=8M,PartitionScheme=default_8MB,PSRAM=disabled,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio' BUSA_1M_WIFI_3v_GOOGLE
+          ```
+          
+          **Важно**: Arduino IDE загружает исходники после компиляции;
+          .ino — не готовый бинарный образ для OTA. Для OTA нужен APP BIN.
+          Никакой автоматической прошивки устройства не выполнялось.
+          Рабочие ветки не менялись. Не считать Wi-Fi проверенным на ESP32
+          только из-за успешной сборки.
+          """
+          (root/'README_ARDUINO_IDE.md').write_text(readme,encoding='utf-8')
+          print('Validated',len(expected),'source files, generated CA roots, version and hardware lock.')
+          PY
+          mkdir -p dist
+          cp -r firmware/BUSA_1M_WIFI_3v_GOOGLE dist/
+          cd dist
+          zip -q -r BUSA_1M_V14_27_Arduino_IDE_INO.zip BUSA_1M_WIFI_3v_GOOGLE
+          sha256sum BUSA_1M_V14_27_Arduino_IDE_INO.zip > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+          unzip -t BUSA_1M_V14_27_Arduino_IDE_INO.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_V14_27_Arduino_IDE_INO_SOURCES
+          path: |
+            dist/BUSA_1M_V14_27_Arduino_IDE_INO.zip
+            dist/SHA256SUMS.txt
