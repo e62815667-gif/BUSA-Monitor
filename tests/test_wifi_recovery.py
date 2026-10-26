@@ -76,8 +76,8 @@ int main(){
  nowMs=61000;d=WiFi.disconnects;wifiRequestScan(nowMs);
  assert(WiFi.disconnects==d&&WiFi.scans==0);
  wifiRequestScan(nowMs);assert(WiFi.scans==0);
- tick(61000);tick(62199);assert(WiFi.scans==0);
- completeScan(62200);
+ tick(61000);tick(61499);assert(WiFi.scans==0);
+ completeScan(61500);
  assert(wifiScanSuccesses==1&&wifiLastVisibleCount==2);
  assert(wifiScanJSON().find("iPhone 16")!=std::string::npos);
  assert(wifiScanJSON().find("[,")==std::string::npos);
