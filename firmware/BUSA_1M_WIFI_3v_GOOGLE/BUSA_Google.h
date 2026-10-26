@@ -39,15 +39,15 @@ uint32_t cloudReleaseAppSize(){return cloudReleaseSnapshot().size;}
 String cloudUpdateJSON(){
   const BusaCloudRelease r=cloudReleaseSnapshot();
   String out;out.reserve(290);
-  out=String("{\\"catalog_seen\\":")+(r.present?"true":"false")+
-    ",\\"available_version\\":"+(r.minor>=0?quoteJson(String("V14.")+String(r.minor)):String("null"))+
-    ",\\"target_valid\\":"+(r.targetValid?"true":"false")+
-    ",\\"sha_format_valid\\":"+(r.shaValid?"true":"false")+
-    ",\\"build_flash_bytes\\":"+String(r.flash)+
-    ",\\"app_size_bytes\\":"+String(r.size)+
-    ",\\"device_flash_bytes\\":"+String((uint32_t)ESP.getFlashChipSize())+
-    ",\\"flash_size_matches\\":"+(r.present&&r.flash==ESP.getFlashChipSize()?"true":"false")+
-    ",\\"remote_install_enabled\\":false,\\"ota_partition_verified\\":false}";
+  out=String("{\"catalog_seen\":")+(r.present?"true":"false")+
+    ",\"available_version\":"+(r.minor>=0?quoteJson(String("V14.")+String(r.minor)):String("null"))+
+    ",\"target_valid\":"+(r.targetValid?"true":"false")+
+    ",\"sha_format_valid\":"+(r.shaValid?"true":"false")+
+    ",\"build_flash_bytes\":"+String(r.flash)+
+    ",\"app_size_bytes\":"+String(r.size)+
+    ",\"device_flash_bytes\":"+String((uint32_t)ESP.getFlashChipSize())+
+    ",\"flash_size_matches\":"+(r.present&&r.flash==ESP.getFlashChipSize()?"true":"false")+
+    ",\"remote_install_enabled\":false,\"ota_partition_verified\":false}";
   return out;
 }
 bool cloudShaIsValid(const char* hex){
