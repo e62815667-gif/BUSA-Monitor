@@ -3,6 +3,7 @@
 // 3.3 V ESP32 GPIO logic, electrical relay driver interface must accept 3.3 V.
 // Relay board is assumed ACTIVE LOW; adjust this constant for an active-HIGH model.
 #include "BUSA_V15_AlarmLogic.h"
+extern volatile bool googleRestart; // declared in BUSA_Google.h later in the module chain
 constexpr bool BUSA_ALARM_ACTIVE_LOW=true;
 constexpr uint32_t BUSA_ALARM_POLL_MS=200U;
 BusaAlarm::Channel alarmChannels[4];
