@@ -56,14 +56,9 @@ void setup(){
   WiFi.setSleep(false); // Favor interactive local response over power saving
   configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
   clockNtpStarted=true;
-  // Private STA password must be provisioned into NVS after public GitHub build;
-  // no STA password is embedded in this public source. Local AP fallback remains.
-  {
-    uint64_t mac=ESP.getEfuseMac();
-    char pwd[24];
-    snprintf(pwd,sizeof(pwd),"BUSA%016llX",(unsigned long long)mac);
-    apPassword=String(pwd);
-  }
+  // User-approved fixed password for the local BUSA AP (not the external STA).
+  // Replaces the earlier MAC-derived string; SSID and AP+STA recovery are unchanged.
+  apPassword="123456789";
   wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),BUSA_AP_CHANNEL,false,4);
   esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
   updateBootStage(1);
