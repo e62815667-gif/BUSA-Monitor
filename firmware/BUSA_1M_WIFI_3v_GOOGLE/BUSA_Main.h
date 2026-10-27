@@ -36,7 +36,7 @@
 #include <math.h>
 
 #include "BUSA_V15_Board.h"
-const char VERSION[]="БУСА 1М WiFi 15v1-N8R2-FOUR-SOUND-ALARMS";
+const char VERSION[]="БУСА 1М WiFi 15v1-N8R2-FOUR-SOUND-ALARMS-TFIX";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -1079,7 +1079,7 @@ main>*{max-width:100%;min-width:0}
 <section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div><p id="lastTUpdate" class="hint">Данных от ESP32 пока нет.</p>
 <div id="temperatureDetails"></div>
 <h3>Привязка найденных датчиков</h3>
-<p class="hint">Если на одной линии несколько датчиков, назначь каждый по ROM. Идентифицируй датчик по изменению его температуры при лёгком нагреве рукой. Один ROM нельзя назначить двум каналам.</p>
+<p class="hint">Если на GPIO17 и GPIO18 отображаются одинаковые ROM, выбери отдельный ROM для Т2 и Т3 вручную. Общая DATA обозначается в списке. Один ROM нельзя назначить двум каналам. Если показания остаются Н/Д, проверь соединения DATA.</p>
 <div class="grid">
 <label>T1 Вода<select id="bind0"><option value="auto">Авто GPIO16</option></select></label>
 <label>T2 Колонна<select id="bind1"><option value="auto">Авто GPIO17</option></select></label>
@@ -1088,26 +1088,26 @@ main>*{max-width:100%;min-width:0}
 <button type="button" class="full" id="saveBindings">Сохранить привязку T1–T4</button>
 <p id="bindingResult" class="hint">Названия каналов автоматически не переставляются.</p>
 <pre id="temperatureInventory" style="white-space:pre-wrap;word-break:break-word">Поиск ROM датчиков...</pre>
-<p class="hint">Пороги звуковой сигнализации: Твкл и Тоткл. Включение каждого канала настраивается отдельно. При неисправном датчике звуковой выход выключен.</p>
+<p class="hint">Уставки каждого канала: ВКЛ и ОТКЛ. Если измерение недостоверно, выход соответствующего канала выключен.</p>
 <div class="grid">
-<div><label>T1 Вода · Звук ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref0"></div>
-<div><label>T1 · Звук ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt0"></div>
-<div><label>T2 Колонна · Звук ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref1"></div>
-<div><label>T2 · Звук ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt1"></div>
-<div><label>T3 Куб · Звук ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref2"></div>
-<div><label>T3 · Звук ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt2"></div>
-<div><label>T4 Верх · Звук ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref3"></div>
-<div><label>T4 · Звук ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
+<div><label>T1 Вода · ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref0"></div>
+<div><label>T1 · ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt0"></div>
+<div><label>T2 Колонна · ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref1"></div>
+<div><label>T2 · ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt1"></div>
+<div><label>T3 Куб · ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref2"></div>
+<div><label>T3 · ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt2"></div>
+<div><label>T4 Верх · ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref3"></div>
+<div><label>T4 · ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
 </div><p class="hint">Для включения канала нужны два разных порога с разницей не менее 0,5 °C. Состояние каналов по умолчанию — выключено.</p>
 <div class="grid">
-<label><input id="alarmEnable0" type="checkbox"> K1 — звуковой сигнал T1</label>
-<label><input id="alarmEnable1" type="checkbox"> K2 — звуковой сигнал T2</label>
-<label><input id="alarmEnable2" type="checkbox"> K3 — звуковой сигнал T3</label>
-<label><input id="alarmEnable3" type="checkbox"> K4 — звуковой сигнал T4</label>
+<label><input id="alarmEnable0" type="checkbox"> К1 · разрешить T1</label>
+<label><input id="alarmEnable1" type="checkbox"> К2 · разрешить T2</label>
+<label><input id="alarmEnable2" type="checkbox"> К3 · разрешить T3</label>
+<label><input id="alarmEnable3" type="checkbox"> К4 · разрешить T4</label>
 </div>
-<button id="refsSave" type="button" class="full">Сохранить пороги звуковой сигнализации</button>
-<button id="alarmSave" type="button" class="full">Применить включение звуковых каналов</button>
-<p id="alarmResult" role="status" class="hint">Звуковые каналы после первой установки выключены.</p>
+<button id="refsSave" type="button" class="full">Сохранить уставки</button>
+<button id="alarmSave" type="button" class="full">Применить К1–К4</button>
+<p id="alarmResult" role="status" class="hint">Выходы К1–К4 после первой установки выключены.</p>
 <p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div></section>
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор · информационный раздел</h2><p class="hint">В этом разделе только отображение данных. Команды физическим выходам не передаются.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden>
@@ -1495,7 +1495,7 @@ function renderTemperatureBindings(s){
   if(!Array.from(select.options).some(x=>x.value===value))select.add(new Option(value+' · не обнаружен',value));
   select.value=value;
  }
- get('temperatureInventory').textContent=inventory.length?inventory.map(x=>'GPIO'+x.gpio+' · '+x.rom+' · '+(x.verified===true&&typeof x.c==='number'?x.c.toFixed(2)+' °C':temperatureErrors[x.error]||x.error)).join('\n'):'Найденных ROM пока нет.';
+ get('temperatureInventory').textContent=inventory.length?inventory.map(x=>'GPIO'+x.gpio+' · '+x.rom+(x.shared_line?' · общая DATA':'')+(x.assigned?' · привязан':'')+' · '+(x.verified===true&&typeof x.c==='number'?x.c.toFixed(2)+' °C':temperatureErrors[x.error]||x.error)).join('\n'):'Найденных ROM пока нет.';
  get('temperatureDetails').textContent=s.temperatures.map((t,i)=>'T'+(i+1)+' '+(t.name||'')+': '+temperatureView(t,s.diagnostics?.onewire?.[i]).detail+(t.sample_age_ms===null?'':' · возраст '+Math.round(t.sample_age_ms/1000)+' с')).join(' | ');
 }
 function temperatureConnectionLost(){
