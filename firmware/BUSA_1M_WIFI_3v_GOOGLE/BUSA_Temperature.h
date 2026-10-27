@@ -38,10 +38,19 @@ bool tempRomUniqueAcrossBuses(const uint8_t* rom){
   int count=0;for(const auto& p:wireProbe)for(int k=0;k<p.count;k++)if(memcmp(p.devices[k].rom,rom,8)==0)++count;
   return count==1;
 }
+// When DATA lines are electrically shared, ROMs may appear on both pins.
+// Require an explicit user-selected ROM+bus pair; never auto-name ambiguous sensors.
+bool tempExplicitMatchOnBus(int b,const uint8_t* rom){
+  for(int n=0;n<4;n++)if(tempBindings[n].explicitRom && tempBindings[n].bus==b &&
+     memcmp(tempBindings[n].rom,rom,8)==0)return true;
+  return false;
+}
 bool oneWireVerified(int n){
   if(n<0||n>3)return false;
   int b=tempBusForLogical(n),k=tempDeviceForLogical(n);
-  return k>=0 && tempProbeClean(wireProbe[b]) && tempRomUniqueAcrossBuses(wireProbe[b].devices[k].rom);
+  return k>=0 && tempProbeClean(wireProbe[b]) &&
+    (tempRomUniqueAcrossBuses(wireProbe[b].devices[k].rom) ||
+     (tempBindings[n].explicitRom && tempExplicitMatchOnBus(b,wireProbe[b].devices[k].rom)));
 }
 bool hasTemp(int n,uint32_t now){
   if(!oneWireVerified(n))return false;
@@ -59,7 +68,7 @@ String wireError(int n,uint32_t now){
   if(!p.count)return "NO_ROM";
   if(k<0)return tempBindings[n].explicitRom?"BOUND_ROM_MISSING":"MULTIPLE_ROM";
   const auto& d=p.devices[k];
-  if(!tempRomUniqueAcrossBuses(d.rom))return "ROM_ON_MULTIPLE_BUSES";
+  if(!tempRomUniqueAcrossBuses(d.rom) && !tempBindings[n].explicitRom)return "ROM_ON_MULTIPLE_BUSES";
   if(!d.external)return String(d.error);
   if(!d.hasSample)return String(d.error);
   return hasTemp(n,now)?"OK":"STALE_READING";
@@ -175,7 +184,9 @@ bool tempValidateBindings(const TempBinding candidate[4]){
     if(bind.explicitRom){
       if(!tempRomValid(bind.rom)||!tempProbeClean(p))return false;
       for(int k=0;k<p.count;k++)if(memcmp(bind.rom,p.devices[k].rom,8)==0)found=k;
-      if(found<0||!tempRomUniqueAcrossBuses(bind.rom))return false;
+      // An explicit binding may select a duplicate observation on a shared bus.
+      // A ROM must still be unique across logical roles (checked below).
+      if(found<0)return false;
     }else if(p.count==1)found=0;
     if(found>=0){
       for(int j=0;j<i;j++){
@@ -202,14 +213,17 @@ String temperatureInventoryJSON(uint32_t now){
   s="[";
   for(int b=0;b<4;b++)for(int k=0;k<wireProbe[b].count;k++){
     const auto& d=wireProbe[b].devices[k];if(s.length()>1)s+=",";
-    const bool valid=tempProbeClean(wireProbe[b])&&tempRomUniqueAcrossBuses(d.rom)&&d.hasSample&&d.external&&!elapsed(now,d.sampledAt,TEMP_STALE_MS);
+    const bool explicitMatch=tempExplicitMatchOnBus(b,d.rom);
+    const bool valid=tempProbeClean(wireProbe[b])&&(tempRomUniqueAcrossBuses(d.rom)||explicitMatch)&&d.hasSample&&d.external&&!elapsed(now,d.sampledAt,TEMP_STALE_MS);
     s+="{\"bus\":"+String(b)+",\"gpio\":"+String(TPIN[b])+",\"rom\":"+quoteJson(romHex(d.rom));
     s+=",\"verified\":"+String(valid?"true":"false")+",\"c\":"+(valid?String(d.value,2):String("null"));
     String error=valid?String("OK"):String(d.error);
     if(wireProbe[b].overflow)error="TOO_MANY_ROMS";
     else if(wireProbe[b].searchNoise)error="ROM_SEARCH_NOISE";
-    else if(!tempRomUniqueAcrossBuses(d.rom))error="ROM_ON_MULTIPLE_BUSES";
+    else if(!tempRomUniqueAcrossBuses(d.rom) && !explicitMatch)error="ROM_ON_MULTIPLE_BUSES";
     else if(d.hasSample && elapsed(now,d.sampledAt,TEMP_STALE_MS))error="STALE_READING";
+    s+=",\"shared_line\":"+String(tempRomUniqueAcrossBuses(d.rom)?"false":"true");
+    s+=",\"assigned\":"+String(explicitMatch?"true":"false");
     s+=",\"error\":"+quoteJson(error)+"}";
   }
   return s+"]";
