@@ -54,6 +54,8 @@ runtime=(src/"BUSA_V15_Runtime.h").read_text()
 driver=(src/"BUSA_V15_Alarm.h").read_text()
 status=(src/"BUSA_V15_Status.h").read_text()
 assert "15v1-N8R2-FOUR-SOUND-ALARMS" in main
+assert 'apPassword="123456789";' in runtime
+assert 'WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str()' in runtime
 assert "constexpr bool BUSA_ALARM_ACTIVE_LOW=true" in driver
 assert "alarmInitPins();" in runtime and "alarmLoadSettings();" in runtime
 assert 'server.on("/api/alarm/config",HTTP_POST' in runtime
