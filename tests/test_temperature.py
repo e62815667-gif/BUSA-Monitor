@@ -91,8 +91,8 @@ int main(){
  assert(hasTemp(1,nowMs)&&hasTemp(2,nowMs));
  assert(temperature[1]==31.0f&&temperature[2]==42.0f);
  assert(wireError(1,nowMs)=="OK"&&wireError(2,nowMs)=="OK");
- assert(temperatureInventoryJSON(nowMs).find("\\"shared_line\\":true")!=std::string::npos);
- assert(temperatureInventoryJSON(nowMs).find("\\"assigned\\":true")!=std::string::npos);
+ assert(temperatureInventoryJSON(nowMs).find("\"shared_line\":true")!=std::string::npos);
+ assert(temperatureInventoryJSON(nowMs).find("\"assigned\":true")!=std::string::npos);
  memcpy(shared[2].rom,shared[1].rom,8);
  assert(!tempValidateBindings(shared)); // one sensor cannot fill two named roles
  buses[1].devices.clear();buses[2].devices={sensor(1,30)};
