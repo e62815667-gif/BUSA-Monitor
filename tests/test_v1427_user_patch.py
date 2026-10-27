@@ -13,7 +13,8 @@ assert 's.reserve(800);' in temps
 assert 's.reserve(1500);' in temps
 assert 'xTaskCreatePinnedToCore(googleWorker,"busa-google",20480' in google
 assert 'StaticJsonDocument<2048> doc;' in google
-assert 'snprintf(pwd,sizeof(pwd),"BUSA%016llX",(unsigned long long)mac)' in main
+assert 'apPassword="123456789";' in main
+assert 'snprintf(pwd,sizeof(pwd),"BUSA%016llX"' not in main
 assert 'BUSA_SCAN_SETTLE_MS=500U,BUSA_SCAN_HOME_MS=100U' in wifi
 assert 'if(wifiHadScan && !elapsed(now,wifiLastScanRequest,3000U))' in wifi
 assert 'for(let i=0;i<25&&j.scanning;i++)' in main
