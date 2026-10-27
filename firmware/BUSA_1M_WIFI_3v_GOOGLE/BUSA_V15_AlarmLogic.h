@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstdint>
 namespace BusaAlarm {
-enum Reason : uint8_t { Disabled, MissingThreshold, SensorInvalid, Waiting, Sounding };
+enum Reason : uint8_t { Disabled, HardwareLocked, MissingThreshold, SensorInvalid, Waiting, Sounding };
 struct Channel {
   bool on=false;
   Reason reason=Disabled;
@@ -31,6 +31,7 @@ inline bool evaluate(Channel& state,bool enabled,bool verified,float c,float tur
 inline const char* reasonText(Reason r){
   switch(r){
     case Disabled:return "DISABLED";
+    case HardwareLocked:return "HARDWARE_LOCKED";
     case MissingThreshold:return "SETPOINTS_REQUIRED";
     case SensorInvalid:return "SENSOR_INVALID";
     case Waiting:return "WAITING";

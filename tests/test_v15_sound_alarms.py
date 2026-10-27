@@ -56,7 +56,6 @@ status=(src/"BUSA_V15_Status.h").read_text()
 assert "15v1-N8R2-FOUR-SOUND-ALARMS" in main
 assert 'apPassword="123456789";' in runtime
 assert 'WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str()' in runtime
-assert "constexpr bool BUSA_ALARM_ACTIVE_LOW=true" in driver
 assert "alarmInitPins();" in runtime and "alarmLoadSettings();" in runtime
 assert 'server.on("/api/alarm/config",HTTP_POST' in runtime
 assert 'prefs.putBool(key.c_str(),requested[i])' in runtime
@@ -64,7 +63,9 @@ assert 'server.arg("confirm")!="SOUND_ALARMS_ONLY"' in runtime
 assert "alarmPoll(now)" in runtime and "alarmOutputsOff()" in runtime
 assert "sound_alarms" in status and "alarmStatusJSON(now)" in status
 assert "id=\"alarmSave\"" in main and "alarmEnable0" in main
-assert 'digitalWrite(KPIN[i],alarmPhysicalLevel(false));' in driver
-assert 'pinMode(KPIN[i],OUTPUT);' in driver
+assert 'digitalWrite(' not in driver
+assert 'pinMode(KPIN[i],INPUT);' in driver
+assert 'HardwareLocked' in driver
+assert 'prefs.getBool(' not in driver
 assert "KPIN[4]={7,6,5,4}" in (src/"BUSA_V15_Board.h").read_text()
-print("PASS V15.1: C++ hot/cold threshold hysteresis, 4 independent sound channels, stale sensor off, NVS flags and 12V GPIO buzzer-only driver")
+print("PASS V15.1: C++ hot/cold threshold hysteresis, 4 independent sound channels, stale sensor off, hysteresis retained but physical GPIO driver locked")

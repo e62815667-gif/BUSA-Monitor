@@ -21,16 +21,16 @@ bool elapsed(uint32_t a,uint32_t b,uint32_t c){return uint32_t(a-b)>=c;}
 constexpr uint8_t TPIN[4]={16,17,18,21};
 struct SimDevice{std::array<uint8_t,8> rom;std::array<uint8_t,9> scratch;bool external=true;};
 struct OneWire{
- std::vector<SimDevice> devices;size_t searchAt=0;int selected=-1,readAt=0;bool low=false,failReset=false;int operations=0,converts=0,powerWrites=0;uint32_t lastConvert=0;
+ std::vector<SimDevice> devices;size_t searchAt=0;int selected=-1,readAt=0;bool low=false,failReset=false,conversionBusy=false;uint8_t lastCommand=0;int operations=0,converts=0,powerWrites=0;uint32_t lastConvert=0;
  static uint8_t crc8(const uint8_t* data,size_t n){uint8_t crc=0;while(n--){uint8_t b=*data++;for(int i=0;i<8;i++){uint8_t mix=(crc^b)&1;crc>>=1;if(mix)crc^=0x8c;b>>=1;}}return crc;}
  int reset(){++operations;return !low&&!failReset&&!devices.empty();}
  void reset_search(){searchAt=0;}
  bool search(uint8_t* out){++operations;if(searchAt>=devices.size()||low||failReset)return false;memcpy(out,devices[searchAt++].rom.data(),8);return true;}
  void select(const uint8_t* rom){++operations;selected=-1;for(size_t i=0;i<devices.size();i++)if(!memcmp(rom,devices[i].rom.data(),8))selected=i;}
  void skip(){++operations;selected=-1;}
- void write(uint8_t command,uint8_t power=0){++operations;assert(power==0);if(command==0x44){++converts;lastConvert=nowMs;}if(command==0xBE)readAt=0;assert(command==0x44||command==0xBE||command==0xB4);}
+ void write(uint8_t command,uint8_t power=0){++operations;lastCommand=command;assert(power==0);if(command==0x44){++converts;lastConvert=nowMs;}if(command==0xBE)readAt=0;assert(command==0x44||command==0xBE||command==0xB4);}
  uint8_t read(){++operations;assert(selected>=0&&readAt<9);return devices[selected].scratch[readAt++];}
- uint8_t read_bit(){++operations;return selected>=0&&devices[selected].external;}
+ uint8_t read_bit(){++operations;return lastCommand==0x44?!conversionBusy:(selected>=0&&devices[selected].external);}
 };
 OneWire buses[4];OneWire* const temperatureBuses[4]={&buses[0],&buses[1],&buses[2],&buses[3]};
 int digitalRead(int gpio){for(int i=0;i<4;i++)if(TPIN[i]==gpio)return !buses[i].low;return 1;}
@@ -42,7 +42,12 @@ SimDevice sensor(uint8_t serial,float c){
 }
 void run(uint32_t duration){uint32_t end=nowMs+duration;while((int32_t)(nowMs-end)<0){
  int before=0;for(auto& b:buses)before+=b.operations;
- temperatureTick(nowMs);int after=0;for(auto& b:buses)after+=b.operations;
+ temperatureTick(nowMs);
+ for(int i=0;i<4;i++)if(hasTemp(i,nowMs)){
+   const auto& sample=wireProbe[tempBusForLogical(i)].devices[tempDeviceForLogical(i)];
+   assert(isfinite(temperature[i]) && temperature[i]==sample.value && tempAt[i]==sample.sampledAt);
+ }
+ int after=0;for(auto& b:buses)after+=b.operations;
  // Each call services one bus operation; scratchpad read is at most 13 primitives.
  assert(after-before<=14);nowMs+=5;
 }}
@@ -77,20 +82,19 @@ int main(){
  assert(wireError(0,nowMs)=="ROM_ON_MULTIPLE_BUSES"&&!hasTemp(0,nowMs));assert(temperatureInventoryJSON(nowMs).find("ROM_ON_MULTIPLE_BUSES")!=std::string::npos);
  // Field case: GPIO17 and GPIO18 both see the same two sensors. Automatic
  // assignment must remain blocked, but explicit UNIQUE ROM+GPIO binding
- // permits verified readings on distinct logical T2 and T3 channels.
+ // must NOT conceal cross-GPIO observations on unknown wiring.
  buses[2].devices={sensor(2,31),sensor(3,42)};
  buses[1].devices={sensor(2,31),sensor(3,42)};restart();run(3500);
- assert(wireError(1,nowMs)=="MULTIPLE_ROM"&&!hasTemp(1,nowMs));
- assert(wireError(2,nowMs)=="MULTIPLE_ROM"&&!hasTemp(2,nowMs));
+ assert(wireError(1,nowMs)=="ROM_ON_MULTIPLE_BUSES"&&!hasTemp(1,nowMs));
+ assert(wireError(2,nowMs)=="ROM_ON_MULTIPLE_BUSES"&&!hasTemp(2,nowMs));
  TempBinding shared[4];for(int i=0;i<4;i++)shared[i]=TempBinding();
  shared[1].explicitRom=shared[2].explicitRom=true;shared[1].bus=1;shared[2].bus=2;
  memcpy(shared[1].rom,buses[1].devices[0].rom.data(),8);
  memcpy(shared[2].rom,buses[2].devices[1].rom.data(),8);
- assert(tempValidateBindings(shared));
+ assert(!tempValidateBindings(shared));
  memcpy(tempBindings,shared,sizeof shared);tempSyncLogical(nowMs);
- assert(hasTemp(1,nowMs)&&hasTemp(2,nowMs));
- assert(temperature[1]==31.0f&&temperature[2]==42.0f);
- assert(wireError(1,nowMs)=="OK"&&wireError(2,nowMs)=="OK");
+ assert(!hasTemp(1,nowMs)&&!hasTemp(2,nowMs));
+ assert(wireError(1,nowMs)=="ROM_ON_MULTIPLE_BUSES"&&wireError(2,nowMs)=="ROM_ON_MULTIPLE_BUSES");
  assert(temperatureInventoryJSON(nowMs).find("\"shared_line\":true")!=std::string::npos);
  assert(temperatureInventoryJSON(nowMs).find("\"assigned\":true")!=std::string::npos);
  memcpy(shared[2].rom,shared[1].rom,8);
@@ -114,6 +118,65 @@ int main(){
  buses[0].devices={sensor(1,20),sensor(5,21),sensor(6,22),sensor(7,23),sensor(8,24)};
  restart();run(3000);assert(wireError(0,nowMs)=="TOO_MANY_ROMS"&&!hasTemp(0,nowMs));
  buses[0].devices={sensor(1,30)};
+ // Explicitly unassigned roles preserve physical diagnostics but never publish a value.
+ buses[0].devices={sensor(1,30)};buses[1].devices={sensor(2,31)};buses[2].devices={sensor(3,32)};restart();run(3000);
+ TempBinding unassigned;assert(tempParseSelection("none",unassigned));assert(unassigned.bus==255&&!unassigned.explicitRom);
+ tempBindings[1]=unassigned;tempSyncLogical(nowMs);
+ assert(wireError(1,nowMs)=="UNASSIGNED"&&!hasTemp(1,nowMs)&&!isfinite(temperature[1]));
+ assert(temperatureDiagnosticsJSON(nowMs).find("\"unassigned\":true")!=std::string::npos);
+ assert(tempValidateBindings(tempBindings));
+ TempBindingRecord noneRecord={};noneRecord.magic=0x42544D50;noneRecord.version=2;
+ memcpy(noneRecord.bindings,tempBindings,sizeof(tempBindings));noneRecord.crc=OneWire::crc8((uint8_t*)&noneRecord,offsetof(TempBindingRecord,crc));
+ assert(tempBindingRecordValid(noneRecord));noneRecord.bindings[1].bus=99;
+ noneRecord.crc=OneWire::crc8((uint8_t*)&noneRecord,offsetof(TempBindingRecord,crc));assert(!tempBindingRecordValid(noneRecord));
+ // GPIO17/18 LOW takes precedence even if a stale inventory claims presence.
+ for(int b:{1,2}){
+   tempBindings[b]=TempBinding();int old=wireProbe[b].idleLevel;wireProbe[b].idleLevel=0;
+   assert(!hasTemp(b,nowMs)&&wireError(b,nowMs)=="LINE_LOW");wireProbe[b].idleLevel=old;
+   old=wireProbe[b].afterResetLevel;wireProbe[b].afterResetLevel=0;
+   assert(!hasTemp(b,nowMs)&&wireError(b,nowMs)=="LINE_LOW");wireProbe[b].afterResetLevel=old;
+ }
+ // A corrupted-but-CRC-valid binding record must not let one physical ROM fill two roles.
+ tempBindings[2].explicitRom=true;tempBindings[2].bus=0;memcpy(tempBindings[2].rom,buses[0].devices[0].rom.data(),8);
+ assert(!hasTemp(0,nowMs)&&!hasTemp(2,nowMs));
+ assert(wireError(2,nowMs)=="ROM_ASSIGNED_MULTIPLE_ROLES");
+ // Missing bound ROM is different from an intentionally unassigned role.
+ tempBindings[2].bus=2;memcpy(tempBindings[2].rom,buses[3].devices[0].rom.data(),8);
+ assert(wireError(2,nowMs)=="BOUND_ROM_MISSING");
+ tempBindings[2]=TempBinding();
+ // No silent substitution for failed ROM CRC, parasite power or a stopped conversion.
+ buses[2].devices[0].rom[7]^=1;restart();run(3000);
+ assert(!hasTemp(2,nowMs)&&wireError(2,nowMs)=="ROM_CRC_BAD");
+ buses[2].devices[0]=sensor(3,32);restart();run(3000);
+ assert(wireError(2,nowMs+TEMP_STALE_MS)=="STALE_READING");
+ // A stuck conversion cannot turn an old, CRC-valid scratchpad into a fresh sample.
+ buses[2].conversionBusy=true;tempBus[2].phase=TempPhase::Converting;tempBus[2].convertedAt=nowMs-TEMP_CONVERSION_MS;tempNextBus=2;
+ temperatureTick(nowMs);assert(!hasTemp(2,nowMs)&&wireError(2,nowMs)=="CONVERSION_TIMEOUT");
+ buses[2].conversionBusy=false;run(3000);assert(hasTemp(2,nowMs));
+ // Field condition reproduced on the actual simulated GPIO17 and GPIO18 buses.
+ restart();buses[1].low=true;buses[2].low=true;run(2200);
+ for(int b:{1,2}){assert(wireProbe[b].idleLevel==0&&wireProbe[b].afterResetLevel==0&&!wireProbe[b].presence);assert(wireError(b,nowMs)=="LINE_LOW"&&!hasTemp(b,nowMs));}
+ assert(hasTemp(0,nowMs)&&hasTemp(3,nowMs));
+ tempBindings[1]=unassigned;tempSyncLogical(nowMs);
+ assert(wireError(1,nowMs)=="UNASSIGNED");
+ assert(temperatureDiagnosticsJSON(nowMs).find("\"electrical_state\":\"LINE_LOW\"")!=std::string::npos);
+ // A CRC-valid foreign family and repeat ROM during search have separate reasons.
+ restart();buses[2].devices[0]=sensor(3,32);buses[2].devices[0].rom[0]=0x10;
+ buses[2].devices[0].rom[7]=OneWire::crc8(buses[2].devices[0].rom.data(),7);run(2500);
+ assert(wireError(2,nowMs)=="NOT_DS18B20"&&!hasTemp(2,nowMs));
+ buses[2].devices={sensor(3,32),sensor(3,32)};restart();run(2500);
+ assert(wireError(2,nowMs)=="ROM_SEARCH_NOISE"&&!hasTemp(2,nowMs));
+ buses[2].devices={sensor(3,32)};
+ // Persisted binding corruption fails closed, rather than silently guessing roles.
+ tempLoadBindingRecord(nullptr,true);assert(tempBindingLoadInvalid);
+ for(int i=0;i<4;i++)assert(tempIsUnassigned(i)&&!hasTemp(i,nowMs));
+ tempLoadBindingRecord(nullptr,false);assert(!tempBindingLoadInvalid&&!tempIsUnassigned(0));
+ TempBindingRecord loadRecord={};loadRecord.magic=0x42544D50U;loadRecord.version=2;
+ for(auto& binding:loadRecord.bindings)binding.bus=255;
+ loadRecord.crc=OneWire::crc8((uint8_t*)&loadRecord,offsetof(TempBindingRecord,crc));
+ tempLoadBindingRecord(&loadRecord,true);assert(!tempBindingLoadInvalid&&tempIsUnassigned(0));
+ loadRecord.crc^=1;tempLoadBindingRecord(&loadRecord,true);assert(tempBindingLoadInvalid&&tempIsUnassigned(0));
+ tempLoadBindingRecord(nullptr,false);
  // Millis rollover retains the conversion deadline and sample validity.
  nowMs=UINT32_MAX-500;restart();run(2500);assert(hasTemp(0,nowMs));
  std::cout<<"PASS: shipping DS18B20 engine: timing, CRC, two ROM binding, duplicates, NVS CRC, stale/POR, missing/low line, recovery, rollover"<<std::endl;

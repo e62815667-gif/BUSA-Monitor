@@ -17,3 +17,22 @@ const html=src.match(/R"HTMLBUSA\(([\s\S]*?)\)HTMLBUSA"/)[1];
 const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(x=>x[1]);assert.equal(new Set(ids).size,ids.length,'duplicate DOM id');
 for(const id of ['saveBindings','temperatureInventory','temperatureDetails','lastTUpdate',...Array.from({length:4},(_,i)=>'bind'+i)])assert(ids.includes(id),id);
 console.log('PASS: actual app helpers: verified finite readings only, real 85 C, error messages, lost-link clearing, binding confirmation and DOM ids');
+
+for(const error of ['LINE_LOW','NO_PRESENCE','MULTIPLE_ROM','STALE_READING','UNASSIGNED','ROM_ASSIGNED_MULTIPLE_ROLES']){
+ const v=context.temperatureView({c:null,verified:false,gpio:17,error});assert(v.detail&&!v.valid);
+}
+assert(src.includes("new Option('Не назначен','none')"));
+for(let i=0;i<4;i++){
+ const on=html.match(new RegExp('<label>([^<]+)</label><input[^>]+id="ref'+i+'"'))[1];
+ const off=html.match(new RegExp('<label>([^<]+)</label><input[^>]+id="nt'+i+'"'))[1];
+ assert(on.includes('ВКЛ, °C')&&off.includes('ОТКЛ, °C'));
+ assert(!/Звук|Сигнализация/i.test(on+off));
+ assert(new RegExp('id="alarmEnable'+i+'"[^>]*disabled').test(html));
+}
+assert(/id="alarmSave"[^>]*disabled/.test(html));
+console.log('PASS SAFE1 UI: independent ON/OFF labels, unassigned and electrical diagnostics, physical controls disabled');
+
+const landscape=fs.readFileSync('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_V15_LandscapeSafe.h','utf8');
+assert(landscape.includes('ВКЛ, °C: ')&&landscape.includes('ОТКЛ, °C: '));
+for(const state of ['LOW','NO DS','ROM?','STALE','UNSET'])assert(landscape.includes('"'+state+'"'));
+assert(src.includes('#include "BUSA_V15_LandscapeSafe.h"'));

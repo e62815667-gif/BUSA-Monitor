@@ -1,11 +1,11 @@
 #pragma once
 // V15 boot and cooperative runtime. Included after all component declarations.
 void setup(){
-  alarmInitPins(); // GPIO7/6/5/4 inactive before radio/display boot
+  alarmInitPins(); // GPIO7/6/5/4 released, no assumed relay polarity
   relaySimStop("BOOT_SAFE");
   ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V15.1: independent four-channel 12V sound alerts");
+  Serial0.println("\nBUSA 1M WiFi V15.1: TFIX-SAFE1: physical outputs LOCKED");
   Serial.begin(115200);
   delay(400);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
@@ -13,10 +13,10 @@ void setup(){
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   prefs.begin("busa-r04",false);
   TempBindingRecord bindings={};
-  if(prefs.getBytesLength("temp_bind")==sizeof(bindings) &&
-     prefs.getBytes("temp_bind",&bindings,sizeof(bindings))==sizeof(bindings) && tempBindingRecordValid(bindings)){
-    memcpy(tempBindings,bindings.bindings,sizeof(tempBindings));
-  }
+  const size_t bindingBytes=prefs.getBytesLength("temp_bind");
+  const bool bindingRead=bindingBytes==sizeof(bindings) &&
+    prefs.getBytes("temp_bind",&bindings,sizeof(bindings))==sizeof(bindings);
+  tempLoadBindingRecord(bindingRead?&bindings:nullptr,bindingBytes!=0);
   waterPulsesPerLiter=prefs.getFloat("wf_ppl",NAN);
   waterCalibrated=prefs.getBool("wf_ready",false) && isfinite(waterPulsesPerLiter) && waterPulsesPerLiter>=10.0f && waterPulsesPerLiter<=500000.0f;
   if(!waterCalibrated)waterPulsesPerLiter=NAN;
@@ -120,23 +120,28 @@ void setup(){
     if(!apClient()||server.arg("confirm")!="BIND_TEMPERATURES"||otaActive||otaRestart){
       server.send(403,"text/plain; charset=utf-8","Нужны локальная сеть и подтверждение привязки");return;
     }
-    TempBindingRecord record={};record.magic=0x42544D50U;record.version=1;
+    TempBindingRecord record={};record.magic=0x42544D50U;record.version=2;
     for(int i=0;i<4;i++){
       if(!tempParseSelection(server.arg(String("t")+String(i)),record.bindings[i])){
         server.send(400,"text/plain; charset=utf-8","Неверный GPIO или ROM датчика");return;
       }
     }
     if(!tempValidateBindings(record.bindings)){
-      server.send(409,"text/plain; charset=utf-8","Датчик не найден или один ROM назначен двум каналам. Обнови список.");return;
+      server.send(409,"text/plain; charset=utf-8","Датчик не найден, линия LOW, ROM виден на нескольких GPIO или назначен двум каналам. Проверь проводку и обнови список.");return;
     }
     record.crc=OneWire::crc8((const uint8_t*)&record,offsetof(TempBindingRecord,crc));
     if(prefs.putBytes("temp_bind",&record,sizeof(record))!=sizeof(record)){
       server.send(500,"text/plain; charset=utf-8","Не удалось сохранить привязку");return;
     }
-    memcpy(tempBindings,record.bindings,sizeof(tempBindings));tempSyncLogical(millis());tftDirty=true;
+    tempLoadBindingRecord(&record,true);tftDirty=true;
     server.send(200,"application/json","{\"saved\":true}");
   });
   server.on("/api/status",HTTP_GET,[]{
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json; charset=utf-8",statusJSON());
+  });
+  server.on("/expert",HTTP_GET,[]{
+    if(!apClient()){server.send(403,"text/plain","Local AP only");return;}
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",statusJSON());
   });
@@ -153,7 +158,11 @@ void setup(){
       if(value!="0" && value!="1"){
         server.send(400,"text/plain; charset=utf-8","Нужен выбор каждого из четырёх каналов");return;
       }
-      requested[i]=value=="1";
+      if(value=="1"){
+        alarmOutputsOff();
+        server.send(423,"text/plain; charset=utf-8","Физические выходы заблокированы до проверки нового оборудования");return;
+      }
+      requested[i]=false;
       if(requested[i] && !BusaAlarm::validPair(refTemp[i],noticeTemp[i])){
         server.send(422,"text/plain; charset=utf-8",
           String("К")+String(i+1)+": сначала укажи Твкл и Тоткл с разницей от 0,5 °C");
@@ -490,7 +499,7 @@ void setup(){
   Serial0.printf("I2C=%d PCF=%d PCA=%d\n",(int)i2cOnline,(int)pcfDetected,(int)pcaDetected);
   updateBootStage(3);
   launchGoogleCloud();
-  Serial0.println("SETUP DONE: K1-K4 only for 12V sound annunciators; no equipment control");
+  Serial0.println("SETUP DONE: K1-K4 INPUT/no pull; physical outputs LOCKED");
 }
 void loop(){
   uint32_t now=millis();

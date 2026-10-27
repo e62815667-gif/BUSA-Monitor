@@ -2,8 +2,8 @@
 // V15 relay state model: virtual diagnostics only, no GPIO output.
 // Safety-bounded virtual relay diagnostics ONLY. No GPIO writes, no PCA PWM.
 // This mode never energizes SRD-12VDC-SL-C coils; there is no feedback sensor.
-static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,
-              "K1..K4 serve sound alarms only; LED PWM is disabled");
+static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,
+              "K1..K4 and LED PWM must stay physically disabled");
 constexpr uint32_t RELAY_SIM_MAX_MS=10000U;
 uint8_t relaySimChannel=0;
 uint32_t relaySimStart=0,relaySimUntil=0;

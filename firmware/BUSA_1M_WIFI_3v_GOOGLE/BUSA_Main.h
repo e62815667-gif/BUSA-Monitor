@@ -2,7 +2,7 @@
 /*
   BUSA-1M-001 БУСА 1М WiFi 3v-GOOGLE
   ESP32-S3 N8R2 44-pin, TFT GMT028-05 V1.1 320x240; temperature monitoring with low-voltage audio alerts.
-  Four relay channels are dedicated to 12 V sound annunciators only.
+  Physical relay/LED outputs are locked pending independent electrical review.
   Approved hardware scope: mains power controller and motorized valve are
   REMOVED from this project; they are operated manually, outside ESP32.
   Approved informational section "Отбор" is retained without actuator control.
@@ -36,7 +36,7 @@
 #include <math.h>
 
 #include "BUSA_V15_Board.h"
-const char VERSION[]="БУСА 1М WiFi 15v1-N8R2-FOUR-SOUND-ALARMS-TFIX";
+const char VERSION[]="БУСА 1М WiFi 15v1-N8R2-FOUR-SOUND-ALARMS-TFIX-SAFE1";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -324,9 +324,9 @@ int scanKeyPair(){
   if(!pcfDetected){pcfScanError=1;return -1;}
   pcfLastScanAt=millis();
   pcfScanError=0;pcfPairCount=0;pcfObservedLow=0;pcfConflictDrive=-1;pcfConflictMask=0;
-  if(!pcfWrite(65535)){pcfScanError=2;return -2;}
+  if(!pcfWrite(65535)){pcfScanError=2;pcfWrite(65535);return -2;}
   delayMicroseconds(160);
-  if(!pcfRead(pcfIdleMask)){pcfScanError=3;return -2;}
+  if(!pcfRead(pcfIdleMask)){pcfScanError=3;pcfWrite(65535);return -2;}
   // Record lines already low with all PCF8575 ports released.
   // Such lines cannot be attributed to a newly driven matrix column.
   const uint16_t idleLow=(uint16_t)~pcfIdleMask;
@@ -357,9 +357,8 @@ int scanKeyPair(){
       // Verify a multi-line reading after settling; never forge a keypress.
       delayMicroseconds(350);
       uint16_t retry=65535;
-      if(pcfRead(retry)){
-        lows=(uint16_t)(~retry) & (uint16_t)~(1u<<a);
-      }
+      if(!pcfRead(retry)){pcfScanError=5;ambiguous=true;break;}
+      lows=(uint16_t)(~retry) & (uint16_t)~(1u<<a);
     }
     pcfObservedLow|=lows;
     if(!lows)continue;
@@ -375,8 +374,18 @@ int scanKeyPair(){
   if(!ambiguous&&found>=0)pcfValidPairTotal++;
   return ambiguous?-2:found;
 }
+const char* keyScanErrorText(uint8_t code){
+  switch(code){
+    case 0:return "OK";case 1:return "PCF_NOT_FOUND";
+    case 2:return "IDLE_WRITE_FAILED";case 3:return "IDLE_READ_FAILED";
+    case 4:return "DRIVE_WRITE_FAILED";case 5:return "SCAN_READ_FAILED";
+    case 6:return "AMBIGUOUS_MATRIX";case 7:return "MULTIPLE_PAIRS";
+    case 8:return "RELEASE_FAILED";case 9:return "IDLE_LOW";
+    default:return "UNKNOWN";
+  }
+}
 String pairName(int p){
-  if(p==-2)return "НЕСКОЛЬКО КНОПОК";
+  if(p==-2)return "НЕОДНОЗНАЧНАЯ МАТРИЦА";
   if(p<0)return "НЕТ";
   return "P"+String(p>>4)+"-P"+String(p&15);
 }
@@ -728,7 +737,7 @@ void darkenTftDisplay(){
 #include "BUSA_ApprovedUI_V13.h"
 
 #include "BUSA_ApprovedGraphics_HQ_V14.h"
-#include "BUSA_Landscape_V14.h"
+#include "BUSA_V15_LandscapeSafe.h"
 void renderScreen(uint32_t now){
   if(!tftStarted||!screen)return;
   if(!bootSplashComplete || !elapsed(now,splashStartedAt,splashHoldMs))return;
@@ -1074,7 +1083,7 @@ main>*{max-width:100%;min-width:0}
   </div>
   <div class="card"><h2>Состояние K1–K4</h2>
    <div class="relayGrid"><span>K1 <b id="alarmState0">ОЖИД.</b></span><span>K2 <b id="alarmState1">ОЖИД.</b></span><span>K3 <b id="alarmState2">ОЖИД.</b></span><span>K4 <b id="alarmState3">ОЖИД.</b></span></div>
-   <p class="hint">Звуковые сигналы через K1–K4: GPIO 7, 6, 5, 4. Каждый канал работает по собственной температуре, настройке ВКЛ и ОТКЛ.</p>
+   <p class="hint">GPIO 7, 6, 5, 4: входы без подтяжек, физическое управление заблокировано. Пороги четырёх температур сохраняются независимо.</p>
   </div></section>
 <section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div><p id="lastTUpdate" class="hint">Данных от ESP32 пока нет.</p>
 <div id="temperatureDetails"></div>
@@ -1088,7 +1097,7 @@ main>*{max-width:100%;min-width:0}
 <button type="button" class="full" id="saveBindings">Сохранить привязку T1–T4</button>
 <p id="bindingResult" class="hint">Названия каналов автоматически не переставляются.</p>
 <pre id="temperatureInventory" style="white-space:pre-wrap;word-break:break-word">Поиск ROM датчиков...</pre>
-<p class="hint">Уставки каждого канала: ВКЛ и ОТКЛ. Если измерение недостоверно, выход соответствующего канала выключен.</p>
+<p class="hint">Уставки каждого канала: ВКЛ и ОТКЛ. Физические выходы в этой сборке заблокированы независимо от уставок.</p>
 <div class="grid">
 <div><label>T1 Вода · ВКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref0"></div>
 <div><label>T1 · ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt0"></div>
@@ -1100,14 +1109,14 @@ main>*{max-width:100%;min-width:0}
 <div><label>T4 · ОТКЛ, °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
 </div><p class="hint">Для включения канала нужны два разных порога с разницей не менее 0,5 °C. Состояние каналов по умолчанию — выключено.</p>
 <div class="grid">
-<label><input id="alarmEnable0" type="checkbox"> К1 · разрешить T1</label>
-<label><input id="alarmEnable1" type="checkbox"> К2 · разрешить T2</label>
-<label><input id="alarmEnable2" type="checkbox"> К3 · разрешить T3</label>
-<label><input id="alarmEnable3" type="checkbox"> К4 · разрешить T4</label>
+<label><input id="alarmEnable0" type="checkbox" disabled> К1 · разрешить T1</label>
+<label><input id="alarmEnable1" type="checkbox" disabled> К2 · разрешить T2</label>
+<label><input id="alarmEnable2" type="checkbox" disabled> К3 · разрешить T3</label>
+<label><input id="alarmEnable3" type="checkbox" disabled> К4 · разрешить T4</label>
 </div>
 <button id="refsSave" type="button" class="full">Сохранить уставки</button>
-<button id="alarmSave" type="button" class="full">Применить К1–К4</button>
-<p id="alarmResult" role="status" class="hint">Выходы К1–К4 после первой установки выключены.</p>
+<button id="alarmSave" type="button" disabled class="full">Применить К1–К4</button>
+<p id="alarmResult" role="status" class="hint">Выходы К1–К4 заблокированы в этой сборке. Полярность и электрическая совместимость не проверены.</p>
 <p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div></section>
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор · информационный раздел</h2><p class="hint">В этом разделе только отображение данных. Команды физическим выходам не передаются.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden>
@@ -1471,7 +1480,7 @@ function graphAllTemperatures(){
  if(!tlog4.some(a=>a.some(v=>v!==null))){x.fillStyle='#a43c24';x.fillText('НЕТ ИЗМЕРЕНИЙ T1–T4',180,107)}
 }
 function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
-const temperatureErrors={OK:'Измерение подтверждено',WAIT_DIAG:'Поиск датчика',WAIT_CONVERSION:'Ожидание измерения',NO_PRESENCE:'Нет ответа датчика',LINE_LOW:'Линия удерживается в нуле',NO_ROM:'ROM не прочитан',ROM_CRC_BAD:'Ошибка CRC адреса',ROM_SEARCH_NOISE:'Нестабильный поиск ROM',MULTIPLE_ROM:'Несколько ROM — выбери датчик',BOUND_ROM_MISSING:'Назначенный ROM не найден',ROM_ON_MULTIPLE_BUSES:'Один ROM найден на разных линиях',PARASITE_POWER_UNSUPPORTED:'Требуется отдельное питание датчика',BUS_POWER_UNSUPPORTED:'На общей линии есть датчик без отдельного питания',SCRATCHPAD_CRC_BAD:'Ошибка CRC измерения',POWER_ON_RESET:'Датчик перезапустился — ожидание новой конверсии',INSUFFICIENT_POWER:'Недостаточное питание датчика',CONFIG_INVALID:'Неверный ответ датчика',OUT_OF_RANGE:'Значение вне диапазона',STALE_READING:'Показание устарело',TOO_MANY_ROMS:'Превышен предел ROM на линии'};
+const temperatureErrors={CONVERSION_TIMEOUT:'Датчик не завершил преобразование',UNASSIGNED:'Датчик намеренно не назначен',ROM_ASSIGNED_MULTIPLE_ROLES:'Один ROM назначен нескольким ролям',NOT_DS18B20:'Неверное семейство датчика',OK:'Измерение подтверждено',WAIT_DIAG:'Поиск датчика',WAIT_CONVERSION:'Ожидание измерения',NO_PRESENCE:'Нет ответа датчика',LINE_LOW:'Линия удерживается в нуле',NO_ROM:'ROM не прочитан',ROM_CRC_BAD:'Ошибка CRC адреса',ROM_SEARCH_NOISE:'Нестабильный поиск ROM',MULTIPLE_ROM:'Несколько ROM — выбери датчик',BOUND_ROM_MISSING:'Назначенный ROM не найден',ROM_ON_MULTIPLE_BUSES:'Один ROM найден на разных линиях',PARASITE_POWER_UNSUPPORTED:'Требуется отдельное питание датчика',BUS_POWER_UNSUPPORTED:'На общей линии есть датчик без отдельного питания',SCRATCHPAD_CRC_BAD:'Ошибка CRC измерения',POWER_ON_RESET:'Датчик перезапустился — ожидание новой конверсии',INSUFFICIENT_POWER:'Недостаточное питание датчика',CONFIG_INVALID:'Неверный ответ датчика',OUT_OF_RANGE:'Значение вне диапазона',STALE_READING:'Показание устарело',TOO_MANY_ROMS:'Превышен предел ROM на линии'};
 function temperatureView(t,d={}){
  const valid=t?.verified===true&&typeof t.c==='number'&&Number.isFinite(t.c)&&t.c>=-55&&t.c<=125;
  const error=valid?'OK':t?.error||d?.result||'NO_VALID_READING';
@@ -1484,7 +1493,7 @@ function renderTemperatureBindings(s){
  if(fingerprint!==bindingFingerprint){
   for(let i=0;i<4;i++){
    const select=get('bind'+i),previous=select.value;
-   select.replaceChildren(new Option('Авто GPIO'+[16,17,18,21][i],'auto'));
+   select.replaceChildren(new Option('Авто GPIO'+[16,17,18,21][i],'auto'),new Option('Не назначен','none'));
    inventory.forEach(x=>select.add(new Option('GPIO'+x.gpio+' · '+x.rom,x.bus+':'+x.rom)));
    if(Array.from(select.options).some(x=>x.value===previous))select.value=previous;
   }
@@ -1537,7 +1546,7 @@ get('temperatures').textContent=names.map((v,i)=>v+': '+get('t'+i).textContent).
 if(s.sound_alarms && Array.isArray(s.sound_alarms.channels)){
   s.sound_alarms.channels.forEach((ch,i)=>{
     let state=get('alarmState'+i);
-    if(state)state.textContent=ch.sound_on?'ЗВУК':'ВЫКЛ';
+    if(state)state.textContent=s.sound_alarms.driver_enabled!==true?'БЛОК':ch.sound_on?'ЗВУК':'ВЫКЛ';
     const control=get('alarmEnable'+i);
     if(control && document.activeElement!==control)control.checked=ch.enabled===true;
   });
@@ -1600,7 +1609,8 @@ if(s.keypad){
    const k=s.diagnostics.keyboard||{};
    get('diagKeyboard').textContent='PCF 0x'+Number(k.pcf_address||0).toString(16)+
       ' | idle=0x'+k.idle_hex+' | low=0x'+k.low_hex+
-      ' | pair='+k.raw_pair+' | error='+k.scan_error;
+      ' | pair='+k.raw_pair+' | error='+k.scan_error+' '+(k.scan_error_reason||'')+
+      ' | drive='+k.conflict_drive+' | conflict=0x'+k.conflict_mask_hex;
    const d=s.diagnostics,addresses=(d.i2c?.addresses||[]);
    get('diagI2c').textContent='I2C GPIO8/9 | ACK total='+d.i2c?.ack_total+
      ' | addresses='+addresses.map(a=>'0x'+Number(a).toString(16).padStart(2,'0')).join(', ')+

@@ -5,7 +5,7 @@ String statusJSON(){
   String s;
   s.reserve(8192);
   s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
-  s+=",\"mode\":\"TEMPERATURE_SOUND_MONITOR\",\"relays_enabled\":true,\"pwm_enabled\":false";
+  s+=",\"mode\":\"MONITOR_HARDWARE_LOCKED\",\"relays_enabled\":false,\"pwm_enabled\":false";
   s+=",\"sound_alarms\":"+alarmStatusJSON(now);
   s+=",\"architecture\":"+v15ArchitectureJSON();
   s+=",\"leds\":"+ledSimJSON();
@@ -29,7 +29,7 @@ String statusJSON(){
     s+=",\"gpio\":"+String(TPIN[tempBusForLogical(i)])+",\"present\":"+(tempPresent[i]?"true":"false");
     s+=",\"verified\":";s+=(hasTemp(i,now)?"true":"false");
     s+=",\"error\":"+quoteJson(wireError(i,now));
-    s+=",\"binding\":"+quoteJson(tempBindings[i].explicitRom?String(tempBindings[i].bus)+":"+romHex(tempBindings[i].rom):String("auto"));
+    s+=",\"binding\":"+quoteJson(tempIsUnassigned(i)?String("none"):tempBindings[i].explicitRom?String(tempBindings[i].bus)+":"+romHex(tempBindings[i].rom):String("auto"));
     s+=",\"sample_age_ms\":"+(hasTemp(i,now)?String((uint32_t)(now-tempAt[i])):String("null"));
     s+=",\"c\":"+(hasTemp(i,now)?String(temperature[i],2):String("null"))+"}";
   }
@@ -59,6 +59,7 @@ String statusJSON(){
   s+=",\"expected\":"+quoteJson(keypadLearning&&learnStep<20?String(KEY_CAPS[learnStep]):String(""));
   s+=",\"raw_pair\":"+quoteJson(rawPair);
   s+=",\"message\":"+quoteJson(keypadMessage)+"}";
+  s+=",\"temperature_binding_record_error\":"+String(tempBindingLoadInvalid?"true":"false");
   s+=",\"temperature_inventory\":"+temperatureInventoryJSON(now);
   s+=",\"diagnostics\":{\"onewire\":"+temperatureDiagnosticsJSON(now);
   s+=",\"keyboard\":{\"pcf_address\":"+String(pcfAddr);
@@ -67,6 +68,7 @@ String statusJSON(){
   s+=",\"low_hex\":"+quoteJson(String(pcfObservedLow,HEX));
   s+=",\"pairs\":"+String(pcfPairCount);
   s+=",\"scan_error\":"+String(pcfScanError);
+  s+=",\"scan_error_reason\":"+quoteJson(keyScanErrorText(pcfScanError));
   s+=",\"conflict_drive\":"+String((int)pcfConflictDrive);
   s+=",\"conflict_mask_hex\":"+quoteJson(String(pcfConflictMask,HEX));
   s+=",\"error6_total\":"+String(pcfError6Total);

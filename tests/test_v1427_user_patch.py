@@ -21,7 +21,7 @@ assert 'for(let i=0;i<25&&j.scanning;i++)' in main
 for text in ("j.error==='scan_cooldown'","if(j.scanning)","else if(j.error)","else if(count)","Сетей 2,4 ГГц не найдено."):
  assert text in main,text
 assert 'server.collectHeaders(headers,1);\n  server.begin();' in main
-assert 'RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false' in main
+assert 'RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false' in main
 assert 'kPhysicalOutputsApproved=false' in (root/'BUSA_PCA9685_Leds.h').read_text()
 assert 'ledcWrite(' not in main
 assert 'setInsecure(' not in main+google

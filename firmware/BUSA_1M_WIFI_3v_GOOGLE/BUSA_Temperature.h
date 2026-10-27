@@ -23,13 +23,15 @@ uint32_t oneWireNoPresenceCount[4]={0},oneWireDetectedCount[4]={0};
 float temperature[4]={NAN,NAN,NAN,NAN};bool tempPresent[4]={false};uint32_t tempAt[4]={0};
 struct TempBinding {uint8_t bus=0,rom[8]={0};bool explicitRom=false;};
 TempBinding tempBindings[4];
+bool tempBindingLoadInvalid=false;
 uint8_t tempNextBus=0;
 String romHex(const uint8_t rom[8]){char out[17];for(int i=0;i<8;i++)snprintf(out+i*2,3,"%02X",rom[i]);return String(out);}
 bool tempRomValid(const uint8_t* rom){return rom[0]==0x28 && OneWire::crc8(rom,7)==rom[7];}
-bool tempProbeClean(const OneWireProbe& p){return p.presence && p.count && !p.searchNoise && !p.overflow && p.familyOk && p.crcOk;}
+bool tempProbeClean(const OneWireProbe& p){return p.checked && p.idleLevel==1 && p.afterResetLevel==1 && p.presence && p.count && !p.searchNoise && !p.overflow && p.familyOk && p.crcOk;}
+bool tempIsUnassigned(int n){return n>=0 && n<4 && !tempBindings[n].explicitRom && tempBindings[n].bus==255;}
 int tempBusForLogical(int n){return tempBindings[n].explicitRom?tempBindings[n].bus:n;}
 int tempDeviceForLogical(int n){
-  if(n<0||n>3)return -1;
+  if(n<0||n>3||tempIsUnassigned(n))return -1;
   const auto& bind=tempBindings[n];const auto& p=wireProbe[tempBusForLogical(n)];
   if(bind.explicitRom){for(int k=0;k<p.count;k++)if(memcmp(bind.rom,p.devices[k].rom,8)==0)return k;return -1;}
   return p.count==1?0:-1;
@@ -38,19 +40,27 @@ bool tempRomUniqueAcrossBuses(const uint8_t* rom){
   int count=0;for(const auto& p:wireProbe)for(int k=0;k<p.count;k++)if(memcmp(p.devices[k].rom,rom,8)==0)++count;
   return count==1;
 }
-// When DATA lines are electrically shared, ROMs may appear on both pins.
-// Require an explicit user-selected ROM+bus pair; never auto-name ambiguous sensors.
+// Multiple DATA pins observing the same ROM is an electrical ambiguity.
+// An explicit role binding must not bypass that diagnostic block.
 bool tempExplicitMatchOnBus(int b,const uint8_t* rom){
   for(int n=0;n<4;n++)if(tempBindings[n].explicitRom && tempBindings[n].bus==b &&
      memcmp(tempBindings[n].rom,rom,8)==0)return true;
   return false;
 }
+bool tempLogicalRomUnique(int n,const uint8_t* rom){
+  for(int other=0;other<4;other++){
+    if(other==n)continue;
+    const int k=tempDeviceForLogical(other);
+    if(k>=0 && memcmp(wireProbe[tempBusForLogical(other)].devices[k].rom,rom,8)==0)return false;
+  }
+  return true;
+}
 bool oneWireVerified(int n){
-  if(n<0||n>3)return false;
-  int b=tempBusForLogical(n),k=tempDeviceForLogical(n);
+  if(n<0||n>3||tempIsUnassigned(n))return false;
+  const int b=tempBusForLogical(n),k=tempDeviceForLogical(n);
   return k>=0 && tempProbeClean(wireProbe[b]) &&
-    (tempRomUniqueAcrossBuses(wireProbe[b].devices[k].rom) ||
-     (tempBindings[n].explicitRom && tempExplicitMatchOnBus(b,wireProbe[b].devices[k].rom)));
+    tempRomUniqueAcrossBuses(wireProbe[b].devices[k].rom) &&
+    tempLogicalRomUnique(n,wireProbe[b].devices[k].rom);
 }
 bool hasTemp(int n,uint32_t now){
   if(!oneWireVerified(n))return false;
@@ -58,17 +68,23 @@ bool hasTemp(int n,uint32_t now){
   return d.external && d.hasSample && !elapsed(now,d.sampledAt,TEMP_STALE_MS) && isfinite(d.value);
 }
 String wireError(int n,uint32_t now){
+  if(tempIsUnassigned(n))return "UNASSIGNED";
   int b=tempBusForLogical(n),k=tempDeviceForLogical(n);const auto& p=wireProbe[b];
   if(!p.checked)return "WAIT_DIAG";
+  if(p.idleLevel==0||p.afterResetLevel==0)return "LINE_LOW";
   if(!p.presence)return p.idleLevel==0?"LINE_LOW":"NO_PRESENCE";
   if(p.overflow)return "TOO_MANY_ROMS";
+  if(!p.crcOk)return "ROM_CRC_BAD";
+  if(!p.familyOk)return "NOT_DS18B20";
   if(p.searchNoise)return "ROM_SEARCH_NOISE";
-  if(!p.familyOk && p.romFound)return "NOT_DS18B20";
-  if(!p.crcOk && p.romFound)return "ROM_CRC_BAD";
   if(!p.count)return "NO_ROM";
-  if(k<0)return tempBindings[n].explicitRom?"BOUND_ROM_MISSING":"MULTIPLE_ROM";
+  if(k<0){
+    for(int j=0;j<p.count;j++)if(!tempRomUniqueAcrossBuses(p.devices[j].rom))return "ROM_ON_MULTIPLE_BUSES";
+    return tempBindings[n].explicitRom?"BOUND_ROM_MISSING":"MULTIPLE_ROM";
+  }
   const auto& d=p.devices[k];
-  if(!tempRomUniqueAcrossBuses(d.rom) && !tempBindings[n].explicitRom)return "ROM_ON_MULTIPLE_BUSES";
+  if(!tempRomUniqueAcrossBuses(d.rom))return "ROM_ON_MULTIPLE_BUSES";
+  if(!tempLogicalRomUnique(n,d.rom))return "ROM_ASSIGNED_MULTIPLE_ROLES";
   if(!d.external)return String(d.error);
   if(!d.hasSample)return String(d.error);
   return hasTemp(n,now)?"OK":"STALE_READING";
@@ -93,7 +109,7 @@ void tempCommitProbe(uint8_t b,uint32_t now){
     }
   }
   auto& p=wireProbe[b];p.romFound=p.count>0;
-  if(p.count){memcpy(p.rom,p.devices[0].rom,8);p.crcOk=!p.searchNoise;p.familyOk=p.familyOk && tempRomValid(p.rom);}
+  if(p.count){memcpy(p.rom,p.devices[0].rom,8);p.crcOk=p.crcOk && tempRomValid(p.rom);p.familyOk=p.familyOk && tempRomValid(p.rom);}
   if(p.count>1){p.secondFound=p.multiple=true;memcpy(p.secondRom,p.devices[1].rom,8);}
   state.cursor=0;state.phase=tempProbeClean(p)?TempPhase::Power:TempPhase::Rest;
   state.cycleAt=now;
@@ -110,7 +126,7 @@ void temperatureTick(uint32_t now){
   }else if(st.phase==TempPhase::Search){
     uint8_t rom[8]={0};
     if(!bus->search(rom)){bus->reset_search();tempCommitProbe(b,now);}
-    else if(OneWire::crc8(rom,7)!=rom[7]){st.pending.searchNoise=true;tempCommitProbe(b,now);}
+    else if(OneWire::crc8(rom,7)!=rom[7]){st.pending.crcOk=false;st.pending.searchNoise=true;tempCommitProbe(b,now);}
     else if(rom[0]!=0x28){st.pending.familyOk=false;st.pending.searchNoise=true;tempCommitProbe(b,now);}
     else if(st.pending.count>=TEMP_MAX_DEVICES){st.pending.overflow=true;tempCommitProbe(b,now);}
     else{
@@ -138,7 +154,12 @@ void temperatureTick(uint32_t now){
       st.phase=TempPhase::Converting;
     }
   }else if(st.phase==TempPhase::Converting){
-    if(elapsed(now,st.convertedAt,TEMP_CONVERSION_MS)){st.cursor=0;st.phase=TempPhase::Read;}
+    if(elapsed(now,st.convertedAt,TEMP_CONVERSION_MS)){
+      // All externally-powered devices must release the conversion busy bit.
+      // Never stamp a previous scratchpad as a new sample while conversion is busy.
+      if(!bus->read_bit()){tempInvalidateBus(b,"CONVERSION_TIMEOUT");st.phase=TempPhase::Probe;}
+      else{st.cursor=0;st.phase=TempPhase::Read;}
+    }
   }else if(st.phase==TempPhase::Read){
     auto& d=p.devices[st.cursor];uint8_t scratch[9]={0};d.hasSample=false;d.value=NAN;
     if(!bus->reset())d.error="NO_PRESENCE";
@@ -163,36 +184,47 @@ void temperatureTick(uint32_t now){
     if(elapsed(now,p.checkedAt,TEMP_PROBE_MS) || (!p.presence && elapsed(now,p.checkedAt,2000U)))st.phase=TempPhase::Probe;
     else if(elapsed(now,st.cycleAt,TEMP_CYCLE_MS) && tempProbeClean(p))st.phase=TempPhase::Start;
   }
-  static uint32_t lastSync=0;
-  if(!lastSync || elapsed(now,lastSync,500U)){
-    tempSyncLogical(now);
-    lastSync=now;
-  }
+  // Keep public values and validity atomic within one loop iteration. A newly
+  // valid physical sample must never coexist with a stale NAN logical value.
+  tempSyncLogical(now);
 }
 // Atomic persisted record: no automatic assignment of two ROMs to named roles.
 struct TempBindingRecord {uint32_t magic;uint8_t version,reserved[3];TempBinding bindings[4];uint8_t crc;};
 bool tempBindingRecordValid(const TempBindingRecord& r){
-  if(r.magic!=0x42544D50U||r.version!=1||OneWire::crc8((const uint8_t*)&r,offsetof(TempBindingRecord,crc))!=r.crc)return false;
-  for(const auto& b:r.bindings)if(b.explicitRom && (b.bus>3||!tempRomValid(b.rom)))return false;
+  if(r.magic!=0x42544D50U||(r.version!=1&&r.version!=2)||OneWire::crc8((const uint8_t*)&r,offsetof(TempBindingRecord,crc))!=r.crc)return false;
+  for(const auto& b:r.bindings){
+    if(b.explicitRom ? (b.bus>3||!tempRomValid(b.rom)) : (b.bus!=0 && !(r.version==2 && b.bus==255)))return false;
+  }
   for(int i=0;i<4;i++)for(int j=i+1;j<4;j++)if(r.bindings[i].explicitRom&&r.bindings[j].explicitRom&&memcmp(r.bindings[i].rom,r.bindings[j].rom,8)==0)return false;
   return true;
 }
+void tempLoadBindingRecord(const TempBindingRecord* record,bool present){
+  tempBindingLoadInvalid=present&&(!record||!tempBindingRecordValid(*record));
+  if(present&&!tempBindingLoadInvalid)memcpy(tempBindings,record->bindings,sizeof(tempBindings));
+  else for(auto& binding:tempBindings){binding=TempBinding();if(tempBindingLoadInvalid)binding.bus=255;}
+  // Invalid persisted choices must not silently become automatic assignments.
+  tempSyncLogical(millis());
+}
 bool tempValidateBindings(const TempBinding candidate[4]){
   for(int i=0;i<4;i++){
-    const auto& bind=candidate[i];const uint8_t b=bind.explicitRom?bind.bus:i;if(b>3)return false;
+    const auto& bind=candidate[i];
+    if(!bind.explicitRom && bind.bus==255)continue;
+    if(!bind.explicitRom && bind.bus!=0)return false;
+    const uint8_t b=bind.explicitRom?bind.bus:i;if(b>3)return false;
     const auto& p=wireProbe[b];int found=-1;
     if(bind.explicitRom){
-      if(!tempRomValid(bind.rom)||!tempProbeClean(p))return false;
+      if(!tempRomValid(bind.rom)||!tempProbeClean(p)||!tempRomUniqueAcrossBuses(bind.rom))return false;
       for(int k=0;k<p.count;k++)if(memcmp(bind.rom,p.devices[k].rom,8)==0)found=k;
-      // An explicit binding may select a duplicate observation on a shared bus.
-      // A ROM must still be unique across logical roles (checked below).
+      // Explicit binding never overrides LOW, CRC faults or cross-GPIO ROM aliases.
       if(found<0)return false;
     }else if(p.count==1)found=0;
     if(found>=0){
       for(int j=0;j<i;j++){
-        const auto& other=candidate[j];const auto& q=wireProbe[other.explicitRom?other.bus:j];
+        const auto& other=candidate[j];
+        if(!other.explicitRom && other.bus==255)continue;
+        const auto& q=wireProbe[other.explicitRom?other.bus:j];
         const uint8_t* rom=other.explicitRom?other.rom:(q.count==1?q.devices[0].rom:nullptr);
-        if(rom && (bind.explicitRom||other.explicitRom) && memcmp(rom,p.devices[found].rom,8)==0)return false;
+        if(rom && memcmp(rom,p.devices[found].rom,8)==0)return false;
       }
     }
   }
@@ -200,6 +232,7 @@ bool tempValidateBindings(const TempBinding candidate[4]){
 }
 bool tempParseSelection(const String& selection,TempBinding& b){
   b=TempBinding();if(selection=="auto")return true;
+  if(selection=="none"){b.bus=255;return true;}
   if(selection.length()!=18 || selection[0]<'0'||selection[0]>'3'||selection[1]!=':')return false;
   b.bus=(uint8_t)(selection[0]-'0');b.explicitRom=true;
   for(int i=0;i<8;i++){
@@ -214,13 +247,15 @@ String temperatureInventoryJSON(uint32_t now){
   for(int b=0;b<4;b++)for(int k=0;k<wireProbe[b].count;k++){
     const auto& d=wireProbe[b].devices[k];if(s.length()>1)s+=",";
     const bool explicitMatch=tempExplicitMatchOnBus(b,d.rom);
-    const bool valid=tempProbeClean(wireProbe[b])&&(tempRomUniqueAcrossBuses(d.rom)||explicitMatch)&&d.hasSample&&d.external&&!elapsed(now,d.sampledAt,TEMP_STALE_MS);
+    const bool valid=tempProbeClean(wireProbe[b])&&tempRomUniqueAcrossBuses(d.rom)&&d.hasSample&&d.external&&!elapsed(now,d.sampledAt,TEMP_STALE_MS);
     s+="{\"bus\":"+String(b)+",\"gpio\":"+String(TPIN[b])+",\"rom\":"+quoteJson(romHex(d.rom));
     s+=",\"verified\":"+String(valid?"true":"false")+",\"c\":"+(valid?String(d.value,2):String("null"));
     String error=valid?String("OK"):String(d.error);
     if(wireProbe[b].overflow)error="TOO_MANY_ROMS";
+    else if(!wireProbe[b].crcOk)error="ROM_CRC_BAD";
+    else if(!wireProbe[b].familyOk)error="NOT_DS18B20";
     else if(wireProbe[b].searchNoise)error="ROM_SEARCH_NOISE";
-    else if(!tempRomUniqueAcrossBuses(d.rom) && !explicitMatch)error="ROM_ON_MULTIPLE_BUSES";
+    else if(!tempRomUniqueAcrossBuses(d.rom))error="ROM_ON_MULTIPLE_BUSES";
     else if(d.hasSample && elapsed(now,d.sampledAt,TEMP_STALE_MS))error="STALE_READING";
     s+=",\"shared_line\":"+String(tempRomUniqueAcrossBuses(d.rom)?"false":"true");
     s+=",\"assigned\":"+String(explicitMatch?"true":"false");
@@ -235,13 +270,16 @@ String temperatureDiagnosticsJSON(uint32_t now){
   for(int i=0;i<4;i++){
     const int b=tempBusForLogical(i),k=tempDeviceForLogical(i);const auto& p=wireProbe[b];if(i)s+=",";
     s+="{\"gpio\":"+String(TPIN[b])+",\"probe_ms\":"+String(p.checkedAt);
-    s+=",\"presence\":"+String(tempPresent[i]?"true":"false")+",\"measurement_verified\":"+String(hasTemp(i,now)?"true":"false");
+    s+=",\"electrical_state\":"+quoteJson(!p.checked?String("WAIT_DIAG"):(p.idleLevel==0||p.afterResetLevel==0)?String("LINE_LOW"):!p.presence?String("NO_PRESENCE"):String("PRESENCE"));
+    s+=",\"unassigned\":"+String(tempIsUnassigned(i)?"true":"false");
+    s+=",\"presence\":"+String(p.presence?"true":"false")+",\"measurement_verified\":"+String(hasTemp(i,now)?"true":"false");
     s+=",\"no_presence_count\":"+String(oneWireNoPresenceCount[b])+",\"detected_count\":"+String(oneWireDetectedCount[b]);
-    s+=",\"rom_found\":"+String(k>=0?"true":"false")+",\"rom_crc_ok\":"+String(oneWireVerified(i)?"true":"false");
+    s+=",\"rom_found\":"+String(k>=0?"true":"false")+",\"rom_crc_ok\":"+String(k>=0&&tempRomValid(p.devices[k].rom)?"true":"false");
     s+=",\"family_ds18b20\":"+String(p.familyOk?"true":"false")+",\"multiple_rom\":"+String(p.multiple?"true":"false");
     s+=",\"idle_gpio\":"+String(p.idleLevel)+",\"after_reset_gpio\":"+String(p.afterResetLevel);
     s+=",\"rom\":"+quoteJson(k>=0?romHex(p.devices[k].rom):String(""));
     s+=",\"second_rom\":"+quoteJson(p.secondFound?romHex(p.secondRom):String(""));
+    s+=",\"inventory_crc_ok\":"+String(p.crcOk?"true":"false");
     s+=",\"rom_search_noise\":"+String(p.searchNoise?"true":"false");
     s+=",\"binding_confirmed\":"+String(tempBindings[i].explicitRom?"true":"false")+",\"result\":"+quoteJson(wireError(i,now))+"}";
   }
