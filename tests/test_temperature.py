@@ -75,6 +75,30 @@ int main(){
  // Disconnected buses recover through periodic discovery; cross-bus ROM aliases fail closed.
  buses[0].devices={sensor(1,30)};buses[2].devices={sensor(1,30)};restart();run(3000);
  assert(wireError(0,nowMs)=="ROM_ON_MULTIPLE_BUSES"&&!hasTemp(0,nowMs));assert(temperatureInventoryJSON(nowMs).find("ROM_ON_MULTIPLE_BUSES")!=std::string::npos);
+ // Field case: GPIO17 and GPIO18 both see the same two sensors. Automatic
+ // assignment must remain blocked, but explicit UNIQUE ROM+GPIO binding
+ // permits verified readings on distinct logical T2 and T3 channels.
+ buses[2].devices={sensor(2,31),sensor(3,42)};
+ buses[1].devices={sensor(2,31),sensor(3,42)};restart();run(3500);
+ assert(wireError(1,nowMs)=="MULTIPLE_ROM"&&!hasTemp(1,nowMs));
+ assert(wireError(2,nowMs)=="MULTIPLE_ROM"&&!hasTemp(2,nowMs));
+ TempBinding shared[4];for(int i=0;i<4;i++)shared[i]=TempBinding();
+ shared[1].explicitRom=shared[2].explicitRom=true;shared[1].bus=1;shared[2].bus=2;
+ memcpy(shared[1].rom,buses[1].devices[0].rom.data(),8);
+ memcpy(shared[2].rom,buses[2].devices[1].rom.data(),8);
+ assert(tempValidateBindings(shared));
+ memcpy(tempBindings,shared,sizeof shared);tempSyncLogical(nowMs);
+ assert(hasTemp(1,nowMs)&&hasTemp(2,nowMs));
+ assert(temperature[1]==31.0f&&temperature[2]==42.0f);
+ assert(wireError(1,nowMs)=="OK"&&wireError(2,nowMs)=="OK");
+ assert(temperatureInventoryJSON(nowMs).find("\\"shared_line\\":true")!=std::string::npos);
+ assert(temperatureInventoryJSON(nowMs).find("\\"assigned\\":true")!=std::string::npos);
+ memcpy(shared[2].rom,shared[1].rom,8);
+ assert(!tempValidateBindings(shared)); // one sensor cannot fill two named roles
+ buses[1].devices.clear();buses[2].devices={sensor(1,30)};
+ buses[0].devices={sensor(1,30)};restart();run(3000);
+ // No stored explicit selection: ambiguous cross-GPIO reading still blocked.
+ assert(wireError(0,nowMs)=="ROM_ON_MULTIPLE_BUSES"&&!hasTemp(0,nowMs));
  buses[2].devices.clear();buses[0].devices[0].external=false;restart();run(3000);
  assert(wireError(0,nowMs)=="PARASITE_POWER_UNSUPPORTED"&&!hasTemp(0,nowMs));
  buses[0].devices[0].external=true;buses[0].low=true;wireProbe[0]=OneWireProbe();tempBus[0]=TempBusState();run(1500);assert(wireError(0,nowMs)=="LINE_LOW");
