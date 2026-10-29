@@ -1,5 +1,5 @@
 #pragma once
-// V15 architecture boundary. Legacy physical outputs remain disconnected.
+// V15.2 board architecture: independent low-voltage monitor with four sound alerts.
 // New channel driver requires independent safe-hardware validation.
 namespace BusaArchitectureV15 {
 constexpr uint8_t kTemperatureChannels=4;
@@ -9,7 +9,7 @@ static_assert(kTemperatureChannels==4 && kLogicalRelayChannels==4,"V15 channels"
 }
 String v15ArchitectureJSON(){
   String s; s.reserve(340);
-  s="{\"revision\":\"V15.1\",\"platform\":\"ESP32-S3-N8R2\",";
+  s="{\"revision\":\"V15.2\",\"platform\":\"ESP32-S3-N16R8\",";
   s+="\"modules\":[\"board\",\"sensors\",\"wifi\",\"google\",\"ui\",\"relay_model\",\"runtime\"],";
   s+="\"physical_relay_driver_implemented\":true,\"purpose\":\"SOUND_ALARMS_ONLY\",";
   s+="\"mains_and_valve_outside_project\":true}";
