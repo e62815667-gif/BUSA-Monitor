@@ -5,7 +5,7 @@ void setup(){
   relaySimStop("BOOT_SAFE");
   ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V15.1: independent four-channel 12V sound alerts");
+  Serial0.println("\nBUSA 1M WiFi V15.2: ESP32-S3 N16R8 / new TFT pins / sound-only low-voltage bench");
   Serial.begin(115200);
   delay(400);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
@@ -76,7 +76,10 @@ void setup(){
     out+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"));
     out+=",\"ap_clients\":"+String(WiFi.softAPgetStationNum());
     out+=",\"sta_connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
-    out+=",\"free_heap\":"+String(ESP.getFreeHeap())+"}";
+    out+=",\"free_heap\":"+String(ESP.getFreeHeap());
+    out+=",\"flash_bytes\":"+String(ESP.getFlashChipSize());
+    out+=",\"psram_bytes\":"+String(ESP.getPsramSize());
+    out+=",\"psram_free\":"+String(ESP.getFreePsram())+"}";
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",out);
   });
