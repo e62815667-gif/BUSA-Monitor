@@ -1,0 +1,115 @@
+name: BUSA V15.2 N16R8 Full Firmware
+on:
+  push:
+    branches:
+      - feature/busa-v15-2-n16r8-tft-pins-20261029
+    paths:
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+      - 'tests/**'
+      - '.github/workflows/busa-v15-2-n16r8-full.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install pinned ESP32 core and libraries
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+          arduino-cli lib install "Adafruit BusIO@1.17.4"
+          arduino-cli lib install "ArduinoJson@6.21.5"
+          arduino-cli lib install "OneWire@2.3.8"
+          arduino-cli lib install "DallasTemperature@4.0.6"
+          arduino-cli lib install "Adafruit GFX Library@1.13.0"
+          arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
+          arduino-cli lib install "Adafruit ILI9341@1.7.0"
+          arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+      - name: Apply repository-pinned network compatibility fixes
+        run: python3 tools/patch_arduino_2_0_17.py "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
+      - name: Test N16R8 and retained full monitoring logic
+        run: |
+          python3 tests/test_v15_2_n16r8.py
+          python3 tests/test_v15_architecture.py
+          python3 tests/test_v15_sound_alarms.py
+          python3 tests/test_temperature.py
+          python3 tests/test_wifi_recovery.py
+          python3 tests/test_wifi_integration.py
+          python3 tests/test_google_transport.py
+          node tests/test_local_fetch.js
+          node tests/test_temperature_ui.js
+      - name: Generate and validate GTS Root R1–R4 trust anchors
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          roots = {}
+          expected_sha256 = {
+            'R1':'D947432ABDE7B7FA90FC2E6B59101B1280E0E1C7E4E40FA3C6887FFF57A7F4CF',
+            'R2':'8D25CD97229DBF70356BDA4EB3CC734031E24CF00FAFCFD32DC76EB5841C7EA8',
+            'R3':'34D8A73EE208D9BCDB0D956520934B4E40E69482596E8B6F73C8426B010A6F48',
+            'R4':'349DFA4058C5E263123B398AE795573C4E1313C83FE68F93556CD5E8031B3C7D',
+          }
+          for n in ('R1','R2','R3','R4'):
+            file = Path('/etc/ssl/certs/GTS_Root_'+n+'.pem')
+            if file.is_file():
+              pem=file.read_text()
+            else:
+              # Hosted Ubuntu runners do not guarantee every GTS root exists.
+              # Fetch ONLY from Google's official CA repository, then pin SHA256.
+              import urllib.request
+              url='https://pki.goog/repo/certs/gtsr'+n[1]+'.pem'
+              try:
+                with urllib.request.urlopen(url,timeout=25) as response:
+                  pem=response.read(12000).decode('ascii')
+              except Exception as ex:
+                raise RuntimeError('Unable to obtain GTS '+n+' from verified repository') from ex
+              file=Path('/tmp/BUSA_GTS_Root_'+n+'.pem')
+              file.write_text(pem)
+            assert pem.count('-----BEGIN CERTIFICATE-----')==1, n
+            fingerprint=subprocess.check_output(['openssl','x509','-in',str(file),'-noout','-fingerprint','-sha256'],text=True).strip().split('=',1)[1].replace(':','').upper()
+            assert fingerprint==expected_sha256[n], f'{n}: unexpected trust anchor {fingerprint}'
+            roots[n]=pem.strip()
+          bundle='\n'.join(roots[n] for n in ('R1','R2','R3','R4'))+'\n'
+          assert bundle.count('-----BEGIN CERTIFICATE-----')==4
+          p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h')
+          p.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+bundle+')GOOGLECERT";\n')
+          print('Verified trust anchors: GTS R1, R2, R3, R4. TLS verification is mandatory.')
+          PY
+      - name: Compile FULL firmware for N16R8 (16 MB flash, OPI PSRAM)
+        run: |
+          mkdir -p build_v15_2_n16r8
+          arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio' --output-dir build_v15_2_n16r8 firmware/BUSA_1M_WIFI_3v_GOOGLE
+      - name: Verify binaries and produce USB merged / OTA application
+        run: |
+          SDK="$HOME/.arduino15/packages/esp32"
+          ESPTOOL="$SDK/tools/esptool_py/4.5.1/esptool.py"
+          BOOTAPP="$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin"
+          python3 "$ESPTOOL" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 80m --flash_size 16MB -o build_v15_2_n16r8/BUSA_V15_2_N16R8_FULL_USB_merged.bin 0x0 build_v15_2_n16r8/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_v15_2_n16r8/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$BOOTAPP" 0x10000 build_v15_2_n16r8/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build_v15_2_n16r8/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_v15_2_n16r8/BUSA_V15_2_N16R8_FULL_APP_OTA.bin
+          (cd build_v15_2_n16r8 && sha256sum BUSA_V15_2_N16R8_FULL_USB_merged.bin BUSA_V15_2_N16R8_FULL_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          git rev-parse HEAD > build_v15_2_n16r8/SOURCE_COMMIT.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          base=Path("build_v15_2_n16r8")
+          app=base/"BUSA_V15_2_N16R8_FULL_APP_OTA.bin"
+          usb=base/"BUSA_V15_2_N16R8_FULL_USB_merged.bin"
+          assert app.stat().st_size < 0x300000,app.stat().st_size
+          assert usb.stat().st_size <= 16*1024*1024,usb.stat().st_size
+          data=(base/"BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin").read_bytes()
+          assert len(data)>64
+          print("APP bytes:",app.stat().st_size,"USB bytes:",usb.stat().st_size,"PART bytes:",len(data))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_V15_2_N16R8_FULL_BIN_SHA256
+          path: |
+            build_v15_2_n16r8/BUSA_V15_2_N16R8_FULL_USB_merged.bin
+            build_v15_2_n16r8/BUSA_V15_2_N16R8_FULL_APP_OTA.bin
+            build_v15_2_n16r8/SHA256SUMS.txt
+            build_v15_2_n16r8/SOURCE_COMMIT.txt
