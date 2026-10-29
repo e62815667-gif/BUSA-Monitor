@@ -1,7 +1,7 @@
 #pragma once
 /*
   BUSA-1M-001 БУСА 1М WiFi 3v-GOOGLE
-  ESP32-S3 N8R2 44-pin, TFT GMT028-05 V1.1 320x240; temperature monitoring with low-voltage audio alerts.
+  ESP32-S3 N16R8 44-pin (16 MB Flash / 8 MB OPI PSRAM), TFT GMT028-05 V1.1 320x240; temperature monitoring with low-voltage audio alerts.
   Four relay channels are dedicated to 12 V sound annunciators only.
   Approved hardware scope: mains power controller and motorized valve are
   REMOVED from this project; they are operated manually, outside ESP32.
@@ -1837,4 +1837,5 @@ void readConsole(){
     else if(c!='\r'&&consoleLine.length()<80)consoleLine+=c;
   }
 }
+#include "BUSA_N16R8_Memory.h"
 #include "BUSA_V15_Runtime.h"
