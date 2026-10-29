@@ -9,7 +9,7 @@ on:
       - '.github/workflows/busa-v15-2-n16r8-full.yml'
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -105,6 +105,18 @@ jobs:
           assert len(data)>64
           print("APP bytes:",app.stat().st_size,"USB bytes:",usb.stat().st_size,"PART bytes:",len(data))
           PY
+      - name: Publish verified BIN files to this independent feature branch
+        run: |
+          mkdir -p releases/V15_2_N16R8
+          cp build_v15_2_n16r8/BUSA_V15_2_N16R8_FULL_USB_merged.bin releases/V15_2_N16R8/
+          cp build_v15_2_n16r8/BUSA_V15_2_N16R8_FULL_APP_OTA.bin releases/V15_2_N16R8/
+          cp build_v15_2_n16r8/SHA256SUMS.txt releases/V15_2_N16R8/
+          cp build_v15_2_n16r8/SOURCE_COMMIT.txt releases/V15_2_N16R8/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add releases/V15_2_N16R8
+          git commit -m "Build V15.2 N16R8 full USB/OTA binaries with SHA-256" || true
+          git push origin HEAD:refs/heads/${GITHUB_REF_NAME}
       - uses: actions/upload-artifact@v4
         with:
           name: BUSA_V15_2_N16R8_FULL_BIN_SHA256
