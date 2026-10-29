@@ -1,0 +1,67 @@
+name: BUSA N16R8 Standalone Lab Build
+on:
+  push:
+    branches:
+      - feature/busa-v15-2-n16r8-tft-pins-20261029
+    paths:
+      - 'firmware/BUSA_N16R8_TFT_LAB/**'
+      - '.github/workflows/busa-n16r8-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install pinned ESP32 toolchain and libraries
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+          arduino-cli lib install "OneWire@2.3.8"
+          arduino-cli lib install "DallasTemperature@4.0.6"
+          arduino-cli lib install "Adafruit BusIO@1.17.4"
+          arduino-cli lib install "Adafruit GFX Library@1.13.0"
+          arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
+      - name: Check exact GPIO assignment, no output switching, 16MB layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path("firmware/BUSA_N16R8_TFT_LAB/BUSA_N16R8_TFT_LAB.ino").read_text()
+          for pin in ("TFT_CS=10","TFT_DC=11","TFT_RST=12","TFT_MOSI=13","TFT_SCK=14","TPINS[4]={16,17,18,21}"):
+              assert pin in s,pin
+          for forbidden in ("pinMode(", "digitalWrite(", "analogWrite(", "ledcWrite("):
+              assert forbidden not in s,forbidden
+          p=Path("firmware/BUSA_N16R8_TFT_LAB/partitions.csv").read_text()
+          assert "0xFF0000, 0x10000" in p
+          assert "ota_0" in p and "ota_1" in p
+          print("PASS pin map and partition contract")
+          PY
+      - name: Compile ESP32-S3 N16R8 (16MB Flash and OPI PSRAM)
+        run: |
+          mkdir -p build_n16r8
+          arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio' --output-dir build_n16r8 firmware/BUSA_N16R8_TFT_LAB
+      - name: Create merged USB and OTA app binaries and hashes
+        run: |
+          SDK="$HOME/.arduino15/packages/esp32"
+          ESPTOOL="$SDK/tools/esptool_py/4.5.1/esptool.py"
+          BOOTAPP="$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin"
+          python3 "$ESPTOOL" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 80m --flash_size 16MB -o build_n16r8/BUSA_N16R8_LAB_USB_merged.bin 0x0 build_n16r8/BUSA_N16R8_TFT_LAB.ino.bootloader.bin 0x8000 build_n16r8/BUSA_N16R8_TFT_LAB.ino.partitions.bin 0xe000 "$BOOTAPP" 0x10000 build_n16r8/BUSA_N16R8_TFT_LAB.ino.bin
+          cp build_n16r8/BUSA_N16R8_TFT_LAB.ino.bin build_n16r8/BUSA_N16R8_LAB_OTA.bin
+          sha256sum build_n16r8/BUSA_N16R8_LAB_*.bin > build_n16r8/SHA256SUMS.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("build_n16r8/BUSA_N16R8_LAB_USB_merged.bin")
+          assert p.stat().st_size <= 16*1024*1024,p.stat().st_size
+          print("PASS output size", p.stat().st_size)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_N16R8_TFT_LAB_BIN_and_SHA256
+          path: |
+            build_n16r8/BUSA_N16R8_LAB_USB_merged.bin
+            build_n16r8/BUSA_N16R8_LAB_OTA.bin
+            build_n16r8/SHA256SUMS.txt
