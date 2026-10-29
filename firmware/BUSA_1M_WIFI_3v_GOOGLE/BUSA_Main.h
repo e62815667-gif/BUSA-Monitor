@@ -1182,7 +1182,7 @@ main>*{max-width:100%;min-width:0}
 <div class="row"><span>OTA через интернет</span><b>ЗАБЛОКИРОВАНО</b></div>
 <p class="hint" id="cloudSafety">Совпадение Flash не подтверждает совместимость разделов OTA и откат. Не устанавливайте непроверенную прошивку.</p>
 <h2>Ручное обновление через локальный Wi-Fi</h2>
-<p class="hint">Только через локальную сеть БУСА. Выберите APP BIN для ESP32-S3 N8R2,
+<p class="hint">Только через локальную сеть БУСА. Выберите APP BIN для ESP32-S3 N16R8,
 НЕ объединённый merged BIN. Только проверенные диагностические сборки.
 Перед обновлением отключите внешние исполнительные цепи.</p>
 <input type="file" accept=".bin" id="firmwareFile">
@@ -1726,7 +1726,7 @@ get('manualUpdate').onclick=async function(){
   if(!file || !file.name.endsWith('.bin') || file.size<60000 || file.size>3340000){
     get('updateResult').textContent='Нужен APP BIN подходящего размера';return;
   }
-  if(!confirm('Подтвердите ручное обновление диагностической прошивки. ESP32-S3 N8R2, внешние выходы отключены, выбран APP BIN?'))return;
+  if(!confirm('Подтвердите ручное обновление диагностической прошивки. ESP32-S3 N16R8, звуковые выходы K1–K4, выбран APP BIN?'))return;
   this.disabled=true;
   try{
     const header=new DataView(await file.slice(0,36).arrayBuffer());
