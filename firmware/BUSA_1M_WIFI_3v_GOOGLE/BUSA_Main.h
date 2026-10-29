@@ -36,7 +36,7 @@
 #include <math.h>
 
 #include "BUSA_V15_Board.h"
-const char VERSION[]="БУСА 1М WiFi 15v1-N8R2-FOUR-SOUND-ALARMS-TFIX";
+const char VERSION[]="БУСА 1М WiFi 15v2-N16R8-TFT-REPIN-PSRAM";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
