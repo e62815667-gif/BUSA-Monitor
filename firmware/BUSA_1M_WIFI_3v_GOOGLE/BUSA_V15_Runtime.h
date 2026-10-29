@@ -6,6 +6,7 @@ void setup(){
   ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
   Serial0.println("\nBUSA 1M WiFi V15.2: ESP32-S3 N16R8 / new TFT pins / sound-only low-voltage bench");
+  busaN16MemoryBegin();
   Serial.begin(115200);
   delay(400);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
@@ -524,6 +525,7 @@ void loop(){
     tftDirty=true;
   }
     sampleFlow(now);
+    busaN16MemoryLog(now,temperature,flowLpm,flowPulses());
   if(i2cOnline){
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
     pollKeys(now);
@@ -540,7 +542,7 @@ void loop(){
   }
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
-    Serial0.printf("N8R2 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
+    Serial0.printf("N16R8 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
       (unsigned long)now,(int)wifiRunning,(int)i2cOnline,(int)tftStarted,
       (unsigned long)flowPulses(),(double)flowLpm);
   }
