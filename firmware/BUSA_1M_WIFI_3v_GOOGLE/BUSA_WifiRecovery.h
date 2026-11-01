@@ -4,7 +4,7 @@ class BusaWiFiScanControl : public WiFiGenericClass {
 public:
   static void clearScanBusy(){clearStatusBits(WIFI_SCANNING_BIT);}
 };
-// V14.27: AP+STA coexistence; local clients never block STA association.
+// V15.6a: AP+STA coexistence; local clients never block STA association.
 // One loop owns radio work; no AP restart or forced home-channel reset.
 // IDF migrates AP to STA channel using CSA. Manual scans visit one channel at a time.
 enum class BusaScanPhase : uint8_t { Idle, Requested, Settling, Running, HomePause };
@@ -34,7 +34,12 @@ void wifiStartAccessPoint(uint32_t now){
   wifiApAttemptAt=now;++wifiApAttempts;
   if((WiFi.getMode() & WIFI_AP)==0)wifiModeStarted=WiFi.mode(WIFI_AP_STA);
   const bool ok=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),BUSA_AP_CHANNEL,false,4);
-  if(ok)esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
+  if(ok){
+    esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
+    // V15.6a: a successful softAP() is evidence of startup even if the
+    // asynchronous AP_START event is missed. AP_STOP still clears this flag.
+    wifiApObserved.store(true);
+  }
   wifiRunning=ok;
   busaLog.printf("AP start attempt=%lu mode_ok=%d result=%d\n",
     (unsigned long)wifiApAttempts,(int)wifiModeStarted,(int)ok);
