@@ -59,22 +59,19 @@ jobs:
             'R3':'34D8A73EE208D9BCDB0D956520934B4E40E69482596E8B6F73C8426B010A6F48',
             'R4':'349DFA4058C5E263123B398AE795573C4E1313C83FE68F93556CD5E8031B3C7D',
           }
+          # Reuse the exact four GTS certificates shipped in the proven V15.2
+          # firmware. Pin both the whole app SHA256 and each X.509 fingerprint.
+          # No outbound PKI download is required by the build runner.
+          import re, hashlib
+          previous=Path('releases/V15_2_N16R8/BUSA_V15_2_N16R8_FULL_APP_OTA.bin')
+          image=previous.read_bytes()
+          assert hashlib.sha256(image).hexdigest()=='45b8aeceb77705bf98246281fe223e29d7c9fbe688339f529886bc6e14e54b01', 'Base image changed unexpectedly'
+          matches=re.findall(rb'-----BEGIN CERTIFICATE-----\r?\n.*?-----END CERTIFICATE-----',image,re.S)
+          assert len(matches)==4, f'Expected four proven trust anchors; found {len(matches)}'
           for n in ('R1','R2','R3','R4'):
-            file = Path('/etc/ssl/certs/GTS_Root_'+n+'.pem')
-            if file.is_file():
-              pem=file.read_text()
-            else:
-              # Hosted Ubuntu runners do not guarantee every GTS root exists.
-              # Fetch ONLY from Google's official CA repository, then pin SHA256.
-              import urllib.request
-              url='https://pki.goog/repo/certs/gtsr'+n[1]+'.pem'
-              try:
-                with urllib.request.urlopen(url,timeout=25) as response:
-                  pem=response.read(12000).decode('ascii')
-              except Exception as ex:
-                raise RuntimeError('Unable to obtain GTS '+n+' from verified repository') from ex
-              file=Path('/tmp/BUSA_GTS_Root_'+n+'.pem')
-              file.write_text(pem)
+            pem=matches[int(n[1])-1].decode('ascii')+'\n'
+            file=Path('/tmp/BUSA_GTS_Root_'+n+'.pem')
+            file.write_text(pem)
             assert pem.count('-----BEGIN CERTIFICATE-----')==1, n
             fingerprint=subprocess.check_output(['openssl','x509','-in',str(file),'-noout','-fingerprint','-sha256'],text=True).strip().split('=',1)[1].replace(':','').upper()
             assert fingerprint==expected_sha256[n], f'{n}: unexpected trust anchor {fingerprint}'
