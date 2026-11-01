@@ -22,13 +22,13 @@ void busaN16MemoryBegin(){
   busaN16Samples=0;
   busaN16Head=0;
   if(ESP.getPsramSize()<sizeof(BusaN16Sample)*BUSA_PSRAM_SAMPLE_CAPACITY) {
-    Serial0.println("PSRAM: not detected or too small, history disabled");
+    busaLog.println("PSRAM: not detected or too small, history disabled");
     return;
   }
   busaN16History=static_cast<BusaN16Sample*>(heap_caps_calloc(
     BUSA_PSRAM_SAMPLE_CAPACITY,sizeof(BusaN16Sample),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
   busaN16MemoryReady=(busaN16History!=nullptr);
-  Serial0.printf("PSRAM: bytes=%lu free=%lu sample_history=%s\n",
+  busaLog.printf("PSRAM: bytes=%lu free=%lu sample_history=%s\n",
        (unsigned long)ESP.getPsramSize(),(unsigned long)ESP.getFreePsram(),
        busaN16MemoryReady?"OK":"ALLOC_FAILED");
 }

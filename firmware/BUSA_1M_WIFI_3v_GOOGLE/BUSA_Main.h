@@ -35,8 +35,9 @@
 #include <U8g2_for_Adafruit_GFX.h>
 #include <math.h>
 
+#include "BUSA_Boot.h"
 #include "BUSA_V15_Board.h"
-const char VERSION[]="БУСА 1М WiFi 15v3-N16R8-UNIFIED-UI";
+const char VERSION[]="БУСА 1М WiFi 15v3-N16R8-UNIFIED-UI-BOOTFIX1";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -49,7 +50,11 @@ String quoteJson(const String &x);
 // Never use zero pulse count or calculated flow as a safety interlock.
 portMUX_TYPE flowMux=portMUX_INITIALIZER_UNLOCKED;
 volatile uint32_t pulseCounter=0;
+volatile uint32_t flowLastEdgeUs=0;
 void IRAM_ATTR flowISR(){
+  const uint32_t edge=micros();
+  if((uint32_t)(edge-flowLastEdgeUs)<100U)return;
+  flowLastEdgeUs=edge;
   portENTER_CRITICAL_ISR(&flowMux);
   ++pulseCounter;
   portEXIT_CRITICAL_ISR(&flowMux);
@@ -209,16 +214,26 @@ bool ack(uint8_t address){
   Wire.beginTransmission(address);return Wire.endTransmission()==0;
 }
 // I2C discovery plus read-only register inspection; never modify PWM outputs.
+uint8_t i2cScanAddress=0x08;
+bool i2cScanActive=false;
+uint8_t i2cScanFound[24]={0},i2cScanCount=0;
+uint16_t i2cScanAcks=0;
+bool i2cLinesReleased(){return digitalRead(BUS_SDA)==HIGH && digitalRead(BUS_SCL)==HIGH;}
 void scanI2cAddresses(uint32_t now){
-  if(!i2cOnline)return;
-  i2cFoundCount=0;i2cAckCount=0;
-  for(uint8_t addr=0x08;addr<=0x77;addr++){
-    if(ack(addr)){
-      i2cAckCount++;
-      if(i2cFoundCount<24)i2cFound[i2cFoundCount++]=addr;
-    }
+  // One address per loop, at most one Wire timeout before HTTP runs again.
+  if(!i2cOnline || !i2cLinesReleased())return;
+  if(!i2cScanActive){
+    if(i2cFullScanAt && !elapsed(now,i2cFullScanAt,15000))return;
+    i2cScanActive=true;i2cScanAddress=0x08;i2cScanCount=0;i2cScanAcks=0;
   }
-  i2cFullScanAt=now;
+  if(ack(i2cScanAddress)){
+    ++i2cScanAcks;
+    if(i2cScanCount<24)i2cScanFound[i2cScanCount++]=i2cScanAddress;
+  }
+  if(++i2cScanAddress>0x77){
+    memcpy(i2cFound,i2cScanFound,i2cScanCount);i2cFoundCount=i2cScanCount;
+    i2cAckCount=i2cScanAcks;i2cFullScanAt=now;i2cScanActive=false;
+  }
 }
 int readPcaReg(uint8_t reg){
   if(!pcaDetected)return -1;
@@ -251,7 +266,7 @@ void probeI2c(uint32_t now){
       pcfIdleReadOk=true;
     }
   }
-  if(!i2cFullScanAt||elapsed(now,i2cFullScanAt,15000))scanI2cAddresses(now);
+  // Full address discovery is sliced by the main loop.
   lastBusProbe=now;
 }
 bool pcfWrite(uint16_t v){
@@ -584,7 +599,14 @@ void pollKeys(uint32_t now){
   tftDirty=true;
 }
 
-Adafruit_ST7789 screenSt(TFT_CS,TFT_DC,TFT_RST);
+class BusaST7789 : public Adafruit_ST7789 {
+ public:
+  using Adafruit_ST7789::Adafruit_ST7789;
+  void begin(uint32_t frequency=0) override {
+    (void)frequency;Adafruit_ST7789::begin(8000000);
+  }
+};
+BusaST7789 screenSt(TFT_CS,TFT_DC,TFT_RST);
 Adafruit_ILI9341 screenIli(TFT_CS,TFT_DC,TFT_RST);
 Adafruit_GFX* screen=nullptr;
 U8G2_FOR_ADAFRUIT_GFX ru;
@@ -666,7 +688,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V15.3 N16R8";
+  const String version="FW V15.3 N16R8 FIX1";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -695,9 +717,9 @@ void drawBootSplash(uint32_t holdMs){
   updateBootStage(bootStage);
 }
 void startScreen(){
-  Serial0.println("TFT: HW SPI landscape; controller model unverified");
+  busaLog.println("TFT: HW SPI landscape; controller model unverified");
   SPI.begin(TFT_SCK,-1,TFT_MOSI,TFT_CS);
-  SPI.setFrequency(16000000); // moderate stable starting frequency
+  SPI.setFrequency(8000000); // moderate stable starting frequency
   if(tftProfile==2){screenIli.begin();screen=&screenIli;}
   else{screenSt.init(240,320);screen=&screenSt;}
   screen->setRotation(tftRotation); // 0..3 selected from iPhone
@@ -708,7 +730,7 @@ void startScreen(){
   tftStarted=true;
   tftDisplayOff=false;tftDisplayActivityMs=millis();
   drawBootSplash(8000); // Wi-Fi AP + web start while splash visible; max 8 seconds
-  Serial0.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
+  busaLog.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
 }
 // Display-only standby; does NOT sleep ESP32, alter sensors, Wi-Fi or GPIO.
 void wakeTftDisplay(){
@@ -1246,7 +1268,8 @@ main>*{max-width:100%;min-width:0}
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
 <div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
-<h2>Диагностика V14 · все модули</h2>
+<h2>Диагностика V15.3 · все модули</h2>
+<p id="bootDiagnostics" class="hint">Ожидание диагностики запуска…</p>
 <p class="hint">Отображаются ответы интерфейсов, а не гарантии исправности оборудования. Отсутствие импульсов расходомера не доказывает отсутствия воды.</p>
 <pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса DS18B20...</pre>
 <pre id="diagKeyboard" style="white-space:pre-wrap;word-break:break-word">Ожидание PCF8575...</pre>
@@ -1260,7 +1283,7 @@ main>*{max-width:100%;min-width:0}
 <p class="hint">Температура: T1 GPIO16, T2 GPIO17, T3 GPIO18, T4 GPIO21. IDLE=1 — линия DATA высока в покое; IDLE=0 или LINE_LOW — линия низкая. AFTER — состояние после импульса сброса. NO_PRESENCE при IDLE=1 — нет ответа датчика, но это не доказывает, что сам датчик неисправен. NO_ROM — не найден адрес; ROM_CRC_BAD — неверная CRC.</p>
 <p class="hint">Клавиатура: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
 <p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
-<h2>Экран TFT · V14</h2>
+<h2>Экран TFT · V15.3</h2>
 <p class="hint">Белый TFT может означать неверный контроллер дисплея или проблему SPI. Профиль выбирается вручную: ESP32 не умеет подтвердить, что пиксели действительно видны.</p>
 <label for="tftDriver">Драйвер TFT</label>
 <select id="tftDriver"><option value="1">ST7789 · горизонтально 320×240</option></select>
@@ -1278,7 +1301,7 @@ main>*{max-width:100%;min-width:0}
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
 <div class="grid"><button type="button" id="keyUndo">Назад на шаг</button>
 <button type="button" id="keyCancel">Отмена</button></div></div></section>
-<footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer><section class="page" data-section="6" hidden><div class="card">
+<footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · К1–К4 — звуковая сигнализация</footer><section class="page" data-section="6" hidden><div class="card">
 <h2>Калькулятор</h2><div class="calcComing"><span aria-hidden="true">▦</span><strong>Раздел зарезервирован</strong><p>Расчёты добавим позднее по утверждённому заданию. Сейчас эта вкладка ничего не измеряет и не управляет оборудованием.</p></div>
 </div></section>
 </main>
@@ -1658,7 +1681,7 @@ if(s.leds){
   get('ledSimModes').textContent=String(s.leds.mode1??'—')+' / '+String(s.leds.mode2??'—');
   get('ledSimRead').textContent=String(s.leds.read_ok_total)+' успешно / '+String(s.leds.read_error_total)+' ошибок';
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
+get('bootDiagnostics').textContent='Запуск: сеть до модулей · TFT '+(s.boot?.tft_bypassed?'пропущен после сбоя':'обычный запуск')+' · I2C '+(s.boot?.i2c_bypassed?'пропущен после сбоя':'обычный запуск')+' · попыток AP '+(s.wifi_recovery?.ap_start_attempts??'—');get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){
   lastStatusError=e?.message||String(e);
   if(connected)message('Потеряна связь с ESP32');
@@ -1833,17 +1856,17 @@ update();setInterval(update,3000);
 
 void handleCommand(String x){
   x.trim();x.toUpperCase();
-  if(x=="STATUS") {Serial0.println(statusJSON());Serial.println(statusJSON());}
+  if(x=="STATUS") {busaLog.println(statusJSON());Serial.println(statusJSON());}
   else if(x.startsWith("PAGE ")){
     int n=x.substring(5).toInt();
-    if(n>=1&&n<=6){navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;Serial0.printf("PAGE=%d\n",n);}
+    if(n>=1&&n<=6){navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;busaLog.printf("PAGE=%d\n",n);}
   }
   else if(x=="TFT ST7789"){
     tftProfile=1;
     prefs.putUChar("tft",tftProfile);
-    Serial0.println("TFT profile saved. Reset board to apply.");
+    busaLog.println("TFT profile saved. Reset board to apply.");
   }
-  else Serial0.println("Commands: STATUS | PAGE 1..6 | TFT ST7789");
+  else busaLog.println("Commands: STATUS | PAGE 1..6 | TFT ST7789");
 }
 void readConsole(){
   // CH343 UART0 (COM6 on current board) is diagnostic console.

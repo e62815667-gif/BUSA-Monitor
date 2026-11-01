@@ -1,1 +1,9 @@
-const CACHE="busa-monitor-v14.4-light-six-tabs";const ASSETS=["./","./index.html","./manifest.webmanifest"];self.addEventListener("install",event=>{event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()))});self.addEventListener("activate",event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith("busa-monitor-")&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim()))});self.addEventListener("fetch",event=>{const req=event.request;if(req.method!=="GET")return;const url=new URL(req.url);if(url.origin!==self.location.origin)return;event.respondWith(fetch(req).then(response=>{if(response.ok){const copy=response.clone();event.waitUntil(caches.open(CACHE).then(cache=>cache.put(req,copy)))}return response}).catch(async()=>{const cached=await caches.match(req);if(cached)return cached;if(req.mode==="navigate"){const page=await caches.match("./index.html");if(page)return page}return Response.error()}))});
+const CACHE='busa-monitor-v15.3-bootfix1';
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['./','./index.html','./manifest.webmanifest'])).then(()=>self.skipWaiting()));});
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('busa-monitor-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
+self.addEventListener('fetch',e=>{
+ const r=e.request,u=new URL(r.url);if(r.method!=='GET'||u.origin!==self.location.origin)return;
+ // Never cache telemetry, API replies or release catalogues.
+ if(u.search||u.pathname.includes('/api/')||u.pathname.endsWith('.json'))return;
+ e.respondWith(fetch(r).then(response=>{if(response.ok){const copy=response.clone();e.waitUntil(caches.open(CACHE).then(c=>c.put(r,copy)));}return response;}).catch(()=>caches.match(r).then(v=>v||Response.error())));
+});

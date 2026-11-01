@@ -297,7 +297,8 @@ input::placeholder{color:#a3bdce}
 <div class="row"><span>Flash</span><b id="diagFlash">—</b></div>
 <div class="row"><span>Причина перезапуска (код)</span><b id="diagReset">—</b></div>
 <div class="row"><span>TFT</span><b id="diagTft">—</b></div>
-<div class="row"><span>Реле / PWM</span><b id="diagOutputs">—</b></div>
+<div class="row"><span>Звуковая сигнализация</span><b id="diagOutputs">—</b></div>
+<div class="row"><span>Запуск V15.3</span><b id="diagBoot">—</b></div>
 </div>
 <div class="card"><h2>Температуры · OneWire</h2><div id="diagOneWireRemote" class="diagList">Нет данных</div></div>
 <div class="card"><h2>Клавиатура и I²C</h2>
@@ -402,7 +403,7 @@ function remoteStatus(msg){
 }
 function clearRemoteNumbers(){
  cloudCurrentTelemetry=null;cloudCurrentAt=null;renderCloudCompatibility();
- const placeholders=['connectionLast','connectionFresh','connectionInternet','connectionWifi','connectionRssi','connectionClients','connectionEnabled','connectionHttp','connectionSent','connectionTls','diagFw','diagUp','diagHeap','diagFlash','diagReset','diagTft','diagOutputs','diagPcf','diagKey','diagIdle','diagI2c','diagPca','diagPulses','diagCal'];
+ const placeholders=['connectionLast','connectionFresh','connectionInternet','connectionWifi','connectionRssi','connectionClients','connectionEnabled','connectionHttp','connectionSent','connectionTls','diagFw','diagUp','diagHeap','diagFlash','diagReset','diagTft','diagOutputs','diagBoot','diagPcf','diagKey','diagIdle','diagI2c','diagPca','diagPulses','diagCal'];
  placeholders.forEach(id=>{const v=byId(id);if(v)v.textContent='—'});
  byId('diagOneWireRemote').textContent='Нет данных';
  byId('diagCloud').textContent='Пока нет данных из Google.';
@@ -420,6 +421,7 @@ function clearRemoteNumbers(){
 }
 function fmtTemp(v){return typeof v==='number'&&Number.isFinite(v)?v.toFixed(1)+' °C':'Н/Д'}
 function asFinite(v){return typeof v==='number'&&Number.isFinite(v)?v:null}
+function verifiedTemperature(t){return t?.verified===true&&typeof t.c==='number'&&Number.isFinite(t.c)&&t.c>=-55&&t.c<=125?t.c:null;}
 function stampRussian(ms){return Number.isFinite(ms)?new Date(ms).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'medium'}):'—'}
 function renderRemoteEvents(){
  const items=remoteErrors.filter(e=>eventFilter==='all'||e.kind===eventFilter);
@@ -430,11 +432,11 @@ function renderCloudCompatibility(){
  const release=cloudRelease,telemetry=cloudCurrentTelemetry;
  const el=id=>document.getElementById(id);
  el('cloudAvailableFw').textContent=release?.version||'—';
- const installedMinor=typeof telemetry?.firmware==='string'?telemetry.firmware.match(/14v([0-9]{1,3})(?![0-9])/i):null;
- const availableMinor=typeof release?.version==='string'?release.version.match(/^V14\.([0-9]{1,3})$/):null;
+ const installedMinor=typeof telemetry?.firmware==='string'?telemetry.firmware.match(/(\d{1,2})v([0-9]{1,3})(?![0-9])/i):null;
+ const availableMinor=typeof release?.version==='string'?release.version.match(/^V(\d{1,2})\.([0-9]{1,3})$/):null;
  let relation='Нет данных для сравнения';
  if(installedMinor&&availableMinor){
-   const x=Number(installedMinor[1]),y=Number(availableMinor[1]);
+   const x=Number(installedMinor[1])*1000+Number(installedMinor[2]),y=Number(availableMinor[1])*1000+Number(availableMinor[2]);
    relation=x===y?'Установлена версия из каталога':x>y?'Установленная версия новее каталога':'Есть более новый релиз (установка отключена)';
  }
  el('cloudVersionRelation').textContent=relation;
@@ -476,7 +478,7 @@ async function checkCloudRelease(){
   const catalog=await response.json();
   const release=catalog?.releases?.[0];
   if(catalog?.device!=='BUSA-1M-001'||!release||
-     !/^V14\.[0-9]{1,3}$/.test(release.version)||
+     !/^V[1-9][0-9]?\.[0-9]{1,3}$/.test(release.version)||
      !/^[a-f0-9]{64}$/.test(release.app_sha256)||
      !Number.isInteger(release.build_flash_bytes)||release.build_flash_bytes<1048576)
      throw new Error('Некорректный каталог версий');
@@ -508,7 +510,8 @@ function renderDiagnostics(d,at,fresh){
  val('diagFlash',Number.isFinite(chip.flash_bytes)?Math.round(chip.flash_bytes/1048576)+' МБ':'—');
  val('diagReset',Number.isInteger(chip.reset_reason_code)?chip.reset_reason_code:'—');
  val('diagTft',modules.tft_boot_complete===true?'Запущен (изображение не проверено)':'Нет подтверждения');
- val('diagOutputs',d.relays_enabled===false&&d.pwm_enabled===false?'Отключены':'Проверить состояние');
+ val('diagOutputs',d.sound_alarms?.purpose==='12V_SOUND_ALERTS_ONLY'?(d.sound_alarms.channels?.some(ch=>ch.on===true)?'Звук включён':'Ожидание порогов'):'Нет данных');
+ val('diagBoot',d.boot?.build?(d.boot.build+(d.boot.tft_bypassed?' · TFT пропущен после сбоя':'')+(d.boot.i2c_bypassed?' · I2C пропущен после сбоя':'')):'Нет отчёта запуска');
  val('diagPcf',modules.pcf8575===true?'Обнаружен':'Нет подтверждения');
  val('diagKey',Number.isInteger(key.scan_error)?key.scan_error:'—');
  val('diagIdle',typeof key.idle_hex==='string'?key.idle_hex:'—');
@@ -532,17 +535,17 @@ function renderRemote(d,history,receivedAt){
  const nets=d.network_indicators||{};
  indicator("cloudInternet","cloudInternetLabel",nets.internet===true,!fresh||typeof nets.internet!=="boolean");
  indicator("cloudLocal","cloudLocalLabel",nets.local_client===true,!fresh||typeof nets.local_client!=="boolean");
- indicator("cloudData","cloudDataLabel",d.google?.configured===true,!fresh||typeof d.google?.configured!=="boolean");
+ indicator("cloudData","cloudDataLabel",d.google?.configured===true&&d.google?.state===5&&d.google?.http===200&&d.google?.sent>0,!fresh||typeof d.google?.configured!=="boolean");
  const temperatures=Array.isArray(d.temperatures)?d.temperatures:[];
  for(let i=0;i<4;i++){
   const t=temperatures[i]||{},probe=one[i]||{};
-  const val=fresh?fmtTemp(asFinite(t.c)):'Н/Д';
+  const val=fresh?fmtTemp(verifiedTemperature(t)):'Н/Д';
   byId('remoteT'+i).textContent=val;
   byId('detailT'+i).textContent=val;
   byId('errorT'+i).textContent=probe.result||'Нет диагностических данных';
  }
  byId('waterLive').textContent=fresh&&d.water&&typeof d.water.pulses==='number'?
-   d.water.pulses+' имп. (не откалибровано)':'Нет свежих показаний';
+   (d.water.calibrated===true&&Number.isFinite(d.water.lpm)?d.water.lpm.toFixed(3)+' л/мин · '+d.water.pulses+' имп.':d.water.pulses+' имп. (не откалибровано)'):'Нет свежих показаний';
  byId('heroStatus').textContent=fresh?'● Последняя запись '+stampRussian(receivedAt):
     '● Запись устарела: '+stampRussian(receivedAt);
  remoteStatus(fresh?'Google · получено '+new Date(receivedAt).toLocaleTimeString('ru-RU'):

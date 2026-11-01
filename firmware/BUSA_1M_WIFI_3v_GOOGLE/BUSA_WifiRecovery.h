@@ -26,6 +26,28 @@ std::atomic<uint32_t> wifiDisconnectCount{0},wifiDisconnectReason{0};
 std::atomic<uint32_t> wifiApStarts{0},wifiApStops{0},wifiApJoins{0},wifiApLeaves{0};
 std::atomic<bool> wifiCloudPaused{false};
 int wifiLastScanErr=0;
+std::atomic<bool> wifiApObserved{false};
+bool wifiModeStarted=false;
+uint32_t wifiApAttemptAt=0,wifiApAttempts=0;
+constexpr uint32_t BUSA_AP_RETRY_MS=15000U;
+void wifiStartAccessPoint(uint32_t now){
+  wifiApAttemptAt=now;++wifiApAttempts;
+  if((WiFi.getMode() & WIFI_AP)==0)wifiModeStarted=WiFi.mode(WIFI_AP_STA);
+  const bool ok=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),BUSA_AP_CHANNEL,false,4);
+  if(ok)esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
+  wifiRunning=ok;
+  busaLog.printf("AP start attempt=%lu mode_ok=%d result=%d\n",
+    (unsigned long)wifiApAttempts,(int)wifiModeStarted,(int)ok);
+}
+void wifiAccessPointTick(uint32_t now){
+  // An AP_STOP event must not leave a permanently stale success flag.
+  // Retry only a missing AP, never reset a healthy AP or disconnect STA.
+  const bool running=wifiApObserved.load() &&
+    ((WiFi.getMode() & WIFI_AP)!=0) && WiFi.softAPIP()!=IPAddress(0,0,0,0);
+  if(running){wifiRunning=true;return;}
+  if(elapsed(now,wifiApAttemptAt,2000U))wifiRunning=false;
+  if(elapsed(now,wifiApAttemptAt,BUSA_AP_RETRY_MS))wifiStartAccessPoint(now);
+}
 uint16_t wifiLastApCount=0,wifiLastVisibleCount=0;
 struct BusaNetwork {String ssid;int32_t rssi=0;uint8_t channel=0;};
 BusaNetwork wifiNetworks[28];
@@ -37,8 +59,8 @@ void wifiRecoveryEvent(WiFiEvent_t event, WiFiEventInfo_t info){
   if(event==ARDUINO_EVENT_WIFI_STA_DISCONNECTED){
     wifiDisconnectReason.store(info.wifi_sta_disconnected.reason);
     wifiDisconnectCount.fetch_add(1);
-  }else if(event==ARDUINO_EVENT_WIFI_AP_START)wifiApStarts.fetch_add(1);
-  else if(event==ARDUINO_EVENT_WIFI_AP_STOP)wifiApStops.fetch_add(1);
+  }else if(event==ARDUINO_EVENT_WIFI_AP_START){wifiApObserved.store(true);wifiApStarts.fetch_add(1);}
+  else if(event==ARDUINO_EVENT_WIFI_AP_STOP){wifiApObserved.store(false);wifiApStops.fetch_add(1);}
   else if(event==ARDUINO_EVENT_WIFI_AP_STACONNECTED)wifiApJoins.fetch_add(1);
   else if(event==ARDUINO_EVENT_WIFI_AP_STADISCONNECTED)wifiApLeaves.fetch_add(1);
 }
@@ -94,7 +116,7 @@ String wifiScanJSON(){
   return wifiScanBusy()?String("{\"scanning\":true,\"networks\":[]}"):wifiScanCache;
 }
 String wifiRecoveryJSON(){
-  return String("{\"local_priority\":true,\"ap_sta_simultaneous\":true,\"scan_active\":")+(wifiScanBusy()?"true":"false")+
+  return String("{\"ap_start_attempts\":")+String(wifiApAttempts)+",\"ap_observed\":"+(wifiApObserved.load()?"true":"false")+",\"local_priority\":true,\"ap_sta_simultaneous\":true,\"scan_active\":"+(wifiScanBusy()?"true":"false")+
     ",\"connect_pending\":"+(wifiConnectPending?"true":"false")+
     ",\"connecting\":"+(wifiConnecting?"true":"false")+
     ",\"sta_deferred_for_local\":"+(wifiDeferredForLocal?"true":"false")+
@@ -197,6 +219,7 @@ void wifiRecoveryTick(uint32_t now){
     }
     return;
   }
+  wifiAccessPointTick(now);
   const bool connected=WiFi.status()==WL_CONNECTED;
   if(wifiConnecting && connected){
     wifiConnecting=false;wifiFailureStreak=0;wifiCloudPaused.store(false);

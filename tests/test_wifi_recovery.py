@@ -13,6 +13,11 @@ String(int v):std::string(std::to_string(v)){}
 String(unsigned v):std::string(std::to_string(v)){}
 bool isEmpty()const{return empty();}
 };
+const int WIFI_AP=2,WIFI_AP_STA=3,WIFI_IF_AP=1,WIFI_BW_HT20=0;
+struct IPAddress{unsigned v;IPAddress(int a,int b,int c,int d):v((a<<24)|(b<<16)|(c<<8)|d){}bool operator!=(const IPAddress&o)const{return v!=o.v;}};
+struct Log{template<class... Args>void printf(const char*,Args...) {}}busaLog;
+bool wifiRunning=false;String apPassword="123456789";
+int esp_wifi_set_bandwidth(int,int){return 0;}
 const int WL_CONNECTED=3,WIFI_SCAN_RUNNING=-1,WIFI_SCAN_FAILED=-2,WIFI_SCANNING_BIT=1;
 const int ARDUINO_EVENT_WIFI_STA_DISCONNECTED=5,ARDUINO_EVENT_WIFI_AP_START=6,
  ARDUINO_EVENT_WIFI_AP_STOP=7,ARDUINO_EVENT_WIFI_AP_STACONNECTED=8,ARDUINO_EVENT_WIFI_AP_STADISCONNECTED=9;
@@ -26,7 +31,11 @@ struct MockWifi{
 int statusCode=0,startRc=WIFI_SCAN_RUNNING,complete=WIFI_SCAN_RUNNING;
 int scans=0,deletes=0,disconnects=0,begins=0,clients=0,channelNow=1;
 String lastSsid,lastPass;
-bool autoreconnect=true;
+bool autoreconnect=true,apOk=true;int apCalls=0,modeNow=WIFI_AP_STA;
+int getMode(){return modeNow;}
+bool mode(int m){modeNow=m;return true;}
+bool softAP(const char*,const char*,int,bool,int){++apCalls;return apOk;}
+IPAddress softAPIP(){return apOk?IPAddress(192,168,4,1):IPAddress(0,0,0,0);}
 int status(){return statusCode;}
 int softAPgetStationNum(){return clients;}
 void setAutoReconnect(bool v){assert(!v);autoreconnect=v;}
@@ -62,7 +71,20 @@ void completeScan(uint32_t t,int n=3){
  assert(!wifiScanBusy());
 }
 int main(){
+ wifiApObserved.store(true);
  wifiStartPolicy(0);assert(!WiFi.autoreconnect);
+ // The AP retry does not mutate a healthy radio.
+ wifiAccessPointTick(20000);assert(WiFi.apCalls==0);
+ wifiRecoveryEvent(ARDUINO_EVENT_WIFI_AP_STOP,{});
+ WiFi.apOk=false;wifiAccessPointTick(20001);
+ assert(!wifiRunning && WiFi.apCalls==1);
+ wifiAccessPointTick(21000);assert(WiFi.apCalls==1);
+ WiFi.apOk=true;wifiAccessPointTick(35001);assert(WiFi.apCalls==2);
+ wifiRecoveryEvent(ARDUINO_EVENT_WIFI_AP_START,{});
+ wifiAccessPointTick(35002);assert(wifiRunning);
+ wifiAccessPointTick(55002);assert(WiFi.apCalls==2);
+ // Return to the original timeline for STA/scan regression scenarios.
+ wifiApAttemptAt=0;
  // Saved credentials connect even with an AP client from boot.
  WiFi.clients=1;tick(2999);assert(WiFi.begins==0);
  tick(3000);tick(3499);assert(WiFi.begins==0);

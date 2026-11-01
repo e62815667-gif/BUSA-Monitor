@@ -41,6 +41,9 @@ int main(){
  h.body=R"release({"stored":true,"release":{"version":"V14.11","target":"ESP32-S3","app_sha256":"1fc280130318c26bda982d48e5b2d2b3b3171c1697e79e7a9ea63b308860cc08","app_size_bytes":1104224,"build_flash_bytes":8388608}})release";
  assert(googleStoredReply(h) && cloudReleaseSnapshot().present && cloudReleaseSnapshot().minor==11 && cloudReleaseSnapshot().flash==8388608 && cloudReleaseSnapshot().size==1104224);
  cloudReleaseData.present=false;
+ h.body=R"release({"stored":true,"release":{"version":"V15.3","target":"ESP32-S3","app_sha256":"1fc280130318c26bda982d48e5b2d2b3b3171c1697e79e7a9ea63b308860cc08","app_size_bytes":1200000,"build_flash_bytes":16777216}})release";
+ assert(googleStoredReply(h) && cloudReleaseSnapshot().major==15 && cloudReleaseSnapshot().minor==3);
+ cloudReleaseData.present=false;
  h.body=R"release({"stored":true,"release":{"version":"V14.11","target":"ESP32-S3","app_sha256":"INVALID","app_size_bytes":1104224,"build_flash_bytes":8388608}})release";
  assert(googleStoredReply(h) && !cloudReleaseSnapshot().present); // bad metadata cannot enable update
  h.body=std::string(2049,'x');assert(!googleStoredReply(h));

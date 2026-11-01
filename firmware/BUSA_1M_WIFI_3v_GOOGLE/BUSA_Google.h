@@ -23,7 +23,7 @@ String googleEndpoint,googleSecret;
 // Fixed-size integral fields avoid sharing dynamic Strings between FreeRTOS tasks.
 // Publish all release metadata together: statusJSON() executes on another core.
 struct BusaCloudRelease {
-  int minor=-1;
+  int major=-1,minor=-1;
   uint32_t flash=0,size=0;
   bool shaValid=false,present=false,targetValid=false;
 };
@@ -40,7 +40,7 @@ String cloudUpdateJSON(){
   const BusaCloudRelease r=cloudReleaseSnapshot();
   String out;out.reserve(290);
   out=String("{\"catalog_seen\":")+(r.present?"true":"false")+
-    ",\"available_version\":"+(r.minor>=0?quoteJson(String("V14.")+String(r.minor)):String("null"))+
+    ",\"available_version\":"+(r.minor>=0?quoteJson(String("V")+String(r.major)+"."+String(r.minor)):String("null"))+
     ",\"target_valid\":"+(r.targetValid?"true":"false")+
     ",\"sha_format_valid\":"+(r.shaValid?"true":"false")+
     ",\"build_flash_bytes\":"+String(r.flash)+
@@ -62,17 +62,24 @@ void cloudReleaseFromReply(JsonVariantConst obj){
   const char* sha=obj["app_sha256"]|"";
   uint32_t size=obj["app_size_bytes"]|0;
   uint32_t flash=obj["build_flash_bytes"]|0;
-  if(strncmp(version,"V14.",4)!=0)return;
-  const char* digits=version+4;
-  if(!*digits || strlen(digits)>3)return;
-  int minor=0;
-  while(*digits){if(*digits<'0'||*digits>'9')return;minor=minor*10+(*digits++-'0');}
+  if(version[0]!='V')return;
+  const char* digits=version+1;
+  int major=0,minor=0,count=0;
+  while(*digits>='0' && *digits<='9'){
+    if(++count>2)return;major=major*10+(*digits++-'0');
+  }
+  if(!count || major<1 || *digits++!='.')return;
+  count=0;
+  while(*digits>='0' && *digits<='9'){
+    if(++count>3)return;minor=minor*10+(*digits++-'0');
+  }
+  if(!count || *digits)return;
   if(size<60000||size>4000000 || (flash!=8388608UL&&flash!=16777216UL))return;
   const bool validTarget=strcmp(target,"ESP32-S3")==0;
   const bool validSha=cloudShaIsValid(sha);
   if(!validTarget||!validSha)return;
   BusaCloudRelease next;
-  next.minor=minor;next.flash=flash;next.size=size;
+  next.major=major;next.minor=minor;next.flash=flash;next.size=size;
   next.targetValid=validTarget;next.shaValid=validSha;next.present=true;
   portENTER_CRITICAL(&cloudReleaseMux);
   cloudReleaseData=next;

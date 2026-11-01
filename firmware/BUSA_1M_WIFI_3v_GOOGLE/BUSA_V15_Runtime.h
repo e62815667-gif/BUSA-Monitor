@@ -5,13 +5,13 @@ void setup(){
   relaySimStop("BOOT_SAFE");
   ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V15.3: ESP32-S3 N16R8 / new TFT pins / sound-only low-voltage bench");
-  busaN16MemoryBegin();
   Serial.begin(115200);
-  delay(400);
-  pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
-  attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
-  Serial0.println("WATER GPIO15 interrupt attached (input only)");
+  busaLog.println("\nBUSA 1M WiFi V15.3: ESP32-S3 N16R8 / new TFT pins / sound-only low-voltage bench");
+  busaBootBegin();
+  delay(50);
+  pinMode(FLOW_GPIO,INPUT_PULLUP); // requires an electrically verified 3.3 V logic signal
+  // Interrupt is attached only after the local network and web server start.
+  busaLog.println("WATER GPIO15 input prepared");
   prefs.begin("busa-r04",false);
   TempBindingRecord bindings={};
   if(prefs.getBytesLength("temp_bind")==sizeof(bindings) &&
@@ -32,9 +32,7 @@ void setup(){
   tftThemeDark=prefs.getBool("tftDarkColor",false);
   startedAt=millis();
   tftProfile=1; // ST7789 only
-  // Initialize TFT first so splash actually covers Wi-Fi and sensor initialization.
-  screenAttempted=true;
-  startScreen();
+  // Peripheral initialization follows AP and HTTP; no module blocks network boot.
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
   loadKeymap();
@@ -53,17 +51,17 @@ void setup(){
   WiFi.persistent(false); // Credentials live only in application Preferences.
   WiFi.setAutoReconnect(false); // Only wifiRecoveryTick owns STA attempts.
   WiFi.onEvent(wifiRecoveryEvent);
-  WiFi.mode(WIFI_AP_STA);
+  wifiModeStarted=WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
   configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
   clockNtpStarted=true;
   // User-approved fixed password for the local BUSA AP (not the external STA).
   // Replaces the earlier MAC-derived string; SSID and AP+STA recovery are unchanged.
   apPassword="123456789";
-  wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),BUSA_AP_CHANNEL,false,4);
+  wifiStartAccessPoint(millis());
   esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
-  updateBootStage(1);
-  Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
+  // TFT is not initialized yet.
+  busaLog.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str());
   wifiStartPolicy(millis()); // Brief startup grace; local clients do not block internet association.
   server.on("/",HTTP_GET,[]{
@@ -115,7 +113,7 @@ void setup(){
     clockUtcOffsetMinutes=(int32_t)offset;clockZoneKnown=true;
     prefs.putInt("clkTz",clockUtcOffsetMinutes);
     prefs.putBool("clkZone",true);
-    Serial0.println("CLOCK: synchronized from phone, UTC offset stored");
+    busaLog.println("CLOCK: synchronized from phone, UTC offset stored");
     // V14.6 live clock refreshes its own header strip; no full-screen flash.
     if(screen && screen->width()<300)tftDirty=true;
     server.send(200,"application/json",String("{\"datetime\":")+quoteJson(clockStamp(false))+"}");
@@ -487,14 +485,27 @@ void setup(){
   const char *headers[]={"X-Busa-Token"};
   server.collectHeaders(headers,1);
   server.begin();
-  Serial0.println("WEB started; temperature scan & I2C next");
-  i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
-  if(i2cOnline){Wire.setTimeOut(25);probeI2c(millis());}
-  updateBootStage(2);
-  Serial0.printf("I2C=%d PCF=%d PCA=%d\n",(int)i2cOnline,(int)pcfDetected,(int)pcaDetected);
+  busaLog.println("WEB started; temperature scan & I2C next");
+  enableLoopWDT(); // reset a stuck peripheral so retained bypass can take effect
+  busaN16MemoryBegin();
+  attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
+  if(!busaSkipTft){
+    busaBootPhase(1);screenAttempted=true;startScreen();busaBootPhase(0);
+    updateBootStage(1);
+  }
+  server.handleClient();
+  // Stuck lines and an absent I2C module must not hold up network startup.
+  if(!busaSkipI2c){
+    pinMode(BUS_SDA,INPUT_PULLUP);pinMode(BUS_SCL,INPUT_PULLUP);
+    if(i2cLinesReleased()){
+      busaBootPhase(2);i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
+      if(i2cOnline)Wire.setTimeOut(10);
+      busaBootPhase(0);
+    }
+  }
   updateBootStage(3);
   launchGoogleCloud();
-  Serial0.println("SETUP DONE: K1-K4 only for 12V sound annunciators; no equipment control");
+  busaLog.println("SETUP DONE: K1-K4 only for 12V sound annunciators; no equipment control");
 }
 void loop(){
   uint32_t now=millis();
@@ -526,9 +537,20 @@ void loop(){
   }
     sampleFlow(now);
     busaN16MemoryLog(now,temperature,flowLpm,flowPulses());
-  if(i2cOnline){
+  if(!i2cOnline && !busaSkipI2c && elapsed(now,lastBusProbe,6000)){
+    lastBusProbe=now;
+    if(i2cLinesReleased()){
+      busaBootPhase(2);i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
+      if(i2cOnline)Wire.setTimeOut(10);
+      busaBootPhase(0);
+    }
+  }
+  if(i2cOnline && i2cLinesReleased()){
+    busaBootPhase(2);
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
-    pollKeys(now);
+    if(i2cLinesReleased())pollKeys(now);
+    scanI2cAddresses(now);
+    busaBootPhase(0);
   }
   // Landscape V14.6: rebuild background ONLY on explicit view/theme change.
   // A 2.5 s telemetry tick refreshes changed text without wiping the TFT.
@@ -537,12 +559,14 @@ void loop(){
      (tftDirty||lastRender==0 || elapsed(now,lastRender,2500))){
     const bool wholeFrame=tftDirty||lastRender==0;
     lastRender=now;
+    busaBootPhase(1);
     if(screen->width()>=300 && !wholeFrame)v14RefreshLive(now);
     else renderScreen(now);
+    busaBootPhase(0);
   }
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
-    Serial0.printf("N16R8 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
+    busaLog.printf("N16R8 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
       (unsigned long)now,(int)wifiRunning,(int)i2cOnline,(int)tftStarted,
       (unsigned long)flowPulses(),(double)flowLpm);
   }

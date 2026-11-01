@@ -8,6 +8,7 @@ String statusJSON(){
   s+=",\"mode\":\"TEMPERATURE_SOUND_MONITOR\",\"relays_enabled\":true,\"pwm_enabled\":false";
   s+=",\"sound_alarms\":"+alarmStatusJSON(now);
   s+=",\"architecture\":"+v15ArchitectureJSON();
+  s+=",\"boot\":"+busaBootJSON();
   s+=",\"leds\":"+ledSimJSON();
   s+=",\"relay_simulation\":"+relaySimJSON();
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
@@ -42,7 +43,7 @@ String statusJSON(){
   s+=",\"collection\":{\"sensor_present\":false,\"ml_per_min\":null,\"total_ml\":null}";
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
   s+=",\"pca9685_ack_only\":"+(pcaDetected?String("true"):String("false"));
-  s+=",\"tft_attempted\":"+(tftStarted?String("true"):String("false"));
+  s+=",\"tft_attempted\":"+(screenAttempted?String("true"):String("false"));
   s+=",\"tft_rotation\":"+String(tftRotation);
   s+=",\"tft_boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
   s+=",\"tft_profile_id\":"+String(tftProfile);
@@ -74,6 +75,7 @@ String statusJSON(){
   s+=",\"valid_pair_total\":"+String(pcfValidPairTotal);
   s+=",\"raw_pair\":"+quoteJson(rawPair)+"}";
   s+=",\"i2c\":{\"sda_gpio\":8,\"scl_gpio\":9,\"controller_started\":"+(i2cOnline?String("true"):String("false"));
+  s+=",\"lines_released\":"+(i2cLinesReleased()?String("true"):String("false"));
   s+=",\"last_scan_ms\":"+String(i2cFullScanAt);
   s+=",\"ack_total\":"+String(i2cAckCount)+",\"addresses\":[";
   for(uint8_t i=0;i<i2cFoundCount;i++){if(i)s+=",";s+=String(i2cFound[i]);}
