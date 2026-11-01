@@ -36,7 +36,7 @@
 #include <math.h>
 
 #include "BUSA_V15_Board.h"
-const char VERSION[]="БУСА 1М WiFi 15v3-N16R8-UNIFIED-UI";
+const char VERSION[]="БУСА 1М WiFi 15v4-N16R8-EARLY-AP-RECOVERY";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -666,7 +666,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V15.3 N16R8";
+  const String version="FW V15.4 N16R8";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
