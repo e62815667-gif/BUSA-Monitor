@@ -29,7 +29,7 @@ void busaBootBegin(){
   busaLastResetReason=(uint32_t)reason;
   const bool crash=reason==ESP_RST_PANIC || reason==ESP_RST_INT_WDT ||
                    reason==ESP_RST_TASK_WDT || reason==ESP_RST_WDT;
-  const bool prior=crash && busaBootMarker.magic==0x42555341U;
+  const bool prior=crash && busaBootMarker.magic==0x42555342U;
   busaLastCrashPhase=prior?busaBootMarker.phase:0;
   uint32_t tft=prior?busaBootMarker.failuresTft:0;
   uint32_t i2c=prior?busaBootMarker.failuresI2c:0;
@@ -39,7 +39,7 @@ void busaBootBegin(){
   // bypass. This preserves Wi-Fi/USB access without skipping on first failure.
   busaSkipTft=prior && (tft>=2 || (busaBootMarker.bypass&1U));
   busaSkipI2c=prior && (i2c>=2 || (busaBootMarker.bypass&2U));
-  busaBootMarker={0x42555341U,0,(busaSkipTft?1U:0U)|(busaSkipI2c?2U:0U),tft,i2c};
+  busaBootMarker={0x42555342U,0,(busaSkipTft?1U:0U)|(busaSkipI2c?2U:0U),tft,i2c};
   busaLog.printf("BOOT reset=%lu prior_phase=%lu TFT_fail=%lu I2C_fail=%lu TFT_bypass=%d I2C_bypass=%d\n",
     (unsigned long)busaLastResetReason,(unsigned long)busaLastCrashPhase,
     (unsigned long)tft,(unsigned long)i2c,(int)busaSkipTft,(int)busaSkipI2c);
