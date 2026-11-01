@@ -2,10 +2,6 @@
 // V15.4: AP is brought up before NVS, TFT, Google and peripheral scans.
 // RTC boot streak is cleared after 30 seconds of a healthy main loop.
 // After three interrupted boots, skip TFT until a stable restart; radio stays available.
-RTC_DATA_ATTR uint32_t busaBootMagic=0;
-RTC_DATA_ATTR uint32_t busaBootStreak=0;
-constexpr uint32_t BUSA_BOOT_MAGIC=0xB154A1F4UL;
-bool busaSkipTftAtBoot=false;
 void setup(){
   alarmInitPins(); // GPIO7/6/5/4 inactive before radio/display boot
   relaySimStop("BOOT_SAFE");
