@@ -1,12 +1,14 @@
 #pragma once
-// V15 boot and cooperative runtime. Included after all component declarations.
+// V15.6: start the network first; stage optional peripherals in loop().
+bool busaTftBootIssued=false;
+uint32_t busaTftInitElapsedMs=0,busaI2cInitElapsedMs=0,busaI2cBootAttempts=0;
 void setup(){
   alarmInitPins(); // GPIO7/6/5/4 inactive before radio/display boot
   relaySimStop("BOOT_SAFE");
   ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
   Serial.begin(115200);
-  busaLog.println("\nBUSA 1M WiFi V15.5: ESP32-S3 N16R8 / stable local app / sound-only low-voltage bench");
+  busaLog.println("\nBUSA 1M WiFi V15.6: staged peripheral boot / local-first / sound only");
   busaBootBegin();
   delay(50);
   pinMode(FLOW_GPIO,INPUT_PULLUP); // requires an electrically verified 3.3 V logic signal
@@ -489,21 +491,12 @@ void setup(){
   enableLoopWDT(); // reset a stuck peripheral so retained bypass can take effect
   busaN16MemoryBegin();
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
-  if(!busaSkipTft){
-    busaBootPhase(1);screenAttempted=true;startScreen();busaBootPhase(0);
-    updateBootStage(1);
-  }
-  server.handleClient();
-  // Stuck lines and an absent I2C module must not hold up network startup.
+  // A peripheral fault must never delay the creation of the AP or the HTTP
+  // recovery endpoint. TFT and I2C are attempted later, one step per loop.
   if(!busaSkipI2c){
-    pinMode(BUS_SDA,INPUT_PULLUP);pinMode(BUS_SCL,INPUT_PULLUP);
-    if(i2cLinesReleased()){
-      busaBootPhase(2);i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
-      if(i2cOnline)Wire.setTimeOut(10);
-      busaBootPhase(0);
-    }
+    pinMode(BUS_SDA,INPUT_PULLUP);
+    pinMode(BUS_SCL,INPUT_PULLUP);
   }
-  updateBootStage(3);
   launchGoogleCloud();
   busaLog.println("SETUP DONE: K1-K4 only for 12V sound annunciators; no equipment control");
 }
@@ -515,6 +508,18 @@ void loop(){
   if(lastLoopStart){const uint32_t gap=now-lastLoopStart;if(gap>loopMaxGapMs)loopMaxGapMs=gap;}
   lastLoopStart=now;
   wifiRecoveryTick(now);
+  // Boot TFT after HTTP is already serving. Stagger its SPI initialization
+  // and the I2C bus so both cannot delay the same start-up interval.
+  if(!busaTftBootIssued && !busaSkipTft && elapsed(now,startedAt,1500U)){
+    busaTftBootIssued=true;
+    screenAttempted=true;
+    busaBootPhase(1);
+    const uint32_t tftBegin=millis();
+    startScreen();
+    busaTftInitElapsedMs=millis()-tftBegin;
+    busaBootPhase(0);
+    updateBootStage(1);
+  }
   const uint32_t webStart=millis();
   server.handleClient();
   const uint32_t webElapsed=millis()-webStart;
@@ -542,10 +547,16 @@ void loop(){
   }
     sampleFlow(now);
     busaN16MemoryLog(now,temperature,flowLpm,flowPulses());
-  if(!i2cOnline && !busaSkipI2c && elapsed(now,lastBusProbe,15000)){
+  if(!i2cOnline && !busaSkipI2c &&
+     elapsed(now,startedAt,5000U) &&
+     (lastBusProbe==0 || elapsed(now,lastBusProbe,15000U))){
     lastBusProbe=now;
+    ++busaI2cBootAttempts;
     if(i2cLinesReleased()){
-      busaBootPhase(2);i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
+      busaBootPhase(2);
+      const uint32_t i2cBegin=millis();
+      i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
+      busaI2cInitElapsedMs=millis()-i2cBegin;
       if(i2cOnline)Wire.setTimeOut(10);
       busaBootPhase(0);
     }
@@ -558,7 +569,7 @@ void loop(){
     busaBootPhase(0);
   }
   // Landscape V14.6: rebuild background ONLY on explicit view/theme change.
-  // A 2.5 s telemetry tick refreshes changed text without wiping the TFT.
+  // A 4 s telemetry tick refreshes changed text without wiping the TFT.
   if(tftStarted && !tftDisplayOff && !otaActive && bootSplashComplete &&
      elapsed(now,splashStartedAt,splashHoldMs) &&
      (tftDirty||lastRender==0 || elapsed(now,lastRender,4000))){
