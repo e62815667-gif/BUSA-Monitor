@@ -39,7 +39,19 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-GMT028-SOUND4-REV2";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-FASTDIAG-20261102";
+// Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
+uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
+uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
+uint32_t busaLastI2cStepMs=0,busaMaxI2cStepMs=0;
+const char* busaBootStage="RESET";
+void busaReportStage(const char* stage){
+  busaBootStage=stage;
+  const uint32_t age=millis()-busaBootAt;
+  Serial.printf("BUSA STAGE %s ms=%lu\n",stage,(unsigned long)age);
+  Serial0.printf("BUSA STAGE %s ms=%lu\n",stage,(unsigned long)age);
+}
+
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -47,6 +59,8 @@ DallasTemperature* sensors[4]={&ds1,&ds2,&ds3,&ds4};
 float temperature[4]={NAN,NAN,NAN,NAN};
 bool tempPresent[4]={false,false,false,false};
 uint32_t tempAt[4]={0,0,0,0},tempCycle=0,tempRequestAt=0;
+bool tempInitialized[4]={false,false,false,false};
+uint32_t tempDiscoverAt[4]={0,0,0,0};
 bool tempConverting=false;
 // Read-only health checks; run only between conversion cycles.
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -58,6 +72,7 @@ struct OneWireProbe {
 };
 OneWireProbe wireProbe[4];
 uint32_t lastWireProbe=0;
+uint8_t wireProbeIndex=0;
 bool elapsed(uint32_t now,uint32_t then,uint32_t ms){return (uint32_t)(now-then)>=ms;}
 void sampleTemperatures(uint32_t now){
   if(tempConverting && elapsed(now,tempRequestAt,825)){
@@ -72,13 +87,20 @@ void sampleTemperatures(uint32_t now){
   if(!tempConverting && (tempCycle==0||elapsed(now,tempCycle,2500))){
     tempCycle=now;
     for(int i=0;i<4;i++){
-      sensors[i]->begin();
-      tempPresent[i]=sensors[i]->getDeviceCount()>0;
-      if(tempPresent[i]){
-        sensors[i]->setResolution(12);
-        sensors[i]->setWaitForConversion(false);
-        sensors[i]->requestTemperatures();
-      }else {temperature[i]=NAN;tempAt[i]=0;}
+      // Do not rediscover four OneWire buses every 2.5 seconds.
+      // A disconnected bus is retried every 12 seconds.
+      if(!tempInitialized[i] || (!tempPresent[i] && elapsed(now,tempDiscoverAt[i],12000))){
+        sensors[i]->begin();
+        tempInitialized[i]=true;
+        tempDiscoverAt[i]=now;
+        tempPresent[i]=sensors[i]->getDeviceCount()>0;
+        if(tempPresent[i]){
+          sensors[i]->setResolution(12);
+          sensors[i]->setWaitForConversion(false);
+        }
+      }
+      if(tempPresent[i])sensors[i]->requestTemperatures();
+      else{temperature[i]=NAN;tempAt[i]=0;}
     }
     tempConverting=true;tempRequestAt=now;
   }
@@ -87,9 +109,10 @@ void sampleTemperatures(uint32_t now){
   }
 }
 void probeOneWire(uint32_t now){
-  if(tempConverting||(lastWireProbe && !elapsed(now,lastWireProbe,12000)))return;
+  if(tempConverting||(lastWireProbe && !elapsed(now,lastWireProbe,3000)))return;
   lastWireProbe=now;
-  for(int i=0;i<4;i++){
+  // Spread CRC and discovery probes across the four sensors; not all at once.
+  const int i=wireProbeIndex++%4;
     OneWireProbe &p=wireProbe[i];
     p=OneWireProbe();
     p.checkedAt=now;
@@ -107,7 +130,6 @@ void probeOneWire(uint32_t now){
       p.multiple=bus->search(second);
     }
     bus->reset_search();
-  }
 }
 String romHex(const uint8_t rom[8]){
   char hex[17];for(int j=0;j<8;j++)snprintf(hex+2*j,3,"%02X",(unsigned)rom[j]);
@@ -209,17 +231,29 @@ String clockStamp(bool compact=false){
 bool ack(uint8_t address){
   Wire.beginTransmission(address);return Wire.endTransmission()==0;
 }
-// I2C discovery plus read-only register inspection; never modify PWM outputs.
+// I2C discovery is incremental (2 addresses per pass): never stall HTTP/TFT
+// by probing 112 addresses in a single main-loop iteration.
+uint8_t busaI2cScanNext=0x08;
+uint32_t busaI2cScanLastStep=0;
 void scanI2cAddresses(uint32_t now){
-  if(!i2cOnline)return;
-  i2cFoundCount=0;i2cAckCount=0;
-  for(uint8_t addr=0x08;addr<=0x77;addr++){
-    if(ack(addr)){
+  if(!i2cOnline || !elapsed(now,busaI2cScanLastStep,30))return;
+  if(busaI2cScanNext>0x77){
+    if(!i2cFullScanAt || elapsed(now,i2cFullScanAt,15000)){
+      i2cFoundCount=0;i2cAckCount=0;busaI2cScanNext=0x08;
+    }else return;
+  }
+  busaI2cScanLastStep=now;
+  const uint32_t started=millis();
+  for(uint8_t n=0;n<2 && busaI2cScanNext<=0x77;n++){
+    const uint8_t address=busaI2cScanNext++;
+    if(ack(address)){
       i2cAckCount++;
-      if(i2cFoundCount<24)i2cFound[i2cFoundCount++]=addr;
+      if(i2cFoundCount<24)i2cFound[i2cFoundCount++]=address;
     }
   }
-  i2cFullScanAt=now;
+  busaLastI2cStepMs=millis()-started;
+  if(busaLastI2cStepMs>busaMaxI2cStepMs)busaMaxI2cStepMs=busaLastI2cStepMs;
+  if(busaI2cScanNext>0x77)i2cFullScanAt=millis();
 }
 int readPcaReg(uint8_t reg){
   if(!pcaDetected)return -1;
@@ -251,7 +285,7 @@ void probeI2c(uint32_t now){
       pcfIdleReadOk=true;
     }
   }
-  if(!i2cFullScanAt||elapsed(now,i2cFullScanAt,15000))scanI2cAddresses(now);
+  scanI2cAddresses(now);
   lastBusProbe=now;
 }
 bool pcfWrite(uint16_t v){
@@ -520,9 +554,20 @@ bool tftDisplayOff=false;
 uint32_t tftDisplayActivityMs=0;
 // No inactivity auto-off. Only F2 or explicit iPhone screen button blanks TFT.
 void pollKeys(uint32_t now){
-  if(!pcfDetected||!elapsed(now,lastKeyScan,60))return;
+  if(!pcfDetected||!elapsed(now,lastKeyScan,160))return;
+  if(busaKeySkipUntil && (int32_t)(now-busaKeySkipUntil)<0)return;
   lastKeyScan=now;
+  const uint32_t keyStarted=millis();
   int pair=scanKeyPair();
+  busaLastKeyScanMs=millis()-keyStarted;
+  if(busaLastKeyScanMs>busaMaxKeyScanMs)busaMaxKeyScanMs=busaLastKeyScanMs;
+  // Misbehaving I2C bus can stall the keypad scanner; back off to protect HTTP.
+  if(busaLastKeyScanMs>100){
+    busaKeySkipUntil=millis()+2000;
+    Serial.printf("BUSA SLOW KEYPAD scan_ms=%lu backoff=2000\n",
+      (unsigned long)busaLastKeyScanMs);
+    return;
+  }
   if(pair>=0){
     rawPair=pairName(pair);
     if(keypadLearning && (pair!=candidatePair||candidateStep!=learnStep)){
@@ -742,6 +787,14 @@ String statusJSON(){
   uint32_t now=millis();
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_SOUND_ONLY\",\"relays_enabled\":true,\"pwm_enabled\":false";
+  s+=",\"performance\":{\"stage\":"+quoteJson(busaBootStage);
+  s+=",\"setup_done_ms\":"+String(busaSetupDoneMs);
+  s+=",\"loop_worst_ms\":"+String(busaMaxLoopMs);
+  s+=",\"slow_loop_count\":"+String(busaSlowLoops);
+  s+=",\"key_scan_last_ms\":"+String(busaLastKeyScanMs);
+  s+=",\"key_scan_worst_ms\":"+String(busaMaxKeyScanMs);
+  s+=",\"i2c_step_last_ms\":"+String(busaLastI2cStepMs);
+  s+=",\"i2c_step_worst_ms\":"+String(busaMaxI2cStepMs)+"}";
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"clock\":{\"synchronized\":"+(deviceClockValid()?String("true"):String("false"));
@@ -1554,10 +1607,14 @@ void readConsole(){
 }
 void setup(){
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V14.7 REV2 N16R8: K1-K4 12V SOUND ONLY");
-  soundInitPins(); // Set relay inputs OFF before Wi-Fi/TFT and sensor startup.
   Serial.begin(115200);
-  delay(400);
+  busaBootAt=millis();
+  busaReportStage("START");
+  Serial.printf("BUSA N16R8 reset_reason=%d flash=%lu free_heap=%lu\n",
+       (int)esp_reset_reason(),(unsigned long)ESP.getFlashChipSize(),
+       (unsigned long)ESP.getFreeHeap());
+  soundInitPins(); // Set relay inputs OFF before Wi-Fi/TFT and sensor startup.
+  delay(100);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
@@ -1573,9 +1630,11 @@ void setup(){
   tftThemeDark=prefs.getBool("tftDarkColor",false);
   startedAt=millis();
   tftProfile=1; // ST7789 only
-  // Initialize TFT first so splash actually covers Wi-Fi and sensor initialization.
+  // Preserve original V14.7 splash-first boot; time every operation.
+  busaReportStage("TFT_BEGIN");
   screenAttempted=true;
   startScreen();
+  busaReportStage("TFT_READY");
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
   loadKeymap();
@@ -1591,6 +1650,7 @@ void setup(){
   }
   soundLoadPrefs();
   setupGoogleCloud();
+  busaReportStage("WIFI_BEGIN");
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
   configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
@@ -1599,6 +1659,7 @@ void setup(){
   // no STA password is embedded in this public source. Local AP fallback remains.
   apPassword="123456789"; // User-selected AP password, V14.7 original startup unchanged
   wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
+  busaReportStage(wifiRunning?"AP_READY":"AP_FAILED");
   updateBootStage(1);
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str(),apPassword.c_str());
@@ -1895,17 +1956,22 @@ void setup(){
   const char *headers[]={"X-Busa-Token"};
   server.collectHeaders(headers,1);
   server.begin();
-  Serial0.println("WEB started; temperature scan & I2C next");
+  busaReportStage("HTTP_READY");
+  // Never do a full I2C address scan inside setup.
+  busaReportStage("I2C_BEGIN");
   i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
-  if(i2cOnline){Wire.setTimeOut(25);probeI2c(millis());}
+  if(i2cOnline)Wire.setTimeOut(25);
   updateBootStage(2);
-  Serial0.printf("I2C=%d PCF=%d PCA=%d\n",(int)i2cOnline,(int)pcfDetected,(int)pcaDetected);
+  busaReportStage("I2C_READY");
   updateBootStage(3);
   launchGoogleCloud();
-  Serial0.println("SETUP DONE: GPIO7/6/5/4 ONLY for 12V sound annunciators; default OFF");
+  busaSetupDoneMs=millis()-busaBootAt;
+  busaReportStage("SETUP_DONE");
+  Serial.printf("BUSA SETUP DONE ms=%lu K1-K4 sound-only\n",(unsigned long)busaSetupDoneMs);
 }
 void loop(){
   uint32_t now=millis();
+  const uint32_t tickStart=now;
   soundPoll(now);
   server.handleClient();
   if(stationSsid.length() && stationPass.length()>=8 && WiFi.status()!=WL_CONNECTED && elapsed(now,lastStationCheck,20000)){
@@ -1931,7 +1997,10 @@ void loop(){
   }
     sampleFlow(now);
   if(i2cOnline){
-    if(elapsed(now,lastBusProbe,6000))probeI2c(now);
+    // Query connected PCF/PCA once per 6 s. Scan at most two I2C addresses
+    // per loop; prevent keypad bus errors from starving the web server.
+    if(!lastBusProbe || elapsed(now,lastBusProbe,6000))probeI2c(now);
+    scanI2cAddresses(now);
     pollKeys(now);
   }
   // Landscape V14.6: rebuild background ONLY on explicit view/theme change.
@@ -1946,9 +2015,16 @@ void loop(){
   }
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
+    Serial.printf("BUSA ALIVE ms=%lu stage=%s AP=%d i2c=%d tft=%d worst_loop=%lu key_ms=%lu i2c_ms=%lu\n",
+      (unsigned long)now,busaBootStage,(int)wifiRunning,(int)i2cOnline,
+      (int)tftStarted,(unsigned long)busaMaxLoopMs,(unsigned long)busaLastKeyScanMs,
+      (unsigned long)busaLastI2cStepMs);
     Serial0.printf("N16R8 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
       (unsigned long)now,(int)wifiRunning,(int)i2cOnline,(int)tftStarted,
       (unsigned long)flowPulses(),(double)flowLpm);
   }
+  const uint32_t loopMs=millis()-tickStart;
+  if(loopMs>busaMaxLoopMs)busaMaxLoopMs=loopMs;
+  if(loopMs>100)busaSlowLoops++;
   delay(2);
 }
