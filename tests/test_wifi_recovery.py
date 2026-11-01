@@ -109,11 +109,12 @@ int main(){
  assert(!wifiScanBusy()&&wifiLastScanErr==-2&&wifiScanFailures==1);
  assert(wifiScanJSON().find("scan_start_failed")!=std::string::npos);
  assert(stopScans&&clearBits&&WiFi.statusCode==WL_CONNECTED);
- // Loss of internet retries with local clients present; no retry storm.
+ // Loss of external Wi-Fi must not disrupt a connected iPhone. No retry storm.
  WiFi.statusCode=0;tick(90000);
  assert(wifiRetryDelay==60000&&wifiConnectFailures==1);
  tick(149999);assert(WiFi.begins==1);
- tick(150000);tick(151200);assert(WiFi.begins==2&&WiFi.clients==2);
+ tick(150000);assert(wifiDeferredForLocal && WiFi.begins==1);
+ WiFi.clients=0;tick(150000);tick(151200);assert(WiFi.begins==2&&WiFi.clients==0);
  wifiRecoveryEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,{{201}});tick(151201);
  assert(wifiRetryDelay==120000&&!wifiConnecting);
  tick(271201);tick(272401);assert(WiFi.begins==3);
@@ -158,7 +159,7 @@ int main(){
  assert(wifiLastVisibleCount==0&&wifiScanJSON().find("error")==std::string::npos);
  scans=WiFi.scans;wifiRequestScan(22000);assert(!wifiScanBusy()&&WiFi.scans==scans);
  assert(wifiScanJSON().find("scan_cooldown")!=std::string::npos);
- // Repeated failures cap at five minutes even while local clients stay attached.
+ // Repeated failures cap at five minutes while the local AP has no clients.
  WiFi.statusCode=0;wifiScheduleConnect(600000);uint32_t retry=601500;
  for(int i=0;i<5;++i){
   tick(retry);tick(retry+1200);assert(wifiConnecting);
@@ -170,7 +171,7 @@ int main(){
  stationPass="";joins=WiFi.begins;wifiScheduleConnect(retry);tick(retry+5000);
  assert(!wifiConnectPending&&WiFi.begins==joins&&!wifiCloudPaused.load());
  assert(wifiRecoveryJSON().find("ap_sta_simultaneous")!=std::string::npos);
- std::cout<<"PASS: shipped AP+STA: local clients during boot/join/retry, HTTP grace, -2, 201, backoff, OTA, scans, rollover"<<std::endl;
+ std::cout<<"PASS: shipped AP+STA: initial join, local priority after failure, HTTP grace, -2, 201, backoff, OTA, scans, rollover"<<std::endl;
 }
 
 '''
