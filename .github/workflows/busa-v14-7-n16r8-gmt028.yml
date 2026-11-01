@@ -1,8 +1,8 @@
-name: BUSA V14.7 N16R8 GMT028 Sound4 Rebuild
+name: BUSA V14.7 Original N16R8 Sound4 REV2
 on:
   push:
     branches:
-      - fix/busa-v14-7-n16r8-tft-gmt028-20261101
+      - release/busa-v14-7-original-n16r8-sound4-corrected-20261101
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-v14-7-n16r8-gmt028.yml'
@@ -36,7 +36,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          for term in ('14v7-N16R8-GMT028-SOUND4','TPIN[4]={16,17,18,21}',
+          for term in ('14v7-N16R8-GMT028-SOUND4-REV2','TPIN[4]={16,17,18,21}',
                        'TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14',
                        'KPIN[4]={7,6,5,4}','BUS_SDA=8,BUS_SCL=9',
                        'FLOW_GPIO=15','RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false',
@@ -50,6 +50,10 @@ jobs:
           assert 'server.on("/api/sound/config"' in p
           assert '"soundSave"' in p and '"soundOn0"' in p
           assert 'BUSA_V15_Runtime.h' not in p
+          assert 'BUSA_Startup.h' not in p, 'No startup rewrite in V14.7'
+          assert 'String(TFT_MOSI)' in p and 'String(TFT_SCK)' in p and 'String(TFT_DC)' in p
+          assert 'N16R8 HEARTBEAT' in p and 'N8R2 HEARTBEAT' not in p
+          assert 'if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}' in p
           sound=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarms.h').read_text()
           logic=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarmLogic.h').read_text()
           assert '12V SOUND' in sound and 'BUSA_SOUND_ACTIVE_LOW=true' in sound
@@ -74,6 +78,43 @@ jobs:
           assert m.group(1).count('<section')==m.group(1).count('</section>')
           PY
           node --check /tmp/busa-v147-sound.js
+      - name: Unit-test independent sound alarm thresholds
+        shell: bash
+        run: |
+          cat > /tmp/test-busa-v147-sound.cpp <<'CPP'
+          #include "BUSA_SoundAlarmLogic.h"
+          #include <cassert>
+          #include <cmath>
+          int main(){
+            using namespace BusaSound;
+            Channel a,b,c,d;
+            assert(!evaluate(a,false,true,50,60,55));
+            assert(a.reason==Disabled);
+            assert(!evaluate(a,true,true,50,NAN,NAN));
+            assert(a.reason==MissingThreshold);
+            assert(!evaluate(a,true,true,59,60,55));
+            assert(evaluate(a,true,true,60,60,55));
+            assert(evaluate(a,true,true,57,60,55));
+            assert(!evaluate(a,true,true,55,60,55));
+            assert(evaluate(a,true,true,70,60,55));
+            assert(!evaluate(a,true,false,70,60,55));
+            assert(a.reason==SensorInvalid);
+            assert(!evaluate(a,true,true,59,60,55));
+            assert(!evaluate(b,true,true,22,20,25));
+            assert(evaluate(b,true,true,20,20,25));
+            assert(evaluate(b,true,true,23,20,25));
+            assert(!evaluate(b,true,true,25,20,25));
+            assert(evaluate(c,true,true,80,80,75));
+            assert(!evaluate(c,false,true,80,80,75));
+            assert(!evaluate(d,true,true,80,80,79.8));
+            assert(d.reason==MissingThreshold);
+            assert(!evaluate(d,true,true,NAN,50,45));
+            return 0;
+          }
+          CPP
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -I firmware/BUSA_1M_WIFI_3v_GOOGLE /tmp/test-busa-v147-sound.cpp -o /tmp/test-busa-v147-sound
+          /tmp/test-busa-v147-sound
+          echo 'PASS: alarm thresholds and missing sensors'
       - name: Prepare Google GTS certificate
         shell: bash
         run: |
@@ -98,15 +139,15 @@ jobs:
         run: |
           set -euo pipefail
           SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_N16R8_GMT028_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_N16R8_GMT028_APP_OTA.bin
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_REV2_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_REV2_N16R8_APP_OTA.bin
           git rev-parse HEAD > build_busa_v147/SOURCE_COMMIT.txt
-          (cd build_busa_v147 && sha256sum BUSA_V14_7_N16R8_GMT028_FULL_USB.bin BUSA_V14_7_N16R8_GMT028_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd build_busa_v147 && sha256sum BUSA_V14_7_REV2_N16R8_FULL_USB.bin BUSA_V14_7_REV2_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
           root=Path('build_busa_v147')
-          full=(root/'BUSA_V14_7_N16R8_GMT028_FULL_USB.bin').read_bytes()
-          app=(root/'BUSA_V14_7_N16R8_GMT028_APP_OTA.bin').read_bytes()
+          full=(root/'BUSA_V14_7_REV2_N16R8_FULL_USB.bin').read_bytes()
+          app=(root/'BUSA_V14_7_REV2_N16R8_APP_OTA.bin').read_bytes()
           assert 60000<len(app)<0x300000
           assert len(full)<16*1024*1024
           assert full[0x10000:0x10000+len(app)]==app, 'Merged USB and OTA content differs'
@@ -114,9 +155,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_V14_7_N16R8_GMT028_USB_OTA_SHA256
+          name: BUSA_V14_7_REV2_N16R8_USB_OTA_SHA256
           path: |
-            build_busa_v147/BUSA_V14_7_N16R8_GMT028_FULL_USB.bin
-            build_busa_v147/BUSA_V14_7_N16R8_GMT028_APP_OTA.bin
+            build_busa_v147/BUSA_V14_7_REV2_N16R8_FULL_USB.bin
+            build_busa_v147/BUSA_V14_7_REV2_N16R8_APP_OTA.bin
             build_busa_v147/SHA256SUMS.txt
             build_busa_v147/SOURCE_COMMIT.txt
