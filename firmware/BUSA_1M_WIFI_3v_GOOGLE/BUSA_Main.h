@@ -691,7 +691,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V15.5 N16R8";
+  const String version="FW V15.6 N16R8";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -973,7 +973,7 @@ body{padding:0!important;padding-bottom:90px!important;-webkit-text-size-adjust:
 .brandSub{font-size:13px;font-weight:500;color:var(--muted)}
 .readOnlyLabel{font-size:10px;color:#20866c;font-weight:700;flex-shrink:0}
 .clockBar{max-width:620px;margin:auto;font-size:12px!important;color:var(--muted)!important;padding:0!important}
-.appTabs{position:fixed;bottom:0;left:0;right:0;z-index:15;display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr));gap:2px!important;overflow:visible!important;background:var(--surface);border-top:2px solid var(--orange);padding:6px 5px max(7px,env(safe-area-inset-bottom));box-shadow:0 -4px 15px #2f485c18}
+.appTabs{position:fixed;bottom:0;left:0;right:0;z-index:15;display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));gap:2px!important;overflow:visible!important;background:var(--surface);border-top:2px solid var(--orange);padding:6px 5px max(7px,env(safe-area-inset-bottom));box-shadow:0 -4px 15px #2f485c18}
 .appTabs button{min-width:0!important;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:7px 0!important;border:1px solid transparent;border-radius:9px;font-size:clamp(9px,2.55vw,12px)!important;line-height:1.15;white-space:nowrap}
 .appTabs .on{background:#f7c58f;color:#3c342a;border-color:#e4a064}
 .tabIcon{font-family:system-ui,sans-serif;font-size:18px;line-height:19px;color:var(--sea)}
@@ -1070,7 +1070,7 @@ main>*{max-width:100%;min-width:0}
 <button data-page="3"><span class="tabIcon">⌁</span><span>Графики</span></button>
 <button data-page="4"><span class="tabIcon">▤</span><span>События</span></button>
 <button data-page="5"><span class="tabIcon">⚙</span><span>Настр.</span></button>
-<button data-page="6"><span class="tabIcon">▦</span><span>Кальк.</span></button>
+
 </nav>
 <section class="page" data-section="0">
   <div class="homeHero"><div class="heroEyebrow">СИСТЕМА МОНИТОРИНГА</div>
