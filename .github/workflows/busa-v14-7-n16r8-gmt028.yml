@@ -86,6 +86,43 @@ jobs:
           assert m.group(1).count('<section')==m.group(1).count('</section>')
           PY
           node --check /tmp/busa-v147-sound.js
+      - name: Unit-test four independent sound channels
+        shell: bash
+        run: |
+          cat > /tmp/test-busa-sound.cpp <<'CPP'
+          #include "BUSA_SoundAlarmLogic.h"
+          #include <cassert>
+          #include <cmath>
+          int main(){
+            using namespace BusaSound;
+            Channel a,b,c,d;
+            assert(!evaluate(a,false,true,50,60,55));
+            assert(a.reason==Disabled);
+            assert(!evaluate(a,true,true,50,NAN,NAN));
+            assert(a.reason==MissingThreshold);
+            assert(!evaluate(a,true,true,59,60,55));
+            assert(evaluate(a,true,true,60,60,55));
+            assert(evaluate(a,true,true,57,60,55));
+            assert(!evaluate(a,true,true,55,60,55));
+            assert(evaluate(a,true,true,70,60,55));
+            assert(!evaluate(a,true,false,70,60,55));
+            assert(a.reason==SensorInvalid);
+            assert(!evaluate(a,true,true,59,60,55));
+            assert(!evaluate(b,true,true,22,20,25));
+            assert(evaluate(b,true,true,20,20,25));
+            assert(evaluate(b,true,true,23,20,25));
+            assert(!evaluate(b,true,true,25,20,25));
+            assert(evaluate(c,true,true,80,80,75));
+            assert(!evaluate(c,false,true,80,80,75));
+            assert(!evaluate(d,true,true,80,80,79.8));
+            assert(d.reason==MissingThreshold);
+            assert(!evaluate(d,true,true,NAN,50,45));
+            return 0;
+          }
+          CPP
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -I firmware/BUSA_1M_WIFI_3v_GOOGLE /tmp/test-busa-sound.cpp -o /tmp/test-busa-sound
+          /tmp/test-busa-sound
+          echo "PASS sound hysteresis / missing sensors / enable logic"
       - name: Prepare Google GTS certificate
         shell: bash
         run: |
