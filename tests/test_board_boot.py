@@ -35,12 +35,12 @@ bool ack(uint8_t a){++calls;return a==0x20 || a==0x40;}
 '''
 i2ctest=r'''
 int main(){
- for(int i=0;i<111;i++){scanI2cAddresses(100+i);assert(calls==i+1);assert(i2cFoundCount==0);}
- scanI2cAddresses(211);assert(calls==112 && i2cFoundCount==2 && i2cAckCount==2);
+ for(int i=0;i<111;i++){scanI2cAddresses(100+100*i);assert(calls==i+1);assert(i2cFoundCount==0);}
+ scanI2cAddresses(11200);assert(calls==112 && i2cFoundCount==2 && i2cAckCount==2);
  assert(i2cFound[0]==0x20 && i2cFound[1]==0x40);
- scanI2cAddresses(212);assert(calls==112);
- released=false;scanI2cAddresses(20000);assert(calls==112);
- released=true;scanI2cAddresses(20001);assert(calls==113 && i2cFoundCount==2);
+ scanI2cAddresses(11201);assert(calls==112);
+ released=false;scanI2cAddresses(80000);assert(calls==112);
+ released=true;scanI2cAddresses(80001);assert(calls==113 && i2cFoundCount==2);
 }
 '''
 main=(r/'BUSA_Main.h').read_text()
