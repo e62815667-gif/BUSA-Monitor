@@ -181,9 +181,6 @@ input::placeholder{color:#a3bdce}
   <span class="indicator"><i class="led" id="cloudLocal"></i> ЛОК <b id="cloudLocalLabel">—</b></span>
   <span class="indicator"><i class="led" id="cloudData"></i> ДАН <b id="cloudDataLabel">—</b></span>
 </div>
-<div class="connectionStrip"><span id="statusText" class="warn">Нет удалённых данных</span>
-<a href="http://192.168.4.1/">Локальная панель <span aria-hidden="true">›</span></a></div>
-<div class="quickMenu"><button type="button" data-open-page="connection">⌁ Связь</button><button type="button" data-open-page="diagnostics">⊞ Диагностика</button><button type="button" data-open-page="cloudUpdates">☁ Обновления</button></div>
 <section id="home">
 <div class="hero"><small>СИСТЕМА МОНИТОРИНГА</small><h2>Главная</h2><span class="status" id="heroStatus">● Ожидается соединение с БУСА</span></div>
 <div class="card"><h2>Четыре температуры</h2><div class="grid">
@@ -240,6 +237,7 @@ input::placeholder{color:#a3bdce}
 <a href="#googleSettings" class="settingsNavLink"><span>⚙</span>Система</a>
 <a href="#aboutSettings" class="settingsNavLink"><span>ⓘ</span>О системе</a>
 </div></div>
+<div class="card"><h2>Состояние и диагностика</h2><p class="muted" id="statusText">Нет удалённых данных</p><div class="settingsOverview"><button type="button" data-open-page="connection">⌁ Связь</button><button type="button" data-open-page="diagnostics">⊞ Диагностика</button><button type="button" data-open-page="cloudUpdates">☁ Обновления</button><a class="settingsNavLink" href="http://192.168.4.1/recovery">Проверка локальной сети</a></div></div>
 <div class="card" id="googleSettings"><h2>Удалённый мониторинг · Google</h2>
 <p class="muted">Введи адрес своего Google Apps Script и отдельный <b>ключ просмотра</b> BUSA_VIEW_TOKEN. Ключ отправки BUSA_TOKEN здесь не нужен.</p>
 <label for="viewUrl">Ссылка веб-приложения Google /exec</label>
@@ -358,8 +356,8 @@ input::placeholder{color:#a3bdce}
 <script>
 // Change the standalone iPhone page's palette only; the TFT palette is
 // changed from the controller's own Settings screen.
-let darkSaved=false;
-try{darkSaved=localStorage.getItem('busa-pwa-dark')==='1';}catch(e){}
+let darkSaved=true;
+try{darkSaved=localStorage.getItem('busa-pwa-dark')!=='0';}catch(e){}
 function applyTheme(dark){
  document.documentElement.dataset.theme=dark?'dark':'light';
  document.getElementById('themeSwitch').textContent=
