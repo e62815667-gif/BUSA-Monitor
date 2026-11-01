@@ -10,7 +10,7 @@ vm.runInContext(fn('verifiedTemperature'),context);
 assert.equal(vm.runInContext('verifiedTemperature({verified:false,c:85})',context),null);
 assert.equal(vm.runInContext('verifiedTemperature({verified:true,c:85})',context),85);
 assert.equal(vm.runInContext('verifiedTemperature({verified:true,c:126})',context),null);
-assert(html.includes('Звуковая сигнализация') && html.includes('15.3'));
+assert(html.includes('Звуковая сигнализация') && html.includes('Запуск и ошибки модулей'));
 const main=fs.readFileSync('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h','utf8');
 for(const [name,text] of [['online',html],['local',main]])for(const m of text.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g))new vm.Script(m[1],{filename:name});
 console.log('PASS: V15.3 catalogue comparison, verified temperatures including 85C, both JS bundles');
