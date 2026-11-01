@@ -53,7 +53,7 @@ main=(src/"BUSA_Main.h").read_text()
 runtime=(src/"BUSA_V15_Runtime.h").read_text()
 driver=(src/"BUSA_V15_Alarm.h").read_text()
 status=(src/"BUSA_V15_Status.h").read_text()
-assert "15v5-N16R8-STABLE-LOCAL" in main
+assert "15v6-N16R8-MODULE-BOOTFIX" in main
 assert 'apPassword="123456789";' in runtime
 assert 'WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str()' in (src/"BUSA_WifiRecovery.h").read_text()
 assert "constexpr bool BUSA_ALARM_ACTIVE_LOW=true" in driver
