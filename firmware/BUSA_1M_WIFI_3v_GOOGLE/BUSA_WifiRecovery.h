@@ -234,6 +234,14 @@ void wifiRecoveryTick(uint32_t now){
   if(connected && !wifiConnectPending){wifiDeferredForLocal=false;wifiCloudPaused.store(false);return;}
   if(!wifiHasCredentials()){wifiConnectPending=false;wifiCloudPaused.store(false);return;}
   if(!connected && !wifiConnectPending)wifiQueueRetry(now,true);
+  // Preserve the local iPhone web app after a failed external STA association.
+  // Successful STA links are kept; a fresh user-entered credential resets
+  // wifiFailureStreak and triggers exactly one normal new connection attempt.
+  if(wifiFailureStreak>0 && WiFi.softAPgetStationNum()>0 && !wifiJoinSettling){
+    wifiDeferredForLocal=true;
+    wifiCloudPaused.store(false);
+    return;
+  }
   if(!elapsed(now,wifiPolicyAt,BUSA_BOOT_GRACE_MS) || !elapsed(now,wifiRetryAt,wifiRetryDelay))return;
   if(!wifiJoinSettling){
     WiFi.setAutoReconnect(false);WiFi.disconnect(false,false);
