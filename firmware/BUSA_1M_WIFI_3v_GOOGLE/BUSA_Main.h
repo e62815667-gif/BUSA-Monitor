@@ -2,7 +2,7 @@
 /*
   BUSA-1M-001 БУСА 1М WiFi 3v-GOOGLE
   ESP32-S3 N16R8, TFT GMT028-05 V1.1 320x240 landscape, monitoring-only.
-  LOW-VOLTAGE MONITORING ONLY. DO NOT DRIVE RELAYS OR POWER OUTPUTS.
+  LOW-VOLTAGE MONITORING + four relay channels for 12V SOUND ONLY. No motor or mains output.
   Approved hardware scope: mains power controller and motorized valve are
   REMOVED from this project; they are operated manually, outside ESP32.
   Approved informational section "Отбор" is retained without actuator control.
@@ -31,15 +31,15 @@
 #include <math.h>
 
 constexpr uint8_t TPIN[4]={16,17,18,21};
-constexpr uint8_t KPIN[4]={7,6,5,4}; // Reference only: never configured as outputs
+constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
 constexpr uint8_t BUS_SDA=8,BUS_SCL=9;
 constexpr uint8_t TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14;
 constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
-constexpr bool RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false;
-static_assert(!RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"Physical outputs must stay locked");
+constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
+static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-GMT028-PINMAP";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-GMT028-SOUND4";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -270,7 +270,7 @@ uint8_t approvedSettingsItem=0; // The six approved settings rows on the physica
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 bool tftDirty=true;
 float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
-// Informational display preferences. Never used for physical outputs.
+// V14 display reference fields remain informational. Sound alarms use separate snd* keys.
 int selectedTemp=0,selectedField=0;
 bool editingTemp=false;
 String editTempBuffer="";
@@ -732,12 +732,13 @@ String quoteJson(const String &x){
   return out+"\"";
 }
 String otaJSON(); // forward declaration
+#include "BUSA_SoundAlarms.h"
 String cloudJSON(); // forward declaration; read-only Google status
 extern volatile int googleInternet; // external TCP health, no credentials
 String statusJSON(){
   uint32_t now=millis();
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
-  s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_ONLY\",\"relays_enabled\":false,\"pwm_enabled\":false";
+  s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_SOUND_ONLY\",\"relays_enabled\":true,\"pwm_enabled\":false";
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"clock\":{\"synchronized\":"+(deviceClockValid()?String("true"):String("false"));
@@ -750,6 +751,7 @@ String statusJSON(){
     s+=",\"notice\":"+(isfinite(noticeTemp[i])?String(noticeTemp[i],1):String("null"))+"}";
   }
   s+="]";
+  s+=",\"sound_alerts\":"+soundJSON(now);
   s+=",\"temperatures\":[";
   for(int i=0;i<4;i++){
     if(i)s+=",";
@@ -1520,7 +1522,8 @@ void readConsole(){
 }
 void setup(){
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V14.1 LIGHT-WATER; physical outputs LOCKED");
+  Serial0.println("\nBUSA 1M WiFi V14.7 N16R8: K1-K4 12V SOUND ONLY");
+  soundInitPins(); // Set relay inputs OFF before Wi-Fi/TFT and sensor startup.
   Serial.begin(115200);
   delay(400);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
@@ -1554,6 +1557,7 @@ void setup(){
     if(!isfinite(refTemp[i])||refTemp[i]<0||refTemp[i]>125)refTemp[i]=NAN;
     if(!isfinite(noticeTemp[i])||noticeTemp[i]<0||noticeTemp[i]>125)noticeTemp[i]=NAN;
   }
+  soundLoadPrefs();
   setupGoogleCloud();
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
@@ -1599,6 +1603,61 @@ void setup(){
   server.on("/api/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",statusJSON());
+  });
+  // Local-only sound-alarm configuration: separate from V14 display references.
+  server.on("/api/sound/config",HTTP_POST,[]{
+    if(!apClient()){server.send(403,"text/plain","BUSA local AP only");return;}
+    bool requestedEnabled[4]={false,false,false,false};
+    float requestedOn[4],requestedOff[4];
+    // Parse and validate the ENTIRE request before changing any GPIO or NVS.
+    for(int i=0;i<4;i++){
+      String onKey=String("on")+i,offKey=String("off")+i,enKey=String("en")+i;
+      if(!server.hasArg(onKey)||!server.hasArg(offKey)||!server.hasArg(enKey)){
+        server.send(400,"text/plain","Missing sound alarm fields");return;
+      }
+      String onRaw=server.arg(onKey),offRaw=server.arg(offKey),enRaw=server.arg(enKey);
+      requestedEnabled[i]=enRaw=="1";
+      if(enRaw!="0" && enRaw!="1"){server.send(400,"text/plain","Invalid enable flag");return;}
+      if(onRaw.isEmpty() && offRaw.isEmpty() && !requestedEnabled[i]){
+        requestedOn[i]=NAN;requestedOff[i]=NAN;continue;
+      }
+      char *p=nullptr,*q=nullptr;
+      requestedOn[i]=strtof(onRaw.c_str(),&p);
+      bool onValid=!onRaw.isEmpty()&&p&&*p=='\0';
+      requestedOff[i]=strtof(offRaw.c_str(),&q);
+      bool offValid=!offRaw.isEmpty()&&q&&*q=='\0';
+      if(!onValid||!offValid||!BusaSound::valid(requestedOn[i],requestedOff[i])){
+        server.send(400,"text/plain","Require valid ON/OFF temperatures 0..125 C, hysteresis >=0.5 C");return;
+      }
+    }
+    soundOutputsOff();
+    for(int i=0;i<4;i++)soundEnabled[i]=false; // No activation during multi-key write.
+    bool saved=true;
+    for(int i=0;i<4;i++){
+      String en=String("sndE")+i,on=String("sndOn")+i,off=String("sndOff")+i;
+      if(!prefs.putBool(en.c_str(),false))saved=false;
+      if(std::isfinite(requestedOn[i])){
+        if(!prefs.putFloat(on.c_str(),requestedOn[i]))saved=false;
+        if(!prefs.putFloat(off.c_str(),requestedOff[i]))saved=false;
+      }else{
+        if(prefs.isKey(on.c_str())&&!prefs.remove(on.c_str()))saved=false;
+        if(prefs.isKey(off.c_str())&&!prefs.remove(off.c_str()))saved=false;
+      }
+      soundOnC[i]=requestedOn[i];soundOffC[i]=requestedOff[i];
+    }
+    if(saved){
+      for(int i=0;i<4;i++){
+        String en=String("sndE")+i;
+        if(!prefs.putBool(en.c_str(),requestedEnabled[i]))saved=false;
+      }
+    }
+    if(!saved){
+      for(int i=0;i<4;i++){soundEnabled[i]=false;prefs.putBool((String("sndE")+i).c_str(),false);}
+      soundOutputsOff();
+      server.send(500,"text/plain","NVS error: sound outputs kept OFF");return;
+    }
+    for(int i=0;i<4;i++)soundEnabled[i]=requestedEnabled[i];
+    server.send(200,"application/json",soundJSON(millis()));
   });
 
   addGoogleRoutes();
@@ -1811,10 +1870,11 @@ void setup(){
   Serial0.printf("I2C=%d PCF=%d PCA=%d\n",(int)i2cOnline,(int)pcfDetected,(int)pcaDetected);
   updateBootStage(3);
   launchGoogleCloud();
-  Serial0.println("SETUP DONE: relay GPIO4/5/6/7 NEVER configured/driven");
+  Serial0.println("SETUP DONE: GPIO7/6/5/4 ONLY for 12V sound annunciators; default OFF");
 }
 void loop(){
   uint32_t now=millis();
+  soundPoll(now);
   server.handleClient();
   if(stationSsid.length() && stationPass.length()>=8 && WiFi.status()!=WL_CONNECTED && elapsed(now,lastStationCheck,20000)){
     lastStationCheck=now;
@@ -1825,9 +1885,9 @@ void loop(){
   if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
-  if(otaActive){delay(0);return;}
-  if(tftRebootPending && elapsed(now,tftRebootAt,3000))ESP.restart();
-  if(googleRestart && elapsed(now,googleRestartAt,3500))ESP.restart();
+  if(otaActive){soundOutputsOff();delay(0);return;}
+  if(tftRebootPending && elapsed(now,tftRebootAt,3000)){soundOutputsOff();ESP.restart();}
+  if(googleRestart && elapsed(now,googleRestartAt,3500)){soundOutputsOff();ESP.restart();}
   sampleTemperatures(now);
   probeOneWire(now); // Diagnose on idle 1-Wire bus only
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
