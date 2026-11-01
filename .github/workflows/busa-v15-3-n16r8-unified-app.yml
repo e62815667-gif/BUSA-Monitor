@@ -43,6 +43,7 @@ jobs:
       - name: Test N16R8 and retained full monitoring logic
         run: |
           python3 tests/test_v15_3_n16r8.py
+          python3 tests/test_webgzip.py
           python3 tests/test_board_boot.py
           python3 tests/test_unified_ui_v15_3.py
           node tests/test_app_v153_bootfix.js

@@ -29,7 +29,7 @@ int wifiLastScanErr=0;
 std::atomic<bool> wifiApObserved{false};
 bool wifiModeStarted=false;
 uint32_t wifiApAttemptAt=0,wifiApAttempts=0;
-constexpr uint32_t BUSA_AP_RETRY_MS=15000U;
+constexpr uint32_t BUSA_AP_RETRY_MS=5000U;
 void wifiStartAccessPoint(uint32_t now){
   wifiApAttemptAt=now;++wifiApAttempts;
   if((WiFi.getMode() & WIFI_AP)==0)wifiModeStarted=WiFi.mode(WIFI_AP_STA);
@@ -144,7 +144,7 @@ void wifiQueueRetry(uint32_t now,bool failure){
   wifiConnecting=wifiJoinSettling=false;wifiConnectPending=wifiHasCredentials();
   if(failure){++wifiConnectFailures;if(wifiFailureStreak<4)++wifiFailureStreak;}
   wifiRetryAt=now;
-  wifiRetryDelay=failure?((wifiFailureStreak<4)?(30000U<<wifiFailureStreak):300000U):0;
+  wifiRetryDelay=failure?((wifiFailureStreak<4)?(5000U<<(wifiFailureStreak-1)):30000U):0;
   wifiCloudPaused.store(false);
 }
 void wifiRecoveryTick(uint32_t now){
@@ -225,8 +225,7 @@ void wifiRecoveryTick(uint32_t now){
     wifiConnecting=false;wifiFailureStreak=0;wifiCloudPaused.store(false);
   }
   if(wifiConnecting){
-    if(elapsed(now,wifiConnectAt,BUSA_CONNECT_TIMEOUT_MS) ||
-       wifiDisconnectCount.load()!=wifiAttemptDisconnects){
+    if(elapsed(now,wifiConnectAt,BUSA_CONNECT_TIMEOUT_MS)){
       WiFi.disconnect(false,false);wifiQueueRetry(now,true);
     }
     return;

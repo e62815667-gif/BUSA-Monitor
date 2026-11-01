@@ -3,11 +3,11 @@
   "releases": [
     {
       "version": "V15.3",
-      "build": "BOOTFIX1",
+      "build": "RECOVERY2",
       "target": "ESP32-S3",
       "build_flash_bytes": 16777216,
-      "app_size_bytes": 1173952,
-      "app_sha256": "5c7d1784794061844838dd001ba89a37aa1cd9c0c4c7e2d96184bf854294c9a7",
+      "app_size_bytes": 1114160,
+      "app_sha256": "42fea66390089c7d9a18247f7873ba84f05e0ec2a3a2ce30a54e2fd7b100ed51",
       "remote_install_enabled": false
     }
   ]

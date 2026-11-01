@@ -111,13 +111,14 @@ int main(){
  assert(stopScans&&clearBits&&WiFi.statusCode==WL_CONNECTED);
  // Loss of internet retries with local clients present; no retry storm.
  WiFi.statusCode=0;tick(90000);
- assert(wifiRetryDelay==60000&&wifiConnectFailures==1);
- tick(149999);assert(WiFi.begins==1);
- tick(150000);tick(151200);assert(WiFi.begins==2&&WiFi.clients==2);
- wifiRecoveryEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,{{201}});tick(151201);
- assert(wifiRetryDelay==120000&&!wifiConnecting);
- tick(271201);tick(272401);assert(WiFi.begins==3);
- tick(284401);assert(!wifiConnecting&&wifiConnectFailures==3&&wifiRetryDelay==240000);
+ assert(wifiRetryDelay==5000&&wifiConnectFailures==1);
+ tick(94999);assert(WiFi.begins==1);
+ tick(95000);tick(95500);assert(WiFi.begins==2&&WiFi.clients==2);
+ wifiRecoveryEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,{{201}});tick(95501);
+ assert(wifiConnecting); // late disconnect event cannot abort a fresh association
+ tick(107500);assert(wifiRetryDelay==10000&&!wifiConnecting);
+ tick(117500);tick(118000);assert(WiFi.begins==3);
+ tick(130000);assert(!wifiConnecting&&wifiConnectFailures==3&&wifiRetryDelay==20000);
  // Saving credentials bypasses previous backoff but lets HTTP response finish.
  d=WiFi.disconnects;wifiScheduleConnect(300000);
  assert(WiFi.disconnects==d&&WiFi.begins==3);
@@ -158,15 +159,16 @@ int main(){
  assert(wifiLastVisibleCount==0&&wifiScanJSON().find("error")==std::string::npos);
  scans=WiFi.scans;wifiRequestScan(22000);assert(!wifiScanBusy()&&WiFi.scans==scans);
  assert(wifiScanJSON().find("scan_cooldown")!=std::string::npos);
- // Repeated failures cap at five minutes even while local clients stay attached.
+ // Repeated failures cap at 30 seconds even while local clients stay attached.
  WiFi.statusCode=0;wifiScheduleConnect(600000);uint32_t retry=601500;
  for(int i=0;i<5;++i){
   tick(retry);tick(retry+1200);assert(wifiConnecting);
   wifiRecoveryEvent(ARDUINO_EVENT_WIFI_STA_DISCONNECTED,{{201}});tick(retry+1201);
-  assert(!wifiConnecting&&wifiRetryDelay<=300000);
+  assert(wifiConnecting);tick(retry+13200);
+  assert(!wifiConnecting&&wifiRetryDelay<=30000);
   retry=wifiRetryAt+wifiRetryDelay;
  }
- assert(wifiRetryDelay==300000);
+ assert(wifiRetryDelay==30000);
  stationPass="";joins=WiFi.begins;wifiScheduleConnect(retry);tick(retry+5000);
  assert(!wifiConnectPending&&WiFi.begins==joins&&!wifiCloudPaused.load());
  assert(wifiRecoveryJSON().find("ap_sta_simultaneous")!=std::string::npos);

@@ -37,7 +37,7 @@
 
 #include "BUSA_Boot.h"
 #include "BUSA_V15_Board.h"
-const char VERSION[]="БУСА 1М WiFi 15v3-N16R8-UNIFIED-UI-BOOTFIX1";
+const char VERSION[]="БУСА 1М WiFi 15v3-N16R8-UNIFIED-UI-RECOVERY2";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -170,12 +170,14 @@ String ledSimJSON(){
 }
 void probePcaLedRegisters(uint32_t now){
   pcaLedScanAt=now;
-  for(uint8_t ch=0;ch<BusaLed::kCount;ch++){
-    if(!pcaDetected){pcaLedRegs[ch]=BusaLed::ChannelSnapshot();continue;}
+  static uint8_t ch=0;
+  if(!pcaDetected){pcaLedRegs[ch]=BusaLed::ChannelSnapshot();}
+  else{
     pcaLedRegs[ch]=BusaLed::snapshot(ch);
     if(pcaLedRegs[ch].valid)pcaLedReadOk++;
     else pcaLedReadErrors++;
   }
+  ch=(ch+1)%BusaLed::kCount;
 }
 
 bool pcfIdleReadOk=false;
@@ -563,7 +565,8 @@ bool tftDisplayOff=false;
 uint32_t tftDisplayActivityMs=0;
 // No inactivity auto-off. Only F2 or explicit iPhone screen button blanks TFT.
 void pollKeys(uint32_t now){
-  if(!pcfDetected||!elapsed(now,lastKeyScan,60))return;
+  const uint32_t interval=pcfScanError?1000U:120U;
+  if(!pcfDetected||!elapsed(now,lastKeyScan,interval))return;
   lastKeyScan=now;
   int pair=scanKeyPair();
   if(pair>=0){
@@ -688,7 +691,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V15.3 N16R8 FIX1";
+  const String version="FW V15.3 N16R8 REC2";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -729,7 +732,7 @@ void startScreen(){
   ru.setFontMode(1);
   tftStarted=true;
   tftDisplayOff=false;tftDisplayActivityMs=millis();
-  drawBootSplash(8000); // Wi-Fi AP + web start while splash visible; max 8 seconds
+  drawBootSplash(1200); // Wi-Fi AP + web start while splash visible; max 8 seconds
   busaLog.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
 }
 // Display-only standby; does NOT sleep ESP32, alter sensors, Wi-Fi or GPIO.
@@ -1856,7 +1859,7 @@ update();setInterval(update,3000);
 
 void handleCommand(String x){
   x.trim();x.toUpperCase();
-  if(x=="STATUS") {busaLog.println(statusJSON());Serial.println(statusJSON());}
+  if(x=="STATUS") {busaLog.println(statusJSON());}
   else if(x.startsWith("PAGE ")){
     int n=x.substring(5).toInt();
     if(n>=1&&n<=6){navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;busaLog.printf("PAGE=%d\n",n);}
@@ -1876,5 +1879,6 @@ void readConsole(){
     else if(c!='\r'&&consoleLine.length()<80)consoleLine+=c;
   }
 }
+#include "BUSA_WebGzip.h"
 #include "BUSA_N16R8_Memory.h"
 #include "BUSA_V15_Runtime.h"

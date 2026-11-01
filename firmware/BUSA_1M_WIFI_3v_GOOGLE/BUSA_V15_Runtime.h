@@ -66,7 +66,8 @@ void setup(){
   wifiStartPolicy(millis()); // Brief startup grace; local clients do not block internet association.
   server.on("/",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store, max-age=0");
-    server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);
+    server.sendHeader("Content-Encoding","gzip");
+    server.send_P(200,"text/html; charset=utf-8",(const char*)BUSA_WEB_GZIP,sizeof(BUSA_WEB_GZIP));
   });
   // Minimal independent endpoints for diagnosing an unreachable main app.
   server.on("/api/ping",HTTP_GET,[]{
@@ -486,7 +487,6 @@ void setup(){
   server.collectHeaders(headers,1);
   server.begin();
   busaLog.println("WEB started; temperature scan & I2C next");
-  enableLoopWDT(); // reset a stuck peripheral so retained bypass can take effect
   busaN16MemoryBegin();
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   if(!busaSkipTft){
@@ -531,7 +531,7 @@ void loop(){
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
   // Wi-Fi AP and HTTP server initialize during the splash.
   // Missing sensors must not delay the user interface.
-  if(!bootSplashComplete && elapsed(now,splashStartedAt,8000)){
+  if(!bootSplashComplete && elapsed(now,splashStartedAt,1200)){
     bootSplashComplete=true;
     tftDirty=true;
   }
@@ -549,7 +549,8 @@ void loop(){
     busaBootPhase(2);
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
     if(i2cLinesReleased())pollKeys(now);
-    scanI2cAddresses(now);
+    static uint32_t addressScanAt=0;
+    if(elapsed(now,addressScanAt,100)){addressScanAt=now;scanI2cAddresses(now);}
     busaBootPhase(0);
   }
   // Landscape V14.6: rebuild background ONLY on explicit view/theme change.
