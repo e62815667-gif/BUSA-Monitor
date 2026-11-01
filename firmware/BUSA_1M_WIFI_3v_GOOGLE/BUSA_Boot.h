@@ -29,6 +29,6 @@ void busaBootBegin(){
 }
 void busaBootPhase(uint32_t phase){busaBootMarker.phase=phase;}
 String busaBootJSON(){
-  return String("{\"build\":\"15.3-BOOTFIX1\",\"network_before_peripherals\":true,\"tft_bypassed\":")+
+  return String("{\"build\":\"15.5-STABLE-LOCAL\",\"network_before_peripherals\":true,\"tft_bypassed\":")+
     (busaSkipTft?"true":"false")+",\"i2c_bypassed\":"+(busaSkipI2c?"true":"false")+"}";
 }
