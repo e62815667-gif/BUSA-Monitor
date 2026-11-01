@@ -1,0 +1,26 @@
+BUSA V15.3 CI failure diagnostics
+TESTS
+>>> tests/test_v15_2_n16r8.py
+PASS full firmware V15.2 N16R8 pin, network, audio and PSRAM contracts
+>>> tests/test_unified_ui_v15_3.py
+PASS: V15.3 full monitor, matching phone shell, no top connection banner, correct TFT GPIO
+>>> tests/test_v15_architecture.py
+PASS V15: board, relay model, telemetry, architecture and runtime are separate; legacy compatibility retained
+>>> tests/test_v15_sound_alarms.py
+PASS V15.1: C++ hot/cold threshold hysteresis, 4 independent sound channels, stale sensor off, NVS flags and 12V GPIO buzzer-only driver
+>>> tests/test_temperature.py
+PASS: shipping DS18B20 engine: timing, CRC, two ROM binding, duplicates, NVS CRC, stale/POR, missing/low line, recovery, rollover
+>>> tests/test_wifi_recovery.py
+PASS: shipped AP+STA: local clients during boot/join/retry, HTTP grace, -2, 201, backoff, OTA, scans, rollover
+>>> tests/test_wifi_integration.py
+Patched Arduino 2.0.17: disabled-auto-reconnect respected on first failure; bounded HTTP waits
+Patched Arduino 2.0.17: disabled-auto-reconnect respected on first failure; bounded HTTP waits
+PASS: integration: one radio owner, deferred HTTP join, OTA/output locks, pinned framework patch
+>>> tests/test_google_transport.py
+PASS: actual firmware helpers: redirect allowlist, JSON types, malformed/HTML responses, response bounds and read errors
+>>> tests/test_local_fetch.js
+PASS: actual Safari HTTP wrapper: request timeout, response-body timeout, successful JSON
+>>> tests/test_temperature_ui.js
+PASS: actual app helpers: verified finite readings only, real 85 C, error messages, lost-link clearing, binding confirmation and DOM ids
+COMPILE LOG TAIL
+compile not reached
