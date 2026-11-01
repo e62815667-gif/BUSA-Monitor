@@ -152,7 +152,7 @@ static void v14DrawFlowBar(){
   v14FlowLast=pulses;
   screen->fillRoundRect(4,198,313,11,3,V14_INFO);
   v14Tiny(String("YF-S401: ")+String(pulses)+
-     " имп. (не калибр.)    K1-K4: БЛОК",8,206,V14_TEXT);
+     " имп. (не калибр.)    K1-K4: ЗВУК 12В",8,206,V14_TEXT);
 }
 static void v14Home(uint32_t now,bool layout){
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -337,12 +337,12 @@ static void v14Settings(bool layout){
         v14Tiny("Настройка: iPhone / Google",48,167,V14_MUTED);
         break;
       default:
-        v14Print("К1–К4: БЛОК",48,126,V14_WARN);
+        v14Print("К1–К4: ЗВУК 12В",48,126,V14_WARN);
         for(int i=0;i<4;i++){
           int x=49+i*53;
           screen->fillRoundRect(x,140,46,29,4,V14_INFO);
           v14Tiny("К"+String(i+1),x+5,151,V14_TEXT);
-          v14Tiny("ВЫКЛ",x+5,164,V14_WARN);
+          v14Tiny(busaSoundActive(i)?"ЗВУК":(busaSoundEnabled(i)?"ГОТОВ":"ВЫКЛ"),x+5,164,V14_WARN);
         }
     }
     v14Tiny("ESC: назад",190,190,V14_MUTED);
