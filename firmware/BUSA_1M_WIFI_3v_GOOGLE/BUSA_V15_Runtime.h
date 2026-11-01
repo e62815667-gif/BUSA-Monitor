@@ -5,7 +5,7 @@ void setup(){
   relaySimStop("BOOT_SAFE");
   ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V15.2: ESP32-S3 N16R8 / new TFT pins / sound-only low-voltage bench");
+  Serial0.println("\nBUSA 1M WiFi V15.3: ESP32-S3 N16R8 / new TFT pins / sound-only low-voltage bench");
   busaN16MemoryBegin();
   Serial.begin(115200);
   delay(400);
