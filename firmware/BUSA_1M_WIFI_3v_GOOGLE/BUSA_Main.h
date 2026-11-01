@@ -1597,7 +1597,7 @@ void setup(){
   clockNtpStarted=true;
   // Private STA password must be provisioned into NVS after public GitHub build;
   // no STA password is embedded in this public source. Local AP fallback remains.
-  apPassword="BUSA"+String((uint32_t)ESP.getEfuseMac(),HEX);
+  apPassword="123456789"; // User-selected AP password, V14.7 original startup unchanged
   wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
   updateBootStage(1);
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
