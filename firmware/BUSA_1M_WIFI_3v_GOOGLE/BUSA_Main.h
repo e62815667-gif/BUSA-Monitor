@@ -38,6 +38,13 @@
 #include "BUSA_V15_Board.h"
 const char VERSION[]="БУСА 1М WiFi 15v4-N16R8-EARLY-AP-RECOVERY";
 
+// RTC preserves interrupted boot count across software resets.
+// Accessed from both diagnostic JSON and setup/loop.
+RTC_DATA_ATTR uint32_t busaBootMagic=0;
+RTC_DATA_ATTR uint32_t busaBootStreak=0;
+constexpr uint32_t BUSA_BOOT_MAGIC=0xB154A1F4UL;
+bool busaSkipTftAtBoot=false;
+
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
 bool elapsed(uint32_t now,uint32_t then,uint32_t ms){return (uint32_t)(now-then)>=ms;}
