@@ -1920,15 +1920,45 @@ void setup(){
 }
 void loop(){
   uint32_t now=millis();
+  busaBootFeed();
   soundPoll(now);
   server.handleClient();
+  // Keep AP independent from STA and peripheral failures.
+  if(!wifiRunning || (WiFi.getMode() & WIFI_AP)==0 || WiFi.softAPIP()==IPAddress(0,0,0,0)){
+    if(elapsed(now,busaApLastTryMs,10000)){
+      busaApLastTryMs=now;
+      WiFi.mode(WIFI_AP_STA);
+      wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),1,false,4);
+      Serial0.printf("AP recovery=%d IP=%s\n",
+        (int)wifiRunning,WiFi.softAPIP().toString().c_str());
+    }
+  }
+  // Run I2C after AP and web. If it crashes twice, skip only I2C.
+  if(!busaPeripheralsStarted){
+    busaPeripheralsStarted=true;
+    updateBootStage(2);
+    if(!busaI2cBypass){
+      busaBootPhase(3);
+      uint32_t started=millis();
+      i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
+      if(i2cOnline){Wire.setTimeOut(25);probeI2c(millis());}
+      busaI2cInitMs=millis()-started;
+      busaBootPhase(0);
+    }else{
+      Serial0.println("I2C BYPASS after repeated crashes; local AP remains accessible");
+    }
+    Serial0.printf("I2C=%d PCF=%d PCA=%d\n",
+      (int)i2cOnline,(int)pcfDetected,(int)pcaDetected);
+    updateBootStage(3);
+    busaBootFeed();
+  }
   if(stationSsid.length() && stationPass.length()>=8 && WiFi.status()!=WL_CONNECTED && elapsed(now,lastStationCheck,20000)){
     lastStationCheck=now;
     WiFi.reconnect();
     Serial0.println("STA reconnect attempt; AP unaffected");
   }
   readConsole();
-  if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
+  if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
   if(otaActive){soundOutputsOff();delay(0);return;}
@@ -1945,8 +1975,10 @@ void loop(){
   }
     sampleFlow(now);
   if(i2cOnline){
+    busaBootPhase(3);
     if(elapsed(now,lastBusProbe,6000))probeI2c(now);
     pollKeys(now);
+    busaBootPhase(0);
   }
   // Landscape V14.6: rebuild background ONLY on explicit view/theme change.
   // A 2.5 s telemetry tick refreshes changed text without wiping the TFT.
@@ -1960,7 +1992,7 @@ void loop(){
   }
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
-    Serial0.printf("N8R2 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
+    Serial0.printf("N16R8 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
       (unsigned long)now,(int)wifiRunning,(int)i2cOnline,(int)tftStarted,
       (unsigned long)flowPulses(),(double)flowLpm);
   }
