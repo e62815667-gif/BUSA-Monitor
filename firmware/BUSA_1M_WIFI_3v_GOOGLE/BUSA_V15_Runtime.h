@@ -61,6 +61,29 @@ void setup(){
     if(!isfinite(refTemp[i])||refTemp[i]<0||refTemp[i]>125)refTemp[i]=NAN;
     if(!isfinite(noticeTemp[i])||noticeTemp[i]<0||noticeTemp[i]>125)noticeTemp[i]=NAN;
   }
+  // V15.6a one-time migration: V14 rf*/nt* were display references,
+  // not confirmed V15 sound-alarm setpoints. Do not enable alarms from
+  // inherited preferences. Preserve all unrelated network/sensor settings.
+  if(!prefs.getBool("v15_alarm_migrated",false)){
+    bool migrationOk=true;
+    for(int i=0;i<4;i++){
+      const String refKey=String("rf")+String(i);
+      const String noticeKey=String("nt")+String(i);
+      const String enableKey=String("aen")+String(i);
+      // remove() returns false when a key is absent; absence is acceptable.
+      if(prefs.isKey(refKey.c_str()) && !prefs.remove(refKey.c_str()))migrationOk=false;
+      if(prefs.isKey(noticeKey.c_str()) && !prefs.remove(noticeKey.c_str()))migrationOk=false;
+      if(prefs.isKey(enableKey.c_str()) && !prefs.remove(enableKey.c_str()))migrationOk=false;
+      refTemp[i]=NAN;
+      noticeTemp[i]=NAN;
+      alarmEnabled[i]=false;
+    }
+    if(migrationOk && prefs.putBool("v15_alarm_migrated",true)){
+      busaLog.println("V15.6a migration: old rf/nt/aen cleared; sounds disabled");
+    }else{
+      busaLog.println("V15.6a migration: NVS write incomplete, will retry next boot");
+    }
+  }
   alarmLoadSettings();
   setupGoogleCloud();
   // The AP has already been started before Preferences and Google.
