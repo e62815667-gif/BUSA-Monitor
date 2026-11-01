@@ -5,8 +5,8 @@ root=Path("firmware/BUSA_1M_WIFI_3v_GOOGLE")
 main=(root/"BUSA_Main.h").read_text()
 online=Path("online/index.html").read_text()
 status=(root/"BUSA_V15_Status.h").read_text()
-assert '15v5-N16R8-STABLE-LOCAL' in main
-assert 'FW V15.5 N16R8' in main
+assert '15v6-N16R8-MODULE-BOOTFIX' in main
+assert 'FW V15.6 N16R8' in main
 assert 'FW V14.1 LIGHT' not in main
 assert 'id="themeSwitch"' in main and 'id="themeSwitch"' in online
 assert "localStorage.getItem('busa-pwa-dark')!=='0'" in main
@@ -16,8 +16,9 @@ assert 'class="localShortcuts"' not in main
 assert 'class="quickMenu"' not in online
 assert 'class="connectionStrip"' not in online
 assert 'id="appHealth"' in main and 'id="statusText"' in online
-for name in ('Главная','Температуры','Отбор','Графики','События','Настр.','Кальк.'):
+for name in ('Главная','Температуры','Отбор','Графики','События','Настр.'):
     assert f'<span>{name}</span>' in main and f'<span>{name}</span>' in online, name
+assert '<span>Кальк.</span>' not in online and '<span>Кальк.</span>' not in main
 for label in ('ИНТ','ЛОК','ДАН'):
     assert label in main and label in online
 for var in ('TFT_CS','TFT_DC','TFT_RST','TFT_MOSI','TFT_SCK'):
