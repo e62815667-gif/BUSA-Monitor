@@ -1002,7 +1002,17 @@ main>*{max-width:100%;min-width:0}
 .appTabs .on .tabIcon,:root[data-theme="dark"] .appTabs .on .tabIcon{color:#e5fff0!important}
 .appTabs button{font-size:clamp(8px,2.35vw,11px)!important;padding:9px 1px!important}
 @media(max-width:380px){.appTabs button{font-size:8px!important}.tabIcon{font-size:16px}}
-.netIndicators{flex-wrap:wrap}
+.netIndicators{display:flex;gap:7px;flex-wrap:wrap;max-width:620px;margin:9px auto 2px;align-items:center;justify-content:space-between}
+.netPill{display:flex;align-items:center;justify-content:center;gap:6px;flex:1 1 90px;min-width:0;padding:9px 6px;background:#17364a;border:1px solid #3c6a83;border-radius:9px;color:#dceefb;font-size:12px;font-weight:700;white-space:nowrap}
+.netPill b{font-weight:750;min-width:0}.netDot{width:11px;height:11px;flex:0 0 11px;border-radius:50%;background:#748697;box-shadow:0 0 0 2px #071923}.netDot.internetOn,.netDot.dataOn{background:#2de382;box-shadow:0 0 8px #2de38266}.netDot.localOn{background:#299bde;box-shadow:0 0 8px #299bde66}
+.netText{font-size:11px;font-weight:700;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:inherit}
+:root[data-theme="light"] .netPill{background:#edf6fa;border-color:#b0ccd9;color:#204359}
+#themeSwitch{flex:0 0 auto;padding:9px 10px;font-size:12px;border:1px solid #75a3bc;border-radius:9px;background:#254f68;color:#e0f6ff}
+:root[data-theme="light"] #themeSwitch{background:#fff0d9;color:#3b5a69;border-color:#cda275}
+:root[data-theme="dark"] .homeHero{background:linear-gradient(125deg,#17374f,#0b2943);border-color:#3878a1}
+.homeHero{margin-bottom:13px}
+.heroStatus{align-items:center}
+:root[data-theme="dark"] .heroEyebrow{color:#9dddf5}
 .calcComing{min-height:200px;border:1px dashed #5586a5;border-radius:13px;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--muted)}
 .calcComing span{font-size:45px;color:var(--sea)}.calcComing strong{font-size:20px;color:var(--ink)}
 .calcComing p{margin:0;max-width:370px}
@@ -1145,7 +1155,7 @@ main>*{max-width:100%;min-width:0}
 <button id="waterCalReset" type="button" class="full">Сбросить коэффициент</button>
 <p id="waterCalResult" role="status" class="hint">Калибровка ещё не начата.</p>
 </div>
-<div class="card settingsTools"><h2>Технические разделы</h2><div class="row">Экран TFT <b>ST7789 · 320×240</b></div>
+<div class="card settingsTools"><h2>Технические разделы</h2><div id="appHealth" role="status">Диагностика ESP32 обновляется...</div><p><a href="/recovery">Проверка связи с контроллером</a></p><div class="row">Экран TFT <b>ST7789 · 320×240</b></div>
 <div class="grid"><button type="button" id="tftUp">TFT ↑</button><button type="button" id="tftDown">TFT ↓</button></div>
 <p class="hint">Управление видом TFT; физические выходы не затрагиваются.</p></div>
 <div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
@@ -1284,7 +1294,17 @@ async function localFetch(url,options={}){
 }
 
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
-let lastWaterPulse=null,themeInitialized=false;
+// Unified browser theme: TFT theme is configured separately in Settings.
+let busaPhoneDark=true;
+try{busaPhoneDark=localStorage.getItem('busa-pwa-dark')!=='0';}catch(e){}
+function applyBusaPhoneTheme(dark){
+ document.documentElement.dataset.theme=dark?'dark':'light';
+ get('themeSwitch').textContent=dark?'☀ Тема':'☾ Тема';
+ try{localStorage.setItem('busa-pwa-dark',dark?'1':'0');}catch(e){}
+}
+applyBusaPhoneTheme(busaPhoneDark);
+get('themeSwitch').addEventListener('click',()=>applyBusaPhoneTheme(document.documentElement.dataset.theme!=='dark'));
+let lastWaterPulse=null;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
 let lastStatusError="",successfulStatusReads=0;
 let eventCategory="all",eventRecords=[];
@@ -1579,10 +1599,7 @@ const delivered=cs?.configured===true&&cs.state===5&&cs.http===200&&cs.sent>0;
 if(dataDot)dataDot.classList.toggle('dataOn',delivered);
 if(dataLabel)dataLabel.textContent=delivered?'подтверждено':cs?.configured===true?'ожидание':'выключено';
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
-if(!themeInitialized && typeof s.tft_theme_dark==='boolean'){
-  document.documentElement.dataset.theme=s.tft_theme_dark?'dark':'light';
-  themeInitialized=true;
-}
+/* iPhone app theme is independent of TFT theme and saved on the phone. */
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent+' · DNS '+(cs.dns??'?')+' · TLS '+(cs.tls_error??'?')+' · этап '+(cs.error_stage??'?');
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
