@@ -7,7 +7,7 @@ parts={n:(root/n).read_text() for n in names}
 for name in names:
  assert ('#include "'+name+'"') in main,name
  assert parts[name].startswith("#pragma once"),name
-assert '15v3-N16R8-UNIFIED-UI' in main
+assert '15v4-N16R8-EARLY-AP-RECOVERY' in main
 assert "void setup(){" not in main and "void loop(){" not in main
 assert parts["BUSA_V15_Runtime.h"].count("void setup(){")==1
 assert parts["BUSA_V15_Runtime.h"].count("void loop(){")==1
