@@ -13,7 +13,7 @@ assert 'KPIN[4]={7,6,5,4}' in board
 assert 'BUS_SDA=8,BUS_SCL=9' in board
 assert 'FLOW_GPIO=15' in board
 assert 'SPI.begin(TFT_SCK,-1,TFT_MOSI,TFT_CS)' in main
-assert 'Adafruit_ST7789 screenSt(TFT_CS,TFT_DC,TFT_RST)' in main
+assert 'BusaST7789 screenSt(TFT_CS,TFT_DC,TFT_RST)' in main
 assert '#include "BUSA_N16R8_Memory.h"' in main
 assert 'busaN16MemoryBegin()' in runtime
 assert 'busaN16MemoryLog(now,temperature,flowLpm,flowPulses())' in runtime
