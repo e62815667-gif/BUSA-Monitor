@@ -6,7 +6,7 @@ main=(root/"BUSA_Main.h").read_text()
 runtime=(root/"BUSA_V15_Runtime.h").read_text()
 memory=(root/"BUSA_N16R8_Memory.h").read_text()
 alarms=(root/"BUSA_V15_Alarm.h").read_text()
-assert '15v3-N16R8-UNIFIED-UI' in main
+assert '15v5-N16R8-STABLE-LOCAL' in main
 assert 'TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14' in board
 assert 'TPIN[4]={16,17,18,21}' in board
 assert 'KPIN[4]={7,6,5,4}' in board
