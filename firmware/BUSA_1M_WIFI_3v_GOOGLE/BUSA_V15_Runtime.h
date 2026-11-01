@@ -11,10 +11,23 @@ void setup(){
   busaLog.println("\nBUSA 1M WiFi V15.6: staged peripheral boot / local-first / sound only");
   busaBootBegin();
   delay(50);
-  pinMode(FLOW_GPIO,INPUT_PULLUP); // requires an electrically verified 3.3 V logic signal
+  // AP-FIRST R1: initialize the local Wi-Fi radio BEFORE potentially slow
+  // NVS, keypad, Google, flow or peripheral setup. It is recoverable via
+  // wifiRecoveryTick() even if the first AP attempt fails.
+  WiFi.persistent(false);
+  WiFi.setAutoReconnect(false);
+  WiFi.onEvent(wifiRecoveryEvent);
+  wifiModeStarted=WiFi.mode(WIFI_AP_STA);
+  WiFi.setSleep(false);
+  apPassword="123456789";
+  wifiStartAccessPoint(millis());
+  busaLog.printf("EARLY AP attempt=%lu running=%d ip=%s\n",
+    (unsigned long)wifiApAttempts,(int)wifiRunning,WiFi.softAPIP().toString().c_str());
+  pinMode(FLOW_GPIO,INPUT_PULLUP); // requires verified 3.3 V logic
   // Interrupt is attached only after the local network and web server start.
   busaLog.println("WATER GPIO15 input prepared");
-  prefs.begin("busa-r04",false);
+  if(!prefs.begin("busa-r04",false))
+    busaLog.println("NVS unavailable: local AP remains independent of preferences");
   TempBindingRecord bindings={};
   if(prefs.getBytesLength("temp_bind")==sizeof(bindings) &&
      prefs.getBytes("temp_bind",&bindings,sizeof(bindings))==sizeof(bindings) && tempBindingRecordValid(bindings)){
@@ -50,21 +63,10 @@ void setup(){
   }
   alarmLoadSettings();
   setupGoogleCloud();
-  WiFi.persistent(false); // Credentials live only in application Preferences.
-  WiFi.setAutoReconnect(false); // Only wifiRecoveryTick owns STA attempts.
-  WiFi.onEvent(wifiRecoveryEvent);
-  wifiModeStarted=WiFi.mode(WIFI_AP_STA);
-  WiFi.setSleep(false); // Favor interactive local response over power saving
-  configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
+  // The AP has already been started before Preferences and Google.
+  // STA credentials are now loaded; connection is scheduled asynchronously.
+  configTime(0,0,"pool.ntp.org","time.google.com");
   clockNtpStarted=true;
-  // User-approved fixed password for the local BUSA AP (not the external STA).
-  // Replaces the earlier MAC-derived string; SSID and AP+STA recovery are unchanged.
-  apPassword="123456789";
-  wifiStartAccessPoint(millis());
-  esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
-  // TFT is not initialized yet.
-  busaLog.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
-                 (int)wifiRunning,WiFi.softAPIP().toString().c_str());
   wifiStartPolicy(millis()); // Brief startup grace; local clients do not block internet association.
   server.on("/",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store, max-age=0");
