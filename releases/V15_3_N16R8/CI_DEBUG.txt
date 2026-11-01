@@ -22,5 +22,7 @@ PASS: actual firmware helpers: redirect allowlist, JSON types, malformed/HTML re
 PASS: actual Safari HTTP wrapper: request timeout, response-body timeout, successful JSON
 >>> tests/test_temperature_ui.js
 PASS: actual app helpers: verified finite readings only, real 85 C, error messages, lost-link clearing, binding confirmation and DOM ids
+CERTIFICATE VALIDATION LOG
+CA step not reached
 COMPILE LOG TAIL
 compile not reached
