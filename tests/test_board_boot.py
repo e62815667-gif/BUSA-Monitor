@@ -18,8 +18,10 @@ int reason=ESP_RST_POWERON;int esp_reset_reason(){return reason;}
 boot=r'''
 int main(){
  busaBootBegin();assert(!busaSkipTft && !busaSkipI2c);
- busaBootPhase(1);reason=ESP_RST_PANIC;busaBootBegin();assert(busaSkipTft && !busaSkipI2c);
- busaBootPhase(2);reason=ESP_RST_TASK_WDT;busaBootBegin();assert(busaSkipTft && busaSkipI2c);
+ busaBootPhase(1);reason=ESP_RST_PANIC;busaBootBegin();assert(!busaSkipTft && !busaSkipI2c && busaBootMarker.failuresTft==1);
+ busaBootPhase(1);reason=ESP_RST_PANIC;busaBootBegin();assert(busaSkipTft && !busaSkipI2c && busaBootMarker.failuresTft==2);
+ busaBootPhase(2);reason=ESP_RST_TASK_WDT;busaBootBegin();assert(busaSkipTft && !busaSkipI2c && busaBootMarker.failuresI2c==1);
+ busaBootPhase(2);reason=ESP_RST_TASK_WDT;busaBootBegin();assert(busaSkipTft && busaSkipI2c && busaBootMarker.failuresI2c==2);
  reason=ESP_RST_SW;busaSkipTft=busaSkipI2c=false;busaBootBegin();assert(!busaSkipTft && !busaSkipI2c);
  busaBootPhase(1);reason=ESP_RST_POWERON;busaBootBegin();assert(!busaSkipTft);
  busaLog.write(65);assert(Serial0.writes==1 && Serial.writes==0);
