@@ -822,6 +822,16 @@ String cloudJSON(); // forward declaration; read-only Google status
 extern volatile int googleInternet; // external TCP health, no credentials
 #include "BUSA_V15_Architecture.h"
 #include "BUSA_V15_Status.h"
+// Shared cached JSON keeps the HTTP response independent of expensive sensor scans.
+String busaCachedStatus;
+uint32_t busaCachedStatusAt=0;
+const String& busaStatusFast(uint32_t now){
+  if(busaCachedStatus.length()==0 || elapsed(now,busaCachedStatusAt,2500U)){
+    busaCachedStatus=statusJSON();
+    busaCachedStatusAt=now;
+  }
+  return busaCachedStatus;
+}
 // Manual local-only OTA; cloud/automatic OTA is NOT enabled.
 String otaJSON(){
  return String("{\"active\":")+(otaActive?"true":"false")
