@@ -1,0 +1,98 @@
+name: BUSA V14.7 N16R8 GMT028 Rebuild
+on:
+  push:
+    branches:
+      - fix/busa-v14-7-n16r8-tft-gmt028-20261101
+    paths:
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+      - '.github/workflows/busa-v14-7-n16r8-gmt028.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install ESP32 core and libraries
+        shell: bash
+        run: |
+          set -euo pipefail
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+          arduino-cli lib install "Adafruit BusIO@1.17.4"
+          arduino-cli lib install "OneWire@2.3.8"
+          arduino-cli lib install "DallasTemperature@4.0.6"
+          arduino-cli lib install "Adafruit GFX Library@1.13.0"
+          arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
+          arduino-cli lib install "Adafruit ILI9341@1.7.0"
+          arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+      - name: Check V14.7 inheritance and N16R8 pinout
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
+          for term in ('14v7-N16R8-GMT028-PINMAP','TPIN[4]={16,17,18,21}',
+                       'TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14',
+                       'KPIN[4]={7,6,5,4}','BUS_SDA=8,BUS_SCL=9',
+                       'FLOW_GPIO=15','RELAY_PHYSICAL_OUTPUTS=false,LED_PHYSICAL_OUTPUTS=false',
+                       'SPI.begin(TFT_SCK,-1,TFT_MOSI,TFT_CS)',
+                       'WiFi.mode(WIFI_AP_STA)','startScreen()'):
+              assert term in p, term
+          assert 'TPIN[4]={38,39,40,41}' not in p
+          assert 'TFT_CS=10,TFT_MOSI=11,TFT_SCK=12' not in p
+          assert 'pinMode(KPIN' not in p
+          assert 'digitalWrite(KPIN' not in p
+          assert 'BUSA_V15_Runtime.h' not in p
+          print('PASS V14.7 baseline; N16R8 GPIO mapping; output pins inactive')
+          PY
+      - name: Prepare Google GTS certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s /etc/ssl/certs/GTS_Root_R1.pem
+          openssl x509 -in /etc/ssl/certs/GTS_Root_R1.pem -noout -checkend 86400
+          python3 - <<'PY'
+          from pathlib import Path
+          pem=Path('/etc/ssl/certs/GTS_Root_R1.pem').read_text()
+          assert 'BEGIN CERTIFICATE' in pem
+          Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h').write_text(
+              'const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+pem+'\n)GOOGLECERT";\n')
+          PY
+      - name: Compile V14.7 for ESP32-S3 N16R8
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build_busa_v147
+          arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio' --output-dir build_busa_v147 firmware/BUSA_1M_WIFI_3v_GOOGLE | tee build_busa_v147/build.log
+      - name: Create two verified images
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK="$HOME/.arduino15/packages/esp32"
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_N16R8_GMT028_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_N16R8_GMT028_APP_OTA.bin
+          git rev-parse HEAD > build_busa_v147/SOURCE_COMMIT.txt
+          (cd build_busa_v147 && sha256sum BUSA_V14_7_N16R8_GMT028_FULL_USB.bin BUSA_V14_7_N16R8_GMT028_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path('build_busa_v147')
+          full=(root/'BUSA_V14_7_N16R8_GMT028_FULL_USB.bin').read_bytes()
+          app=(root/'BUSA_V14_7_N16R8_GMT028_APP_OTA.bin').read_bytes()
+          assert 60000<len(app)<0x300000
+          assert len(full)<16*1024*1024
+          assert full[0x10000:0x10000+len(app)]==app, 'Merged USB and OTA content differs'
+          print('USB bytes:',len(full),'OTA bytes:',len(app))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_V14_7_N16R8_GMT028_USB_OTA_SHA256
+          path: |
+            build_busa_v147/BUSA_V14_7_N16R8_GMT028_FULL_USB.bin
+            build_busa_v147/BUSA_V14_7_N16R8_GMT028_APP_OTA.bin
+            build_busa_v147/SHA256SUMS.txt
+            build_busa_v147/SOURCE_COMMIT.txt
