@@ -5,8 +5,8 @@ root=Path("firmware/BUSA_1M_WIFI_3v_GOOGLE")
 main=(root/"BUSA_Main.h").read_text()
 online=Path("online/index.html").read_text()
 status=(root/"BUSA_V15_Status.h").read_text()
-assert '15v3-N16R8-UNIFIED-UI' in main
-assert 'FW V15.3 N16R8' in main
+assert '15v4-N16R8-EARLY-AP-RECOVERY' in main
+assert 'FW V15.4 N16R8' in main
 assert 'FW V14.1 LIGHT' not in main
 assert 'id="themeSwitch"' in main and 'id="themeSwitch"' in online
 assert "localStorage.getItem('busa-pwa-dark')!=='0'" in main
