@@ -123,11 +123,14 @@ String statusJSON(){
   s+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"))+"}";
   s+=",\"wifi_recovery\":"+wifiRecoveryJSON();
   s+=",\"web_health\":{\"max_service_ms\":"+String(webMaxServiceMs)+",\"max_loop_gap_ms\":"+String(loopMaxGapMs)+"}";
-  s+=",\"peripheral_boot\":{\"tft_attempted\":"+(busaTftBootIssued?"true":"false")+
-    ",\"tft_init_ms\":"+String(busaTftInitElapsedMs)+
-    ",\"i2c_init_attempts\":"+String(busaI2cBootAttempts)+
-    ",\"i2c_last_init_ms\":"+String(busaI2cInitElapsedMs)+
-    ",\"i2c_line_released\":"+(i2cLinesReleased()?"true":"false")+"}";
+  s+=",\"peripheral_boot\":{\"tft_attempted\":";
+  s+=(busaTftBootIssued?"true":"false");
+  s+=",\"tft_init_ms\":"+String(busaTftInitElapsedMs);
+  s+=",\"i2c_init_attempts\":"+String(busaI2cBootAttempts);
+  s+=",\"i2c_last_init_ms\":"+String(busaI2cInitElapsedMs);
+  s+=",\"i2c_line_released\":";
+  s+=(i2cLinesReleased()?"true":"false");
+  s+="}";
   s+=",\"station\":{\"ssid\":"+quoteJson(WiFi.status()==WL_CONNECTED?WiFi.SSID():stationSsid);
   s+=",\"target_ssid\":"+quoteJson(stationSsid);
   s+=",\"connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
