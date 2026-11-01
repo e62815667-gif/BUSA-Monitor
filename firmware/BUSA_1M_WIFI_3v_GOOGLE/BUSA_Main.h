@@ -36,7 +36,7 @@
 #include <math.h>
 
 #include "BUSA_V15_Board.h"
-const char VERSION[]="БУСА 1М WiFi 15v2-N16R8-TFT-REPIN-PSRAM";
+const char VERSION[]="БУСА 1М WiFi 15v3-N16R8-UNIFIED-UI";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -666,7 +666,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V14.1 LIGHT";
+  const String version="FW V15.3 N16R8";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -1010,15 +1010,14 @@ main>*{max-width:100%;min-width:0}
 </style></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
-<span class="readOnlyLabel">● МОНИТОРИНГ</span></div>
+<button type="button" id="themeSwitch" aria-label="Сменить цветную тему">☾ Тема</button></div>
 <div id="clockDisplay" class="clockBar" aria-live="off">Время синхронизируется…</div>
-<div class="netIndicators" role="status" aria-label="Два подключения БУСА">
-<span class="netPill"><span id="internetLed" class="netDot"></span>ИНТЕРНЕТ <span id="internetLabel" class="netText">нет связи</span></span>
-<span class="netPill"><span id="localLed" class="netDot"></span>БУСА Wi-Fi <span id="localLabel" class="netText">нет клиента</span></span>
-<span class="netPill"><span id="dataLed" class="netDot"></span>ДАН <span id="dataLabel" class="netText">не настроено</span></span>
+</header><main>
+<div class="netIndicators" role="status" aria-label="Связь и передача телеметрии">
+<span class="netPill"><span id="internetLed" class="netDot"></span>ИНТ <b id="internetLabel" class="netText">—</b></span>
+<span class="netPill"><span id="localLed" class="netDot"></span>ЛОК <b id="localLabel" class="netText">—</b></span>
+<span class="netPill"><span id="dataLed" class="netDot"></span>ДАН <b id="dataLabel" class="netText">—</b></span>
 </div>
-<div id="appHealth" role="status">Связь с ESP32 проверяется...</div>
-<div class="localShortcuts"><button type="button" data-quick-local="wifi">⌁ Связь</button><button type="button" data-quick-local="diagnostics">⊞ Диагностика</button><a href="/recovery" style="padding:10px;display:inline-flex;align-items:center">Проверка связи</a></div>
 <nav class="appTabs" aria-label="Разделы">
 <button data-page="0" class="on"><span class="tabIcon">⌂</span><span>Главная</span></button>
 <button data-page="1"><span class="tabIcon">♨</span><span>Температуры</span></button>
@@ -1027,9 +1026,9 @@ main>*{max-width:100%;min-width:0}
 <button data-page="4"><span class="tabIcon">▤</span><span>События</span></button>
 <button data-page="5"><span class="tabIcon">⚙</span><span>Настр.</span></button>
 <button data-page="6"><span class="tabIcon">▦</span><span>Кальк.</span></button>
-</nav></header><main>
+</nav>
 <section class="page" data-section="0">
-  <div class="homeHero"><div class="heroEyebrow">БУСА-1М №001 · ПАНЕЛЬ МОНИТОРИНГА</div>
+  <div class="homeHero"><div class="heroEyebrow">СИСТЕМА МОНИТОРИНГА</div>
   <h2>Главная</h2><div class="heroStatus"><span>● Только показания</span><span id="mainwifi">Wi-Fi: ожидание</span></div></div>
   <div class="card"><h2>Температура · T1–T4</h2><div class="grid temps">
     <div class="tile"><small><span class="tempDot t1"></span>T1 · Вода</small><strong id="t0">Н/Д</strong><small id="ts0">Ожидание измерения</small></div>
