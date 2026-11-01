@@ -86,6 +86,7 @@ String statusJSON(){
   s+=",\"pca9685\":{\"expected_address\":64,\"ack\":"+(pcaDetected?String("true"):String("false"));
   s+=",\"mode1\":"+String(pcaMode1)+",\"mode2\":"+String(pcaMode2);
   s+=",\"outputs_enabled\":false}";
+  s+=",\"boot_recovery\":{\"tft_skipped\":"+(busaSkipTftAtBoot?String("true"):String("false"))+",\"boot_streak\":"+String(busaBootStreak)+",\"early_ap_active\":"+(wifiRunning?String("true"):String("false"))+"}";
   s+=",\"tft\":{\"spi_cs\":"+String(TFT_CS)+",\"spi_mosi\":"+String(TFT_MOSI)+",\"spi_sck\":"+String(TFT_SCK)+",\"dc\":"+String(TFT_DC)+",\"rst\":"+String(TFT_RST);
   s+=",\"profile\":"+quoteJson(tftProfileName())+",\"rotation\":"+String(tftRotation);
   s+=",\"init_sent\":"+(tftStarted?String("true"):String("false"));
