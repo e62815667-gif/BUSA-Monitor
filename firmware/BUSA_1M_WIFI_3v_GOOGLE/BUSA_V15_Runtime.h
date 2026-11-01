@@ -6,7 +6,7 @@ void setup(){
   ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
   Serial.begin(115200);
-  busaLog.println("\nBUSA 1M WiFi V15.3: ESP32-S3 N16R8 / new TFT pins / sound-only low-voltage bench");
+  busaLog.println("\nBUSA 1M WiFi V15.5: ESP32-S3 N16R8 / stable local app / sound-only low-voltage bench");
   busaBootBegin();
   delay(50);
   pinMode(FLOW_GPIO,INPUT_PULLUP); // requires an electrically verified 3.3 V logic signal
@@ -526,8 +526,13 @@ void loop(){
   if(otaActive){alarmOutputsOff();relaySimStop("OTA_TRANSFER");ledSimStop("OTA_TRANSFER");delay(0);return;}
   if(tftRebootPending && elapsed(now,tftRebootAt,3000))ESP.restart();
   if(googleRestart && elapsed(now,googleRestartAt,3500))ESP.restart();
+  // Rate-limit expensive JSON and 1-Wire transactions. Local HTTP must remain responsive.
+  static uint32_t nextTempAt=0;
+  if(nextTempAt==0 || elapsed(now,nextTempAt,40U)){
+    nextTempAt=now;
+    temperatureTick(millis()); // one bounded temperature-bus operation per 40 ms
+  }
   publishGoogleSnapshot(now);
-  temperatureTick(millis()); // One bounded temperature bus operation per iteration
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
   // Wi-Fi AP and HTTP server initialize during the splash.
   // Missing sensors must not delay the user interface.
@@ -537,7 +542,7 @@ void loop(){
   }
     sampleFlow(now);
     busaN16MemoryLog(now,temperature,flowLpm,flowPulses());
-  if(!i2cOnline && !busaSkipI2c && elapsed(now,lastBusProbe,6000)){
+  if(!i2cOnline && !busaSkipI2c && elapsed(now,lastBusProbe,15000)){
     lastBusProbe=now;
     if(i2cLinesReleased()){
       busaBootPhase(2);i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
@@ -547,7 +552,7 @@ void loop(){
   }
   if(i2cOnline && i2cLinesReleased()){
     busaBootPhase(2);
-    if(elapsed(now,lastBusProbe,6000))probeI2c(now);
+    if(elapsed(now,lastBusProbe,15000))probeI2c(now);
     if(i2cLinesReleased())pollKeys(now);
     scanI2cAddresses(now);
     busaBootPhase(0);
@@ -556,7 +561,7 @@ void loop(){
   // A 2.5 s telemetry tick refreshes changed text without wiping the TFT.
   if(tftStarted && !tftDisplayOff && !otaActive && bootSplashComplete &&
      elapsed(now,splashStartedAt,splashHoldMs) &&
-     (tftDirty||lastRender==0 || elapsed(now,lastRender,2500))){
+     (tftDirty||lastRender==0 || elapsed(now,lastRender,4000))){
     const bool wholeFrame=tftDirty||lastRender==0;
     lastRender=now;
     busaBootPhase(1);
