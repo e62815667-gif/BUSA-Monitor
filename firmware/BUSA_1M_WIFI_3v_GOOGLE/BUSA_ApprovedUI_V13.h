@@ -136,7 +136,7 @@ static void v13Home(uint32_t now,bool layout){
   }
   screenField(v13Flow()+" мл/мин",134,218,96,YELLOW);
   screenField(v13Total()+" мл",134,248,96,flowSeen?GREEN:YELLOW);
-  screenField(String("Wi-Fi ")+(WiFi.getMode()!=WIFI_OFF?"AP OK":"НЕТ")+"   Реле ВЫКЛ",12,267,216,GREEN);
+  screenField(String("Wi-Fi ")+(WiFi.getMode()!=WIFI_OFF?"AP OK":"НЕТ")+"   К1–К4 звук",12,267,216,GREEN);
 }
 static void v13Temperatures(uint32_t now,bool layout){
   static const char* labels[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -275,7 +275,7 @@ static void v13Settings(uint32_t now,bool layout){
         break;
       case 4:
         v13Text("T1-T4 диагностика",17,132,GRAY);
-        v13Text("Реле отключены",17,158,YELLOW);
+        v13Text("К1–К4: только звук",17,158,YELLOW);
         v13Text("Тесты через iPhone",17,185,GRAY);
         break;
       case 5:
