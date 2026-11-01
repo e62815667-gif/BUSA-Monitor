@@ -10,7 +10,7 @@ public:
 enum class BusaScanPhase : uint8_t { Idle, Requested, Settling, Running, HomePause };
 BusaScanPhase wifiScanPhase=BusaScanPhase::Idle;
 constexpr uint8_t BUSA_AP_CHANNEL=6;
-constexpr uint32_t BUSA_BOOT_GRACE_MS=12000U,BUSA_HTTP_REPLY_GRACE_MS=2500U;
+constexpr uint32_t BUSA_BOOT_GRACE_MS=3000U,BUSA_HTTP_REPLY_GRACE_MS=1500U;
 constexpr uint32_t BUSA_CONNECT_TIMEOUT_MS=12000U,BUSA_SCAN_TIMEOUT_MS=12000U;
 constexpr uint32_t BUSA_SCAN_SETTLE_MS=500U,BUSA_SCAN_HOME_MS=100U;
 constexpr uint8_t BUSA_SCAN_MAX_TRIES=2;
