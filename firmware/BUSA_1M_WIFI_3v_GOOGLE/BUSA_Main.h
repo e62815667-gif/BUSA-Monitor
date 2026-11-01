@@ -691,7 +691,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V15.3 N16R8 FIX1";
+  const String version="FW V15.5 N16R8";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -1271,7 +1271,7 @@ main>*{max-width:100%;min-width:0}
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
 <div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
-<h2>Диагностика V15.3 · все модули</h2>
+<h2>Диагностика V15.5 · все модули</h2>
 <p id="bootDiagnostics" class="hint">Ожидание диагностики запуска…</p>
 <p class="hint">Отображаются ответы интерфейсов, а не гарантии исправности оборудования. Отсутствие импульсов расходомера не доказывает отсутствия воды.</p>
 <pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса DS18B20...</pre>
@@ -1286,7 +1286,7 @@ main>*{max-width:100%;min-width:0}
 <p class="hint">Температура: T1 GPIO16, T2 GPIO17, T3 GPIO18, T4 GPIO21. IDLE=1 — линия DATA высока в покое; IDLE=0 или LINE_LOW — линия низкая. AFTER — состояние после импульса сброса. NO_PRESENCE при IDLE=1 — нет ответа датчика, но это не доказывает, что сам датчик неисправен. NO_ROM — не найден адрес; ROM_CRC_BAD — неверная CRC.</p>
 <p class="hint">Клавиатура: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
 <p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
-<h2>Экран TFT · V15.3</h2>
+<h2>Экран TFT · V15.5</h2>
 <p class="hint">Белый TFT может означать неверный контроллер дисплея или проблему SPI. Профиль выбирается вручную: ESP32 не умеет подтвердить, что пиксели действительно видны.</p>
 <label for="tftDriver">Драйвер TFT</label>
 <select id="tftDriver"><option value="1">ST7789 · горизонтально 320×240</option></select>
