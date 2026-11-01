@@ -37,7 +37,7 @@
 
 #include "BUSA_Boot.h"
 #include "BUSA_V15_Board.h"
-const char VERSION[]="БУСА 1М WiFi 15v3-N16R8-UNIFIED-UI-BOOTFIX1";
+const char VERSION[]="БУСА 1М WiFi 15v5-N16R8-STABLE-LOCAL";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 OneWire* const temperatureBuses[4]={&ow1,&ow2,&ow3,&ow4};
@@ -53,7 +53,7 @@ volatile uint32_t pulseCounter=0;
 volatile uint32_t flowLastEdgeUs=0;
 void IRAM_ATTR flowISR(){
   const uint32_t edge=micros();
-  if((uint32_t)(edge-flowLastEdgeUs)<100U)return;
+  if((uint32_t)(edge-flowLastEdgeUs)<2000U)return; // reject excessive noise, max 500 pulses/s
   flowLastEdgeUs=edge;
   portENTER_CRITICAL_ISR(&flowMux);
   ++pulseCounter;
@@ -223,9 +223,12 @@ void scanI2cAddresses(uint32_t now){
   // One address per loop, at most one Wire timeout before HTTP runs again.
   if(!i2cOnline || !i2cLinesReleased())return;
   if(!i2cScanActive){
-    if(i2cFullScanAt && !elapsed(now,i2cFullScanAt,15000))return;
+    if(i2cFullScanAt && !elapsed(now,i2cFullScanAt,60000))return;
     i2cScanActive=true;i2cScanAddress=0x08;i2cScanCount=0;i2cScanAcks=0;
   }
+  static uint32_t scanStepAt=0;
+  if(scanStepAt && !elapsed(now,scanStepAt,100U))return;
+  scanStepAt=now;
   if(ack(i2cScanAddress)){
     ++i2cScanAcks;
     if(i2cScanCount<24)i2cScanFound[i2cScanCount++]=i2cScanAddress;
