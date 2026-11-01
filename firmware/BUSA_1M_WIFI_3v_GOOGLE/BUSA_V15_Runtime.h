@@ -140,7 +140,7 @@ void setup(){
   });
   server.on("/api/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
-    server.send(200,"application/json; charset=utf-8",statusJSON());
+    server.send(200,"application/json; charset=utf-8",busaStatusFast(millis()));
   });
   // Local Wi-Fi-only in-memory simulation. No direct GPIO, coil or PWM actuation.
   // Sound-only K1..K4 are intentionally independent of the legacy virtual test.
