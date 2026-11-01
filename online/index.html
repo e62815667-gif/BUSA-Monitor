@@ -76,7 +76,7 @@ main>*,main>*>*{min-width:0;max-width:100%}
 .rigViewport{width:100%;max-width:430px;aspect-ratio:360/225;max-height:269px;overflow:hidden;margin:8px auto;position:relative}
 .rigViewport svg{width:100%!important;max-width:100%!important;height:100%!important;max-height:100%!important;display:block!important;overflow:hidden}
 .rigs p{clear:both;position:relative}
-.appTabs{position:fixed;bottom:0;left:0;right:0;z-index:8;display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr));overflow:visible;gap:2px;background:#fff;box-shadow:0 -4px 15px #243f5516;padding:5px 4px max(7px,env(safe-area-inset-bottom));border-top:2px solid var(--orange)}
+.appTabs{position:fixed;bottom:0;left:0;right:0;z-index:8;display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));overflow:visible;gap:2px;background:#fff;box-shadow:0 -4px 15px #243f5516;padding:5px 4px max(7px,env(safe-area-inset-bottom));border-top:2px solid var(--orange)}
 .appTabs button{width:100%;min-width:0!important;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;line-height:1.15;padding:7px 0;font-size:clamp(9px,2.55vw,12px)!important;white-space:nowrap;border:1px solid transparent;border-radius:9px}
 .appTabs button.active{background:#f7d5a9;border:1px solid #e8b274}
 .tabIcon{font-family:system-ui,sans-serif;display:block;font-size:18px;line-height:19px;color:#178eae}
@@ -297,7 +297,8 @@ input::placeholder{color:#a3bdce}
 <div class="row"><span>Flash</span><b id="diagFlash">—</b></div>
 <div class="row"><span>Причина перезапуска (код)</span><b id="diagReset">—</b></div>
 <div class="row"><span>TFT</span><b id="diagTft">—</b></div>
-<div class="row"><span>Реле / PWM</span><b id="diagOutputs">—</b></div>
+<div class="row"><span>Звуковая сигнализация</span><b id="diagOutputs">—</b></div>
+<div class="row"><span>Диагностика запуска</span><b id="diagBoot">—</b></div>
 </div>
 <div class="card"><h2>Температуры · OneWire</h2><div id="diagOneWireRemote" class="diagList">Нет данных</div></div>
 <div class="card"><h2>Клавиатура и I²C</h2>
@@ -351,7 +352,7 @@ input::placeholder{color:#a3bdce}
 <button data-tab="graphs"><span class="tabIcon">⌁</span><span>Графики</span></button>
 <button data-tab="events"><span class="tabIcon">▤</span><span>События</span></button>
 <button data-tab="settings"><span class="tabIcon">⚙</span><span>Настр.</span></button>
-<button data-tab="calculator"><span class="tabIcon">▦</span><span>Кальк.</span></button>
+
 </nav>
 <script>
 // Change the standalone iPhone page's palette only; the TFT palette is
@@ -402,7 +403,7 @@ function remoteStatus(msg){
 }
 function clearRemoteNumbers(){
  cloudCurrentTelemetry=null;cloudCurrentAt=null;renderCloudCompatibility();
- const placeholders=['connectionLast','connectionFresh','connectionInternet','connectionWifi','connectionRssi','connectionClients','connectionEnabled','connectionHttp','connectionSent','connectionTls','diagFw','diagUp','diagHeap','diagFlash','diagReset','diagTft','diagOutputs','diagPcf','diagKey','diagIdle','diagI2c','diagPca','diagPulses','diagCal'];
+ const placeholders=['connectionLast','connectionFresh','connectionInternet','connectionWifi','connectionRssi','connectionClients','connectionEnabled','connectionHttp','connectionSent','connectionTls','diagFw','diagUp','diagHeap','diagFlash','diagReset','diagTft','diagOutputs','diagBoot','diagPcf','diagKey','diagIdle','diagI2c','diagPca','diagPulses','diagCal'];
  placeholders.forEach(id=>{const v=byId(id);if(v)v.textContent='—'});
  byId('diagOneWireRemote').textContent='Нет данных';
  byId('diagCloud').textContent='Пока нет данных из Google.';
@@ -508,7 +509,11 @@ function renderDiagnostics(d,at,fresh){
  val('diagFlash',Number.isFinite(chip.flash_bytes)?Math.round(chip.flash_bytes/1048576)+' МБ':'—');
  val('diagReset',Number.isInteger(chip.reset_reason_code)?chip.reset_reason_code:'—');
  val('diagTft',modules.tft_boot_complete===true?'Запущен (изображение не проверено)':'Нет подтверждения');
- val('diagOutputs',d.relays_enabled===false&&d.pwm_enabled===false?'Отключены':'Проверить состояние');
+ val('diagOutputs',d.sound_alarms?.purpose==='12V_SOUND_ALERTS_ONLY'?
+   (d.sound_alarms.channels?.some(ch=>ch.sound_on===true)?'Звук включён':'Звук выключен'):'Нет данных');
+ val('diagBoot',d.boot?.build?(d.boot.build+
+   (d.boot.tft_bypassed?' · TFT пропущен после сбоя':'')+
+   (d.boot.i2c_bypassed?' · I²C пропущен после сбоя':'')):'Нет данных');
  val('diagPcf',modules.pcf8575===true?'Обнаружен':'Нет подтверждения');
  val('diagKey',Number.isInteger(key.scan_error)?key.scan_error:'—');
  val('diagIdle',typeof key.idle_hex==='string'?key.idle_hex:'—');
@@ -523,6 +528,20 @@ function renderDiagnostics(d,at,fresh){
  byId('diagOneWireRemote').textContent=rows.join('\n');
  byId('diagCloud').textContent='Google: '+(cloud.configured?'передача включена':'выключена')+', HTTP '+String(cloud.http??'—')+', подтверждений ESP32 '+String(cloud.sent??'—')+'. Записи в Google Таблице могут сохраняться и при HTTP 302.';
 }
+function invalidateStaleRemote(){
+ if(!cloudCurrentAt || Date.now()-cloudCurrentAt<150000)return;
+ byId('connectionFresh').textContent='УСТАРЕЛА';
+ byId('heroStatus').textContent='● Нет новых данных: '+stampRussian(cloudCurrentAt);
+ for(const id of ['cloudInternet','cloudLocal','cloudData']){
+   indicator(id,id+'Label',false,true);
+ }
+ for(let i=0;i<4;i++){
+   byId('remoteT'+i).textContent='Н/Д';
+   byId('detailT'+i).textContent='Н/Д';
+ }
+ byId('waterLive').textContent='Нет свежих показаний';
+}
+setInterval(invalidateStaleRemote,5000);
 function renderRemote(d,history,receivedAt){
  cloudCurrentTelemetry=d;cloudCurrentAt=receivedAt;renderCloudCompatibility();
  const age=Date.now()-receivedAt;
@@ -646,7 +665,7 @@ function connectRemote(url,token,persist=true){
  if(!/^[A-Fa-f0-9]{64}$/.test(token)){
   remoteStatus('Укажи BUSA_VIEW_TOKEN: 64 символа');return false;
  }
- stopRemote();configUrl=url;configToken=token;remoteEnabled=true;
+ stopRemote();clearRemoteNumbers();configUrl=url;configToken=token;remoteEnabled=true;
  if(persist)try{
   localStorage.setItem(remoteStorePrefix+'url',url);
   localStorage.setItem(remoteStorePrefix+'token',token);
