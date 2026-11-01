@@ -74,7 +74,6 @@ jobs:
           assert m.group(1).count('<section')==m.group(1).count('</section>')
           PY
           node --check /tmp/busa-v147-sound.js
-          PY
       - name: Prepare Google GTS certificate
         shell: bash
         run: |
