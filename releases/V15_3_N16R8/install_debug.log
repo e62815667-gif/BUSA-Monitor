@@ -2,16 +2,6 @@ Config file written to: /home/runner/.arduino15/arduino-cli.yaml
 Downloading index: library_index.tar.bz2 0 B / 4.42 MiB    0.00%Downloading index: library_index.tar.bz2 downloaded
 Downloading index: package_index.tar.bz2 0 B / 111.61 KiB    0.00%Downloading index: package_index.tar.bz2 downloaded
 Downloading index: package_esp32_index.json 0 B / 636.15 KiB    0.00%Downloading index: package_esp32_index.json downloaded
-Downloading missing tool builtin:ctags@5.8-arduino11...
-builtin:ctags@5.8-arduino11 0 B / 108.99 KiB    0.00%builtin:ctags@5.8-arduino11 downloaded
-Installing builtin:ctags@5.8-arduino11...
-Skipping tool configuration....
-builtin:ctags@5.8-arduino11 installed
-Downloading missing tool builtin:dfu-discovery@0.1.2...
-builtin:dfu-discovery@0.1.2 0 B / 1.65 MiB    0.00%builtin:dfu-discovery@0.1.2 downloaded
-Installing builtin:dfu-discovery@0.1.2...
-Skipping tool configuration....
-builtin:dfu-discovery@0.1.2 installed
 Downloading missing tool builtin:mdns-discovery@1.1.0...
 builtin:mdns-discovery@1.1.0 0 B / 3.07 MiB    0.00%builtin:mdns-discovery@1.1.0 downloaded
 Installing builtin:mdns-discovery@1.1.0...
@@ -27,21 +17,31 @@ Downloading missing tool builtin:serial-monitor@0.15.0...
 Installing builtin:serial-monitor@0.15.0...
 Skipping tool configuration....
 builtin:serial-monitor@0.15.0 installed
+Downloading missing tool builtin:ctags@5.8-arduino11...
+builtin:ctags@5.8-arduino11 0 B / 108.99 KiB    0.00%builtin:ctags@5.8-arduino11 downloaded
+Installing builtin:ctags@5.8-arduino11...
+Skipping tool configuration....
+builtin:ctags@5.8-arduino11 installed
+Downloading missing tool builtin:dfu-discovery@0.1.2...
+builtin:dfu-discovery@0.1.2 0 B / 1.65 MiB    0.00%builtin:dfu-discovery@0.1.2 downloaded
+Installing builtin:dfu-discovery@0.1.2...
+Skipping tool configuration....
+builtin:dfu-discovery@0.1.2 installed
 Downloading index: package_index.tar.bz2 0 B / 111.61 KiB    0.00%Downloading index: package_index.tar.bz2 downloaded
 Downloading index: package_esp32_index.json 0 B / 636.15 KiB    0.00%Downloading index: package_esp32_index.json downloaded
 Downloading packages...
-esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 90.02 MiB    0.00%esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 90.02 MiB    0.00%esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0 41.58 MiB / 90.02 MiB   46.19%esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0 downloaded
+esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 90.02 MiB    0.00%esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 90.02 MiB    0.00%esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0 30.00 MiB / 90.02 MiB   33.32%esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0 downloaded
 esp32:xtensa-esp32s2-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 64.71 MiB    0.00%esp32:xtensa-esp32s2-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 64.71 MiB    0.00%esp32:xtensa-esp32s2-elf-gcc@esp-2021r2-patch5-8.4.0 downloaded
 esp32:xtensa-esp32s3-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 64.94 MiB    0.00%esp32:xtensa-esp32s3-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 64.94 MiB    0.00%esp32:xtensa-esp32s3-elf-gcc@esp-2021r2-patch5-8.4.0 downloaded
 esp32:xtensa-esp-elf-gdb@11.2_20220823 0 B / 25.70 MiB    0.00%esp32:xtensa-esp-elf-gdb@11.2_20220823 downloaded
-esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 183.48 MiB    0.00%esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 183.48 MiB    0.00%esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 46.61 MiB / 183.48 MiB   25.41% 00m01sesp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 95.66 MiB / 183.48 MiB   52.14%esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 138.04 MiB / 183.48 MiB   75.23%esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 downloaded
+esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 183.48 MiB    0.00%esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 0 B / 183.48 MiB    0.00%esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 43.38 MiB / 183.48 MiB   23.64% 00m01sesp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 93.31 MiB / 183.48 MiB   50.86%esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 144.61 MiB / 183.48 MiB   78.82%esp32:riscv32-esp-elf-gcc@esp-2021r2-patch5-8.4.0 downloaded
 esp32:riscv32-esp-elf-gdb@11.2_20220823 0 B / 25.56 MiB    0.00%esp32:riscv32-esp-elf-gdb@11.2_20220823 downloaded
 esp32:openocd-esp32@v0.12.0-esp32-20230921 0 B / 2.09 MiB    0.00%esp32:openocd-esp32@v0.12.0-esp32-20230921 downloaded
 esp32:esptool_py@4.5.1 0 B / 94.65 KiB    0.00%esp32:esptool_py@4.5.1 downloaded
 esp32:mkspiffs@0.2.3 0 B / 49.46 KiB    0.00%esp32:mkspiffs@0.2.3 downloaded
 esp32:mklittlefs@3.0.0-gnu12-dc7f933 0 B / 45.68 KiB    0.00%esp32:mklittlefs@3.0.0-gnu12-dc7f933 downloaded
 arduino:dfu-util@0.11.0-arduino5 0 B / 2.18 MiB    0.00%arduino:dfu-util@0.11.0-arduino5 downloaded
-esp32:esp32@2.0.17 0 B / 242.86 MiB    0.00%esp32:esp32@2.0.17 0 B / 242.86 MiB    0.00%esp32:esp32@2.0.17 40.00 MiB / 242.86 MiB   16.47% 00m01sesp32:esp32@2.0.17 80.00 MiB / 242.86 MiB   32.94% 00m01sesp32:esp32@2.0.17 128.44 MiB / 242.86 MiB   52.89%esp32:esp32@2.0.17 128.44 MiB / 242.86 MiB   52.89%esp32:esp32@2.0.17 173.09 MiB / 242.86 MiB   71.27%esp32:esp32@2.0.17 downloaded
+esp32:esp32@2.0.17 0 B / 242.86 MiB    0.00%esp32:esp32@2.0.17 0 B / 242.86 MiB    0.00%esp32:esp32@2.0.17 46.89 MiB / 242.86 MiB   19.31% 00m01sesp32:esp32@2.0.17 96.53 MiB / 242.86 MiB   39.75%esp32:esp32@2.0.17 144.57 MiB / 242.86 MiB   59.53%esp32:esp32@2.0.17 185.31 MiB / 242.86 MiB   76.30%esp32:esp32@2.0.17 185.31 MiB / 242.86 MiB   76.30%esp32:esp32@2.0.17 downloaded
 Installing esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0...
 Skipping tool configuration....
 esp32:xtensa-esp32-elf-gcc@esp-2021r2-patch5-8.4.0 installed
@@ -115,14 +115,6 @@ Installing Adafruit ST7735 and ST7789 Library@1.12.0...
 Installed Adafruit ST7735 and ST7789 Library@1.12.0
 Already installed Adafruit BusIO@1.17.4
 Already installed Adafruit GFX Library@1.13.0
-Downloading Adafruit ILI9341@1.7.0...
-Adafruit ILI9341@1.7.0 0 B / 44.31 KiB    0.00%Adafruit ILI9341@1.7.0 downloaded
-Installing Adafruit ILI9341@1.7.0...
-Installed Adafruit ILI9341@1.7.0
-Downloading Adafruit STMPE610@1.1.6...
-Adafruit STMPE610@1.1.6 0 B / 287.36 KiB    0.00%Adafruit STMPE610@1.1.6 downloaded
-Installing Adafruit STMPE610@1.1.6...
-Installed Adafruit STMPE610@1.1.6
 Downloading Adafruit TouchScreen@1.1.6...
 Adafruit TouchScreen@1.1.6 0 B / 10.79 KiB    0.00%Adafruit TouchScreen@1.1.6 downloaded
 Installing Adafruit TouchScreen@1.1.6...
@@ -135,8 +127,16 @@ Downloading Adafruit SH110X@2.1.15...
 Adafruit SH110X@2.1.15 0 B / 23.91 KiB    0.00%Adafruit SH110X@2.1.15 downloaded
 Installing Adafruit SH110X@2.1.15...
 Installed Adafruit SH110X@2.1.15
-Already installed Adafruit BusIO@1.17.4
+Downloading Adafruit ILI9341@1.7.0...
+Adafruit ILI9341@1.7.0 0 B / 44.31 KiB    0.00%Adafruit ILI9341@1.7.0 downloaded
+Installing Adafruit ILI9341@1.7.0...
+Installed Adafruit ILI9341@1.7.0
+Downloading Adafruit STMPE610@1.1.6...
+Adafruit STMPE610@1.1.6 0 B / 287.36 KiB    0.00%Adafruit STMPE610@1.1.6 downloaded
+Installing Adafruit STMPE610@1.1.6...
+Installed Adafruit STMPE610@1.1.6
 Already installed Adafruit GFX Library@1.13.0
+Already installed Adafruit BusIO@1.17.4
 Downloading U8g2_for_Adafruit_GFX@1.8.0...
 U8g2_for_Adafruit_GFX@1.8.0 0 B / 9.28 MiB    0.00%U8g2_for_Adafruit_GFX@1.8.0 downloaded
 Installing U8g2_for_Adafruit_GFX@1.8.0...
