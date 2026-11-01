@@ -22,18 +22,22 @@ jobs:
       - uses: arduino/setup-arduino-cli@v2
       - name: Install pinned ESP32 core and libraries
         run: |
-          arduino-cli config init
-          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
-          arduino-cli core update-index
-          arduino-cli core install esp32:esp32@2.0.17
-          arduino-cli lib install "Adafruit BusIO@1.17.4"
-          arduino-cli lib install "ArduinoJson@6.21.5"
-          arduino-cli lib install "OneWire@2.3.8"
-          arduino-cli lib install "DallasTemperature@4.0.6"
-          arduino-cli lib install "Adafruit GFX Library@1.13.0"
-          arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
-          arduino-cli lib install "Adafruit ILI9341@1.7.0"
-          arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+          mkdir -p releases/V15_3_N16R8
+          exec > >(tee releases/V15_3_N16R8/install_debug.log) 2>&1
+          retry() { local i; for i in 1 2 3 4; do "$@" && return 0; echo "Retry $i of $*: failure"; sleep $((i*6)); done; return 1; }
+          retry arduino-cli config init
+          retry arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          retry arduino-cli core update-index
+          retry arduino-cli core install esp32:esp32@2.0.17
+          retry arduino-cli lib install "Adafruit BusIO@1.17.4"
+          retry arduino-cli lib install "ArduinoJson@6.21.5"
+          retry arduino-cli lib install "OneWire@2.3.8"
+          retry arduino-cli lib install "DallasTemperature@4.0.6"
+          retry arduino-cli lib install "Adafruit GFX Library@1.13.0"
+          retry arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
+          retry arduino-cli lib install "Adafruit ILI9341@1.7.0"
+          retry arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+          echo INSTALL_DONE
       - name: Apply repository-pinned network compatibility fixes
         run: python3 tools/patch_arduino_2_0_17.py "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
       - name: Test N16R8 and retained full monitoring logic
@@ -136,6 +140,8 @@ jobs:
               echo ">>> $test"
               node "$test" 2>&1 || echo "FAILED $test"
             done
+            echo 'INSTALL LOG'
+            if [ -f releases/V15_3_N16R8/install_debug.log ]; then tail -n 80 releases/V15_3_N16R8/install_debug.log; else echo 'install not reached'; fi
             echo 'CERTIFICATE VALIDATION LOG'
             if [ -f releases/V15_3_N16R8/cert_debug.log ]; then tail -n 80 releases/V15_3_N16R8/cert_debug.log; else echo 'CA step not reached'; fi
             echo 'COMPILE LOG TAIL'
