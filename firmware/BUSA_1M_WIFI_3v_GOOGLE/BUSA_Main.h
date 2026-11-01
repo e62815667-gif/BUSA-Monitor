@@ -39,7 +39,7 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-GMT028-SOUND4";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-GMT028-SOUND4-REV2";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -638,7 +638,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V14.1 LIGHT";
+  const String version="FW V14.7 N16R8";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -821,7 +821,7 @@ String statusJSON(){
   s+=",\"pca9685\":{\"expected_address\":64,\"ack\":"+(pcaDetected?String("true"):String("false"));
   s+=",\"mode1\":"+String(pcaMode1)+",\"mode2\":"+String(pcaMode2);
   s+=",\"outputs_enabled\":false}";
-  s+=",\"tft\":{\"spi_cs\":10,\"spi_mosi\":11,\"spi_sck\":12,\"dc\":13,\"rst\":14";
+  s+=",\"tft\":{\"spi_cs\":"+String(TFT_CS)+",\"spi_mosi\":"+String(TFT_MOSI)+",\"spi_sck\":"+String(TFT_SCK)+",\"dc\":"+String(TFT_DC)+",\"rst\":"+String(TFT_RST);
   s+=",\"profile\":"+quoteJson(tftProfileName())+",\"rotation\":"+String(tftRotation);
   s+=",\"init_sent\":"+(tftStarted?String("true"):String("false"));
   s+=",\"boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
@@ -1554,7 +1554,7 @@ void readConsole(){
 }
 void setup(){
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V14.7 N16R8: K1-K4 12V SOUND ONLY");
+  Serial0.println("\nBUSA 1M WiFi V14.7 REV2 N16R8: K1-K4 12V SOUND ONLY");
   soundInitPins(); // Set relay inputs OFF before Wi-Fi/TFT and sensor startup.
   Serial.begin(115200);
   delay(400);
@@ -1914,7 +1914,7 @@ void loop(){
     Serial0.println("STA reconnect attempt; AP unaffected");
   }
   readConsole();
-  if(otaRestart && elapsed(now,otaRestartAt,4000))ESP.restart();
+  if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
   if(otaActive){soundOutputsOff();delay(0);return;}
@@ -1946,7 +1946,7 @@ void loop(){
   }
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
-    Serial0.printf("N8R2 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
+    Serial0.printf("N16R8 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
       (unsigned long)now,(int)wifiRunning,(int)i2cOnline,(int)tftStarted,
       (unsigned long)flowPulses(),(double)flowLpm);
   }
