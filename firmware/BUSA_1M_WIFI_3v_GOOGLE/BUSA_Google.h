@@ -167,7 +167,7 @@ uint32_t googleSnapshotAt=0;
 void publishGoogleSnapshot(uint32_t now){
   if(!googleEnabled||otaActive||!googleSnapshotMutex)return;
   if(googleSnapshotAt && !elapsed(now,googleSnapshotAt,8000))return; // 30 s cloud posting does not need 2 s full JSON rebuild
-  String next=statusJSON();
+  String next=busaStatusFast(now);
   if(xSemaphoreTake(googleSnapshotMutex,0)==pdTRUE){
     googleSnapshot=next;googleSnapshotAt=now;
     xSemaphoreGive(googleSnapshotMutex);
