@@ -29,6 +29,7 @@
 #include <Adafruit_ILI9341.h>
 #include <U8g2_for_Adafruit_GFX.h>
 #include <math.h>
+#include "BUSA_Startup.h"
 
 constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
@@ -39,7 +40,7 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-GMT028-SOUND4";
+const char VERSION[]="БУСА 1М WiFi V14.7-FINAL-N16R8-SOUND4";
 
 OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
@@ -172,6 +173,8 @@ float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
 
 // I2C devices: PCF8575 keypad is monitored; PCA9685 ACK-only (never PWM).
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
+bool busaPeripheralsStarted=false;
+uint32_t busaApLastTryMs=0;
 uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
 uint8_t i2cFound[24]={0},i2cFoundCount=0;
 uint16_t i2cAckCount=0;
@@ -638,7 +641,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V14.1 LIGHT";
+  const String version="FW V14.7 FINAL";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -669,7 +672,7 @@ void drawBootSplash(uint32_t holdMs){
 void startScreen(){
   Serial0.println("TFT: HW SPI landscape; controller model unverified");
   SPI.begin(TFT_SCK,-1,TFT_MOSI,TFT_CS);
-  SPI.setFrequency(16000000); // moderate stable starting frequency
+  SPI.setFrequency(8000000); // conservative 8 MHz on real TFT wiring
   if(tftProfile==2){screenIli.begin();screen=&screenIli;}
   else{screenSt.init(240,320);screen=&screenSt;}
   screen->setRotation(tftRotation); // 0..3 selected from iPhone
@@ -742,6 +745,7 @@ String statusJSON(){
   uint32_t now=millis();
   String s="{\"device\":\"BUSA-1M-001\",\"firmware\":\""+String(VERSION)+"\"";
   s+=",\"mode\":\"LOW_VOLTAGE_MONITOR_SOUND_ONLY\",\"relays_enabled\":true,\"pwm_enabled\":false";
+  s+=",\"boot\":"+busaBootStatus();
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"clock\":{\"synchronized\":"+(deviceClockValid()?String("true"):String("false"));
@@ -821,7 +825,7 @@ String statusJSON(){
   s+=",\"pca9685\":{\"expected_address\":64,\"ack\":"+(pcaDetected?String("true"):String("false"));
   s+=",\"mode1\":"+String(pcaMode1)+",\"mode2\":"+String(pcaMode2);
   s+=",\"outputs_enabled\":false}";
-  s+=",\"tft\":{\"spi_cs\":10,\"spi_mosi\":11,\"spi_sck\":12,\"dc\":13,\"rst\":14";
+  s+=",\"tft\":{\"spi_cs\":"+String(TFT_CS)+",\"spi_mosi\":"+String(TFT_MOSI)+",\"spi_sck\":"+String(TFT_SCK)+",\"dc\":"+String(TFT_DC)+",\"rst\":"+String(TFT_RST);
   s+=",\"profile\":"+quoteJson(tftProfileName())+",\"rotation\":"+String(tftRotation);
   s+=",\"init_sent\":"+(tftStarted?String("true"):String("false"));
   s+=",\"boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
@@ -1554,10 +1558,11 @@ void readConsole(){
 }
 void setup(){
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V14.7 N16R8: K1-K4 12V SOUND ONLY");
+  Serial0.println("\nBUSA 1M WiFi V14.7 FINAL N16R8: K1-K4 12V SOUND ONLY");
+  busaBootBegin();
   soundInitPins(); // Set relay inputs OFF before Wi-Fi/TFT and sensor startup.
   Serial.begin(115200);
-  delay(400);
+  delay(100);
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
@@ -1573,9 +1578,30 @@ void setup(){
   tftThemeDark=prefs.getBool("tftDarkColor",false);
   startedAt=millis();
   tftProfile=1; // ST7789 only
-  // Initialize TFT first so splash actually covers Wi-Fi and sensor initialization.
-  screenAttempted=true;
-  startScreen();
+  // SPLASH FIRST; crashes in the TFT stage trigger a retained bypass.
+  if(!busaTftBypass){
+    busaBootPhase(1);
+    const uint32_t started=millis();
+    screenAttempted=true;
+    startScreen();
+    busaTftInitMs=millis()-started;
+    busaBootPhase(0);
+  }else{
+    Serial0.println("TFT BYPASS after repeated watchdog failures; local AP will recover");
+  }
+  busaBootFeed();
+  // AP second, before keypad, sensors, cloud and remaining modules.
+  WiFi.persistent(false);
+  WiFi.setAutoReconnect(false);
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.setSleep(false);
+  apPassword="123456789";
+  busaApLastTryMs=millis();
+  wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),1,false,4);
+  updateBootStage(1);
+  Serial0.printf("EARLY AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
+    (int)wifiRunning,WiFi.softAPIP().toString().c_str());
+  busaBootFeed();
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
   loadKeymap();
@@ -1591,17 +1617,9 @@ void setup(){
   }
   soundLoadPrefs();
   setupGoogleCloud();
-  WiFi.mode(WIFI_AP_STA);
-  WiFi.setSleep(false); // Favor interactive local response over power saving
-  configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
+  configTime(0,0,"pool.ntp.org","time.google.com");
   clockNtpStarted=true;
-  // Private STA password must be provisioned into NVS after public GitHub build;
-  // no STA password is embedded in this public source. Local AP fallback remains.
-  apPassword="BUSA"+String((uint32_t)ESP.getEfuseMac(),HEX);
-  wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
-  updateBootStage(1);
-  Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
-                 (int)wifiRunning,WiFi.softAPIP().toString().c_str(),apPassword.c_str());
+  // AP already running; STA credentials stay in private NVS.
   if(stationSsid.length() && stationPass.length()>=8){
     WiFi.setAutoReconnect(true);
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
@@ -1895,14 +1913,10 @@ void setup(){
   const char *headers[]={"X-Busa-Token"};
   server.collectHeaders(headers,1);
   server.begin();
-  Serial0.println("WEB started; temperature scan & I2C next");
-  i2cOnline=Wire.begin(BUS_SDA,BUS_SCL,100000);
-  if(i2cOnline){Wire.setTimeOut(25);probeI2c(millis());}
-  updateBootStage(2);
-  Serial0.printf("I2C=%d PCF=%d PCA=%d\n",(int)i2cOnline,(int)pcfDetected,(int)pcaDetected);
-  updateBootStage(3);
+  Serial0.println("WEB ready before I2C/DS18B20/peripherals");
+  busaBootFeed();
   launchGoogleCloud();
-  Serial0.println("SETUP DONE: GPIO7/6/5/4 ONLY for 12V sound annunciators; default OFF");
+  Serial0.println("SETUP DONE: GPIO7/6/5/4 for 12V sound only");
 }
 void loop(){
   uint32_t now=millis();
