@@ -1082,11 +1082,11 @@ main>*{max-width:100%;min-width:0}
    <p class="hint">Датчик охлаждающей воды не измеряет отбор.</p></div>
   </div>
   <div class="card"><h2>Состояние K1–K4</h2>
-   <div class="relayGrid"><span>K1 <b>БЛОК</b></span><span>K2 <b>БЛОК</b></span><span>K3 <b>БЛОК</b></span><span>K4 <b>БЛОК</b></span></div>
-   <p class="hint">Состояние информационное. Физические выходы ESP32 отключены.</p>
+   <div class="relayGrid"><span>K1 <b id="soundStatus0">ВЫКЛ</b></span><span>K2 <b id="soundStatus1">ВЫКЛ</b></span><span>K3 <b id="soundStatus2">ВЫКЛ</b></span><span>K4 <b id="soundStatus3">ВЫКЛ</b></span></div>
+   <p class="hint">К1–К4: звуковые реле 12 В. Настройка отдельно на странице «Температуры».</p>
   </div></section>
 <section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div>
-<p class="hint">Информационные поля для отображения на TFT. Не управляют реле и не заменяют защиту.</p>
+<p class="hint">Справочные значения экрана TFT. Звуковая сигнализация К1–К4 настраивается ниже.</p>
 <div class="grid">
 <div><label>T1 Вода · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref0"></div>
 <div><label>T1 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt0"></div>
@@ -1097,7 +1097,15 @@ main>*{max-width:100%;min-width:0}
 <div><label>T4 Верх · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref3"></div>
 <div><label>T4 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
 </div><button id="refsSave" type="button" class="full">Сохранить значения отображения</button>
-<p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div></section>
+<p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div>
+<div class="card"><h2>Звуковая сигнализация · К1–К4</h2>
+<p class="hint">Только звуковые реле 12 В. Отдельные настройки каждого канала, пороги включения и выключения, гистерезис ≥ 0,5 °C. При потере датчика звук выключается.</p>
+<div class="grid">
+<div><label><input type="checkbox" id="soundEn0"> K1 · Вода</label><label>Звук ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn0"><label>Звук ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff0"></div>
+<div><label><input type="checkbox" id="soundEn1"> K2 · Колонна</label><label>Звук ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn1"><label>Звук ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff1"></div>
+<div><label><input type="checkbox" id="soundEn2"> K3 · Куб</label><label>Звук ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn2"><label>Звук ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff2"></div>
+<div><label><input type="checkbox" id="soundEn3"> K4 · Верх колонны</label><label>Звук ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn3"><label>Звук ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff3"></div>
+</div><button id="soundSave" type="button" class="full">Сохранить настройки звука</button><p id="soundSaveResult" class="hint">До настройки все каналы выключены.</p></div></section>
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор · ручной режим</h2><p class="hint">Блок 220 В и электропривод крана исключены. ESP32 не управляет ими.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden>
  <div class="card"><h2>Графики · реальные измерения</h2>
@@ -1175,7 +1183,7 @@ main>*{max-width:100%;min-width:0}
 <textarea id="diagReport" rows="9" readonly style="width:100%;font:11px ui-monospace,monospace;white-space:pre;overflow:auto">Ожидание диагностики...</textarea>
 <button type="button" id="diagCopy" class="full">Скопировать отчёт всех модулей</button>
 <p id="diagCopyResult" class="hint">—</p>
-<p class="hint">Температура: T1 GPIO38, T2 GPIO39, T3 GPIO40, T4 GPIO41. IDLE=1 — линия DATA высока в покое; IDLE=0 или LINE_LOW — линия низкая. AFTER — состояние после импульса сброса. NO_PRESENCE при IDLE=1 — нет ответа датчика, но это не доказывает, что сам датчик неисправен. NO_ROM — не найден адрес; ROM_CRC_BAD — неверная CRC.</p>
+<p class="hint">Температура: T1 GPIO16, T2 GPIO17, T3 GPIO18, T4 GPIO21. IDLE=1 — линия DATA высока в покое; IDLE=0 или LINE_LOW — линия низкая. AFTER — состояние после импульса сброса. NO_PRESENCE при IDLE=1 — нет ответа датчика, но это не доказывает, что сам датчик неисправен. NO_ROM — не найден адрес; ROM_CRC_BAD — неверная CRC.</p>
 <p class="hint">Клавиатура: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
 <p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
 <h2>Экран TFT · V14</h2>
@@ -1194,10 +1202,10 @@ main>*{max-width:100%;min-width:0}
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
 <div class="grid"><button type="button" id="keyUndo">Назад на шаг</button>
 <button type="button" id="keyCancel">Отмена</button></div></div></section>
-<footer class="hint">БУСА-1М №001 · только мониторинг · управление внешними устройствами вручную · физические выходы заблокированы</footer></main>
+<footer class="hint">БУСА-1М №001 · мониторинг + 4 звуковых реле 12 В · силовое оборудование управляется вручную</footer></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
-let lastWaterPulse=null,themeInitialized=false;
+let lastWaterPulse=null,themeInitialized=false,soundInitialized=false;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
 function networkLeds(info,ssid){
@@ -1276,7 +1284,7 @@ get('screenWake').onclick=()=>setScreenPower('wake');
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
 get('keyNext').onclick=()=>keyCommand('next');
 get('tftSave').onclick=async()=>{
- if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Реле остаются отключены.'))return;
+ if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Звуковые реле временно выключатся на перезагрузке.'))return;
  try{
   const r=await fetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value,rotation:get('tftRotation').value})});
   get('tftProfileStatus').textContent=await r.text();
@@ -1359,6 +1367,11 @@ s.temperatures.forEach((t,i)=>{
  if(i===0){tlog.push(t.c===null?null:Number(t.c));if(tlog.length>80)tlog.shift();}
 });
 get('temperatures').textContent=names.map((v,i)=>v+': '+get('t'+i).textContent).join(' | ');
+if(!soundInitialized && s.sound_alerts && Array.isArray(s.sound_alerts.channels)){
+ s.sound_alerts.channels.forEach((ch,i)=>{get('soundEn'+i).checked=ch.enabled===true;get('soundOn'+i).value=ch.on_c===null?'':ch.on_c;get('soundOff'+i).value=ch.off_c===null?'':ch.off_c});
+ soundInitialized=true;
+}
+if(s.sound_alerts && Array.isArray(s.sound_alerts.channels))s.sound_alerts.channels.forEach((ch,i)=>{get('soundStatus'+i).textContent=ch.sound_on?'ЗВУК':ch.enabled?'ГОТОВ':'ВЫКЛ'});
 if(!refsInit && Array.isArray(s.display_references)){
   s.display_references.forEach((r,i)=>{get('ref'+i).value=r.target===null?'':r.target;get('nt'+i).value=r.notice===null?'':r.notice});
   refsInit=true;
@@ -1420,7 +1433,7 @@ if(s.keypad){
      device:s.device,firmware:s.firmware,uptime_ms:s.uptime_ms,
      temperatures:s.temperatures,modules:s.modules,diagnostics:d,
      station_connected:s.station?.connected,ap_enabled:s.ap?.enabled,
-     relay_outputs_enabled:s.relays_enabled
+     relay_outputs_enabled:s.relays_enabled,sound_alerts:s.sound_alerts
    },null,2);
    const report=get('diagReport');
    if(document.activeElement!==report)report.value=lastDiagnosticReport;
@@ -1429,6 +1442,22 @@ if(s.keypad){
 }
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
+get('soundSave').onclick=async()=>{
+ const data=new URLSearchParams();
+ for(let i=0;i<4;i++){
+  data.set('en'+i,get('soundEn'+i).checked?'1':'0');
+  data.set('on'+i,get('soundOn'+i).value.trim());
+  data.set('off'+i,get('soundOff'+i).value.trim());
+ }
+ if(!confirm('Сохранить пороги К1–К4? Включённые каналы смогут подать звуковой сигнал по текущей температуре.'))return;
+ get('soundSave').disabled=true;
+ try{
+  const r=await fetch('/api/sound/config',{method:'POST',body:data});
+  if(!r.ok)throw Error(await r.text());
+  get('soundSaveResult').textContent='Настройки звуковых каналов сохранены';
+ }catch(e){get('soundSaveResult').textContent='Ошибка: '+e.message;}
+ get('soundSave').disabled=false;
+};
 get('googleSave').onclick=async()=>{
 const url=get('googleUrl').value.trim(),token=get('googleToken').value.trim();
 if(!url.startsWith('https://script.google.com/macros/s/')||!url.endsWith('/exec')||!/^[a-fA-F0-9]{64}$/.test(token)){
@@ -1455,7 +1484,7 @@ get('manualUpdate').onclick=async function(){
   if(!file || !file.name.endsWith('.bin') || file.size<60000 || file.size>3340000){
     get('updateResult').textContent='Нужен APP BIN подходящего размера';return;
   }
-  if(!confirm('Подтвердите ручное обновление диагностической прошивки. ESP32-S3 N8R2, внешние выходы отключены, выбран APP BIN?'))return;
+  if(!confirm('Подтвердите ручное обновление диагностической прошивки. ESP32-S3 N16R8, звуковые реле К1–К4 временно отключаются, выбран APP BIN?'))return;
   this.disabled=true;
   try{
     const begin=await fetch('/api/ota/prepare',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
