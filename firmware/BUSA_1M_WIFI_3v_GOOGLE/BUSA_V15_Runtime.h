@@ -1,11 +1,32 @@
 #pragma once
-// V15 boot and cooperative runtime. Included after all component declarations.
+// V15.4: AP is brought up before NVS, TFT, Google and peripheral scans.
+// RTC boot streak is cleared after 30 seconds of a healthy main loop.
+// After three interrupted boots, skip TFT until a stable restart; radio stays available.
+RTC_DATA_ATTR uint32_t busaBootMagic=0;
+RTC_DATA_ATTR uint32_t busaBootStreak=0;
+constexpr uint32_t BUSA_BOOT_MAGIC=0xB154A1F4UL;
+bool busaSkipTftAtBoot=false;
 void setup(){
   alarmInitPins(); // GPIO7/6/5/4 inactive before radio/display boot
   relaySimStop("BOOT_SAFE");
   ledSimStop("BOOT_LOCKED");
   Serial0.begin(115200);
-  Serial0.println("\nBUSA 1M WiFi V15.3: ESP32-S3 N16R8 / new TFT pins / sound-only low-voltage bench");
+  Serial0.println("\nBUSA 1M WiFi V15.4: ESP32-S3 N16R8 / EARLY AP / TFT RECOVERY");
+  if(busaBootMagic!=BUSA_BOOT_MAGIC){busaBootMagic=BUSA_BOOT_MAGIC;busaBootStreak=0;}
+  if(busaBootStreak<10)busaBootStreak++;
+  busaSkipTftAtBoot=busaBootStreak>=3;
+  Serial0.printf("BOOT_STREAK=%lu TFT_SKIP=%d RESET=%d\n",(unsigned long)busaBootStreak,(int)busaSkipTftAtBoot,(int)esp_reset_reason());
+  WiFi.persistent(false);
+  WiFi.setAutoReconnect(false); // One cooperative state machine owns STA recovery.
+  WiFi.onEvent(wifiRecoveryEvent);
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.setSleep(false);
+  apPassword="123456789";
+  wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),BUSA_AP_CHANNEL,false,4);
+  if(!wifiRunning){delay(150);wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),BUSA_AP_CHANNEL,false,4);}
+  if(wifiRunning)esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
+  Serial0.printf("EARLY_AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
+    (int)wifiRunning,WiFi.softAPIP().toString().c_str());
   busaN16MemoryBegin();
   Serial.begin(115200);
   delay(400);
@@ -32,9 +53,9 @@ void setup(){
   tftThemeDark=prefs.getBool("tftDarkColor",false);
   startedAt=millis();
   tftProfile=1; // ST7789 only
-  // Initialize TFT first so splash actually covers Wi-Fi and sensor initialization.
-  screenAttempted=true;
-  startScreen();
+  // TFT is deliberately AFTER the radio: if SPI initialization fails, AP has already started.
+  if(!busaSkipTftAtBoot){screenAttempted=true;startScreen();}
+  else Serial0.println("TFT RECOVERY: display skipped after interrupted boots; AP remains enabled");
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
   loadKeymap();
@@ -50,20 +71,10 @@ void setup(){
   }
   alarmLoadSettings();
   setupGoogleCloud();
-  WiFi.persistent(false); // Credentials live only in application Preferences.
-  WiFi.setAutoReconnect(false); // Only wifiRecoveryTick owns STA attempts.
-  WiFi.onEvent(wifiRecoveryEvent);
-  WiFi.mode(WIFI_AP_STA);
-  WiFi.setSleep(false); // Favor interactive local response over power saving
-  configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
+  configTime(0,0,"pool.ntp.org","time.google.com");
   clockNtpStarted=true;
-  // User-approved fixed password for the local BUSA AP (not the external STA).
-  // Replaces the earlier MAC-derived string; SSID and AP+STA recovery are unchanged.
-  apPassword="123456789";
-  wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str(),BUSA_AP_CHANNEL,false,4);
-  esp_wifi_set_bandwidth(WIFI_IF_AP,WIFI_BW_HT20);
   updateBootStage(1);
-  Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04\n",
+  Serial0.printf("AP_STATUS=%d IP=%s SSID=BUSA-1M-001-R04\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str());
   wifiStartPolicy(millis()); // Brief startup grace; local clients do not block internet association.
   server.on("/",HTTP_GET,[]{
@@ -498,6 +509,10 @@ void setup(){
 }
 void loop(){
   uint32_t now=millis();
+  if(busaBootStreak && elapsed(now,startedAt,30000U)){
+    busaBootStreak=0;
+    Serial0.println("BOOT_HEALTH_OK: stable for 30 s, reset streak cleared");
+  }
   alarmPoll(now);
   relaySimTick(now);
   ledSimTick(now);
