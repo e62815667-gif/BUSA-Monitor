@@ -135,11 +135,11 @@ jobs:
           {
             echo 'BUSA V15.6 CI failure diagnostics'
             echo 'TESTS'
-            for test in tests/test_v15_2_n16r8.py tests/test_unified_ui_v15_3.py tests/test_v15_architecture.py tests/test_v15_sound_alarms.py tests/test_temperature.py tests/test_wifi_recovery.py tests/test_wifi_integration.py tests/test_google_transport.py; do
+            for test in tests/test_v15_3_n16r8.py tests/test_v15_2_n16r8.py tests/test_board_boot.py tests/test_unified_ui_v15_3.py tests/test_v15_architecture.py tests/test_v15_sound_alarms.py tests/test_temperature.py tests/test_wifi_recovery.py tests/test_wifi_integration.py tests/test_google_transport.py; do
               echo ">>> $test"
               python3 "$test" 2>&1 || echo "FAILED $test"
             done
-            for test in tests/test_local_fetch.js tests/test_temperature_ui.js; do
+            for test in tests/test_app_v153_bootfix.js tests/test_local_fetch.js tests/test_temperature_ui.js; do
               echo ">>> $test"
               node "$test" 2>&1 || echo "FAILED $test"
             done
