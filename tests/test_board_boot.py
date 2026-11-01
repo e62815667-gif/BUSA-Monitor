@@ -7,7 +7,7 @@ common=r'''
 #include <cstdint>
 #include <cassert>
 #include <cstring>
-class String:public std::string{public:using std::string::string;String(const std::string&s):std::string(s){}};
+class String:public std::string{public:using std::string::string;String(const std::string&s):std::string(s){};String(uint32_t n):std::string(std::to_string(n)){};};
 struct Print{virtual ~Print()=default;virtual size_t write(uint8_t)=0;template<class...T>void printf(const char*,T...){};};
 struct Port{int writes=0;bool host=false;size_t write(uint8_t){++writes;return 1;}int availableForWrite(){return 0;}operator bool()const{return host;}}Serial0,Serial;
 #define RTC_DATA_ATTR
