@@ -1652,7 +1652,6 @@ main>*{max-width:100%;min-width:0}
 .approvedTemp small{display:block;white-space:normal;line-height:1.15;font-size:10px}
 .approvedRig{position:relative;overflow:hidden;min-width:0;min-height:292px;border:1px solid #115d92;border-radius:10px;background:radial-gradient(ellipse at 50% 45%,#17466a,#03121f 75%);display:flex;align-items:center;justify-content:center}
 .approvedRig svg{display:block;width:100%;height:100%;max-height:315px;min-width:0;overflow:hidden}
-.approvedRig svg rect:first-of-type{fill:transparent}
 .approvedRigLabel{position:absolute;bottom:3px;font:9px system-ui;letter-spacing:.4px;color:#70c6ff;background:#081c2ddd;padding:2px 5px;border-radius:5px}
 .approvedMetrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:8px 0}
 .approvedMetric{border:1px solid var(--line);border-radius:9px;padding:9px;display:flex;align-items:center;gap:8px;min-width:0}
@@ -2035,10 +2034,17 @@ function settingsTab(n,send=true){
  if(send){
   lastLocalNav=Date.now();
   if(n===6)fetch('/api/page?n=7').catch(()=>{});
-  else if(n>=0&&n<=4)fetch('/api/settings-tab?n='+n).catch(()=>{});
+  else{
+   fetch('/api/page?n=6').then(()=>{
+     if(n>=0&&n<=4)return fetch('/api/settings-tab?n='+n);
+   }).catch(()=>{});
+  }
  }
 }
-get('settingsBack').onclick=()=>settingsTab(-1,false);
+get('settingsBack').onclick=()=>{
+ settingsTab(-1,false);lastLocalNav=Date.now();
+ fetch('/api/page?n=6').catch(()=>{});
+};
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
 document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=async()=>{
   const n=Number(b.dataset.graphTft);
