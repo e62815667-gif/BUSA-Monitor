@@ -98,7 +98,7 @@ jobs:
           assert 'busaI2cRebuildAddressCache(' in p
           assert 'BUSA_I2C_ACK_FRESH_MS=30000' in p
           assert 'pcf_ack_total' in p and 'pca_ack_total' in p
-          assert 'pinMode(BUS_SDA,OUTPUT_OPEN_DRAIN)' in p and 'pinMode(BUS_SCL,OUTPUT_OPEN_DRAIN)' in p
+          assert 'i2cPinCfg.mode=GPIO_MODE_INPUT_OUTPUT_OD' in p and 'gpio_config(&i2cPinCfg)' in p
           assert 'busaI2cLastResult' in p and 'busaI2cNackCount' in p
           assert 'i2c_master_cmd_begin(' not in p
           assert 'Wire.endTransmission()' not in p
