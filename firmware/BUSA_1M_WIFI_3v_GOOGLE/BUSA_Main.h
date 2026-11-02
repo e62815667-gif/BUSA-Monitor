@@ -1140,7 +1140,7 @@ String statusJSON(){
   s+=",\"psram_total_bytes\":"+String(ESP.getPsramSize());
   s+=",\"psram_free_bytes\":"+String(ESP.getFreePsram())+"}";
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
-  s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
+  s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"graph_view\":"+String(graphSubView)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"clock\":{\"synchronized\":"+(deviceClockValid()?String("true"):String("false"));
   s+=",\"datetime\":"+quoteJson(clockStamp(false));
   s+=",\"utc_offset_minutes\":"+String(clockUtcOffsetMinutes)+"}";
@@ -1686,7 +1686,10 @@ main>*{max-width:100%;min-width:0}
 .approvedGraphPlaceholder{display:flex;align-items:center;justify-content:center;height:155px;position:relative;border:1px solid #27516d;border-radius:7px;overflow:hidden}
 .approvedGridLines{position:absolute;inset:10px;background:repeating-linear-gradient(to bottom,transparent 0,transparent 27px,#35628488 28px,#35628488 29px)}
 .approvedGraphPlaceholder>span{position:relative;z-index:1;background:#0b1e31cb;padding:4px 8px;border-radius:5px}
-.approvedGraphTabs{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.approvedGraphTabs{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.approvedBlackGraph canvas.approvedLaneCanvas{height:338px!important;background:#000!important;border:1px solid #2774a5!important}
+.approvedBlackGraph canvas.approvedWaterCanvas{height:245px!important;background:#000!important;border:1px solid #2774a5!important}
+.approvedBlackGraph .graphPanel h3{margin:12px 0 10px}
 .approvedGraphTabs button{font-size:12px;min-width:0;padding:8px 2px}
 .approvedLegend{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:10px;margin:5px 0 6px}
 .approvedLegend .temp0{color:#078fbe}.approvedLegend .temp1{color:#df8744}
@@ -1837,13 +1840,14 @@ main>*{max-width:100%;min-width:0}
 <div class="row">Расход, л/мин (оценка) <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div>
 <p class="hint">Не откалибровано; вода охлаждения не является измерением отбора.</p></details></section>
 <section class="page" data-section="3" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><strong>ГРАФИКИ</strong></div>
-<div class="card"><div class="settingsTabs approvedGraphTabs"><button type="button" data-graph-tft="0" class="on">Температуры</button>
-<button type="button" data-graph-tft="1">Вода</button><button type="button" data-graph-tft="2">Отбор</button></div>
-<div class="graphPanel" data-graph-panel="0"><h3>Температура (°C)</h3>
-<div class="approvedLegend"><span class="temp0">T1 Вода</span><span class="temp1">T2 Колонна</span><span class="temp2">T3 Куб</span><span class="temp3">T4 Верх</span></div>
-<canvas id="graphT" width="600" height="200"></canvas><p class="hint">Измерения текущей сессии; без выдуманных значений.</p></div>
-<div class="graphPanel" data-graph-panel="1" hidden><h3>Охлаждающая вода · импульсы</h3><canvas id="graphF" width="600" height="200"></canvas><p class="hint">YF-S401 не откалиброван: это импульсы, не измеренный расход.</p></div>
-<div class="graphPanel" data-graph-panel="2" hidden><h3>Расход отбора</h3><div class="approvedGraphPlaceholder">Нет датчика отбора</div></div>
+<div class="card approvedBlackGraph"><div class="settingsTabs approvedGraphTabs"><button type="button" data-graph-tft="0" class="on">Температуры</button>
+<button type="button" data-graph-tft="1">Вода и отбор</button></div>
+<div class="graphPanel" data-graph-panel="0"><h3>Т1–Т4 · отдельные линии</h3>
+<canvas id="graphT" class="approvedLaneCanvas" width="600" height="420" aria-label="Четыре отдельных графика T1, T2, T3 и T4 сверху вниз"></canvas>
+<p class="hint">Чёрный фон и четыре дорожки: Т1 Вода, Т2 Колонна, Т3 Куб, Т4 Верх. Каждая дорожка имеет свой масштаб.</p></div>
+<div class="graphPanel" data-graph-panel="1" hidden><h3>Вода и отбор · раздельно</h3>
+<canvas id="graphF" class="approvedWaterCanvas" width="600" height="280" aria-label="Охлаждающая вода сверху, отбор снизу"></canvas>
+<p class="hint">Сверху — реальные импульсы YF-S401 за 2 с (не калиброван). Снизу — отбор без датчика, линия не строится.</p></div>
 <div class="approvedSession">Текущая сессия · реальные данные</div></div></section>
 <section class="page" data-section="4" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h5"/></svg><strong>СОБЫТИЯ</strong></div>
 <div class="card"><div class="eventFilters"><button type="button" class="on" data-event="all">Все</button><button type="button" data-event="warn">Предупр.</button><button type="button" data-event="alarm">Аварии</button><button type="button" data-event="system">Система</button></div>
@@ -1965,6 +1969,7 @@ main>*{max-width:100%;min-width:0}
 <footer class="hint">БУСА-1М №001 · мониторинг + 4 звуковых реле 12 В · силовое оборудование управляется вручную</footer></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
+let busaGraphData={temperature:[[],[],[],[]],water_pulses:[]},busaGraphFetchedAt=0,busaGraphLoading=false;
 let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=false,calInitialized=false;
 let active=0,connected=false,pollBusy=false,settingsActive=-1,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
@@ -2026,7 +2031,7 @@ function page(n,send=true){
  if(inDiag)settingsTab(6,false);
  else if(visible===5&&send)settingsTab(-1,false);
  if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{});}
- if(visible===3)graphs();
+ if(visible===3){graphs();refreshGraphHistory(true);}
 }
 function settingsTab(n,send=true){
  settingsActive=n;
@@ -2049,11 +2054,15 @@ get('settingsBack').onclick=()=>{
  fetch('/api/page?n=6').catch(()=>{});
 };
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
-document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=async()=>{
-  const n=Number(b.dataset.graphTft);
-  document.querySelectorAll('[data-graph-tft]').forEach(c=>c.classList.toggle('on',c===b));
-  document.querySelectorAll('[data-graph-panel]').forEach(p=>p.hidden=Number(p.dataset.graphPanel)!==n);
-  await fetch('/api/graph-view?view='+n).catch(()=>{});
+function selectGraphView(n,send=true){
+ if(n<0||n>1)return;
+ document.querySelectorAll('[data-graph-tft]').forEach(c=>c.classList.toggle('on',Number(c.dataset.graphTft)===n));
+ document.querySelectorAll('[data-graph-panel]').forEach(p=>p.hidden=Number(p.dataset.graphPanel)!==n);
+ graphs();
+ if(send){lastLocalNav=Date.now();fetch('/api/graph-view?view='+n).catch(()=>{});}
+}
+document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=()=>{
+ selectGraphView(Number(b.dataset.graphTft));refreshGraphHistory(true);
 });
 async function keyCommand(action){
  try{
