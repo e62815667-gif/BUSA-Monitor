@@ -12,11 +12,12 @@ volatile uint32_t googleRestartAt=0,googleSent=0;
 volatile int googleHttp=0,googleState=0;
 // Diagnostics only: no tokens or passwords in logs or /api/status.
 volatile int googleDns=-1; // -1 not attempted, 0 failed, 1 resolved
-volatile int googleInternet=0; // 1 only if external TCP/443 connection succeeds
+volatile int googleInternet=0; // 1 after a successful HTTPS telemetry response; no extra reachability probes
 volatile int googleTlsError=0;
 volatile int googleErrorStage=0; // 0 OK/idle, 1 DNS, 2 HTTPS, 3 HTTP
 
 String googleEndpoint,googleSecret;
+volatile bool busaGoogleNetworkBusy=false; // Distinguishes HTTPS transactions from AP scans
 // Sending is one-way HTTPS. No remote command endpoint is ever accepted.
 bool googleURLValid(const String &s){
   const String prefix="https://script.google.com/macros/s/";
@@ -51,9 +52,8 @@ void setupGoogleCloud(){
 }
 void googleWorker(void* unused){
   (void)unused;
-  configTime(0,0,"pool.ntp.org","time.google.com");
+  // NTP is configured once in setup(); this worker never launches network probes.
   uint32_t last=millis()-30000;
-  uint32_t lastNetProbe=millis()-15000;
   while(true){
     vTaskDelay(pdMS_TO_TICKS(1250));
     if(WiFi.status()!=WL_CONNECTED){
@@ -61,23 +61,16 @@ void googleWorker(void* unused){
       if(googleEnabled)googleState=1;
       continue;
     }
-    const uint32_t netNow=millis();
-    if((uint32_t)(netNow-lastNetProbe)>=15000){
-      lastNetProbe=netNow;
-      IPAddress remote;
-      int dns=WiFi.hostByName("script.google.com",remote)==1?1:0;
-      googleDns=dns;
-      WiFiClient probe;
-      // The probe tests Internet reachability only; Google POST remains TLS-verified.
-      googleInternet=(dns==1 && probe.connect(remote,443,1600))?1:0;
-      probe.stop();
-    }
+    // One radio serves both the local AP and Google uplink. Do not run HTTPS
+    // while a user-requested Wi-Fi scan is switching 2.4 GHz channels.
+    if(busaWifiScanRunning)continue;
     if(!googleEnabled)continue;
     if(time(nullptr)<1700000000){googleState=2;continue;}
     const uint32_t now=millis();
     if(!googleTestRequested && (uint32_t)(now-last)<30000)continue;
     googleTestRequested=false;
     last=now;
+    busaGoogleNetworkBusy=true;
     googleState=3;
     // The full read-only status object includes every OneWire diagnostic error,
     // keypad scan_error, I2C, PCA9685, YF-S401 pulse counts and Wi-Fi state.
@@ -86,52 +79,51 @@ void googleWorker(void* unused){
       +String((uint32_t)time(nullptr))
       +",\"telemetry\":"+statusJSON()
       +",\"token\":"+quoteJson(googleSecret)+"}";
-    // Resolve Google before TLS, so HTTP -1 can be diagnosed rather than guessed.
-    // TLS authentication stays mandatory; insecure mode is NOT used.
-    IPAddress googleHostIP;
-    if(WiFi.hostByName("script.google.com",googleHostIP)!=1){
-      googleDns=0;googleTlsError=0;googleErrorStage=1;
-      googleHttp=-1;googleState=6;
-      Serial0.println("GOOGLE TX: DNS lookup failed");
-      continue;
-    }
-    googleDns=1;googleTlsError=0;googleErrorStage=0;
+    // HTTPS already resolves the host. A second DNS lookup and a separate
+    // TCP:443 probe caused unnecessary radio traffic every 15 seconds.
+    googleDns=-1;googleTlsError=0;googleErrorStage=0;
     WiFiClientSecure secure;
     secure.setCACert(GOOGLE_TRUST_ANCHOR);
-    secure.setTimeout(20000);
+    secure.setTimeout(10000);
     HTTPClient request;
-    request.setConnectTimeout(20000);
-    request.setTimeout(20000);
+    request.setConnectTimeout(8000);
+    request.setTimeout(10000);
     int code=-1;
     if(request.begin(secure,googleEndpoint)){
       request.addHeader("Content-Type","application/json");
       code=request.POST((uint8_t*)packet.c_str(),packet.length());
       if(code<0){
+        googleInternet=0;
         char tlsText[96]={0};
         googleTlsError=secure.lastError(tlsText,sizeof(tlsText));
         googleErrorStage=2;googleState=6;
         Serial0.printf("GOOGLE TX: HTTPS error %d, TLS code %d (%s)\\n",
                        code,(int)googleTlsError,tlsText);
       }else if(code==200){
+        googleInternet=1;googleDns=1;
         const String reply=request.getString();
         googleState=reply.indexOf("\"stored\":true")>=0?5:7;
         googleErrorStage=googleState==5?0:3;
         googleTlsError=0;
       }else if(code==302||code==303){
+        googleInternet=1;googleDns=1;
         // Apps Script ContentService redirects after execution. Delivery is
         // not counted as confirmed unless sheet response says stored:true.
         googleState=4;googleErrorStage=0;
       }else{
+        googleInternet=0;
         googleState=6;googleErrorStage=3;
         Serial0.printf("GOOGLE TX: HTTP status %d\\n",code);
       }
       request.end();
     }else{
+      googleInternet=0;
       googleState=6;googleErrorStage=2;googleTlsError=0;
       Serial0.println("GOOGLE TX: HTTPClient.begin failed");
     }
     googleHttp=code;
     if(googleState==5)googleSent++;
+    busaGoogleNetworkBusy=false;
   }
 }
 void addGoogleRoutes(){
