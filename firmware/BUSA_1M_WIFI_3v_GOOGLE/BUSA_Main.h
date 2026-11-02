@@ -204,7 +204,7 @@ float flowLpm=0.0f,flowTrace[40]={};
 uint32_t waterPulseHistory[40]={}; // raw pulses only, not calibrated
 uint32_t waterPulseDelta=0;
 bool flowReady=false,flowSeen=false;
-uint8_t flowTraceHead=0;
+uint8_t flowTraceHead=0,waterSamplesRecorded=0;
 void sampleFlow(uint32_t now){
   if(!flowCycle){flowCycle=now;return;}
   uint32_t dt=now-flowCycle;
@@ -216,8 +216,10 @@ void sampleFlow(uint32_t now){
   if(diff)flowSeen=true;
   flowReady=true;
   waterPulseDelta=diff;
-  waterPulseHistory[flowTraceHead%40]=diff;
-  flowTrace[flowTraceHead++%40]=flowLpm;
+  waterPulseHistory[flowTraceHead]=diff;
+  flowTrace[flowTraceHead]=flowLpm;
+  flowTraceHead=(flowTraceHead+1)%40;
+  if(waterSamplesRecorded<40)waterSamplesRecorded++;
 }
 float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
 
@@ -551,6 +553,7 @@ bool pcfRead(uint16_t &value){
 }
 uint8_t currentPage=0; // 7 tabs including Diagnostics
 uint8_t graphSubView=0; // 0 four isolated temperature lanes; 1 water + collection lanes
+uint32_t busaGraphLastDrawnCapture=0;
 uint8_t approvedSettingsItem=0; // 5 approved settings
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 uint8_t diagModule=0,calSensor=0,themeDraft=2,tftThemeMode=2;
@@ -2840,7 +2843,7 @@ void setup(){
       j+="]";
     }
     j+="],\"water_pulses\":[";
-    const int waterCount=flowReady?40:0;
+    const int waterCount=waterSamplesRecorded;
     for(int i=0;i<waterCount;i++){
       if(i)j+=",";
       const int idx=(flowTraceHead+40-waterCount+i)%40;
@@ -2916,6 +2919,11 @@ void loop(){
     tftDirty=true;
   }
     sampleFlow(now);
+  v13Collect(now); // Shared graph sampling, including when TFT screen is asleep.
+  // Keep physical TFT graph refreshed as the shared history grows (one frame per 5 s).
+  if(currentPage==3 && v13HistoryCount && v13LastCapture!=busaGraphLastDrawnCapture){
+    tftDirty=true;busaGraphLastDrawnCapture=v13LastCapture;
+  }
   // Landscape V14.7: repaint changed fields at 5 Hz; full frame only on page/theme change.
   // TFT driver writes are kept in the main loop so no concurrent SPI transactions occur.
   if(tftStarted && !tftDisplayOff && !otaActive && bootSplashComplete &&
