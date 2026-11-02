@@ -1582,26 +1582,19 @@ main>*{max-width:100%;min-width:0}
 <span class="netPill"><span id="internetLed" class="netDot"></span>ИНТЕРНЕТ <span id="internetLabel" class="netText">нет связи</span></span>
 <span class="netPill"><span id="localLed" class="netDot"></span>БУСА Wi-Fi <span id="localLabel" class="netText">нет клиента</span></span>
 </div>
-<nav class="appTabs" aria-label="Разделы">
-<button data-page="0" class="on"><span class="tabIcon">⌂</span><span>Главная</span></button>
-<button data-page="1"><span class="tabIcon">♨</span><span>Температуры</span></button>
-<button data-page="2"><span class="tabIcon">♧</span><span>Отбор</span></button>
-<button data-page="3"><span class="tabIcon">⌁</span><span>Графики</span></button>
-<button data-page="4"><span class="tabIcon">▤</span><span>События</span></button>
-<button data-page="5"><span class="tabIcon">⚙</span><span>Настройки</span></button>
-<button data-page="6"><span class="tabIcon">◈</span><span>Диагностика</span></button>
-</nav></header><main>
-<section class="page" data-section="0">
-  <div class="homeHero"><div class="heroEyebrow">БУСА-1М №001 · ПАНЕЛЬ МОНИТОРИНГА</div>
-  <h2>Главная</h2><div class="heroStatus"><span>● Только показания</span><span id="mainwifi">Wi-Fi: ожидание</span></div></div>
-  <div class="card"><h2>Температура · T1–T4</h2><div class="grid temps">
-    <div class="tile"><small><span class="tempDot t1"></span>T1 · Вода</small><strong id="t0">Н/Д</strong><small id="homeSet0">ВКЛ — · ВЫКЛ —</small></div>
-    <div class="tile"><small><span class="tempDot t2"></span>T2 · Колонна</small><strong id="t1">Н/Д</strong><small id="homeSet1">ВКЛ — · ВЫКЛ —</small></div>
-    <div class="tile"><small><span class="tempDot t3"></span>T3 · Куб</small><strong id="t2">Н/Д</strong><small id="homeSet2">ВКЛ — · ВЫКЛ —</small></div>
-    <div class="tile"><small><span class="tempDot t4"></span>T4 · Верх колонны</small><strong id="t3">Н/Д</strong><small id="homeSet3">ВКЛ — · ВЫКЛ —</small></div>
-  </div></div>
-  <div class="card rigCard"><h2>Схема установки</h2><div class="rigViewport">
-  <svg viewBox="0 0 360 225" role="img" aria-label="Схема установки БУСА с датчиком YF-S401 на линии охлаждающей воды" preserveAspectRatio="xMidYMid meet">
+<nav class="appTabs" aria-label="Шесть разделов БУСА"><button data-page="0" class="on"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-7h6v7"/></svg><span>Главная</span></button>
+<button data-page="1"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg><span>Температуры</span></button>
+<button data-page="2"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><span>Отбор</span></button>
+<button data-page="3"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><span>Графики</span></button>
+<button data-page="4"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h5"/></svg><span>События</span></button>
+<button data-page="5"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><span>Настройки</span></button></nav></header><main><section class="page" data-section="0">
+<div class="approvedHomeTitle"><strong>БУСА-1М №001</strong><span id="mainwifi">Wi-Fi: ожидание</span></div>
+<div class="approvedDashboard">
+  <div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon">💧</span><span>Вода</span></div><strong id="t0">Н/Д</strong><small id="homeSet0">ВКЛ — · ВЫКЛ —</small></div>
+<div class="approvedTemp temp1"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Колонна</span></div><strong id="t1">Н/Д</strong><small id="homeSet1">ВКЛ — · ВЫКЛ —</small></div>
+<div class="approvedTemp temp2"><div class="approvedTempTitle"><span class="approvedTempIcon">▣</span><span>Куб</span></div><strong id="t2">Н/Д</strong><small id="homeSet2">ВКЛ — · ВЫКЛ —</small></div>
+<div class="approvedTemp temp3"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Верх колонны</span></div><strong id="t3">Н/Д</strong><small id="homeSet3">ВКЛ — · ВЫКЛ —</small></div></div>
+  <div class="approvedRig"><svg viewBox="0 0 360 225" role="img" aria-label="Схема установки БУСА с датчиком YF-S401 на линии охлаждающей воды" preserveAspectRatio="xMidYMid meet">
 <defs><linearGradient id="steel" x1="0" x2="1"><stop stop-color="#71899a"/><stop offset=".45" stop-color="#e6f0f3"/><stop offset="1" stop-color="#768b9b"/></linearGradient><linearGradient id="water" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#31b6e8"/><stop offset="1" stop-color="#087eae"/></linearGradient></defs>
 <rect width="360" height="225" rx="14" fill="#f8fbfd"/>
 <path d="M88 179 V93 Q88 85 96 85 H164" fill="none" stroke="#738c9b" stroke-width="7"/>
@@ -1625,50 +1618,76 @@ main>*{max-width:100%;min-width:0}
 <rect x="315" y="199" width="26" height="13" rx="3" fill="#b4e4ed"/>
 <text x="95" y="217" text-anchor="middle" font-size="11" fill="#526779">Мониторинг температур T1–T4</text>
 <text x="254" y="41" text-anchor="middle" font-size="10" fill="#526779">Охлаждение</text>
-</svg></div>
-  <p class="hint">Схема условная. YF-S401 показан на линии <b>охлаждающей воды</b>, а не на линии отбора.</p></div>
-  <div class="grid homeMini">
-   <div class="card"><h2>Охлаждающая вода</h2><div class="row">YF-S401 <b>GPIO15</b></div>
-   <div class="row">Импульсы <b id="pulses">—</b></div>
-   <div class="row">Расход, оценка <b id="flow">—</b></div><p class="hint">Не откалибровано; 0 импульсов не доказывает отсутствие воды.</p></div>
-   <div class="card"><h2>Отбор</h2><div class="row">Расход <b class="warn">НЕТ ДАТЧИКА</b></div>
-   <div class="row">Собрано <b class="warn">Н/Д</b></div>
-   <p class="hint">Датчик охлаждающей воды не измеряет отбор.</p></div>
-  </div>
-  <div class="card"><h2>Состояние K1–K4</h2>
-   <div class="relayGrid"><span>K1 <b id="soundStatus0">ВЫКЛ</b></span><span>K2 <b id="soundStatus1">ВЫКЛ</b></span><span>K3 <b id="soundStatus2">ВЫКЛ</b></span><span>K4 <b id="soundStatus3">ВЫКЛ</b></span></div>
-   <p class="hint">Т3 ВКЛ — К1 + К2 (90 сек); Т3 ВЫКЛ — К1 выкл + К3 (90 сек). Т4 ВКЛ — К4 + К2 (90 сек); Т4 ВЫКЛ — К4 выкл + К3 (90 сек), К1 не меняет состояние. Все реле только звуковые.</p>
-  </div></section>
-<section class="page" data-section="1" hidden><div class="card"><h2>Температуры</h2><div class="grid">
-<div><label>Т1 · Вода</label><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><label for="tempOn0">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn0"></div><div><label for="tempOff0">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff0"></div></div></div>
-<div><label>Т2 · Колонна</label><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><label for="tempOn1">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn1"></div><div><label for="tempOff1">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff1"></div></div></div>
-<div><label>Т3 · Куб</label><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><label for="tempOn2">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn2"></div><div><label for="tempOff2">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff2"></div></div></div>
-<div><label>Т4 · Верх колонны</label><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><label for="tempOn3">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn3"></div><div><label for="tempOff3">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff3"></div></div></div>
-</div><button type="button" id="temperatureSave" class="full">Сохранить</button><p id="temperatureSaveResult" class="hint"></p></div></section>
-<section class="page" data-section="2" hidden><div class="card"><h2>Отбор · ручной режим</h2><p class="hint">Блок 220 В и электропривод крана исключены. ESP32 не управляет ими.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
-<section class="page" data-section="3" hidden>
- <div class="card"><h2>Графики · реальные измерения</h2>
- <div class="settingsTabs" style="grid-template-columns:repeat(3,1fr)"><button type="button" data-graph-tft="0" class="on">T1–T4</button><button type="button" data-graph-tft="1">Вода</button><button type="button" data-graph-tft="2">Отбор</button></div>
- <div class="graphPanel" data-graph-panel="0"><h3>Четыре температуры, °C</h3><canvas id="graphT" width="600" height="200"></canvas><p class="hint">Только измерения текущей сессии. Каждая линия имеет свой цвет.</p></div>
- <div class="graphPanel" data-graph-panel="1" hidden><h3>YF-S401 · вода охлаждения</h3><canvas id="graphF" width="600" height="200"></canvas><p class="hint">Показаны реальные импульсы опроса, не литры: датчик не откалиброван.</p></div>
- <div class="graphPanel" data-graph-panel="2" hidden><h3>График отбора</h3><p class="warn">Нет датчика отбора. График без выдуманных данных.</p></div>
- </div></section>
-<section class="page" data-section="4" hidden><div class="card"><h2>Журнал событий</h2>
-<div class="eventFilters">
-<button type="button" class="on" data-event="all">Все</button>
-<button type="button" data-event="warn">Предупр.</button>
-<button type="button" data-event="alarm">Аварии</button>
-<button type="button" data-event="system">Система</button></div>
-<div id="events">Ожидание...</div><p class="hint">Только события текущей сессии. Записи без подтверждения не создаются.</p></div></section>
-<section class="page" data-section="5" hidden>
-<div class="card"><h2>Настройки</h2>
-<div class="settingsTabs" id="settingsTabs">
-<button type="button" data-stab-btn="0" class="on">Температура</button>
-<button type="button" data-stab-btn="1">Wi-Fi</button>
-<button type="button" data-stab-btn="2">Экран</button>
-<button type="button" data-stab-btn="3">Google</button>
-<button type="button" data-stab-btn="4">О системе</button>
-</div></div>
+</svg><div class="approvedRigLabel">СХЕМА УСТАНОВКИ</div></div>
+</div>
+<div class="approvedMetrics">
+  <div class="approvedMetric"><span>◉</span><div><small>Расход отбора</small><strong>Н/Д</strong><small>мл/мин · нет датчика</small></div></div>
+  <div class="approvedMetric"><span>▤</span><div><small>Собрано</small><strong>Н/Д</strong><small>мл · нет датчика</small></div></div>
+</div>
+<div class="approvedStatus"><span>● Мониторинг</span><span>4 звуковых реле</span></div>
+<details class="card approvedAdditional"><summary>Охлаждающая вода и звуковые выходы</summary>
+  <div class="row">YF-S401 <b>GPIO15</b></div><div class="row">Импульсы <b id="pulses">—</b></div>
+  <div class="row">Расход воды (не калиброван) <b id="flow">—</b></div>
+  <p class="hint">Датчик на линии охлаждающей воды, а не на линии отбора. Его расчётный расход не подтверждён калибровкой.</p>
+  <div class="relayGrid"><span>K1 <b id="soundStatus0">ВЫКЛ</b></span><span>K2 <b id="soundStatus1">ВЫКЛ</b></span><span>K3 <b id="soundStatus2">ВЫКЛ</b></span><span>K4 <b id="soundStatus3">ВЫКЛ</b></span></div>
+  <p class="hint">К1–К4 используются только для звуковой сигнализации.</p>
+</details></section>
+<section class="page" data-section="1" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg><strong>ТЕМПЕРАТУРЫ</strong></div>
+<div class="approvedSensorList"><div class="approvedSensor temp0">
+  <div class="approvedSensorHead"><div class="approvedSensorIcon">💧</div><div class="approvedSensorText"><strong>Вода</strong><small id="detailSet0">Пороги не установлены</small></div><strong id="tempLive0" class="approvedSensorLive">Н/Д</strong></div>
+  <details class="sensorEdit"><summary>Настроить пороги звукового сигнала <span>›</span></summary>
+    <div class="grid approvedFieldGrid"><div><label for="tempOn0">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn0"></div>
+    <div><label for="tempOff0">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff0"></div></div>
+  </details></div>
+<div class="approvedSensor temp1">
+  <div class="approvedSensorHead"><div class="approvedSensorIcon">♧</div><div class="approvedSensorText"><strong>Колонна</strong><small id="detailSet1">Пороги не установлены</small></div><strong id="tempLive1" class="approvedSensorLive">Н/Д</strong></div>
+  <details class="sensorEdit"><summary>Настроить пороги звукового сигнала <span>›</span></summary>
+    <div class="grid approvedFieldGrid"><div><label for="tempOn1">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn1"></div>
+    <div><label for="tempOff1">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff1"></div></div>
+  </details></div>
+<div class="approvedSensor temp2">
+  <div class="approvedSensorHead"><div class="approvedSensorIcon">▣</div><div class="approvedSensorText"><strong>Куб</strong><small id="detailSet2">Пороги не установлены</small></div><strong id="tempLive2" class="approvedSensorLive">Н/Д</strong></div>
+  <details class="sensorEdit"><summary>Настроить пороги звукового сигнала <span>›</span></summary>
+    <div class="grid approvedFieldGrid"><div><label for="tempOn2">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn2"></div>
+    <div><label for="tempOff2">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff2"></div></div>
+  </details></div>
+<div class="approvedSensor temp3">
+  <div class="approvedSensorHead"><div class="approvedSensorIcon">♧</div><div class="approvedSensorText"><strong>Верх колонны</strong><small id="detailSet3">Пороги не установлены</small></div><strong id="tempLive3" class="approvedSensorLive">Н/Д</strong></div>
+  <details class="sensorEdit"><summary>Настроить пороги звукового сигнала <span>›</span></summary>
+    <div class="grid approvedFieldGrid"><div><label for="tempOn3">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn3"></div>
+    <div><label for="tempOff3">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff3"></div></div>
+  </details></div></div>
+<div class="card"><p class="hint">Пороги управляют звуковыми предупреждениями. Калибровка показаний находится в «Настройки → Температура».</p>
+<button id="temperatureSave" type="button" class="full">Сохранить пороги</button><p id="temperatureSaveResult" class="hint"></p></div></section>
+<section class="page" data-section="2" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><strong>ОТБОР ЖИДКОСТИ</strong></div>
+<div class="approvedCollectionMetrics"><div class="approvedCollectionCell"><small>Текущий расход</small><strong>НЕТ ДАТЧИКА</strong><small>мл/мин</small></div>
+<div class="approvedCollectionCell"><small>Собрано жидкости</small><strong>Н/Д</strong><small>мл</small></div></div>
+<div class="card approvedGraphCard"><h2>График расхода (мл/мин)</h2><div class="approvedGraphPlaceholder"><div class="approvedGridLines"></div><span>Нет датчика отбора</span></div>
+<p class="hint">График и счётчик не подменяются данными YF-S401.</p></div>
+<details class="card approvedAdditional"><summary>Данные охлаждающей воды</summary>
+<div class="row">Расход, л/мин (оценка) <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div>
+<p class="hint">Не откалибровано; вода охлаждения не является измерением отбора.</p></details></section>
+<section class="page" data-section="3" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><strong>ГРАФИКИ</strong></div>
+<div class="card"><div class="settingsTabs approvedGraphTabs"><button type="button" data-graph-tft="0" class="on">Температуры</button>
+<button type="button" data-graph-tft="1">Вода</button><button type="button" data-graph-tft="2">Отбор</button></div>
+<div class="graphPanel" data-graph-panel="0"><h3>Температура (°C)</h3>
+<div class="approvedLegend"><span class="temp0">T1 Вода</span><span class="temp1">T2 Колонна</span><span class="temp2">T3 Куб</span><span class="temp3">T4 Верх</span></div>
+<canvas id="graphT" width="600" height="200"></canvas><p class="hint">Измерения текущей сессии; без выдуманных значений.</p></div>
+<div class="graphPanel" data-graph-panel="1" hidden><h3>Охлаждающая вода · импульсы</h3><canvas id="graphF" width="600" height="200"></canvas><p class="hint">YF-S401 не откалиброван: это импульсы, не измеренный расход.</p></div>
+<div class="graphPanel" data-graph-panel="2" hidden><h3>Расход отбора</h3><div class="approvedGraphPlaceholder">Нет датчика отбора</div></div>
+<div class="approvedSession">Текущая сессия · реальные данные</div></div></section>
+<section class="page" data-section="4" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h5"/></svg><strong>СОБЫТИЯ</strong></div>
+<div class="card"><div class="eventFilters"><button type="button" class="on" data-event="all">Все</button><button type="button" data-event="warn">Предупр.</button><button type="button" data-event="alarm">Аварии</button><button type="button" data-event="system">Система</button></div>
+<div id="events" class="approvedEvents">Ожидание...</div><p class="hint">Регистрируются только полученные события; исторические записи не выдумываются.</p></div></section>
+<section class="page" data-section="5" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><strong>НАСТРОЙКИ</strong></div>
+<div class="card approvedSettingsMain" id="settingsMenu"><button type="button" data-stab-btn="0" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg></span><span>Температура</span><span class="approvedArrow">›</span></button>
+<button type="button" data-stab-btn="1" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M2 8c6-5 14-5 20 0M5 12c4-4 10-4 14 0M8 16c2-2 6-2 8 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg></span><span>Wi-Fi</span><span class="approvedArrow">›</span></button>
+<button type="button" data-stab-btn="2" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg></span><span>Экран</span><span class="approvedArrow">›</span></button>
+<button type="button" data-stab-btn="3" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M7 19h11a4 4 0 0 0 .5-8A6.5 6.5 0 0 0 6 11a4 4 0 0 0 1 8z"/></svg></span><span>Google</span><span class="approvedArrow">›</span></button>
+<button type="button" data-stab-btn="5" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 18v3h16v-3"/></svg></span><span>Обновление ПО</span><span class="approvedArrow">›</span></button>
+<button type="button" data-stab-btn="6" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 18h4l3-8 4 6 3-4h4"/><circle cx="12" cy="12" r="10"/></svg></span><span>Диагностика</span><span class="approvedArrow">›</span></button>
+<button type="button" data-stab-btn="4" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/></svg></span><span>О системе</span><span class="approvedArrow">›</span></button></div>
+<button type="button" id="settingsBack" hidden class="approvedBack">‹ Все настройки</button>
 <div class="card settingCard" data-stab="0"><h2>Калибровка температуры</h2>
 <p class="hint">Поправки показаний T1–T4, шаг 0,1 °C, от −10 до +10 °C. Это НЕ пороги звуковых сигналов.</p>
 <div class="row"><label for="calOffset0">T1 · Вода</label><input id="calOffset0" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
@@ -1677,6 +1696,7 @@ main>*{max-width:100%;min-width:0}
 <div class="row"><label for="calOffset3">T4 · Верх колонны</label><input id="calOffset3" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
 <button id="tempCalSave" type="button" class="full">Сохранить поправки</button>
 <p id="tempCalResult" role="status" class="hint">—</p></div>
+
 <div class="card settingCard" data-stab="1" hidden><h2>Wi-Fi</h2>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select>
@@ -1684,6 +1704,7 @@ main>*{max-width:100%;min-width:0}
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна только в защищённой локальной сети БУСА. Пароль хранится на ESP32.</p></div>
+
 <div class="card settingCard" data-stab="2" hidden><h2>Экран</h2>
 <p class="hint">Три темы: светлая, тёмная и системная с утверждёнными рисунками. Драйвер и распиновка не меняются.</p>
 <label for="themeModeSelect">Тема TFT</label><select id="themeModeSelect">
@@ -1692,6 +1713,7 @@ main>*{max-width:100%;min-width:0}
 </select>
 <button type="button" id="tftTheme" class="full">Применить и сохранить тему</button>
 <p id="tftThemeStatus" class="hint">—</p></div>
+
 <div class="card settingCard" data-stab="3" hidden><h2>Google · телеметрия БУСА</h2>
 <div class="row">Состояние канала <b id="googleState">НЕ НАСТРОЕН</b></div>
 <p class="hint">БУСА передаёт измерения и диагностику в Google Таблицу. Настройка подключения сохранена.</p>
@@ -1703,14 +1725,22 @@ main>*{max-width:100%;min-width:0}
 <button id="googleTest" type="button" class="full">Проверить отправку диагностики</button>
 <button id="googleStop" type="button" class="full">Отключить передачу в Google</button>
 <p id="googleResult" role="status" class="hint">—</p></div>
+
 <div class="card settingCard" data-stab="4" hidden><h2>О системе</h2>
 <div class="row">Подключение к Wi-Fi <b id="aboutWifi">—</b></div>
 <div class="row">Передача в Google <b id="aboutGoogle">—</b></div>
 <div class="row">Прошивка <b id="aboutFirmware">—</b></div>
 <div class="row">Время работы <b id="aboutUptime">—</b></div></div>
-</section>
-<section class="page" data-section="6" hidden>
-<div class="card"><h2>Диагностика</h2>
+
+<div class="card settingCard" data-stab="5" hidden><h2>Обновление ПО</h2>
+<div class="row">Установленная прошивка <b id="otaFirmware">—</b></div>
+<p class="hint">Обновление только локально по Wi-Fi БУСА. Выбирайте APP_OTA.bin, настройки и раскладку клавиш не стирайте.</p>
+<h3>Обновление прошивки</h3>
+<p class="hint">Для OTA выбирай APP_OTA.bin, подключившись к Wi-Fi БУСА. Не стирай NVS — раскладка клавиатуры и настройки сохраняются.</p>
+<input type="file" accept=".bin" id="firmwareFile">
+<button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
+<p id="updateResult" role="status">Ожидание подтверждения</p></div>
+<div class="settingCard" data-stab="6" hidden><div class="card"><h2>Диагностика</h2>
 <div class="settingsTabs diagTabs">
 <button type="button" data-diag-btn="screen" class="on">Экран</button>
 <button type="button" data-diag-btn="keys">Клавиатура</button>
@@ -1757,14 +1787,11 @@ main>*{max-width:100%;min-width:0}
 <textarea id="diagReport" rows="9" readonly style="width:100%;font:11px ui-monospace,monospace;white-space:pre;overflow:auto">Ожидание диагностики...</textarea>
 <button type="button" id="diagCopy" class="full">Скопировать отчёт всех модулей</button>
 <p id="diagCopyResult" class="hint">—</p>
-<h3>Обновление прошивки</h3>
-<p class="hint">Для OTA выбирай APP_OTA.bin, подключившись к Wi-Fi БУСА. Не стирай NVS — раскладка клавиатуры и настройки сохраняются.</p>
-<input type="file" accept=".bin" id="firmwareFile">
-<button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
-<p id="updateResult" role="status">Ожидание подтверждения</p></div>
+</div>
 <div class="card" data-diag-panel="flow" hidden><h2>Расходомер охлаждающей воды</h2>
 <pre id="diagFlow" style="white-space:pre-wrap;word-break:break-word">Ожидание импульсов...</pre>
 <p class="hint">Пока не откалиброван; значения расхода и объёма оценочные.</p></div>
+</div>
 </section>
 <footer class="hint">БУСА-1М №001 · мониторинг + 4 звуковых реле 12 В · силовое оборудование управляется вручную</footer></main>
 <script>
