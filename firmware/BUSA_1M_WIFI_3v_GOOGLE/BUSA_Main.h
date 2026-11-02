@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-WIFISTABLE-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-NETSTABLE-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1066,7 +1066,7 @@ bool otaActive=false,otaSuccess=false,otaRestart=false,otaWriteAllowed=false;
 uint32_t otaBytes=0,otaRestartAt=0,otaTokenIssued=0,startedAt=0;
 String otaToken="",otaMessage="Ожидание",nearbyNames[5];
 uint8_t nearbyCount=0;
-bool busaWifiScanRunning=false;
+volatile bool busaWifiScanRunning=false;
 uint32_t busaWifiScanStartedAt=0,busaWifiScanLastAt=0;
 bool screenAttempted=false;
 bool apClient(){return server.client().localIP()==WiFi.softAPIP();}
@@ -1978,7 +1978,7 @@ main>*{max-width:100%;min-width:0}
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let busaGraphData={temperature:[[],[],[],[]],water_pulses:[]},busaGraphFetchedAt=0,busaGraphLoading=false;
 let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=false,calInitialized=false;
-let active=0,connected=false,pollBusy=false,settingsActive=-1,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
+let active=0,connected=false,pollBusy=false,statusFailures=0,settingsActive=-1,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
 function networkLeds(info,ssid){
  const online=info&&info.internet===true;
@@ -2196,7 +2196,7 @@ async function refreshGraphHistory(force=false){
   }
  }catch(e){}finally{busaGraphLoading=false;}
 }
-async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;
+async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;statusFailures=0;
 networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(Date.now()-lastLocalNav>1800){
  const physicalPage=(s.ui_page||1)-1;
  if(typeof s.ui_page==='number'&&(physicalPage===6?active!==5||settingsActive!==6:physicalPage!==active))page(physicalPage,false);
@@ -2312,7 +2312,7 @@ if(s.keypad){
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (проверка изображения визуальная)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)refreshGraphHistory();
-}catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
+}catch(e){statusFailures++;if(statusFailures>=3){if(connected)message('Нет ответа ESP32: проверь локальный Wi-Fi');connected=false;networkLeds(null,'')}}finally{pollBusy=false}}
 get('temperatureSave').onclick=async()=>{
  const button=get('temperatureSave'),result=get('temperatureSaveResult');
  const data=new URLSearchParams();
@@ -2531,7 +2531,7 @@ void setup(){
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
     Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
   }else Serial0.println("STA config missing: preprovision NVS before use; AP stays available");
-  server.on("/",HTTP_GET,[]{server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
+  server.on("/",HTTP_GET,[]{server.sendHeader("Cache-Control","no-store");server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
   server.on("/api/time/sync",HTTP_POST,[]{
     if(!apClient()){
       server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;
@@ -2758,12 +2758,17 @@ void setup(){
       if(busaWifiScanRunning){
         server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
       }
+      if(busaGoogleNetworkBusy){
+        server.send(503,"application/json","{\"scanning\":false,\"error\":\"google_upload_active\",\"networks\":[]}");return;
+      }
       if(busaWifiScanLastAt && !elapsed(now,busaWifiScanLastAt,15000)){
         server.send(429,"application/json","{\"scanning\":false,\"error\":\"repeat_too_soon\",\"networks\":[]}");return;
       }
       WiFi.scanDelete();
       busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
-      const int started=WiFi.scanNetworks(true,false,true,45);
+      // Active probe is more reliable than the old 45-ms passive scan, which
+      // could miss 100-ms AP beacons and incorrectly report zero networks.
+      const int started=WiFi.scanNetworks(true,false,false,80);
       busaWifiScanRunning=(started==WIFI_SCAN_RUNNING);
       if(started==WIFI_SCAN_FAILED){
         busaWifiScanRunning=false;
@@ -2810,7 +2815,9 @@ void setup(){
     bool ok=(prefs.putString("ssid",ssid)>0 && prefs.putString("pass",pass)>0);
     if(!ok){server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;}
     stationSsid=ssid;stationPass=pass;
-    WiFi.disconnect();WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    // Do not force a STA disconnect while an HTTPS Google request is active.
+    // Save credentials now; start the new association after sending the reply.
+    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
     lastStationCheck=millis();
     server.send(200,"text/plain; charset=utf-8","Wi-Fi сохранён. Подключение к сети запущено.");
   });
@@ -2997,10 +3004,16 @@ void loop(){
   const uint32_t tickStart=now;
   soundPoll(now);
   {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
-  if(stationSsid.length() && stationPass.length()>=8 && WiFi.status()!=WL_CONNECTED && elapsed(now,lastStationCheck,20000)){
+  // ESP-IDF auto-reconnect already runs in the Wi-Fi driver. Manual retries
+  // use a 2-min backoff and never interrupt a local AP client, an active
+  // Google HTTPS transfer, or a channel scan.
+  if(stationSsid.length() && stationPass.length()>=8 &&
+      WiFi.status()!=WL_CONNECTED && !busaWifiScanRunning &&
+      !busaGoogleNetworkBusy && WiFi.softAPgetStationNum()==0 &&
+      elapsed(now,lastStationCheck,120000)){
     lastStationCheck=now;
     WiFi.reconnect();
-    Serial0.println("STA reconnect attempt; AP unaffected");
+    Serial0.println("STA reconnect: no local clients, 120s backoff");
   }
   readConsole();
   if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
