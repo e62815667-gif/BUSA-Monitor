@@ -36,6 +36,12 @@ function setupBusaSheet() {
                   Utilities.getUuid().replace(/-/g, '');
     cfg.setProperty('BUSA_VIEW_TOKEN', token);
   }
+  // Independent administrator secret; never place in the published page or ESP32.
+  if (!cfg.getProperty('BUSA_ADMIN_TOKEN')) {
+    const token = Utilities.getUuid().replace(/-/g, '') +
+                  Utilities.getUuid().replace(/-/g, '');
+    cfg.setProperty('BUSA_ADMIN_TOKEN', token);
+  }
   const tab = sheet.getSheetByName(BUSA_TAB) || sheet.insertSheet(BUSA_TAB);
   if (tab.getLastRow() === 0) {
     tab.appendRow(BUSA_HEADERS);
@@ -102,7 +108,27 @@ function doPost(e) {
     } finally {
       lock.releaseLock();
     }
-    return busaJson_({stored: true});
+    // Acknowledgement is sent in the next authenticated ESP32 telemetry POST.
+    // One pending command at a time; expiry prevents stale commands after outages.
+    const ack=payload.cloud_control_ack;
+    const props=PropertiesService.getScriptProperties();
+    let pending=null;
+    try{pending=JSON.parse(props.getProperty('BUSA_PENDING_COMMAND')||'null')}catch(ignore){}
+    if(ack && pending && ack.id===pending.id){
+      props.setProperty('BUSA_LAST_COMMAND_RESULT',JSON.stringify({
+        id:pending.id,kind:pending.kind,result:String(ack.result||'received').slice(0,80),at:Date.now()
+      }));
+      props.deleteProperty('BUSA_PENDING_COMMAND');
+      pending=null;
+    }
+    if(pending && Date.now()-pending.created>600000){
+      props.setProperty('BUSA_LAST_COMMAND_RESULT',JSON.stringify({
+        id:pending.id,kind:pending.kind,result:'expired',at:Date.now()
+      }));
+      props.deleteProperty('BUSA_PENDING_COMMAND');
+      pending=null;
+    }
+    return busaJson_({stored:true,command:pending||null});
   } catch (err) {
     // Do not log raw requests: they contain the token.
     return busaJson_({stored: false, error: String(err.message || 'Receiver error')});
@@ -129,6 +155,9 @@ function doGet(e) {
   const callback = 'busaViewReceive';
   try {
     const q = (e && e.parameter) || {};
+    if(q.mode==='adminCommand'||q.mode==='adminStatus'){
+      return busaAdminCommand_(q);
+    }
     const expected = PropertiesService.getScriptProperties().getProperty('BUSA_VIEW_TOKEN');
     if (!expected || typeof q.readToken !== 'string' ||
         !/^[a-fA-F0-9]{64}$/.test(q.readToken) ||
@@ -177,5 +206,71 @@ function busaScript_(data) {
   // Fixed callback prevents script injection through callback parameters.
   const js='busaViewReceive('+JSON.stringify(data)+');';
   return ContentService.createTextOutput(js)
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
+
+/**
+ * The cloud administrator key is NEVER the BUSA_TOKEN or BUSA_VIEW_TOKEN.
+ * Each command is explicitly requested and expires after 10 minutes.
+ * The ESP32 receives commands only inside its authenticated HTTPS telemetry
+ * response and validates every field again before changing any local setting.
+ */
+function busaAdminCommand_(q){
+  const fixed='busaAdminReceive';
+  try {
+    const cfg=PropertiesService.getScriptProperties();
+    const secret=cfg.getProperty('BUSA_ADMIN_TOKEN');
+    if(!secret||typeof q.adminToken!=='string'||!/^[a-fA-F0-9]{64}$/.test(q.adminToken)||
+       q.adminToken!==secret||(q.callback&&q.callback!==fixed)){
+      return busaAdminScript_({ok:false,error:'Требуется отдельный ключ администратора'});
+    }
+    const lock=LockService.getScriptLock();
+    if(!lock.tryLock(8000))return busaAdminScript_({ok:false,error:'Команда занята'});
+    try{
+      let pending=null;
+      try{pending=JSON.parse(cfg.getProperty('BUSA_PENDING_COMMAND')||'null')}catch(ignore){}
+      if(pending && Date.now()-pending.created>600000){
+        cfg.deleteProperty('BUSA_PENDING_COMMAND');pending=null;
+      }
+      let last=null;
+      try{last=JSON.parse(cfg.getProperty('BUSA_LAST_COMMAND_RESULT')||'null')}catch(ignore){}
+      if(q.mode==='adminStatus')return busaAdminScript_({ok:true,pending:pending?{
+        id:pending.id,kind:pending.kind,created:pending.created
+      }:null,last:last||null});
+      if(pending)return busaAdminScript_({ok:false,error:'Предыдущая команда ещё не подтверждена'});
+      const kind=String(q.kind||'');
+      const cmd={id:Utilities.getUuid(),kind,created:Date.now()};
+      const finite=(v,min,max)=>{const n=Number(v);if(!Number.isFinite(n)||String(v).trim()===''||n<min||n>max)throw new Error('Значение вне диапазона');return n};
+      if(kind==='threshold'){
+        cmd.index=finite(q.index,0,3);
+        if(!Number.isInteger(cmd.index))throw new Error('Номер датчика');
+        cmd.on=finite(q.on,0,125);cmd.off=finite(q.off,0,125);
+        if(Math.abs(cmd.on-cmd.off)<0.1)throw new Error('Пороги должны различаться');
+      }else if(kind==='calibration'){
+        cmd.index=finite(q.index,0,3);
+        if(!Number.isInteger(cmd.index))throw new Error('Номер датчика');
+        cmd.offset=finite(q.offset,-10,10);
+      }else if(kind==='theme'){
+        cmd.theme=finite(q.theme,0,2);
+        if(!Number.isInteger(cmd.theme))throw new Error('Номер темы');
+      }else if(kind==='ota'){
+        // Only the dedicated public owner-controlled GitHub Pages release path.
+        const allowed='https://e62815667-gif.github.io/BUSA-Monitor/online/firmware/BUSA_APP_OTA.bin';
+        if(q.url!==allowed)throw new Error('Неверный адрес прошивки');
+        if(!/^[a-fA-F0-9]{64}$/.test(String(q.sha256||'')))throw new Error('SHA-256');
+        cmd.size=finite(q.size,60000,3000000);
+        if(!Number.isInteger(cmd.size))throw new Error('Размер BIN');
+        cmd.url=allowed;cmd.sha256=q.sha256.toLowerCase();
+        cmd.version=String(q.version||'').slice(0,100);
+        if(!/^14v7-N16R8-/.test(cmd.version))throw new Error('Версия не совместима');
+      }else throw new Error('Недопустимая команда');
+      cfg.setProperty('BUSA_PENDING_COMMAND',JSON.stringify(cmd));
+      return busaAdminScript_({ok:true,queued:{id:cmd.id,kind:cmd.kind}});
+    }finally{lock.releaseLock();}
+  }catch(err){return busaAdminScript_({ok:false,error:String(err.message||'Ошибка')});}
+}
+function busaAdminScript_(obj){
+  return ContentService.createTextOutput('busaAdminReceive('+JSON.stringify(obj)+');')
     .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
