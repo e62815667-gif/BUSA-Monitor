@@ -1,8 +1,8 @@
-name: BUSA V14.7 N16R8 Smooth Google TLS CA Chain
+name: BUSA V14.7 Smooth Google Bounded I2C
 on:
   push:
     branches:
-      - release/busa-v14-7-smooth-google-ca-bundle-20261102
+      - release/busa-v14-7-smooth-google-i2c-bounded-20261102
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-v14-7-n16r8-gmt028.yml'
@@ -36,7 +36,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          for term in ('14v7-N16R8-SMOOTH-GOOGLE-20261102','TPIN[4]={16,17,18,21}',
+          for term in ('14v7-N16R8-SMOOTH-GOOGLE-I2C-20261102','TPIN[4]={16,17,18,21}',
                        'TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14',
                        'KPIN[4]={7,6,5,4}','BUS_SDA=8,BUS_SCL=9',
                        'FLOW_GPIO=15','RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false',
@@ -63,7 +63,11 @@ jobs:
           assert 'busaI2cScanLastStep,600' in p
           assert 'drawBootSplash(2500)' in p
           assert 'busaLastTftRenderMs' in p and 'tft_full_render_count' in p
-          assert 'busaI2cCheckTransfer(' in p
+          assert 'busaI2cTransaction(' in p
+          assert 'BUSA_I2C_TX_BUDGET_MS=20' in p
+          assert 'i2c_master_cmd_begin(I2C_NUM_0,cmd,ticks?ticks:1)' in p
+          assert 'busaI2cNackCount' in p and 'busaI2cTimeoutCount' in p
+          assert 'Wire.endTransmission()' not in '\\n'.join(line for line in p.splitlines() if not line.lstrip().startswith('//'))
           assert 'setCpuFrequencyMhz(240)' in p
           assert 'busaCpu240Ok' in p and 'psramFound()' in p
           assert 'psram_total_bytes' in p and 'psram_free_bytes' in p
@@ -184,15 +188,15 @@ jobs:
         run: |
           set -euo pipefail
           SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_SMOOTH_GOOGLE_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_SMOOTH_GOOGLE_N16R8_APP_OTA.bin
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_SMOOTH_GOOGLE_I2C_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_SMOOTH_GOOGLE_I2C_N16R8_APP_OTA.bin
           git rev-parse HEAD > build_busa_v147/SOURCE_COMMIT.txt
-          (cd build_busa_v147 && sha256sum BUSA_V14_7_SMOOTH_GOOGLE_N16R8_FULL_USB.bin BUSA_V14_7_SMOOTH_GOOGLE_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd build_busa_v147 && sha256sum BUSA_V14_7_SMOOTH_GOOGLE_I2C_N16R8_FULL_USB.bin BUSA_V14_7_SMOOTH_GOOGLE_I2C_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
           root=Path('build_busa_v147')
-          full=(root/'BUSA_V14_7_SMOOTH_GOOGLE_N16R8_FULL_USB.bin').read_bytes()
-          app=(root/'BUSA_V14_7_SMOOTH_GOOGLE_N16R8_APP_OTA.bin').read_bytes()
+          full=(root/'BUSA_V14_7_SMOOTH_GOOGLE_I2C_N16R8_FULL_USB.bin').read_bytes()
+          app=(root/'BUSA_V14_7_SMOOTH_GOOGLE_I2C_N16R8_APP_OTA.bin').read_bytes()
           assert 60000<len(app)<0x300000
           assert len(full)<16*1024*1024
           assert full[0x10000:0x10000+len(app)]==app, 'Merged USB and OTA content differs'
@@ -200,9 +204,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_V14_7_SMOOTH_GOOGLE_N16R8_USB_OTA_SHA256
+          name: BUSA_V14_7_SMOOTH_GOOGLE_I2C_N16R8_USB_OTA_SHA256
           path: |
-            build_busa_v147/BUSA_V14_7_SMOOTH_GOOGLE_N16R8_FULL_USB.bin
-            build_busa_v147/BUSA_V14_7_SMOOTH_GOOGLE_N16R8_APP_OTA.bin
+            build_busa_v147/BUSA_V14_7_SMOOTH_GOOGLE_I2C_N16R8_FULL_USB.bin
+            build_busa_v147/BUSA_V14_7_SMOOTH_GOOGLE_I2C_N16R8_APP_OTA.bin
             build_busa_v147/SHA256SUMS.txt
             build_busa_v147/SOURCE_COMMIT.txt
