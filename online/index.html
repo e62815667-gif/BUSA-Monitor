@@ -337,6 +337,10 @@ main .card{background:#071c32!important;border:1px solid #195486!important;box-s
 .settingCard[hidden],#settingsMenu[hidden],#settingsBack[hidden]{display:none!important}
 #googleSettings[hidden]{display:none!important}
 #heroStatus{color:#7decaf}
+.onlineSetupBanner{display:flex;align-items:center;gap:10px;justify-content:space-between;background:#122d45;border:1px solid #4299c8;border-radius:11px;padding:11px 12px;margin:4px 0 11px;font-size:13px}
+.onlineSetupBanner strong{color:#8ed9ff;font-size:13px}.onlineSetupBanner p{margin:4px 0 0;color:#bdd8ea;font-size:12px;line-height:1.4}
+.onlineSetupBanner button{border:1px solid #5ab8ec;background:#0e73c1;color:white;border-radius:8px;padding:9px 10px;font-size:12px;font-weight:700;flex-shrink:0}
+#onlineSetupBanner[hidden]{display:none!important}
 :root[data-theme="light"] .card{background:#f6fbff!important;color:#173b50!important;border-color:#b3d2e2!important}
 :root[data-theme="light"] .approvedTemp,:root[data-theme="light"] .approvedSensor,:root[data-theme="light"] .approvedMetric{background:#e4f2fa!important;color:#193e53!important}
 :root[data-theme="light"] .approvedTemp strong,:root[data-theme="light"] .approvedSensorLive{color:#168354!important}
@@ -345,10 +349,11 @@ main .card{background:#071c32!important;border:1px solid #195486!important;box-s
 .approvedBlackGraph canvas{border-radius:9px}
 
 </style></head><body>
-<header class="appHeader"><div class="headerRow"><div><div class="eyebrow">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div><span class="onlineReadOnly">● ОНЛАЙН</span></div><div class="headerTime" id="clockDisplay">Время: —</div><div class="onlineNetwork"><span><i class="led" id="cloudInternet"></i> ИНТ <b id="cloudInternetLabel">—</b></span><span><i class="led" id="cloudLocal"></i> ЛОК <b id="cloudLocalLabel">—</b></span><span><i class="led" id="cloudData"></i> ДАН <b id="cloudDataLabel">—</b></span></div></header>
+<header class="appHeader"><div class="headerRow"><div><div class="eyebrow">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div><span class="onlineReadOnly">● САЙТ ОТКРЫТ</span></div><div class="headerTime" id="clockDisplay">Время: —</div><div class="onlineNetwork"><span><i class="led" id="cloudInternet"></i> ИНТ <b id="cloudInternetLabel">—</b></span><span><i class="led" id="cloudLocal"></i> ЛОК <b id="cloudLocalLabel">—</b></span><span><i class="led" id="cloudData"></i> ДАН <b id="cloudDataLabel">—</b></span></div></header>
 <main>
 
-<section id="home"><div class="approvedHomeTitle"><strong>БУСА-1М №001</strong><span id="heroStatus">● Ожидание данных</span></div><div class="approvedDashboard"><div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon">💧</span><span>Вода</span></div><strong id="remoteT0">Н/Д</strong><small id="onlineSet0">Зад: —</small></div><div class="approvedTemp temp1"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Колонна</span></div><strong id="remoteT1">Н/Д</strong><small id="onlineSet1">Зад: —</small></div><div class="approvedTemp temp2"><div class="approvedTempTitle"><span class="approvedTempIcon">▣</span><span>Куб</span></div><strong id="remoteT2">Н/Д</strong><small id="onlineSet2">Зад: —</small></div><div class="approvedTemp temp3"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Верх колонны</span></div><strong id="remoteT3">Н/Д</strong><small id="onlineSet3">Зад: —</small></div></div><div class="approvedRig"><svg viewBox="0 0 190 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схематичная колонна БУСА: куб, колонна и охлаждение" preserveAspectRatio="xMidYMid meet">
+<section id="home"><div class="approvedHomeTitle"><strong>БУСА-1М №001</strong><span id="heroStatus">● Ожидание данных</span></div>
+<div id="onlineSetupBanner" class="onlineSetupBanner"><div><strong>Google не подключён</strong><p id="onlineSetupMessage">Для показа температур подключи защищённый просмотр Google. БУСА уже отправляет данные в таблицу.</p></div><button id="onlineOpenGoogle" type="button">Подключить</button></div><div class="approvedDashboard"><div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon">💧</span><span>Вода</span></div><strong id="remoteT0">Н/Д</strong><small id="onlineSet0">Зад: —</small></div><div class="approvedTemp temp1"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Колонна</span></div><strong id="remoteT1">Н/Д</strong><small id="onlineSet1">Зад: —</small></div><div class="approvedTemp temp2"><div class="approvedTempTitle"><span class="approvedTempIcon">▣</span><span>Куб</span></div><strong id="remoteT2">Н/Д</strong><small id="onlineSet2">Зад: —</small></div><div class="approvedTemp temp3"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Верх колонны</span></div><strong id="remoteT3">Н/Д</strong><small id="onlineSet3">Зад: —</small></div></div><div class="approvedRig"><svg viewBox="0 0 190 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схематичная колонна БУСА: куб, колонна и охлаждение" preserveAspectRatio="xMidYMid meet">
 <defs>
  <linearGradient id="busaSteel" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#475967"/><stop offset=".2" stop-color="#bfdae3"/><stop offset=".39" stop-color="#e4f0f3"/><stop offset=".62" stop-color="#6d8290"/><stop offset=".85" stop-color="#b7d0da"/><stop offset="1" stop-color="#435563"/></linearGradient>
  <linearGradient id="busaGlass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081b2b"/><stop offset=".45" stop-color="#0d4160"/><stop offset="1" stop-color="#0a1a2b"/></linearGradient>
@@ -537,6 +542,10 @@ document.querySelectorAll('[data-settings-target]').forEach(button=>button.addEv
  settingsPanel(id);window.scrollTo(0,0);
 }));
 byId('settingsBack').addEventListener('click',()=>settingsPanel(null));
+byId('onlineOpenGoogle').addEventListener('click',()=>{
+ showOnlinePage('settings');
+ settingsPanel('googleSettings');
+});
 document.querySelectorAll('[data-open-page]').forEach(b=>b.addEventListener('click',()=>showOnlinePage(b.dataset.openPage)));
 byId('onlineInnerBack').addEventListener('click',()=>showOnlinePage('settings'));
 document.getElementById('goConnectionSettings').addEventListener('click',()=>{
@@ -563,6 +572,10 @@ function indicator(id,label,on,unknown=false){
 function remoteStatus(msg){
  byId('statusText').textContent=msg;
  byId('viewState').textContent=msg;
+ if(/^(Ошибка|Нет ответа|Нужен адрес|Укажи BUSA_VIEW_TOKEN|Таблица пока пуста|Некорректная телеметрия)/.test(msg)){
+  byId('onlineSetupBanner').hidden=false;
+  byId('onlineSetupMessage').textContent=msg;
+ }
 }
 function clearRemoteNumbers(){
  cloudCurrentTelemetry=null;cloudCurrentAt=null;renderCloudCompatibility();
@@ -884,6 +897,7 @@ function connectRemote(url,token,persist=true){
   remoteStatus('Укажи BUSA_VIEW_TOKEN: 64 символа');return false;
  }
  stopRemote();clearRemoteNumbers();configUrl=url;configToken=token;remoteEnabled=true;
+ byId('onlineSetupBanner').hidden=true;
  if(persist)try{
   localStorage.setItem(remoteStorePrefix+'url',url);
   localStorage.setItem(remoteStorePrefix+'token',token);
@@ -902,6 +916,8 @@ byId('viewClear').addEventListener('click',()=>{
  try{localStorage.removeItem(remoteStorePrefix+'url');
  localStorage.removeItem(remoteStorePrefix+'token')}catch(ignore){}
  clearRemoteNumbers();remoteStatus('Подключение отключено');
+ byId('onlineSetupBanner').hidden=false;
+ byId('onlineSetupMessage').textContent='Для показа температур введи ссылку Apps Script и отдельный ключ BUSA_VIEW_TOKEN в настройках Google.';
  drawRemoteCharts();
 });
 document.querySelectorAll('[data-settings-page]').forEach(b=>b.addEventListener('click',()=>{
@@ -924,6 +940,10 @@ try{
  const savedToken=localStorage.getItem(remoteStorePrefix+'token')||'';
  byId('viewUrl').value=savedUrl;byId('viewToken').value=savedToken;
  if(savedUrl&&savedToken)connectRemote(savedUrl,savedToken,false);
+ else {
+  byId('onlineSetupBanner').hidden=false;
+  byId('onlineSetupMessage').textContent='Настрой подключение один раз: ссылка Google Apps Script /exec и ключ просмотра BUSA_VIEW_TOKEN.';
+ }
 }catch(ignore){}
 drawRemoteCharts();
 checkCloudRelease();
