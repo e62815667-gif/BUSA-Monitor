@@ -164,18 +164,29 @@ static void v14Frame(uint32_t now){
     int w=ru.getUTF8Width(title.c_str());
     v14Tiny(title,x+max(1,(43-w)/2),40,V14_TEXT);
   }
-  // Footer always visible, no truncation, equal arrow centres.
+  // Only approved input pictograms; the * key is the decimal comma in editors.
   screen->fillRect(0,211,320,29,V14_CARD);
   screen->drawFastHLine(0,211,320,V14_ORANGE);
-  static const char* labels[]={"Влево","Вверх","Вниз","Вправо","OK","Назад"};
-  for(int i=0;i<6;i++){
-    const int x=1+i*53;
-    screen->fillRoundRect(x,215,51,22,4,i==4?V14_BADGE:V14_CARD);
-    screen->drawRoundRect(x,215,51,22,4,V14_RULE);
-    if(i<4)v14FootArrow(x,i,V14_ORANGE);
-    else if(i==4){screen->drawCircle(x+10,225,5,V14_GREEN);screen->fillCircle(x+10,225,2,V14_GREEN);}
-    else{screen->drawFastHLine(x+4,225,11,V14_BLUE);screen->fillTriangle(x+4,225,x+9,221,x+9,229,V14_BLUE);}
-    v14Print(labels[i],x+14,229,V14_TEXT);
+  for(int i=0;i<7;i++){
+    const int x=3+i*45;
+    const int cx=x+21,cy=226;
+    screen->fillRoundRect(x,215,42,22,4,i==4?V14_BADGE:V14_CARD);
+    screen->drawRoundRect(x,215,42,22,4,V14_RULE);
+    if(i<4){v14FootArrow(x+13,i,V14_ORANGE);}
+    else if(i==4){ // *
+      screen->drawFastVLine(cx,219,14,V14_GREEN);
+      screen->drawLine(cx-6,223,cx+6,230,V14_GREEN);
+      screen->drawLine(cx-6,230,cx+6,223,V14_GREEN);
+    }else if(i==5){ // ENT/OK: checkmark only
+      screen->drawCircle(cx,cy,8,V14_GREEN);
+      screen->drawLine(cx-5,cy,cx-1,cy+4,V14_GREEN);
+      screen->drawLine(cx-1,cy+4,cx+6,cy-5,V14_GREEN);
+    }else{ // ESC/back: hooked left arrow
+      screen->drawFastHLine(cx-6,cy+3,13,V14_BLUE);
+      screen->drawFastVLine(cx+7,cy-5,9,V14_BLUE);
+      screen->drawLine(cx-6,cy+3,cx-1,cy-2,V14_BLUE);
+      screen->drawLine(cx-6,cy+3,cx-1,cy+8,V14_BLUE);
+    }
   }
 }
 static void v14MiniRig(){
@@ -269,21 +280,27 @@ static void v14GraphTabs(){
   }
 }
 static void v14Graphs(bool layout){
-  v14GraphTabs();
-  hqPanel(5,79,310,128);
-  // Black plot background is mandatory in every theme, including light mode.
-  screen->fillRoundRect(10,84,300,119,5,0x0000);
-  screen->drawRoundRect(10,84,300,119,5,V14_BLUE);
+  if(layout){
+    v14GraphTabs();
+    hqPanel(5,79,310,128);
+    screen->fillRoundRect(10,84,300,119,5,0x0000);
+    screen->drawRoundRect(10,84,300,119,5,V14_BLUE);
+  }else{
+    // Repaint only pixels inside the already drawn chart border.
+    // Header, tabs, footer and fixed frame never disappear on a 5s sample.
+    screen->fillRect(12,86,296,115,0x0000);
+  }
   if(graphSubView==0){
     const int x0=83,xw=215,bandY=92,bandH=26;
     for(int k=0;k<4;k++){
       const int rowY=bandY+k*bandH;
       if(k)screen->drawFastHLine(14,rowY-2,290,V14_RULE);
-      v14Tiny("T"+String(k+1),16,rowY+9,v14SeriesColors[k]);
+      static const char* names[]={"T1 Вода","T2 Кол.","T3 Куб","T4 Верх"};
+      v14Tiny(names[k],15,rowY+8,v14SeriesColors[k]);
       // Show the current measured value alongside each independent trace.
       const int lastIndex=(v13HistoryHead+47)%48;
       const float latest=v13HistoryCount?v13History[k][lastIndex]:NAN;
-      v14Tiny(isfinite(latest)?String(latest,1):String("Н/Д"),36,rowY+9,V14_TEXT);
+      v14Tiny(isfinite(latest)?String(latest,1):String("Н/Д"),26,rowY+20,V14_TEXT);
       screen->drawFastVLine(x0-3,rowY+1,21,V14_RULE);
       float lo=INFINITY,hi=-INFINITY;
       for(int i=0;i<v13HistoryCount;i++){
@@ -311,7 +328,7 @@ static void v14Graphs(bool layout){
         }
       }
     }
-    v14Tiny("5 c/точка · 4 отдельных графика",15,201,V14_MUTED);
+
   }else{
     v14Tiny("ВОДА · YF-S401 · импульсы/2c",16,98,V14_BLUE);
     screen->drawFastHLine(14,146,291,V14_RULE);
@@ -336,7 +353,7 @@ static void v14Graphs(bool layout){
       }
     }
     if(!waterSamplesRecorded)v14Tiny("Нет импульсов",88,125,V14_MUTED);
-    v14Tiny("Вода не откалибрована",158,201,V14_MUTED);
+
   }
 }
 static void v14Events(bool layout){
@@ -457,7 +474,7 @@ void renderLandscape(uint32_t now){
     case 0:v14Home(now,true);break;
     case 1:v14Temperature(now,true);break;
     case 2:v14Collection(true);break;
-    case 3:v14Graphs(true);break;
+    case 3:v14Graphs(true);busaGraphLastDrawnCapture=v13LastCapture;break;
     case 4:v14Events(true);break;
     case 5:v14Settings(true);break;
     case 6:v14Diagnostics(true);break;
@@ -470,6 +487,11 @@ void renderLandscape(uint32_t now){
 void v14RefreshLive(uint32_t now){
   v13Collect(now);
   v14NetIndicators();
+  if(currentPage==3 && v13HistoryCount && 
+     v13LastCapture!=busaGraphLastDrawnCapture){
+    v14Graphs(false); // chart pixels only; prevents full-screen flashing
+    busaGraphLastDrawnCapture=v13LastCapture;
+  }
   if(currentPage==0){
     for(int i=0;i<4;i++)
       v14Metric(v13Temp(i,now),21,52+i*36+30,94,hasTemp(i,now));
