@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-CLEANTEMP-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-TFTSYNC-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -535,18 +535,12 @@ uint8_t approvedSettingsItem=0; // The six approved settings rows on the physica
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 bool tftDirty=true;
 float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
-// V14 display reference fields remain informational. Sound alarms use separate snd* keys.
+// TFT temperature setpoints mirror the actual active sound threshold settings.
 int selectedTemp=0,selectedField=0;
 bool editingTemp=false;
 String editTempBuffer="";
 uint8_t editCursor=0;
-bool storeTempReference(int sensor,int field,float value){
-  if(sensor<0||sensor>3||field<0||field>1||!isfinite(value)||value<0||value>125)return false;
-  String key=String(field?"nt":"rf")+String(sensor);
-  if(prefs.putFloat(key.c_str(),value)==0)return false;
-  (field?noticeTemp[sensor]:refTemp[sensor])=value;
-  return true;
-}
+bool storeTempReference(int sensor,int field,float value); // writes real sound setpoint
 
 // Keyboard faceplate layout confirmed by photo. Wiring is learned, not guessed.
 const char* const KEY_CAPS[20]={"F1","F2","#","*","1","2","3","UP",
@@ -655,15 +649,9 @@ void navigatePage(uint8_t target){
 }
 void deleteSelectedReference(){
   if(currentPage!=1 || selectedTemp<0 || selectedTemp>3)return;
-  // Only local informational reference field is removed; no DS18B20
-  // measurement, GPIO configuration, or protective output is touched.
-  const char* prefix=selectedField?"nt":"rf";
-  String key=String(prefix)+String(selectedTemp);
-  prefs.remove(key.c_str());
-  if(selectedField)noticeTemp[selectedTemp]=NAN;
-  else refTemp[selectedTemp]=NAN;
+  if(!storeTempReference(selectedTemp,selectedField,NAN))return;
   keyMessage=String("T")+String(selectedTemp+1)+
-    (selectedField?" Пред.":" Зад.")+" - удалено";
+    (selectedField?" ВЫКЛ":" ВКЛ")+" - удалено";
 }
 void moveApprovedTab(int direction); // declaration required by keypad navigation
 void darkenTftDisplay(); // manual screen-off via F2 or local iPhone UI
@@ -690,7 +678,7 @@ void keypadAction(int k){
         editingTemp=false;
       }else if(storeTempReference(selectedTemp,selectedField,editTempBuffer.toFloat())){
         editingTemp=false;editTempBuffer="";
-        keyMessage="Справочное значение сохранено";
+        keyMessage="Порог звука сохранён";
       }else keyMessage="Проверь значение 0..125";
     }else{
       const int digitKey[10]={17,4,5,6,8,9,10,12,13,14};
@@ -730,7 +718,7 @@ void keypadAction(int k){
     }
   }else if(k==16 || k==18){ // LEFT / RIGHT move horizontally
     if(currentPage==1){
-      selectedField=k==16?0:1; // target / warning informational fields
+      selectedField=k==16?0:1; // sound T_ON / T_OFF thresholds
     }else if(currentPage==5){
       approvedSettingsItem=(approvedSettingsItem+(k==16?6:1))%7;
     }else if(currentPage==3){
@@ -1035,6 +1023,29 @@ String quoteJson(const String &x){
 }
 String otaJSON(); // forward declaration
 #include "BUSA_SoundAlarms.h"
+// Shared TFT/editor setpoint writer; controls sound notifications only.
+bool storeTempReference(int sensor,int field,float value){
+  if(sensor<0||sensor>3||field<0||field>1||(isfinite(value)&&(value<0||value>125)))return false;
+  const char* onKeys[4]={"buzOn0","buzOn1","sndT3On","sndT4On"};
+  const char* offKeys[4]={"buzOff0","buzOff1","sndT3Off","sndT4Off"};
+  const char* key=field?offKeys[sensor]:onKeys[sensor];
+  const bool ok=isfinite(value)?(prefs.putFloat(key,value)>0):
+    (!prefs.isKey(key)||prefs.remove(key));
+  if(!ok)return false;
+  (field?noticeTemp[sensor]:refTemp[sensor])=value;
+  if(sensor<2){
+    (field?buzzerOffC[sensor]:buzzerOnC[sensor])=value;
+    buzzerTempChannels[sensor]=BusaSound::Channel();
+  }else{
+    if(sensor==2){
+      for(int i=0;i<3;i++)(field?soundOffC[i]:soundOnC[i])=value;
+    }else (field?soundOffC[3]:soundOnC[3])=value;
+    soundResetState();
+  }
+  soundOutputsOff();
+  tftDirty=true;lastRender=0;
+  return true;
+}
 bool busaSoundEnabled(uint8_t i){return i<4&&soundEnabled[i];}
 bool busaSoundActive(uint8_t i){return i<4&&soundChannels[i].on;}
 String cloudJSON(); // forward declaration; read-only Google status
@@ -1783,7 +1794,7 @@ get('temperatureSave').onclick=async()=>{
   if((!on)!==(!off)){result.textContent='Т'+(i+1)+': заполните оба значения';return;}
   if(on){
    const a=Number(on),b=Number(off);
-   if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||a>125||b<0||b>125||Math.abs(a-b)<0.5){
+   if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||a>125||b<0||b>125||Math.abs(a-b)<0.099){
     result.textContent='Т'+(i+1)+': проверьте ВКЛ и ВЫКЛ';return;
    }
   }
@@ -1936,14 +1947,11 @@ void setup(){
   clockZoneKnown=prefs.getBool("clkZone",false);
   clockUtcOffsetMinutes=prefs.getInt("clkTz",0);
   if(clockUtcOffsetMinutes<(-12*60)||clockUtcOffsetMinutes>14*60)clockZoneKnown=false;
-  for(int i=0;i<4;i++){
-    String k=String("rf")+String(i),j=String("nt")+String(i);
-    refTemp[i]=prefs.getFloat(k.c_str(),NAN);
-    noticeTemp[i]=prefs.getFloat(j.c_str(),NAN);
-    if(!isfinite(refTemp[i])||refTemp[i]<0||refTemp[i]>125)refTemp[i]=NAN;
-    if(!isfinite(noticeTemp[i])||noticeTemp[i]<0||noticeTemp[i]>125)noticeTemp[i]=NAN;
-  }
   soundLoadPrefs();
+  for(int i=0;i<4;i++){
+    refTemp[i]=i<2?buzzerOnC[i]:soundOnC[i];
+    noticeTemp[i]=i<2?buzzerOffC[i]:soundOffC[i];
+  }
   setupGoogleCloud();
   busaReportStage("WIFI_BEGIN");
   WiFi.mode(WIFI_AP_STA);
@@ -2018,7 +2026,7 @@ void setup(){
       requested[i+1]=strtof(b.c_str(),&endB);
       if(a.isEmpty()||b.isEmpty()||!endA||*endA||!endB||*endB||
          !BusaSound::valid(requested[i],requested[i+1])){
-        server.send(400,"text/plain","Invalid T3/T4 ON/OFF, require 0..125 C, delta >=0.5 C");return;
+        server.send(400,"text/plain","Invalid T3/T4 ON/OFF, require 0..125 C, delta >=0.1 C");return;
       }
       pairPresent[pair]=true;
     }
@@ -2114,7 +2122,7 @@ void setup(){
       requestedOff[i]=strtof(off.c_str(),&endOff);
       if(on.isEmpty()||off.isEmpty()||!endOn||*endOn||!endOff||*endOff||
          !BusaSound::valid(requestedOn[i],requestedOff[i])){
-        server.send(400,"text/plain","Invalid ON/OFF temperatures 0..125 C, delta >=0.5 C");return;
+        server.send(400,"text/plain","Invalid ON/OFF temperatures 0..125 C, delta >=0.1 C");return;
       }
       present[i]=true;
     }
@@ -2150,7 +2158,12 @@ void setup(){
     soundOnC[0]=soundOnC[1]=soundOnC[2]=requestedOn[2];
     soundOffC[0]=soundOffC[1]=soundOffC[2]=requestedOff[2];
     soundOnC[3]=requestedOn[3];soundOffC[3]=requestedOff[3];
-    for(int i=0;i<4;i++)soundEnabled[i]=true;
+    for(int i=0;i<4;i++){
+      refTemp[i]=requestedOn[i];noticeTemp[i]=requestedOff[i];
+      soundEnabled[i]=true;
+    }
+    for(int i=0;i<2;i++)buzzerTempChannels[i]=BusaSound::Channel();
+    tftDirty=true;lastRender=0;
     server.send(200,"application/json",soundJSON(millis()));
   });
 
@@ -2313,28 +2326,6 @@ void setup(){
     keypadMessage=keypadReady?"Сохранённая раскладка сохранена":"Обучение отменено";
     tftDirty=true;
     server.send(200,"text/plain; charset=utf-8",keypadMessage);
-  });
-  server.on("/api/display-refs",HTTP_POST,[]{
-    if(!apClient()){server.send(403,"text/plain; charset=utf-8","Нужна локальная точка доступа БУСА");return;}
-    float target[4],notice[4];
-    for(int i=0;i<4;i++){
-      String a=server.arg(String("ref")+i),b=server.arg(String("nt")+i);
-      target[i]=a.length()?a.toFloat():NAN;
-      notice[i]=b.length()?b.toFloat():NAN;
-      if((isfinite(target[i])&&(target[i]<0||target[i]>125))||
-         (isfinite(notice[i])&&(notice[i]<0||notice[i]>125))){
-         server.send(400,"text/plain","Диапазон 0..125");return;
-      }
-    }
-    for(int i=0;i<4;i++){
-      String k=String("rf")+i,j=String("nt")+i;
-      if(isfinite(target[i]))storeTempReference(i,0,target[i]);
-      else{prefs.remove(k.c_str());refTemp[i]=NAN;}
-      if(isfinite(notice[i]))storeTempReference(i,1,notice[i]);
-      else{prefs.remove(j.c_str());noticeTemp[i]=NAN;}
-    }
-    tftDirty=true;
-    server.send(200,"text/plain; charset=utf-8","Справочные значения сохранены. Реле не затронуты.");
   });
   server.on("/api/graph-view",HTTP_GET,[]{
     int n=server.arg("view").toInt();
