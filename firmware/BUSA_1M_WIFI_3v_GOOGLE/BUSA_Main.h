@@ -651,7 +651,6 @@ void pollKeys(uint32_t now){
   busaLastKeyScanMs=millis()-keyStarted;
   if(busaLastKeyScanMs>busaMaxKeyScanMs)busaMaxKeyScanMs=busaLastKeyScanMs;
   // Misbehaving I2C bus can stall the keypad scanner; back off to protect HTTP.
-  if(pair==-3)return; // incomplete four-row scan: leave debounce state untouched
   if(busaLastKeyScanMs>100){
     busaI2cQuarantine(millis());
     busaKeySkipUntil=millis()+60000;
@@ -659,6 +658,7 @@ void pollKeys(uint32_t now){
       (unsigned long)busaLastKeyScanMs);
     return;
   }
+  if(pair==-3)return; // incomplete four-row scan: keep debounce state untouched
   if(pair>=0){
     rawPair=pairName(pair);
     if(keypadLearning && (pair!=candidatePair||candidateStep!=learnStep)){
@@ -815,7 +815,7 @@ void startScreen(){
   ru.setFontMode(1);
   tftStarted=true;
   tftDisplayOff=false;tftDisplayActivityMs=millis();
-  drawBootSplash(8000); // Wi-Fi AP + web start while splash visible; max 8 seconds
+  drawBootSplash(2500); // 2.5 s splash; Wi-Fi AP and web start before peripheral scans
   Serial0.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
 }
 // Display-only standby; does NOT sleep ESP32, alter sensors, Wi-Fi or GPIO.
@@ -2110,7 +2110,7 @@ void loop(){
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
   // Wi-Fi AP and HTTP server initialize during the splash.
   // Missing sensors must not delay the user interface.
-  if(!bootSplashComplete && elapsed(now,splashStartedAt,8000)){
+  if(!bootSplashComplete && elapsed(now,splashStartedAt,2500)){
     bootSplashComplete=true;
     tftDirty=true;
   }
