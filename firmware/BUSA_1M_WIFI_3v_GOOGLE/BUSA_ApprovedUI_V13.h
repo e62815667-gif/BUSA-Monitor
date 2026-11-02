@@ -76,17 +76,17 @@ static void v13Frame(uint32_t now){
   screen->fillCircle(229,11,5,WiFi.getMode()!=WIFI_OFF?GREEN:V13_RED);
   // Local STA status and clock; never infer that the AP is connected to the Internet.
   v13Text(deviceClockValid()?clockStamp(true):"--:--",165,18,GRAY);
-  const char* tab[]={"Глав","Темп","Отбор","Граф","Событ","Настр"};
+  const char* tab[]={"Глав","Темп","Отбор","Граф","Событ","Настр","Диаг"};
   screen->fillRect(0,276,240,44,PANEL);
   v13Line(0,276,240);
-  for(int i=0;i<6;i++){
-    const int x=i*40;
+  for(int i=0;i<7;i++){
+    const int x=i*34;
     if(i==currentPage){
-      screen->fillRoundRect(x+2,279,36,39,4,BLUE);
-      v13Line(x+3,279,34,V13_CYAN);
+      screen->fillRoundRect(x+2,279,31,39,4,BLUE);
+      v13Line(x+3,279,28,V13_CYAN);
     }
     // Compact pictograms are rendered as vector primitives, not Unicode emoji.
-    const int cx=x+20,cy=288;
+    const int cx=x+17,cy=288;
     switch(i){
       case 0: screen->drawTriangle(cx-7,cy,cx,cy-6,cx+7,cy,WHITE);screen->drawRect(cx-5,cy,10,9,WHITE);break;
       case 1: screen->drawRoundRect(cx-3,cy-7,6,16,3,V13_CYAN);screen->fillCircle(cx,cy+6,3,V13_CYAN);break;
@@ -95,7 +95,7 @@ static void v13Frame(uint32_t now){
       case 4: screen->drawRect(cx-6,cy-7,12,15,WHITE);screen->drawFastHLine(cx-3,cy-3,7,WHITE);screen->drawFastHLine(cx-3,cy+1,7,WHITE);break;
       default: screen->drawCircle(cx,cy,7,WHITE);screen->fillCircle(cx,cy,3,WHITE);break;
     }
-    v13Text(tab[i],x+((i==2||i==4)?5:7),314,i==currentPage?WHITE:GRAY);
+    v13Text(tab[i],x+2,314,i==currentPage?WHITE:GRAY);
   }
   if(tftView && currentPage!=1 && currentPage!=5){
     v13Badge(199,36,"INFO",V13_CYAN);
@@ -259,48 +259,59 @@ static void v13EventsPage(bool layout){
   }
 }
 static void v13Settings(uint32_t now,bool layout){
-  static const char* menu[]={"Температуры","Отбор жидкости","Wi-Fi","Экран и звук","Система","О системе"};
-  if(layout){
-    v13Text("НАСТРОЙКИ",8,44,WHITE);
-    for(int i=0;i<6;i++){
-      int y=51+i*36;
-      v13Panel(5,y,230,33);
-      if(i==approvedSettingsItem)screen->fillRect(7,y+4,3,25,V13_CYAN);
-      v13Text(menu[i],17,y+22,WHITE);
-      v13Text(">",221,y+21,V13_CYAN);
-    }
+ static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе"};
+ if(layout){
+  v13Text("НАСТРОЙКИ",8,44,WHITE);
+  for(int i=0;i<5;i++){
+   const int y=52+i*39;v13Panel(5,y,230,35);
+   if(i==approvedSettingsItem)screen->fillRect(7,y+3,3,29,V13_CYAN);
+   v13Text(names[i],17,y+22,WHITE);
   }
-  if(tftView){
-    screen->fillRoundRect(7,74,226,156,5,PANEL);
-    screen->drawRoundRect(7,74,226,156,5,V13_CYAN);
-    String title=menu[approvedSettingsItem];
-    v13Text(title,17,98,WHITE);
-    switch(approvedSettingsItem){
-      case 2:
-        v13Text(String("STA: ")+(WiFi.status()==WL_CONNECTED?"СВЯЗЬ":"НЕТ"),17,132,GRAY);
-        v13Text("AP: "+WiFi.softAPIP().toString(),17,157,GREEN);
-        break;
-      case 3:
-        v13Text(String("TFT: ")+tftProfileName(),17,132,GRAY);
-        v13Text("Поворот: "+String(tftRotation),17,158,GRAY);
-        v13Text("Изменение через iPhone",17,185,YELLOW);
-        break;
-      case 4:
-        v13Text("T1-T4 диагностика",17,132,GRAY);
-        v13Text("К1–К4: только звук",17,158,YELLOW);
-        v13Text("Тесты через iPhone",17,185,GRAY);
-        break;
-      case 5:
-        v13Text("БУСА-1М с ИИ №001",17,132,GRAY);
-        v13Text("Интерфейс V13",17,158,GREEN);
-        v13Text("Наблюдение без управления",17,185,YELLOW);
-        break;
-      default:
-        v13Text("Справочный экран",17,143,GRAY);
-        break;
-    }
-    v13Text("Esc: назад",17,214,V13_CYAN);
+ }
+ if(!tftView)return;
+ screen->fillRoundRect(7,90,226,135,5,PANEL);
+ screen->drawRoundRect(7,90,226,135,5,V13_CYAN);
+ v13Text(names[approvedSettingsItem],17,111,WHITE);
+ switch(approvedSettingsItem){
+  case 0:
+   v13Text("T"+String(calSensor+1)+" "+String(calEditing?calDraft:tempOffset[calSensor],1)+" C",17,146,V13_CYAN);
+   v13Text("UP/DN: 0.1 C",17,174,WHITE);
+   v13Text("ENT: сохранить",17,195,WHITE);break;
+  case 1:v13Text(WiFi.status()==WL_CONNECTED?"Wi-Fi OK":"Нет Wi-Fi",17,145,WHITE);break;
+  case 2:v13Text(themeDraft==0?"Светлая":themeDraft==1?"Тёмная":"Системная",17,145,WHITE);break;
+  case 3:v13Text(googleEnabled?"Google OK":"Нет Google",17,145,WHITE);break;
+  default:
+   v13Text(String("Wi-Fi ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),17,133,WHITE);
+   v13Text(String("Google ")+(googleEnabled?"да":"нет"),17,155,WHITE);
+   v13Text("Прошивка V14.7",17,178,WHITE);
+   v13Text(String(millis()/60000)+" мин",17,200,WHITE);break;
+ }
+}
+static void v13Diagnostics(uint32_t now,bool layout){
+ static const char* names[]={"Экран","Клавиатура","Реле","Датчики","Wi-Fi/Google","ESP32","Расходомер"};
+ if(layout){
+  v13Text("ДИАГНОСТИКА",8,43,WHITE);
+  for(int i=0;i<7;i++){
+   const int y=48+i*29;v13Panel(5,y,230,27);
+   if(i==diagModule)screen->fillRect(7,y+3,3,21,V13_CYAN);
+   v13Text(names[i],17,y+19,WHITE);
   }
+ }
+ if(tftView){
+  screen->fillRoundRect(12,99,220,117,6,PANEL);
+  screen->drawRoundRect(12,99,220,117,6,V13_CYAN);
+  v13Text(names[diagModule],23,125,WHITE);
+  switch(diagModule){
+   case 0:v13Text("ST7789 · OK",23,157,WHITE);break;
+   case 1:v13Text(pcfDetected?"PCF8575 · есть":"PCF8575 · нет",23,157,WHITE);break;
+   case 2:v13Text("K1-K4 · ЗВУК",23,157,WHITE);break;
+   case 3:v13Text("T1-T4 · DS18B20",23,157,WHITE);break;
+   case 4:v13Text("Wi-Fi / Google",23,157,WHITE);break;
+   case 5:v13Text("ESP32-S3",23,157,WHITE);break;
+   default:v13Text(String("YF: ")+flowPulses()+" имп.",23,157,WHITE);break;
+  }
+  v13Text("ESC назад",23,192,WHITE);
+ }
 }
 void renderPortrait(uint32_t now){
   static uint8_t oldPage=255,oldView=255,oldSettings=255;
@@ -320,6 +331,7 @@ void renderPortrait(uint32_t now){
     case 3:v13Graphs(layout);break;
     case 4:v13EventsPage(layout);break;
     case 5:v13Settings(now,layout);break;
+    case 6:v13Diagnostics(now,layout);break;
     default:break;
   }
   // Update clock without repainting the whole UI.
