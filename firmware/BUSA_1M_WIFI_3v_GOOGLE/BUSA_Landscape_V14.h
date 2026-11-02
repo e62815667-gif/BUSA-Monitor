@@ -6,8 +6,8 @@
 extern volatile bool googleEnabled;
 extern volatile int googleState;
 extern volatile int googleInternet;
-static const uint8_t v14Order[6]={0,1,2,5,3,4};
-static const char* const v14Tabs[6]={"Глав","Т","Отбор","Настр","Граф","Событ"};
+static const uint8_t v14Order[7]={0,1,2,5,6,3,4};
+static const char* const v14Tabs[7]={"Глав","Т","Отбор","Настр","Диаг","Граф","Событ"};
 // V14 palette is software-defined. DO NOT use ST7789 invertDisplay(): it
 // inverts every accent and destroys the colored illustration.
 static uint16_t V14_TEXT=0x2104,V14_MUTED=0x632c,V14_WARN=0xa800,
@@ -48,6 +48,10 @@ static void v14ApplyPalette(bool dark){
    V14_INFO=0xff16;V14_GRID=0xe71c;V14_BADGE=0xe7f8;
    v14SeriesColors[0]=0x037b;v14SeriesColors[1]=0xd980;
    v14SeriesColors[2]=0xb500;v14SeriesColors[3]=0x3685;
+   if(tftThemeMode==0){
+     HQ_NAVY=0xffff;HQ_DEEP=0xffff;HQ_GLOW=0xe73c;HQ_GLASS=0xef7d;
+     V14_CARD=0xffff;V14_PALE=0xffff;V14_BADGE=0xef7d;
+   }
  }
 }
 static void v14Print(const String& txt,int x,int y,uint16_t col=V14_TEXT){
@@ -117,14 +121,14 @@ static void v14Frame(uint32_t now){
   int tw=ru.getUTF8Width(dt.c_str());
   v14Print(dt,max(220,317-tw),15,V14_TEXT);
   // Six tabs, preserving internal IDs with the explicit approved visual order.
-  for(int i=0;i<6;i++){
-    int x=1+i*53;bool chosen=(v14Order[i]==currentPage);
-    screen->fillRoundRect(x,25,51,22,4,chosen?V14_ORANGE:V14_CARD);
-    screen->drawRoundRect(x,25,51,22,4,chosen?V14_ORANGE:V14_RULE);
-    if(chosen)screen->drawFastHLine(x+6,45,39,V14_WARN);
+  for(int i=0;i<7;i++){
+    int x=1+i*45;bool chosen=(v14Order[i]==currentPage);
+    screen->fillRoundRect(x,25,43,22,4,chosen?V14_ORANGE:V14_CARD);
+    screen->drawRoundRect(x,25,43,22,4,chosen?V14_ORANGE:V14_RULE);
+    if(chosen)screen->drawFastHLine(x+5,45,33,V14_WARN);
     String title=v14Tabs[i];
     int w=ru.getUTF8Width(title.c_str());
-    v14Print(title,x+max(2,(51-w)/2),41,V14_TEXT);
+    v14Tiny(title,x+max(1,(43-w)/2),40,V14_TEXT);
   }
   // Footer always visible, no truncation, equal arrow centres.
   screen->fillRect(0,211,320,29,V14_CARD);
@@ -298,66 +302,102 @@ static void v14Events(bool layout){
   }
 }
 static void v14Settings(bool layout){
-  static const char* names[]={"Температуры","Отбор","Wi-Fi","Экран","Система","Google","К1-К4"};
+ static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе"};
+ if(!tftView){
+  for(int i=0;i<5;i++){
+   int x=5+(i%2)*157,y=53+(i/2)*45;
+   hqPanel(x,y,152,41);
+   if(i==approvedSettingsItem)screen->fillRoundRect(x+3,y+4,4,32,2,V14_ORANGE);
+   v14Print(names[i],x+15,y+24,V14_TEXT);
+   v14Tiny("ENT",x+127,y+24,V14_MUTED);
+  }
+  return;
+ }
+ hqPanel(25,72,270,131);
+ v14Big(String(names[approvedSettingsItem]),35,92,V14_TEXT);
+ screen->drawFastHLine(35,100,250,V14_RULE);
+ switch(approvedSettingsItem){
+  case 0:
+   v14Print("T"+String(calSensor+1)+" · поправка: "+String(tempOffset[calSensor],1)+" C",35,123,V14_TEXT);
+   if(calEditing){
+    v14Big("ВВОД: "+String(calDraft,1)+" C",35,147,V14_ORANGE);
+    v14Tiny("UP/DN +-0.1 · ENT сохранить",35,170,V14_BLUE);
+    v14Tiny("ESC отменить",35,188,V14_MUTED);
+   }else{
+    v14Tiny("UP/DN выбор датчика · ENT поправка",35,149,V14_BLUE);
+    v14Tiny("Пороги звука не меняются",35,173,V14_MUTED);
+   }break;
+  case 1:
+   v14Print(WiFi.status()==WL_CONNECTED?"Wi-Fi: подключён":"Wi-Fi: нет связи",35,121,V14_TEXT);
+   v14Tiny("AP: "+WiFi.softAPIP().toString(),35,144,V14_BLUE);
+   v14Tiny("Параметры подключения: iPhone",35,170,V14_MUTED);break;
+  case 2:
+   v14Print(themeDraft==0?"Светлая":themeDraft==1?"Тёмная":"Системная",35,126,V14_TEXT);
+   v14Tiny("UP/DN выбор · ENT сохранить",35,152,V14_BLUE);
+   v14Tiny("Системная: рисунки БУСА",35,177,V14_MUTED);break;
+  case 3:
+   v14Print(googleEnabled?"Google: настроен":"Google: не настроен",35,125,V14_TEXT);
+   v14Tiny("Передача: "+String(googleState==5?"подтверждена":googleState==6?"ошибка":"проверяется"),35,149,V14_BLUE);
+   v14Tiny("Параметры подключения: iPhone",35,175,V14_MUTED);break;
+  default:
+   v14Tiny(String("Wi-Fi: ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),35,118,V14_TEXT);
+   v14Tiny(String("Google: ")+(googleEnabled?"да":"нет"),35,138,V14_TEXT);
+   v14Tiny("Прошивка: V14.7 UISETDIAG",35,158,V14_BLUE);
+   v14Tiny(String("Работа: ")+(millis()/60000)+" мин",35,180,V14_TEXT);
+ }
+}
+static void v14Diagnostics(bool layout){
+ static const char* modules[]={"Экран TFT","Клавиатура","Реле K1-K4","Датчики T1-T4",
+ "Wi-Fi / Google","ESP32","Расходомер"};
+ if(!tftView){
   for(int i=0;i<7;i++){
-    int x=4+(i%2)*158,y=52+(i/2)*38;
-    hqPanel(x,y,153,35);
-    hqSymbol(i==0?1:i==1?2:i==2?0:i==3?4:i==4?3:5,
-             x+19,y+18,8,V14_BLUE);
-    if(i==approvedSettingsItem)screen->fillRoundRect(x+3,y+4,4,27,2,V14_ORANGE);
-    v14Print(names[i],x+35,y+22,V14_TEXT);
-    v14Print(">",x+138,y+22,V14_MUTED);
+   int x=4+(i%2)*158,y=53+(i/2)*38;
+   hqPanel(x,y,153,34);
+   if(i==diagModule)screen->fillRoundRect(x+3,y+3,4,28,2,V14_ORANGE);
+   v14Tiny(modules[i],x+14,y+20,V14_TEXT);
   }
-  if(tftView){
-    hqPanel(37,72,247,126);
-    v14Big(String(names[approvedSettingsItem]),49,95,V14_TEXT);
-    screen->drawFastHLine(47,103,226,V14_RULE);
-    switch(approvedSettingsItem){
-      case 0:
-        v14Print("T1–T4: пороги звука",48,124,V14_TEXT);
-        v14Tiny("ВКЛ / ВЫКЛ",48,144,V14_MUTED);
-        v14Tiny("ENT: открыть экран Т",48,174,V14_BLUE);break;
-      case 1:
-        v14Print("Датчика отбора нет",48,126,V14_WARN);
-        v14Tiny("YF-S401 — только вода",48,151,V14_MUTED);break;
-      case 2:
-        v14Print(WiFi.status()==WL_CONNECTED?"Интернет Wi-Fi: ДА":"Интернет Wi-Fi: НЕТ",48,120,V14_TEXT);
-        v14Tiny(String("Сеть: ")+(WiFi.status()==WL_CONNECTED?stationSsid.substring(0,19):String("--")),48,139,V14_BLUE);
-        v14Tiny("AP: "+WiFi.softAPIP().toString(),48,158,V14_BLUE);
-        v14Tiny(String("Клиентов локально: ")+WiFi.softAPgetStationNum(),48,176,V14_TEXT);break;
-      case 3:
-        v14Print("ST7789 / 320x240",48,129,V14_TEXT);
-        v14Tiny("Ориентация: горизонтальная",48,151,V14_MUTED);break;
-      case 4:
-        v14Print(keypadLearning?"Обучение 5x4":"Диагностика 5x4",48,124,V14_TEXT);
-        v14Tiny(keypadLearning?(String("Клавиша: ")+String(KEY_CAPS[learnStep])):
-                  "Обучение через iPhone",48,145,V14_BLUE);
-        v14Tiny(String("PCF: ")+(pcfDetected?"есть":"нет")+
-                  "  scan="+String(pcfScanError),48,167,V14_WARN);break;
-      case 5:
-        v14Print(googleEnabled?"Google настроен":"Google: НЕТ НАСТРОЕК",48,124,V14_TEXT);
-        v14Tiny(String("Канал: ")+(googleState==5?"ПОДТВЕРЖДЕНО":
-                    googleState==4?"ОТПРАВЛЕНО":
-                    googleState==3?"ОТПРАВКА":
-                    googleState==1?"НЕТ ИНТЕРНЕТА":"ПРОВЕРЬ СТАТУС"),
-                   48,146,V14_BLUE);
-        v14Tiny("Настройка: iPhone / Google",48,167,V14_MUTED);
-        break;
-      default:
-        v14Print("К1–К4: ЗВУК 12В",48,126,V14_WARN);
-        for(int i=0;i<4;i++){
-          int x=49+i*53;
-          screen->fillRoundRect(x,140,46,29,4,V14_INFO);
-          v14Tiny("К"+String(i+1),x+5,151,V14_TEXT);
-          v14Tiny(busaSoundActive(i)?"ЗВУК":(busaSoundEnabled(i)?"ГОТОВ":"ВЫКЛ"),x+5,164,V14_WARN);
-        }
-    }
-    v14Tiny("ESC: назад",190,190,V14_MUTED);
-  }
+  return;
+ }
+ hqPanel(19,69,282,135);
+ v14Print(String(modules[diagModule]),28,89,V14_TEXT);
+ screen->drawFastHLine(28,98,263,V14_RULE);
+ switch(diagModule){
+  case 0:
+   v14Tiny("ST7789 320x240 · SPI",28,121,V14_TEXT);
+   v14Tiny("Изображение: визуальный тест",28,148,V14_MUTED);
+   v14Tiny(tftStarted?"Запуск выполнен":"Не запущен",28,173,V14_BLUE);break;
+  case 1:
+   v14Tiny(pcfDetected?"PCF8575 0x20: отвечает":"PCF8575: нет связи",28,121,V14_TEXT);
+   v14Tiny(String("Карта 20: ")+(keypadReady?"сохранена":"нет"),28,145,V14_BLUE);
+   v14Tiny(String("Ошибка: ")+pcfScanError,28,170,V14_TEXT);break;
+  case 2:
+   for(int i=0;i<4;i++)
+    v14Tiny(String("K")+String(i+1)+": "+(busaSoundActive(i)?"ЗВУК":"ОЖИДАНИЕ"),
+     28+(i%2)*132,121+(i/2)*27,V14_TEXT);
+   v14Tiny("Физическое срабатывание: отдельно",28,181,V14_MUTED);break;
+  case 3:
+   for(int i=0;i<4;i++)
+    v14Tiny(String("T")+String(i+1)+": "+
+     (hasTemp(i,millis())?String(temperature[i],1)+" C":"Н/Д"),
+     28+(i%2)*132,121+(i/2)*27,V14_TEXT);
+   v14Tiny("Поправки: Настройки",28,181,V14_MUTED);break;
+  case 4:
+   v14Tiny(WiFi.status()==WL_CONNECTED?"Wi-Fi STA: да":"Wi-Fi STA: нет",28,122,V14_TEXT);
+   v14Tiny(googleEnabled?"Google: настроен":"Google: нет",28,146,V14_BLUE);
+   v14Tiny("AP: "+WiFi.softAPIP().toString(),28,171,V14_TEXT);break;
+  case 5:
+   v14Tiny("ESP32-S3 · 240 МГц",28,121,V14_TEXT);
+   v14Tiny("RAM: "+String(ESP.getFreeHeap()/1024)+" КБ",28,144,V14_BLUE);
+   v14Tiny("Uptime: "+String(millis()/60000)+" мин",28,170,V14_TEXT);break;
+  case 6:
+   v14Tiny("GPIO15 · YF-S401",28,121,V14_TEXT);
+   v14Tiny("Импульсы: "+String(flowPulses()),28,146,V14_BLUE);
+   v14Tiny("Калибровка: НЕТ",28,171,V14_MUTED);break;
+ }
 }
 // Called on TFT startup, page switch, theme change or keypad action.
 void renderLandscape(uint32_t now){
-  v14ApplyPalette(tftThemeDark);
+  v14ApplyPalette(tftThemeMode==1);
   v13Collect(now);
   v14InvalidateLive();
   tftFieldCount=0;
@@ -369,6 +409,7 @@ void renderLandscape(uint32_t now){
     case 3:v14Graphs(true);break;
     case 4:v14Events(true);break;
     case 5:v14Settings(true);break;
+    case 6:v14Diagnostics(true);break;
   }
   tftDirty=false;
 }
