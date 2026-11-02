@@ -36,11 +36,17 @@ constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver
 constexpr uint8_t BUS_SDA=8,BUS_SCL=9;
 constexpr uint8_t TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14;
 constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
+constexpr uint8_t BUSA_RESERVED_BUZZER_GPIO=2; // active 3.3V logic buzzer input, T1/T2
 constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
+static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!=BUS_SDA &&
+  BUSA_RESERVED_BUZZER_GPIO!=BUS_SCL && BUSA_RESERVED_BUZZER_GPIO!=TFT_CS &&
+  BUSA_RESERVED_BUZZER_GPIO!=TFT_DC && BUSA_RESERVED_BUZZER_GPIO!=TFT_RST &&
+  BUSA_RESERVED_BUZZER_GPIO!=TFT_MOSI && BUSA_RESERVED_BUZZER_GPIO!=TFT_SCK,
+  "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-T3T4SOUND-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-T1T4SOUND-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1473,7 +1479,16 @@ main>*{max-width:100%;min-width:0}
 <label>Температура ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff3"></div>
 </div>
 <button id="soundSave" type="button" class="full">Сохранить привязку и пороги звуковых сигналов</button>
-<p id="soundSaveResult" class="hint">К1–К4 доступны. Звук появится после установки температурных порогов.</p></div></section>
+<p id="soundSaveResult" class="hint">К1–К4 доступны. Звук появится после установки температурных порогов.</p></div>
+<div class="card"><h2>Дополнительный звуковой сигнал · Т1 и Т2 · GPIO2</h2>
+<p class="hint">Отдельный активный звуковой сигнал 3,3 В на GPIO2. Т1 (вода) и Т2 (колонна) имеют независимые пороги Твкл / Твыкл. Если сработал хотя бы один датчик, сигнал включается. При снятии обоих условий — выключается. Не управляет К1–К4, краном или нагревом. Подключать только совместимый с 3,3 В по току вход звукового модуля либо внешний драйвер.</p>
+<div class="grid">
+<div><label><input type="checkbox" id="buzzerEn0"> Т1 · Вода</label><label>Т1 · Включить звук при, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="buzzerOn0"><label>Т1 · Выключить звук при, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="buzzerOff0"></div>
+<div><label><input type="checkbox" id="buzzerEn1"> Т2 · Колонна</label><label>Т2 · Включить звук при, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="buzzerOn1"><label>Т2 · Выключить звук при, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="buzzerOff1"></div>
+</div><div class="row">Т1 / Т2 · состояние зуммера <b id="buzzerStatus">ОЖИДАНИЕ</b></div>
+<button id="buzzerSave" type="button" class="full">Сохранить пороги звука Т1 и Т2</button>
+<p id="buzzerSaveResult" class="hint">Пороги Т1/Т2 сохраняются в ESP32 и передаются в Google-диагностику.</p>
+</div></section>
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор · ручной режим</h2><p class="hint">Блок 220 В и электропривод крана исключены. ESP32 не управляет ими.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden>
  <div class="card"><h2>Графики · реальные измерения</h2>
@@ -1573,7 +1588,7 @@ main>*{max-width:100%;min-width:0}
 <footer class="hint">БУСА-1М №001 · мониторинг + 4 звуковых реле 12 В · силовое оборудование управляется вручную</footer></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
-let lastWaterPulse=null,themeInitialized=false,soundInitialized=false;
+let lastWaterPulse=null,themeInitialized=false,soundInitialized=false,buzzerInitialized=false;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
 function networkLeds(info,ssid){
@@ -1743,6 +1758,11 @@ if(!soundInitialized && s.sound_alerts && Array.isArray(s.sound_alerts.channels)
  get('soundOff3').value=s.sound_alerts.channels[3].off_c??'';
  soundInitialized=true;
 }
+if(!buzzerInitialized && s.sound_alerts?.buzzer?.sensors){
+ s.sound_alerts.buzzer.sensors.forEach((ch,i)=>{get('buzzerEn'+i).checked=ch.enabled===true;get('buzzerOn'+i).value=ch.on_c??'';get('buzzerOff'+i).value=ch.off_c??'';});
+ buzzerInitialized=true;
+}
+if(s.sound_alerts?.buzzer)get('buzzerStatus').textContent=s.sound_alerts.buzzer.sound_on?'ЗВУК ВКЛ':'ЗВУК ВЫКЛ';
 if(s.sound_alerts && Array.isArray(s.sound_alerts.channels))s.sound_alerts.channels.forEach((ch,i)=>{get('soundStatus'+i).textContent=ch.sound_on?(ch.timed?'ЗВУК '+ch.remaining_seconds+'с':'ЗВУК'):(!ch.enabled?'ВЫКЛ':ch.reason==='SETPOINTS_REQUIRED'?'НУЖНЫ ПОРОГИ':'ГОТОВ')});
 if(!refsInit && Array.isArray(s.display_references)){
   s.display_references.forEach((r,i)=>{get('ref'+i).value=r.target===null?'':r.target;get('nt'+i).value=r.notice===null?'':r.notice});
@@ -1829,6 +1849,22 @@ get('soundSave').onclick=async()=>{
   get('soundSaveResult').textContent='Привязка Т3/Т4 и все настройки сохранены';
  }catch(e){get('soundSaveResult').textContent='Ошибка: '+e.message;}
  get('soundSave').disabled=false;
+};
+get('buzzerSave').onclick=async()=>{
+ const data=new URLSearchParams();
+ for(let i=0;i<2;i++){
+   data.set('en'+i,get('buzzerEn'+i).checked?'1':'0');
+   data.set('on'+i,get('buzzerOn'+i).value.trim());
+   data.set('off'+i,get('buzzerOff'+i).value.trim());
+ }
+ if(!confirm('Сохранить пороги Т1/Т2? Звуковой сигнал может сразу включиться по текущим температурам.'))return;
+ get('buzzerSave').disabled=true;
+ try{
+  const r=await fetch('/api/buzzer/config',{method:'POST',body:data});
+  if(!r.ok)throw Error(await r.text());
+  get('buzzerSaveResult').textContent='Настройки звука Т1/Т2 сохранены';
+ }catch(e){get('buzzerSaveResult').textContent='Ошибка: '+e.message;}
+ get('buzzerSave').disabled=false;
 };
 get('googleSave').onclick=async()=>{
 const url=get('googleUrl').value.trim(),token=get('googleToken').value.trim();
@@ -2083,6 +2119,52 @@ void setup(){
     server.send(200,"application/json",soundJSON(millis()));
   });
 
+  // Independent T1/T2 monitoring buzzer. Local access only; no relay commands.
+  server.on("/api/buzzer/config",HTTP_POST,[]{
+    if(!apClient()){server.send(403,"text/plain","BUSA local AP only");return;}
+    bool enabled[2]={false,false};float on[2]={NAN,NAN},off[2]={NAN,NAN};
+    for(int i=0;i<2;i++){
+      const String enKey=String("en")+i,onKey=String("on")+i,offKey=String("off")+i;
+      if(!server.hasArg(enKey)||!server.hasArg(onKey)||!server.hasArg(offKey)){
+        server.send(400,"text/plain","Missing T1/T2 buzzer fields");return;
+      }
+      const String flag=server.arg(enKey);
+      if(flag!="0" && flag!="1"){server.send(400,"text/plain","Invalid T1/T2 enable");return;}
+      enabled[i]=flag=="1";
+      const String a=server.arg(onKey),b=server.arg(offKey);
+      if(a.isEmpty()&&b.isEmpty())continue;
+      char* endA=nullptr;char* endB=nullptr;
+      on[i]=strtof(a.c_str(),&endA);off[i]=strtof(b.c_str(),&endB);
+      if(a.isEmpty()||b.isEmpty()||!endA||*endA||!endB||*endB||
+         !BusaSound::valid(on[i],off[i])){
+        server.send(400,"text/plain","Invalid T1/T2 ON/OFF, 0..125C, delta >=0.5C");return;
+      }
+    }
+    // Keep buzzer silent until the save completes.
+    digitalWrite(BUSA_BUZZER_GPIO,buzzerPinLevel(false));buzzerSoundOn=false;
+    bool saved=true;
+    for(int i=0;i<2;i++){
+      const String ek=String("buzE")+i,ok=String("buzOn")+i,fk=String("buzOff")+i;
+      if(!prefs.putBool(ek.c_str(),false))saved=false;
+      if(isfinite(on[i])){
+        if(!prefs.putFloat(ok.c_str(),on[i]))saved=false;
+        if(!prefs.putFloat(fk.c_str(),off[i]))saved=false;
+      }else{
+        if(prefs.isKey(ok.c_str())&&!prefs.remove(ok.c_str()))saved=false;
+        if(prefs.isKey(fk.c_str())&&!prefs.remove(fk.c_str()))saved=false;
+      }
+    }
+    if(saved)for(int i=0;i<2;i++)
+      if(!prefs.putBool((String("buzE")+i).c_str(),enabled[i]))saved=false;
+    if(!saved){
+      for(int i=0;i<2;i++){buzzerEnabled[i]=false;prefs.putBool((String("buzE")+i).c_str(),false);}
+      digitalWrite(BUSA_BUZZER_GPIO,buzzerPinLevel(false));buzzerSoundOn=false;
+      server.send(500,"text/plain","NVS buzzer settings save failed");return;
+    }
+    for(int i=0;i<2;i++){buzzerEnabled[i]=enabled[i];buzzerOnC[i]=on[i];buzzerOffC[i]=off[i];
+      buzzerTempChannels[i]=BusaSound::Channel();}
+    server.send(200,"application/json",soundJSON(millis()));
+  });
   addGoogleRoutes();
   server.on("/api/ota/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
