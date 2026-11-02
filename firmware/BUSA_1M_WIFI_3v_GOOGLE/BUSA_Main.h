@@ -696,8 +696,8 @@ bool saveThemeMode(uint8_t mode){
 }
 void darkenTftDisplay(); // manual screen-off via F2 or local iPhone UI
 void keypadAction(int k){
-  // # and * are deliberately unassigned: no navigation or other action.
-  if(k==2 || k==3)return;
+  // # stays unassigned; * enters the decimal comma only in a threshold editor.
+  if(k==2 || (k==3 && !editingTemp))return;
   if(calEditing){
     if(k==7||k==11){calDraft=constrain(roundf((calDraft+(k==7?0.1f:-0.1f))*10.0f)/10.0f,-10.0f,10.0f);}
     else if(k==19){if(saveTempOffset(calSensor,calDraft)){calEditing=false;keyMessage="Калибровка сохранена";}}
@@ -736,15 +736,17 @@ void keypadAction(int k){
     }else if(k==19){ // ENT: save only a valid numeric value
       if(editTempBuffer.isEmpty()){
         keyMessage="Пустое поле: введи число или ESC";
-      }else if(storeTempReference(selectedTemp,selectedField,editTempBuffer.toFloat())){
+      }else {String parsed=editTempBuffer;parsed.replace(',','.');
+       if(storeTempReference(selectedTemp,selectedField,parsed.toFloat())){
         editingTemp=false;editTempBuffer="";
         keyMessage="Порог звука сохранён";
-      }else keyMessage="Проверь значение 0..125";
+       }else keyMessage="Проверь значение 0..125";
+      }
     }else{
       const int digitKey[10]={17,4,5,6,8,9,10,12,13,14};
       String insert="";
       for(int d=0;d<10;d++)if(k==digitKey[d])insert=String(d);
-      if(k==1 && editTempBuffer.indexOf('.')<0)insert="."; // F2 decimal separator
+      if(k==3 && editTempBuffer.indexOf(',')<0 && editTempBuffer.indexOf('.')<0)insert=","; // * decimal comma; F2 remains display-off
       if(insert.length() && editTempBuffer.length()<7){
         editTempBuffer=editTempBuffer.substring(0,editCursor)+
           insert+editTempBuffer.substring(editCursor);
@@ -789,6 +791,7 @@ void keypadAction(int k){
       editingTemp=true;
       float v=selectedField?noticeTemp[selectedTemp]:refTemp[selectedTemp];
       editTempBuffer=isfinite(v)?String(v,1):String("");
+      editTempBuffer.replace('.',',');
       editCursor=(uint8_t)editTempBuffer.length();
     }else if(currentPage==0){
       navigatePage(1);
