@@ -3,7 +3,7 @@
 // T3 (cube) ON: K1 steady sound + K2 90-second closing notification.
 // T3 OFF: K3 90-second opening notification; K1 is silenced.
 // T4 (top) ON: K4 steady warning + K2 90-second closing notification.
-// T4 OFF: K4 off + K3 90-second opening notification; K1 silenced.
+// T4 OFF: K4 off + K3 90-second opening notification; K1 unchanged.
 // T3 and T4 each have configurable T_ON/T_OFF thresholds.
 #include "BUSA_SoundAlarmLogic.h"
 constexpr bool BUSA_SOUND_ACTIVE_LOW=true;
@@ -89,7 +89,7 @@ String soundJSON(uint32_t now){
   String s="{\"purpose\":\"12V_SOUND_ONLY\",\"active_low\":";
   s+=(BUSA_SOUND_ACTIVE_LOW?String("true"):String("false"));
   s+=",\"control_of_valve_or_power\":false";
-  s+=",\"mapping\":\"T3_ON=K1+K2;T3_OFF=K3+K1_OFF;T4_ON=K4+K2;T4_OFF=K4_OFF+K3+K1_OFF\"";
+  s+=",\"mapping\":\"T3_ON=K1+K2;T3_OFF=K3+K1_OFF;T4_ON=K4+K2;T4_OFF=K4_OFF+K3\"";
   s+=",\"t3_on_events\":"+String(soundT3OnEvents);
   s+=",\"t3_off_events\":"+String(soundT3OffEvents);
   s+=",\"t4_on_events\":"+String(soundT4OnEvents);
