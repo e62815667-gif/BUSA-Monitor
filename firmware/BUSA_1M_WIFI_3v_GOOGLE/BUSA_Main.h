@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-T1T4SOUND-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-CLEANTEMP-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1451,44 +1451,12 @@ main>*{max-width:100%;min-width:0}
    <div class="relayGrid"><span>K1 <b id="soundStatus0">ВЫКЛ</b></span><span>K2 <b id="soundStatus1">ВЫКЛ</b></span><span>K3 <b id="soundStatus2">ВЫКЛ</b></span><span>K4 <b id="soundStatus3">ВЫКЛ</b></span></div>
    <p class="hint">Т3 ВКЛ — К1 + К2 (90 сек); Т3 ВЫКЛ — К1 выкл + К3 (90 сек). Т4 ВКЛ — К4 + К2 (90 сек); Т4 ВЫКЛ — К4 выкл + К3 (90 сек), К1 не меняет состояние. Все реле только звуковые.</p>
   </div></section>
-<section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div>
-<p class="hint">Справочные значения экрана TFT. Звуковая сигнализация К1–К4 настраивается ниже.</p>
-<div class="grid">
-<div><label>T1 Вода · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref0"></div>
-<div><label>T1 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt0"></div>
-<div><label>T2 Колонна · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref1"></div>
-<div><label>T2 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt1"></div>
-<div><label>T3 Куб · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref2"></div>
-<div><label>T3 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt2"></div>
-<div><label>T4 Верх · Зад., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="ref3"></div>
-<div><label>T4 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
-</div><button id="refsSave" type="button" class="full">Сохранить значения отображения</button>
-<p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div>
-<div class="card"><h2>Звуковые реле · Привязка Т3 и Т4</h2>
-<p class="hint">Это только звуковая сигнализация, не управление краном или питанием. Т3 включает К1 и запускает К2 на 90 сек; при Т3-ВЫКЛ выключается К1 и запускается К3 на 90 сек. Т4 включает К4 и тоже запускает К2; при Т4-ВЫКЛ выключается К4, выключается К1 и звучит К3 на 90 сек. К1 включится снова только при следующем Т3-ВКЛ. К2 и К3 общие для обоих датчиков.</p>
-<div class="grid">
-<div><label><input type="checkbox" id="soundEn0"> К1 · Т3 · штатный звуковой сигнал</label></div>
-<div><label><input type="checkbox" id="soundEn1"> К2 · Т3/Т4 ВКЛ · звуковой сигнал 90 сек</label></div>
-<div><label><input type="checkbox" id="soundEn2"> К3 · Т3/Т4 ВЫКЛ · звуковой сигнал 90 сек (К1 выкл)</label></div>
-<div><label><input type="checkbox" id="soundEn3"> К4 · Т4 · аварийный звуковой сигнал</label></div>
-</div>
-<div class="grid">
-<div><h3>Т3 · Куб</h3><label>Температура ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn0">
-<label>Температура ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff0"></div>
-<div><h3>Т4 · Верх колонны</h3><label>Температура ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn3">
-<label>Температура ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff3"></div>
-</div>
-<button id="soundSave" type="button" class="full">Сохранить привязку и пороги звуковых сигналов</button>
-<p id="soundSaveResult" class="hint">К1–К4 доступны. Звук появится после установки температурных порогов.</p></div>
-<div class="card"><h2>Дополнительный звуковой сигнал · Т1 и Т2 · GPIO2</h2>
-<p class="hint">Отдельный активный звуковой сигнал 3,3 В на GPIO2. Т1 (вода) и Т2 (колонна) имеют независимые пороги Твкл / Твыкл. Если сработал хотя бы один датчик, сигнал включается. При снятии обоих условий — выключается. Не управляет К1–К4, краном или нагревом. Подключать только совместимый с 3,3 В по току вход звукового модуля либо внешний драйвер.</p>
-<div class="grid">
-<div><label><input type="checkbox" id="buzzerEn0"> Т1 · Вода</label><label>Т1 · Включить звук при, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="buzzerOn0"><label>Т1 · Выключить звук при, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="buzzerOff0"></div>
-<div><label><input type="checkbox" id="buzzerEn1"> Т2 · Колонна</label><label>Т2 · Включить звук при, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="buzzerOn1"><label>Т2 · Выключить звук при, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="buzzerOff1"></div>
-</div><div class="row">Т1 / Т2 · состояние зуммера <b id="buzzerStatus">ОЖИДАНИЕ</b></div>
-<button id="buzzerSave" type="button" class="full">Сохранить пороги звука Т1 и Т2</button>
-<p id="buzzerSaveResult" class="hint">Пороги Т1/Т2 сохраняются в ESP32 и передаются в Google-диагностику.</p>
-</div></section>
+<section class="page" data-section="1" hidden><div class="card"><h2>Температуры</h2><div class="grid">
+<div><label>Т1 · Вода</label><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><label for="tempOn0">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn0"></div><div><label for="tempOff0">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff0"></div></div></div>
+<div><label>Т2 · Колонна</label><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><label for="tempOn1">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn1"></div><div><label for="tempOff1">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff1"></div></div></div>
+<div><label>Т3 · Куб</label><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><label for="tempOn2">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn2"></div><div><label for="tempOff2">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff2"></div></div></div>
+<div><label>Т4 · Верх колонны</label><div class="grid" style="grid-template-columns:1fr 1fr;gap:10px"><div><label for="tempOn3">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn3"></div><div><label for="tempOff3">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff3"></div></div></div>
+</div><button type="button" id="temperatureSave" class="full">Сохранить</button><p id="temperatureSaveResult" class="hint"></p></div></section>
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор · ручной режим</h2><p class="hint">Блок 220 В и электропривод крана исключены. ESP32 не управляет ими.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden>
  <div class="card"><h2>Графики · реальные измерения</h2>
@@ -1588,8 +1556,8 @@ main>*{max-width:100%;min-width:0}
 <footer class="hint">БУСА-1М №001 · мониторинг + 4 звуковых реле 12 В · силовое оборудование управляется вручную</footer></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
-let lastWaterPulse=null,themeInitialized=false,soundInitialized=false,buzzerInitialized=false;
-let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,refsInit=false,lastClockPush=0,tftProfileLoaded=false;
+let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=false;
+let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
 function networkLeds(info,ssid){
  const online=info&&info.internet===true;
@@ -1704,22 +1672,6 @@ get('tftTheme').onclick=async()=>{
 };
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
-get('refsSave').onclick=async()=>{
- let body=new URLSearchParams();
- for(let i=0;i<4;i++){
-   for(let k of ['ref','nt']){
-     let v=get(k+i).value.trim();
-     if(v&&(!Number.isFinite(Number(v))||Number(v)<0||Number(v)>125)){
-       get('refsResult').textContent='Допустимы только значения 0..125 °C';return;
-     }
-     body.set(k+i,v);
-   }
- }
- let r=await fetch('/api/display-refs',{method:'POST',body});
- get('refsResult').textContent=await r.text();
- if(r.ok)refsInit=false;
-};
-
 document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.dataset.page)));
 function plot(id,values){const c=get(id),x=c.getContext('2d');x.fillStyle='#061b2c';x.fillRect(0,0,600,200);const a=values.filter(v=>v!==null);if(!a.length){x.fillStyle='#d9bd75';x.fillText('НЕТ ДАННЫХ',24,60);return}let lo=Math.min(...a),hi=Math.max(...a);if(hi-lo<.1)hi=lo+.1;x.strokeStyle='#70e99b';x.beginPath();values.forEach((v,i)=>{if(v===null)return;let xx=10+i*580/80,yy=185-(v-lo)/(hi-lo)*165;if(i===0||values[i-1]===null)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke()}
 function graphAllTemperatures(){
@@ -1749,25 +1701,14 @@ s.temperatures.forEach((t,i)=>{
  const a=tlog4[i];a.push(t.c===null?null:Number(t.c));if(a.length>80)a.shift();
  if(i===0){tlog.push(t.c===null?null:Number(t.c));if(tlog.length>80)tlog.shift();}
 });
-get('temperatures').textContent=names.map((v,i)=>v+': '+get('t'+i).textContent).join(' | ');
-if(!soundInitialized && s.sound_alerts && Array.isArray(s.sound_alerts.channels)){
- s.sound_alerts.channels.forEach((ch,i)=>{get('soundEn'+i).checked=ch.enabled===true;});
- get('soundOn0').value=s.sound_alerts.channels[0].on_c??'';
- get('soundOff0').value=s.sound_alerts.channels[0].off_c??'';
- get('soundOn3').value=s.sound_alerts.channels[3].on_c??'';
- get('soundOff3').value=s.sound_alerts.channels[3].off_c??'';
- soundInitialized=true;
+if(!temperatureThresholdsInitialized && s.sound_alerts?.channels?.length===4 && s.sound_alerts?.buzzer?.sensors?.length===2){
+ const c=s.sound_alerts.channels,b=s.sound_alerts.buzzer.sensors;
+ const pairs=[[b[0].on_c,b[0].off_c],[b[1].on_c,b[1].off_c],[c[0].on_c,c[0].off_c],[c[3].on_c,c[3].off_c]];
+ pairs.forEach((p,i)=>{get('tempOn'+i).value=p[0]??'';get('tempOff'+i).value=p[1]??'';});
+ temperatureThresholdsInitialized=true;
 }
-if(!buzzerInitialized && s.sound_alerts?.buzzer?.sensors){
- s.sound_alerts.buzzer.sensors.forEach((ch,i)=>{get('buzzerEn'+i).checked=ch.enabled===true;get('buzzerOn'+i).value=ch.on_c??'';get('buzzerOff'+i).value=ch.off_c??'';});
- buzzerInitialized=true;
-}
-if(s.sound_alerts?.buzzer)get('buzzerStatus').textContent=s.sound_alerts.buzzer.sound_on?'ЗВУК ВКЛ':'ЗВУК ВЫКЛ';
-if(s.sound_alerts && Array.isArray(s.sound_alerts.channels))s.sound_alerts.channels.forEach((ch,i)=>{get('soundStatus'+i).textContent=ch.sound_on?(ch.timed?'ЗВУК '+ch.remaining_seconds+'с':'ЗВУК'):(!ch.enabled?'ВЫКЛ':ch.reason==='SETPOINTS_REQUIRED'?'НУЖНЫ ПОРОГИ':'ГОТОВ')});
-if(!refsInit && Array.isArray(s.display_references)){
-  s.display_references.forEach((r,i)=>{get('ref'+i).value=r.target===null?'':r.target;get('nt'+i).value=r.notice===null?'':r.notice});
-  refsInit=true;
-}
+if(s.sound_alerts?.channels?.length===4)
+ s.sound_alerts.channels.forEach((ch,i)=>{get('soundStatus'+i).textContent=ch.sound_on?(ch.timed?'ЗВУК '+ch.remaining_seconds+'с':'ЗВУК'):(!ch.enabled?'ВЫКЛ':ch.reason==='SETPOINTS_REQUIRED'?'НУЖНЫ ПОРОГИ':'ГОТОВ')});
 let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'НЕТ ДАННЫХ':f.toFixed(2);get('flow2').textContent=get('flow').textContent;get('pulses').textContent=s.water.pulses;get('total').textContent=Number(s.water.total_l_estimate).toFixed(3);
 flog.push(f);if(flog.length>80)flog.shift();
 const currentPulse=Number(s.water.pulses);
@@ -1834,37 +1775,28 @@ if(s.keypad){
 }
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
-get('soundSave').onclick=async()=>{
+get('temperatureSave').onclick=async()=>{
+ const button=get('temperatureSave'),result=get('temperatureSaveResult');
  const data=new URLSearchParams();
- for(let i=0;i<4;i++)data.set('en'+i,get('soundEn'+i).checked?'1':'0');
- data.set('t3on',get('soundOn0').value.trim());
- data.set('t3off',get('soundOff0').value.trim());
- data.set('t4on',get('soundOn3').value.trim());
- data.set('t4off',get('soundOff3').value.trim());
- if(!confirm('Сохранить Т3/Т4 и звуковые реле? Включённые сигналы могут сразу сработать по текущим температурам.'))return;
- get('soundSave').disabled=true;
- try{
-  const r=await fetch('/api/sound/config',{method:'POST',body:data});
-  if(!r.ok)throw Error(await r.text());
-  get('soundSaveResult').textContent='Привязка Т3/Т4 и все настройки сохранены';
- }catch(e){get('soundSaveResult').textContent='Ошибка: '+e.message;}
- get('soundSave').disabled=false;
-};
-get('buzzerSave').onclick=async()=>{
- const data=new URLSearchParams();
- for(let i=0;i<2;i++){
-   data.set('en'+i,get('buzzerEn'+i).checked?'1':'0');
-   data.set('on'+i,get('buzzerOn'+i).value.trim());
-   data.set('off'+i,get('buzzerOff'+i).value.trim());
+ for(let i=0;i<4;i++){
+  const on=get('tempOn'+i).value.trim(),off=get('tempOff'+i).value.trim();
+  if((!on)!==(!off)){result.textContent='Т'+(i+1)+': заполните оба значения';return;}
+  if(on){
+   const a=Number(on),b=Number(off);
+   if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||a>125||b<0||b>125||Math.abs(a-b)<0.5){
+    result.textContent='Т'+(i+1)+': проверьте ВКЛ и ВЫКЛ';return;
+   }
+  }
+  data.set('on'+i,on);data.set('off'+i,off);
  }
- if(!confirm('Сохранить пороги Т1/Т2? Звуковой сигнал может сразу включиться по текущим температурам.'))return;
- get('buzzerSave').disabled=true;
+ button.disabled=true;result.textContent='Сохранение...';
  try{
-  const r=await fetch('/api/buzzer/config',{method:'POST',body:data});
+  const r=await fetch('/api/temperature-alarms',{method:'POST',body:data});
   if(!r.ok)throw Error(await r.text());
-  get('buzzerSaveResult').textContent='Настройки звука Т1/Т2 сохранены';
- }catch(e){get('buzzerSaveResult').textContent='Ошибка: '+e.message;}
- get('buzzerSave').disabled=false;
+  result.textContent='Сохранено';
+  temperatureThresholdsInitialized=false;
+ }catch(e){result.textContent='Ошибка: '+e.message;}
+ button.disabled=false;
 };
 get('googleSave').onclick=async()=>{
 const url=get('googleUrl').value.trim(),token=get('googleToken').value.trim();
@@ -2165,6 +2097,63 @@ void setup(){
       buzzerTempChannels[i]=BusaSound::Channel();}
     server.send(200,"application/json",soundJSON(millis()));
   });
+  // Single minimalist T1-T4 alarm-threshold form. Monitoring and sound only.
+  server.on("/api/temperature-alarms",HTTP_POST,[]{
+    if(!apClient()){server.send(403,"text/plain","BUSA local AP only");return;}
+    float requestedOn[4]={NAN,NAN,NAN,NAN},requestedOff[4]={NAN,NAN,NAN,NAN};
+    bool present[4]={false,false,false,false};
+    for(int i=0;i<4;i++){
+      const String onKey=String("on")+i,offKey=String("off")+i;
+      if(!server.hasArg(onKey)||!server.hasArg(offKey)){
+        server.send(400,"text/plain","Missing T1-T4 fields");return;
+      }
+      const String on=server.arg(onKey),off=server.arg(offKey);
+      if(on.isEmpty()&&off.isEmpty())continue; // no threshold: no sound
+      char *endOn=nullptr,*endOff=nullptr;
+      requestedOn[i]=strtof(on.c_str(),&endOn);
+      requestedOff[i]=strtof(off.c_str(),&endOff);
+      if(on.isEmpty()||off.isEmpty()||!endOn||*endOn||!endOff||*endOff||
+         !BusaSound::valid(requestedOn[i],requestedOff[i])){
+        server.send(400,"text/plain","Invalid ON/OFF temperatures 0..125 C, delta >=0.5 C");return;
+      }
+      present[i]=true;
+    }
+    // Do not alter any hardware output until the full submitted form is valid.
+    soundOutputsOff();soundResetState();
+    const char* onKeys[4]={"buzOn0","buzOn1","sndT3On","sndT4On"};
+    const char* offKeys[4]={"buzOff0","buzOff1","sndT3Off","sndT4Off"};
+    bool saved=true;
+    for(int i=0;i<4;i++){
+      if(present[i]){
+        if(!prefs.putFloat(onKeys[i],requestedOn[i]))saved=false;
+        if(!prefs.putFloat(offKeys[i],requestedOff[i]))saved=false;
+      }else{
+        if(prefs.isKey(onKeys[i])&&!prefs.remove(onKeys[i]))saved=false;
+        if(prefs.isKey(offKeys[i])&&!prefs.remove(offKeys[i]))saved=false;
+      }
+    }
+    for(int i=0;i<2;i++){
+      if(!prefs.putBool((String("buzE")+i).c_str(),true))saved=false;
+    }
+    for(int i=0;i<4;i++){
+      if(!prefs.putBool((String("sndRoleEnable")+i).c_str(),true))saved=false;
+    }
+    if(!saved){
+      for(int i=0;i<4;i++){soundEnabled[i]=false;prefs.putBool((String("sndRoleEnable")+i).c_str(),false);}
+      for(int i=0;i<2;i++){buzzerEnabled[i]=false;prefs.putBool((String("buzE")+i).c_str(),false);}
+      soundOutputsOff();
+      server.send(500,"text/plain","Temperature settings save failed");return;
+    }
+    for(int i=0;i<2;i++){
+      buzzerOnC[i]=requestedOn[i];buzzerOffC[i]=requestedOff[i];buzzerEnabled[i]=true;
+    }
+    soundOnC[0]=soundOnC[1]=soundOnC[2]=requestedOn[2];
+    soundOffC[0]=soundOffC[1]=soundOffC[2]=requestedOff[2];
+    soundOnC[3]=requestedOn[3];soundOffC[3]=requestedOff[3];
+    for(int i=0;i<4;i++)soundEnabled[i]=true;
+    server.send(200,"application/json",soundJSON(millis()));
+  });
+
   addGoogleRoutes();
   server.on("/api/ota/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
