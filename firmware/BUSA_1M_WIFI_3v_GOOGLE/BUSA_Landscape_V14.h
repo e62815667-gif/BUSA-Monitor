@@ -382,7 +382,7 @@ void v14RefreshLive(uint32_t now){
     for(int i=0;i<4;i++)
       v14Metric(v13Temp(i,now),21,52+i*36+30,94,hasTemp(i,now));
     v14DrawFlowBar();
-  } else if(currentPage==1 && !editingTemp){
+  } else if(currentPage==1 && !editingTemp && !deleteConfirmPending){
     for(int i=0;i<4;i++){
       int x=4+(i%2)*158,y=52+(i/2)*77;
       v14Metric(v13Temp(i,now),x+11,y+40,133,hasTemp(i,now));
