@@ -40,6 +40,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
+          landscape=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Landscape_V14.h').read_text()
           for term in ('14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-FLICKERFIX-20261102','TPIN[4]={16,17,18,21}',
                        'TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14',
                        'KPIN[4]={7,6,5,4}','BUS_SDA=40,BUS_SCL=41',
