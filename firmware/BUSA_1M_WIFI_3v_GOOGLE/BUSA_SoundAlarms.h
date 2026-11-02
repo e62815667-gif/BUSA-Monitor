@@ -6,6 +6,16 @@
 // T4 OFF: K4 off + K3 90-second opening notification; K1 unchanged.
 // T3 and T4 each have configurable T_ON/T_OFF thresholds.
 #include "BUSA_SoundAlarmLogic.h"
+// A separate active-3.3V logic buzzer input on GPIO2. Use a compatible
+// low-current active buzzer module or an external driver as required.
+constexpr uint8_t BUSA_BUZZER_GPIO=2;
+constexpr bool BUSA_BUZZER_ACTIVE_HIGH=true;
+BusaSound::Channel buzzerTempChannels[2];
+bool buzzerEnabled[2]={true,true};
+float buzzerOnC[2]={NAN,NAN},buzzerOffC[2]={NAN,NAN};
+bool buzzerSoundOn=false;
+uint32_t buzzerLastStartMs=0,buzzerActivationCount=0;
+int buzzerPinLevel(bool active){return active==BUSA_BUZZER_ACTIVE_HIGH?HIGH:LOW;}
 constexpr bool BUSA_SOUND_ACTIVE_LOW=true;
 constexpr uint32_t BUSA_SOUND_POLL_MS=200U;
 constexpr uint32_t BUSA_SOUND_TIMED_MS=90000UL;
@@ -29,15 +39,21 @@ void soundOutputsOff(){
     if(soundGpioInitialized)digitalWrite(KPIN[i],soundPinLevel(false));
     soundChannels[i].on=false;
   }
+  if(soundGpioInitialized)digitalWrite(BUSA_BUZZER_GPIO,buzzerPinLevel(false));
+  buzzerSoundOn=false;
 }
 void soundInitPins(){
   // All four GPIOs connect exclusively to low-voltage 12 V sound relays.
   for(int i=0;i<4;i++){digitalWrite(KPIN[i],soundPinLevel(false));pinMode(KPIN[i],OUTPUT);}
+  digitalWrite(BUSA_BUZZER_GPIO,buzzerPinLevel(false));
+  pinMode(BUSA_BUZZER_GPIO,OUTPUT);
   soundGpioInitialized=true;soundOutputsOff();
 }
 void soundResetState(){
   BusaSound::resetRouted(soundRoute);
   for(int i=0;i<4;i++)soundChannels[i]=BusaSound::Channel();
+  for(int i=0;i<2;i++)buzzerTempChannels[i]=BusaSound::Channel();
+  buzzerSoundOn=false;
   soundLastPoll=0;
 }
 void soundLoadPrefs(){
@@ -53,6 +69,11 @@ void soundLoadPrefs(){
   for(int i=0;i<4;i++){
     soundEnabled[i]=prefs.getBool((String("sndRoleEnable")+i).c_str(),true);
     soundSensorIndex[i]=i==3?3:2;
+  }
+  for(int i=0;i<2;i++){
+    buzzerEnabled[i]=prefs.getBool((String("buzE")+i).c_str(),true);
+    buzzerOnC[i]=prefs.getFloat((String("buzOn")+i).c_str(),NAN);
+    buzzerOffC[i]=prefs.getFloat((String("buzOff")+i).c_str(),NAN);
   }
   soundResetState();
 }
@@ -84,6 +105,17 @@ void soundPoll(uint32_t now){
     if(on&&!old){soundLastStartMs[i]=now;++soundSignalCount[i];}
     digitalWrite(KPIN[i],soundPinLevel(on));
   }
+  const bool previousBuzzer=buzzerSoundOn;
+  bool sum=false;
+  for(int i=0;i<2;i++){
+    const bool fresh=hasTemp(i,now);
+    const bool active=BusaSound::evaluate(buzzerTempChannels[i],buzzerEnabled[i],
+       fresh,fresh?temperature[i]:NAN,buzzerOnC[i],buzzerOffC[i]);
+    sum=sum||active;
+  }
+  buzzerSoundOn=sum; // T1 OR T2: independent thresholds, one sound output.
+  if(sum&&!previousBuzzer){buzzerLastStartMs=now;++buzzerActivationCount;}
+  digitalWrite(BUSA_BUZZER_GPIO,buzzerPinLevel(sum));
 }
 String soundJSON(uint32_t now){
   String s="{\"purpose\":\"12V_SOUND_ONLY\",\"active_low\":";
@@ -95,6 +127,23 @@ String soundJSON(uint32_t now){
   s+=",\"t4_on_events\":"+String(soundT4OnEvents);
   s+=",\"t4_off_events\":"+String(soundT4OffEvents);
   s+=",\"k1_silenced_on_open\":"+(soundRoute.k1Hold?String("true"):String("false"));
+  s+=",\"buzzer\":{\"gpio\":"+String(BUSA_BUZZER_GPIO);
+  s+=",\"logic_voltage_v\":3.3,\"active_high\":true,\"source\":\"T1_OR_T2\"";
+  s+=",\"sound_on\":"+(buzzerSoundOn?String("true"):String("false"));
+  s+=",\"command_gpio_level\":"+String(buzzerPinLevel(buzzerSoundOn));
+  s+=",\"activation_count\":"+String(buzzerActivationCount);
+  s+=",\"last_start_ms\":"+String(buzzerLastStartMs);
+  s+=",\"physical_buzzer_feedback\":false,\"sensors\":[";
+  for(int i=0;i<2;i++){
+    if(i)s+=",";
+    s+="{\"sensor_index\":"+String(i);
+    s+=",\"enabled\":"+(buzzerEnabled[i]?String("true"):String("false"));
+    s+=",\"on_c\":"+(std::isfinite(buzzerOnC[i])?String(buzzerOnC[i],1):String("null"));
+    s+=",\"off_c\":"+(std::isfinite(buzzerOffC[i])?String(buzzerOffC[i],1):String("null"));
+    s+=",\"condition_active\":"+(buzzerTempChannels[i].on?String("true"):String("false"));
+    s+=",\"reason\":\""+String(BusaSound::reasonText(buzzerTempChannels[i].reason))+"\"}";
+  }
+  s+="]}";
   s+=",\"channels\":[";
   for(int i=0;i<4;i++){
     if(i)s+=",";
