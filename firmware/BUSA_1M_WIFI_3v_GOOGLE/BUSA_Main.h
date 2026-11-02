@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-TFTSYNC-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-GPIODIRECT-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -252,6 +252,10 @@ uint32_t busaI2cClockStretchCount=0,busaI2cLowDuringHighBits=0;
 uint8_t busaI2cAckSampleEarly=1,busaI2cAckSampleLate=1;
 uint8_t busaI2cLastTxByte=0;
 bool busaI2cGpioTestPassed=false;
+bool busaI2cElectricalFault=true;
+uint32_t busaI2cDisabledScanCount=0;
+uint32_t busaI2cGpioConfigErrors=0;
+uint8_t busaI2cSdaIdfLow=1,busaI2cSclIdfLow=1;
 bool busaI2cSuspended(uint32_t now){return busaI2cSuspendedUntil && (int32_t)(now-busaI2cSuspendedUntil)<0;}
 void busaI2cQuarantine(uint32_t now,uint32_t durationMs=500){
   // Do not erase positive device discoveries on a single bad sample.
@@ -263,8 +267,15 @@ bool busaI2cLinesFree(){
   busaI2cLastScl=(uint8_t)digitalRead(BUS_SCL);
   return busaI2cLastSda==HIGH && busaI2cLastScl==HIGH;
 }
-inline void busaSda(bool release){digitalWrite(BUS_SDA,release?HIGH:LOW);}
-inline void busaScl(bool release){digitalWrite(BUS_SCL,release?HIGH:LOW);}
+// GPIO_MODE_INPUT_OUTPUT_OD enables the ESP32-S3 pad input buffer; Arduino's
+// output-only open drain can make digitalRead() report HIGH even while
+// the pad is commanded LOW. IDF writes 1 = release, 0 = sink only.
+inline void busaSda(bool release){
+  if(gpio_set_level(static_cast<gpio_num_t>(BUS_SDA),release?1:0)!=ESP_OK)++busaI2cGpioConfigErrors;
+}
+inline void busaScl(bool release){
+  if(gpio_set_level(static_cast<gpio_num_t>(BUS_SCL),release?1:0)!=ESP_OK)++busaI2cGpioConfigErrors;
+}
 inline void busaI2cPause(){delayMicroseconds(BUSA_SOFTI2C_HALF_PERIOD_US);}
 void busaI2cRunGpioSelfTest(){
   busaSda(true);busaScl(true);delayMicroseconds(200);
@@ -272,12 +283,14 @@ void busaI2cRunGpioSelfTest(){
   busaI2cTestIdleScl=digitalRead(BUS_SCL);
   // Check clock-low drive, then release it before the brief SDA START/STOP.
   busaScl(false);delayMicroseconds(30);
-  busaI2cTestSclForcedLow=digitalRead(BUS_SCL);
-  busaI2cTestSdaWhileSclLow=digitalRead(BUS_SDA);
+  busaI2cTestSclForcedLow=gpio_get_level(static_cast<gpio_num_t>(BUS_SCL));
+  busaI2cSclIdfLow=busaI2cTestSclForcedLow;
+  busaI2cTestSdaWhileSclLow=gpio_get_level(static_cast<gpio_num_t>(BUS_SDA));
   busaScl(true);delayMicroseconds(200);
   busaSda(false);delayMicroseconds(30);
-  busaI2cTestSdaForcedLow=digitalRead(BUS_SDA);
-  busaI2cTestSclWhileSdaLow=digitalRead(BUS_SCL);
+  busaI2cTestSdaForcedLow=gpio_get_level(static_cast<gpio_num_t>(BUS_SDA));
+  busaI2cSdaIdfLow=busaI2cTestSdaForcedLow;
+  busaI2cTestSclWhileSdaLow=gpio_get_level(static_cast<gpio_num_t>(BUS_SCL));
   busaSda(true);delayMicroseconds(200);
   busaI2cTestSdaReleased=digitalRead(BUS_SDA);
   busaI2cTestSclReleased=digitalRead(BUS_SCL);
@@ -285,6 +298,7 @@ void busaI2cRunGpioSelfTest(){
     !busaI2cTestSdaForcedLow && !busaI2cTestSclForcedLow &&
     busaI2cTestSdaReleased && busaI2cTestSclReleased &&
     busaI2cTestSdaWhileSclLow && busaI2cTestSclWhileSdaLow;
+  busaI2cElectricalFault=!busaI2cGpioTestPassed;
   ++busaI2cGpioTests;busaI2cLastGpioTestMs=millis();
 }
 bool busaI2cClockHigh(){
@@ -370,6 +384,7 @@ void busaI2cRecover(){
 bool busaI2cExchange(uint8_t address,const uint8_t* tx,size_t txLen,uint8_t* rx,size_t rxLen){
   const uint32_t started=millis();
   if(!i2cOnline || busaI2cSuspended(started)){busaI2cLastResult=4;return false;}
+  if(busaI2cElectricalFault){busaI2cLastResult=5;return false;}
   busaI2cLastAddress=address;busaI2cLastResult=0;
   bool ok=busaI2cStart();
   if(ok)ok=busaI2cWriteByte((uint8_t)(address<<1)|(txLen||!rxLen?0:1));
@@ -458,7 +473,9 @@ void busaI2cRebuildAddressCache(uint32_t now){
   i2cAckCount=i2cFoundCount;
 }
 void scanI2cAddresses(uint32_t now){
-  if(!i2cOnline || busaI2cSuspended(now) || !elapsed(now,busaI2cScanLastStep,120))return;
+  if(!i2cOnline || busaI2cSuspended(now))return;
+  if(busaI2cElectricalFault){++busaI2cDisabledScanCount;return;}
+  if(!elapsed(now,busaI2cScanLastStep,120))return;
   busaI2cScanLastStep=now;
   uint8_t address;
   if(busaI2cPriorityNext<sizeof(BUSA_I2C_PRIORITY_ADDRS)){
@@ -1158,7 +1175,16 @@ String statusJSON(){
   s+=",\"pca_ack_total\":"+String(busaI2cPcaAcks);
   s+=",\"pcf_last_nack_ms\":"+String(busaI2cLastPcfNackMs);
   s+=",\"pca_last_nack_ms\":"+String(busaI2cLastPcaNackMs);
-  s+=",\"driver\":\"SOFTWARE_OPEN_DRAIN\"";
+  s+=",\"driver\":\"IDF_INPUT_OUTPUT_OPEN_DRAIN\"";
+  s+=",\"electrical_fault\":"+(busaI2cElectricalFault?String("true"):String("false"));
+  s+=",\"scan_suppressed\":"+(busaI2cElectricalFault?String("true"):String("false"));
+  s+=",\"gpio_config_errors\":"+String(busaI2cGpioConfigErrors);
+  s+=",\"sda_idf_low_readback\":"+String(busaI2cSdaIdfLow);
+  s+=",\"scl_idf_low_readback\":"+String(busaI2cSclIdfLow);
+  s+=",\"fault_hint\":"+quoteJson(!busaI2cElectricalFault?String("NONE"):
+    busaI2cTestSdaForcedLow?String("SDA_GPIO8_NOT_LOW"):
+    busaI2cTestSclForcedLow?String("SCL_GPIO9_NOT_LOW"):
+    String("I2C_PAD_READBACK_FAILED"));
   s+=",\"gpio_test\":{\"count\":"+String(busaI2cGpioTests);
   s+=",\"tested_at_ms\":"+String(busaI2cLastGpioTestMs);
   s+=",\"passed\":"+(busaI2cGpioTestPassed?String("true"):String("false"));
@@ -2354,14 +2380,16 @@ void setup(){
   busaReportStage("HTTP_READY");
   // Never do a full I2C address scan inside setup.
   busaReportStage("I2C_BEGIN");
-  // Open-drain software I2C on the original SDA=8, SCL=9 pins.
-  // No ESP-IDF or Wire controller is started, avoiding its 1-second waits.
-  pinMode(BUS_SDA,OUTPUT_OPEN_DRAIN);
-  pinMode(BUS_SCL,OUTPUT_OPEN_DRAIN);
-  // Internal weak pull-ups supplement the board pull-ups; high means released,
-  // never push 3.3V against a slave pulling the line low.
-  gpio_pullup_en(static_cast<gpio_num_t>(BUS_SDA));
-  gpio_pullup_en(static_cast<gpio_num_t>(BUS_SCL));
+  // Direct ESP-IDF GPIO pads, not the ESP-IDF I2C controller. Enable both
+  // the input buffer (for ACK/signal feedback) and open-drain output driver.
+  // No push-pull HIGH: release the line to external + internal pull-up.
+  gpio_config_t i2cPinCfg={};
+  i2cPinCfg.pin_bit_mask=(1ULL<<BUS_SDA)|(1ULL<<BUS_SCL);
+  i2cPinCfg.mode=GPIO_MODE_INPUT_OUTPUT_OD;
+  i2cPinCfg.pull_up_en=GPIO_PULLUP_ENABLE;
+  i2cPinCfg.pull_down_en=GPIO_PULLDOWN_DISABLE;
+  i2cPinCfg.intr_type=GPIO_INTR_DISABLE;
+  if(gpio_config(&i2cPinCfg)!=ESP_OK)++busaI2cGpioConfigErrors;
   busaSda(true);busaScl(true);
   delayMicroseconds(300);
   busaI2cLinesFree();
@@ -2423,7 +2451,7 @@ void loop(){
   }
   // Display updates take priority over peripheral diagnostics.
   if(i2cOnline){
-    if(i2cFoundCount==0 && !busaI2cSuspended(now) &&
+    if((busaI2cElectricalFault || i2cFoundCount==0) && !busaI2cSuspended(now) &&
        elapsed(now,busaI2cLastGpioTestMs,30000)){
       const uint32_t started=millis();
       busaI2cRunGpioSelfTest();
@@ -2432,11 +2460,13 @@ void loop(){
     // Query connected PCF/PCA once per 6 s. Probe one supported I2C address
     // per loop; prevent keypad bus errors from starving the web server.
     // Profile each blocking component and quarantine a misbehaving I2C bus.
+    if(!busaI2cElectricalFault){
     {const uint32_t started=millis();scanI2cAddresses(now);busaObserve("I2C_DISCOVERY",started,busaI2cWorstMs);}
     if(!lastBusProbe || elapsed(now,lastBusProbe,6000)){
       const uint32_t started=millis();probeI2c(now);busaObserve("I2C_DEVICES",started,busaI2cWorstMs);
     }
     {const uint32_t started=millis();pollKeys(now);busaObserve("KEYPAD",started,busaMaxKeyScanMs);}
+    }
   }
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
