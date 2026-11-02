@@ -421,7 +421,8 @@ main .card{background:#071c32!important;border:1px solid #195486!important;box-s
 <div class="actions"><a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/blob/main/google/README_BUSA_Google_Drive.md" target="_blank" rel="noopener">Инструкция Google</a></div></div>
 <div class="card settingCard" id="aboutSettings" hidden><h2>О системе</h2><div class="row"><span>Wi-Fi</span><b id="onlineAboutWifi">—</b></div><div class="row"><span>Google</span><b id="onlineAboutGoogle">—</b></div><div class="row"><span>Прошивка</span><b id="onlineAboutFirmware">—</b></div><div class="row"><span>Время работы</span><b id="onlineAboutUptime">—</b></div></div><div id="statusText" hidden>Нет удалённых данных</div></section>
 <section id="graphs" hidden><div class="approvedPageTitle"><span>⌁</span><strong>ГРАФИКИ</strong></div><div class="card approvedBlackGraph"><div class="graphTabs approvedGraphTabs"><button class="on" data-chart="0">Температуры</button><button data-chart="1">Вода и отбор</button></div><div data-chart-panel="0"><h3>Т1–Т4 · отдельные линии</h3><canvas id="remoteGraphT" class="approvedLaneCanvas" width="600" height="420"></canvas></div><div data-chart-panel="1" hidden><h3>Вода и отбор · раздельно</h3><canvas id="remoteGraphW" class="approvedWaterCanvas" width="600" height="280"></canvas></div></div></section>
-<section id="events" hidden><div class="approvedPageTitle"><span>▤</span><strong>СОБЫТИЯ</strong></div><div class="card"><div class="graphTabs eventTabs"><button class="on" data-event-filter="all">Все</button><button data-event-filter="warn">Предупр.</button><button data-event-filter="alarm">Аварии</button><button data-event-filter="system">Система</button></div><div id="remoteEvents" class="approvedEvents">Ожидание Google…</div></div></section><section id="connection" hidden>
+<section id="events" hidden><div class="approvedPageTitle"><span>▤</span><strong>СОБЫТИЯ</strong></div><div class="card"><div class="graphTabs eventTabs"><button class="on" data-event-filter="all">Все</button><button data-event-filter="warn">Предупр.</button><button data-event-filter="alarm">Аварии</button><button data-event-filter="system">Система</button></div><div id="remoteEvents" class="approvedEvents">Ожидание Google…</div></div></section><button type="button" id="onlineInnerBack" class="approvedBack" hidden>‹ Все настройки</button>
+<section id="connection" hidden>
 <div class="card"><h2>Связь с БУСА</h2><p class="muted">Состояние с последнего отчёта, полученного через Google. Это не прямое соединение с ESP32.</p>
 <div class="row"><span>Последний пакет</span><b id="connectionLast">—</b></div>
 <div class="row"><span>Актуальность</span><b id="connectionFresh">Нет данных</b></div>
@@ -516,18 +517,35 @@ document.getElementById('themeSwitch').addEventListener('click',()=>{
 });
 function showOnlinePage(page){
  document.querySelectorAll('main section[id]').forEach(s=>s.hidden=s.id!==page);
- document.querySelectorAll('nav [data-tab]').forEach(t=>t.classList.toggle('active',t.dataset.tab===page||((page==='connection'||page==='diagnostics')&&t.dataset.tab==='settings')));
+ document.querySelectorAll('nav [data-tab]').forEach(t=>{
+ const on=t.dataset.tab===page||(['connection','diagnostics','cloudUpdates'].includes(page)&&t.dataset.tab==='settings');
+ t.classList.toggle('active',on);t.classList.toggle('on',on);
+ });
+ if(page==='settings')settingsPanel(null);
+ byId('onlineInnerBack').hidden=!['connection','diagnostics','cloudUpdates'].includes(page);
  window.scrollTo(0,0);
 }
 document.querySelectorAll('nav [data-tab]').forEach(b=>b.addEventListener('click',()=>showOnlinePage(b.dataset.tab)));
+function settingsPanel(id){
+ byId('settingsMenu').hidden=!!id;
+ byId('settingsBack').hidden=!id;
+ document.querySelectorAll('#settings .settingCard, #settings #googleSettings').forEach(el=>el.hidden=el.id!==id);
+}
+document.querySelectorAll('[data-settings-target]').forEach(button=>button.addEventListener('click',()=>{
+ const id=button.dataset.settingsTarget;
+ if(['connection','diagnostics','cloudUpdates'].includes(id)){showOnlinePage(id);return;}
+ settingsPanel(id);window.scrollTo(0,0);
+}));
+byId('settingsBack').addEventListener('click',()=>settingsPanel(null));
 document.querySelectorAll('[data-open-page]').forEach(b=>b.addEventListener('click',()=>showOnlinePage(b.dataset.openPage)));
+byId('onlineInnerBack').addEventListener('click',()=>showOnlinePage('settings'));
 document.getElementById('goConnectionSettings').addEventListener('click',()=>{
  showOnlinePage('settings');
- document.getElementById('googleSettings').scrollIntoView({block:'start',behavior:'smooth'});
+ settingsPanel('googleSettings');document.getElementById('googleSettings').scrollIntoView({block:'start',behavior:'smooth'});
 });
 document.querySelectorAll('[data-chart]').forEach(b=>b.addEventListener('click',()=>{
  document.querySelectorAll('[data-chart]').forEach(t=>t.classList.toggle('on',t===b));
- document.querySelectorAll('[data-chart-panel]').forEach(p=>p.hidden=p.dataset.chartPanel!==b.dataset.chart);
+ document.querySelectorAll('[data-chart-panel]').forEach(p=>p.hidden=p.dataset.chartPanel!==b.dataset.chart);drawRemoteCharts();
 }));
 
 // Read-only remote feed: user-owned Google Apps Script with separate VIEW token.
@@ -569,7 +587,14 @@ function asFinite(v){return typeof v==='number'&&Number.isFinite(v)?v:null}
 function stampRussian(ms){return Number.isFinite(ms)?new Date(ms).toLocaleString('ru-RU',{dateStyle:'short',timeStyle:'medium'}):'—'}
 function renderRemoteEvents(){
  const items=remoteErrors.filter(e=>eventFilter==='all'||e.kind===eventFilter);
- byId('remoteEvents').textContent=items.length?items.map(e=>e.text).join('\n'):'Событий выбранного типа нет';
+ const holder=byId('remoteEvents');holder.replaceChildren();
+ if(!items.length){holder.textContent='Событий выбранного типа нет';return;}
+ items.forEach(item=>{
+  const line=document.createElement('div');line.className='eventRow '+item.kind;
+  const dot=document.createElement('span');dot.className='eventDot';
+  const label=document.createElement('span');label.textContent=item.text;
+  line.append(dot,label);holder.append(line);
+ });
 }
 let cloudRelease=null,cloudCurrentTelemetry=null,cloudCurrentAt=null;
 function renderCloudCompatibility(){
