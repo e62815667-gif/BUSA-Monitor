@@ -565,6 +565,20 @@ function indicator(id,label,on,unknown=false){
 function remoteStatus(msg){
  byId('statusText').textContent=msg;
  byId('viewState').textContent=msg;
+ const message=byId('busaGoogleDiagMessage');
+ if(message){
+  if(msg.includes('Доступ к телеметрии не разрешён')){
+   message.textContent='Google Apps Script отклонил ключ просмотра. БУСА отправляет данные в таблицу отдельно. Проверь, что ссылка /exec ведёт в действующее развёртывание, а BUSA_VIEW_TOKEN совпадает с ключом в настройках этого Apps Script. Если код скрипта обновлялся, обнови развёртывание. Ключ не присылай.';
+  }else if(msg.includes('Нет ответа Google')||msg.includes('Ошибка загрузки из Google')){
+   message.textContent='Не удалось получить ответ Apps Script. Проверь доступность /exec, интернет и настройки развёртывания. Сохранённые ключи и адрес не удалены.';
+  }else if(msg==='Подключение к Google…'){
+   message.textContent='Выполняется проверка доступа. Данные с БУСА не подменяются примерными значениями.';
+  }else if(msg==='Подключено'){
+   message.textContent='Чтение из Google подтверждено. Температуры и остальные значения берутся из реальной телеметрии.';
+  }else{
+   message.textContent=msg;
+  }
+ }
  if(/^(Ошибка|Нет ответа|Нужен адрес|Укажи BUSA_VIEW_TOKEN|Таблица пока пуста|Некорректная телеметрия)/.test(msg)){
   byId('onlineSetupBanner').hidden=false;
   byId('onlineSetupMessage').textContent=msg;
@@ -864,6 +878,8 @@ window.busaViewReceive=function(data){
  }
  remoteLastSample=sample;
  renderRemote(sample.telemetry,data.history||[],at);
+ const diag=byId('busaGoogleDiagMessage');
+ if(diag)diag.textContent='Google Apps Script подтвердил ключ просмотра. Показаны фактические данные из таблицы.';
 };
 function loadGoogleLatest(){
  if(!remoteEnabled||!configUrl||!configToken)return;
@@ -872,7 +888,7 @@ function loadGoogleLatest(){
  const join=configUrl.includes('?')?'&':'?';
  script.src=configUrl+join+'mode=latest&callback=busaViewReceive&readToken='+
   encodeURIComponent(configToken)+'&t='+Date.now();
- script.onerror=()=>{if(remoteEnabled)remoteStatus('Ошибка загрузки из Google')};
+ script.onerror=()=>{if(remoteEnabled){clearTimeout(remoteTimeout);remoteStatus('Ошибка загрузки из Google')}};
  remoteRequest=script;document.head.appendChild(script);
  clearTimeout(remoteTimeout);
  remoteTimeout=setTimeout(()=>{if(remoteEnabled)remoteStatus('Нет ответа Google (проверь развёртывание)')},18000);
@@ -903,6 +919,17 @@ function connectRemote(url,token,persist=true){
 byId('viewConnect').addEventListener('click',()=>{
  connectRemote(byId('viewUrl').value.trim(),byId('viewToken').value.trim());
 });
+byId('viewRetry').addEventListener('click',()=>{
+ const url=byId('viewUrl').value.trim();
+ const token=byId('viewToken').value.trim();
+ if(!remoteEnabled||url!==configUrl||token!==configToken){
+  connectRemote(url,token,false);
+ }else{
+  remoteStatus('Подключение к Google…');
+  loadGoogleLatest();
+ }
+});
+
 byId('viewClear').addEventListener('click',()=>{
  stopRemote();configUrl='';configToken='';remoteHistory=[];remoteLastSample=null;
  byId('viewUrl').value='';byId('viewToken').value='';
