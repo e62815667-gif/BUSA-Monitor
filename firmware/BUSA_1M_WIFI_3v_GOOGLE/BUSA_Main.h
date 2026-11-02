@@ -2138,14 +2138,14 @@ get('keyCancel').onclick=()=>keyCommand('cancel');
 document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.dataset.page)));
 // One controller history feeds the TFT and iPhone: no invented collection values.
 function chartFrame(ctx,w,h){ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);ctx.strokeStyle='#2774a5';ctx.lineWidth=2;ctx.strokeRect(1,1,w-2,h-2);}
-function chartLine(ctx,values,color,x,y,w,h,zero=false){
+function chartLine(ctx,values,color,x,y,w,h,zero=false,slots=48){
  const a=values.filter(v=>Number.isFinite(v));if(!a.length)return;
  let low=zero?0:Math.min(...a),high=Math.max(...a);
  if(zero)high=Math.max(1,high);else{let p=Math.max(.2,(high-low)*.22);low-=p;high+=p;}
  if(high<=low)high=low+1;ctx.strokeStyle=color;ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();
  let drawing=false;values.forEach((v,i)=>{
   if(!Number.isFinite(v)){drawing=false;return;}
-  let xx=x+(values.length<2?w:i*w/(values.length-1));
+  let xx=x+i*w/Math.max(1,slots-1);
   let yy=y+h-3-Math.min(1,Math.max(0,(v-low)/(high-low)))*(h-6);
   if(!drawing){ctx.moveTo(xx,yy);drawing=true}else ctx.lineTo(xx,yy);
  });ctx.stroke();
@@ -2170,7 +2170,7 @@ function graphWaterAndCollection(){
  x.textBaseline='middle';x.textAlign='left';x.font='18px sans-serif';x.fillStyle='#58d8ff';x.fillText('ВОДА · YF-S401',15,23);
  x.font='13px sans-serif';x.fillStyle='#bce6fb';x.textAlign='right';x.fillText('Импульсы за 2 с · без калибровки',585,23);x.textAlign='left';
  x.strokeStyle='#1a3f57';x.lineWidth=1;x.strokeRect(12,40,576,96);
- chartLine(x,busaGraphData.water_pulses||[],'#37bcff',17,43,566,88,true);
+ chartLine(x,busaGraphData.water_pulses||[],'#37bcff',17,43,566,88,true,40);
  x.strokeStyle='#28608b';x.lineWidth=2;x.beginPath();x.moveTo(8,146);x.lineTo(592,146);x.stroke();
  x.font='18px sans-serif';x.fillStyle='#ffae65';x.fillText('ОТБОР',15,173);
  x.fillStyle='#b6d6e9';x.font='17px sans-serif';x.fillText('НЕТ ДАТЧИКА ОТБОРА',20,215);
