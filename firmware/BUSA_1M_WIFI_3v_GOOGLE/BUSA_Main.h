@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-GPIODIRECT-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-RECOVERY-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -255,6 +255,7 @@ bool busaI2cGpioTestPassed=false;
 bool busaI2cElectricalFault=true;
 uint32_t busaI2cDisabledScanCount=0;
 uint32_t busaI2cGpioConfigErrors=0;
+uint32_t busaI2cPadReinitCount=0,busaI2cLastPadReinitMs=0;
 uint8_t busaI2cSdaIdfLow=1,busaI2cSclIdfLow=1;
 bool busaI2cSuspended(uint32_t now){return busaI2cSuspendedUntil && (int32_t)(now-busaI2cSuspendedUntil)<0;}
 void busaI2cQuarantine(uint32_t now,uint32_t durationMs=500){
@@ -275,6 +276,25 @@ inline void busaSda(bool release){
 }
 inline void busaScl(bool release){
   if(gpio_set_level(static_cast<gpio_num_t>(BUS_SCL),release?1:0)!=ESP_OK)++busaI2cGpioConfigErrors;
+}
+// Reconfigure SDA/SCL only when needed. Never drive an I2C line HIGH.
+void busaI2cConfigurePads(){
+  const gpio_num_t sda=static_cast<gpio_num_t>(BUS_SDA);
+  const gpio_num_t scl=static_cast<gpio_num_t>(BUS_SCL);
+  gpio_hold_dis(sda);gpio_hold_dis(scl);
+  if(gpio_reset_pin(sda)!=ESP_OK)++busaI2cGpioConfigErrors;
+  if(gpio_reset_pin(scl)!=ESP_OK)++busaI2cGpioConfigErrors;
+  gpio_config_t i2cPinCfg={};
+  i2cPinCfg.pin_bit_mask=(1ULL<<BUS_SDA)|(1ULL<<BUS_SCL);
+  i2cPinCfg.mode=GPIO_MODE_INPUT_OUTPUT_OD;
+  i2cPinCfg.pull_up_en=GPIO_PULLUP_ENABLE;
+  i2cPinCfg.pull_down_en=GPIO_PULLDOWN_DISABLE;
+  i2cPinCfg.intr_type=GPIO_INTR_DISABLE;
+  if(gpio_config(&i2cPinCfg)!=ESP_OK)++busaI2cGpioConfigErrors;
+  busaSda(true);busaScl(true);
+  delayMicroseconds(300);
+  busaI2cLastPadReinitMs=millis();
+  ++busaI2cPadReinitCount;
 }
 inline void busaI2cPause(){delayMicroseconds(BUSA_SOFTI2C_HALF_PERIOD_US);}
 void busaI2cRunGpioSelfTest(){
@@ -1179,6 +1199,8 @@ String statusJSON(){
   s+=",\"electrical_fault\":"+(busaI2cElectricalFault?String("true"):String("false"));
   s+=",\"scan_suppressed\":"+(busaI2cElectricalFault?String("true"):String("false"));
   s+=",\"gpio_config_errors\":"+String(busaI2cGpioConfigErrors);
+  s+=",\"pad_reinit_count\":"+String(busaI2cPadReinitCount);
+  s+=",\"pad_last_reinit_ms\":"+String(busaI2cLastPadReinitMs);
   s+=",\"sda_idf_low_readback\":"+String(busaI2cSdaIdfLow);
   s+=",\"scl_idf_low_readback\":"+String(busaI2cSclIdfLow);
   s+=",\"fault_hint\":"+quoteJson(!busaI2cElectricalFault?String("NONE"):
@@ -2380,21 +2402,8 @@ void setup(){
   busaReportStage("HTTP_READY");
   // Never do a full I2C address scan inside setup.
   busaReportStage("I2C_BEGIN");
-  // Direct ESP-IDF GPIO pads, not the ESP-IDF I2C controller. Enable both
-  // the input buffer (for ACK/signal feedback) and open-drain output driver.
-  // No push-pull HIGH: release the line to external + internal pull-up.
-  // Reset any previous IO-matrix routing before direct open-drain I2C.
-  if(gpio_reset_pin(static_cast<gpio_num_t>(BUS_SDA))!=ESP_OK)++busaI2cGpioConfigErrors;
-  if(gpio_reset_pin(static_cast<gpio_num_t>(BUS_SCL))!=ESP_OK)++busaI2cGpioConfigErrors;
-  gpio_config_t i2cPinCfg={};
-  i2cPinCfg.pin_bit_mask=(1ULL<<BUS_SDA)|(1ULL<<BUS_SCL);
-  i2cPinCfg.mode=GPIO_MODE_INPUT_OUTPUT_OD;
-  i2cPinCfg.pull_up_en=GPIO_PULLUP_ENABLE;
-  i2cPinCfg.pull_down_en=GPIO_PULLDOWN_DISABLE;
-  i2cPinCfg.intr_type=GPIO_INTR_DISABLE;
-  if(gpio_config(&i2cPinCfg)!=ESP_OK)++busaI2cGpioConfigErrors;
-  busaSda(true);busaScl(true);
-  delayMicroseconds(300);
+  // Configure pads as open-drain input/output, with a reset of stale GPIO routing.
+  busaI2cConfigurePads();
   busaI2cLinesFree();
   if(!busaI2cLastSda || !busaI2cLastScl)busaI2cRecover();
   busaI2cRunGpioSelfTest(); // bounded, non-destructive bus-level selftest
@@ -2457,6 +2466,10 @@ void loop(){
     if((busaI2cElectricalFault || i2cFoundCount==0) && !busaI2cSuspended(now) &&
        elapsed(now,busaI2cLastGpioTestMs,30000)){
       const uint32_t started=millis();
+      // Reapply the pad configuration after a failed readback, without restart.
+      if(busaI2cElectricalFault && elapsed(now,busaI2cLastPadReinitMs,30000)){
+        busaI2cConfigurePads();
+      }
       busaI2cRunGpioSelfTest();
       busaObserve("I2C_GPIO_TEST",started,busaI2cWorstMs);
     }
