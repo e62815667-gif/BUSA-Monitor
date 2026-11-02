@@ -8,7 +8,7 @@ enum Reason : uint8_t { Disabled, MissingThreshold, SensorInvalid, Waiting, Soun
 struct Channel { bool on=false; Reason reason=Disabled; };
 inline bool valid(float on,float off) {
   return std::isfinite(on) && std::isfinite(off) && on>=0 && on<=125 &&
-    off>=0 && off<=125 && std::fabs(on-off)>=0.5f;
+    off>=0 && off<=125 && std::fabs(on-off)>=0.099f;
 }
 inline bool evaluate(Channel& c,bool enabled,bool fresh,float t,float on,float off){
   if(!enabled){c.on=false;c.reason=Disabled;return false;}
