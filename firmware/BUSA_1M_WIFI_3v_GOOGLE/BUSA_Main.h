@@ -1443,7 +1443,7 @@ main>*{max-width:100%;min-width:0}
   </div>
   <div class="card"><h2>Состояние K1–K4</h2>
    <div class="relayGrid"><span>K1 <b id="soundStatus0">ВЫКЛ</b></span><span>K2 <b id="soundStatus1">ВЫКЛ</b></span><span>K3 <b id="soundStatus2">ВЫКЛ</b></span><span>K4 <b id="soundStatus3">ВЫКЛ</b></span></div>
-   <p class="hint">Т3 ВКЛ — К1 + К2 (90 сек); Т3 ВЫКЛ — К1 выкл + К3 (90 сек). Т4 ВКЛ — К4 + К2 (90 сек); Т4 ВЫКЛ — К4 выкл + К3 (90 сек), К1 тоже выключается. Все реле только звуковые.</p>
+   <p class="hint">Т3 ВКЛ — К1 + К2 (90 сек); Т3 ВЫКЛ — К1 выкл + К3 (90 сек). Т4 ВКЛ — К4 + К2 (90 сек); Т4 ВЫКЛ — К4 выкл + К3 (90 сек), К1 не меняет состояние. Все реле только звуковые.</p>
   </div></section>
 <section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div>
 <p class="hint">Справочные значения экрана TFT. Звуковая сигнализация К1–К4 настраивается ниже.</p>
