@@ -24,6 +24,39 @@ inline bool evaluate(Channel& c,bool enabled,bool fresh,float t,float on,float o
   c.reason=c.on?Sounding:Waiting;
   return c.on;
 }
+// Sound-only pulse logic for K2 and K3. 90 s once on each new
+// temperature-condition transition; rearm only after T_OFF is reached.
+struct TimedSignal {
+  bool armed=true;
+  bool running=false;
+  bool sounding=false;
+  uint32_t start_ms=0;
+};
+inline void resetTimed(TimedSignal& p){ p=TimedSignal(); }
+inline bool evaluateTimed(Channel& threshold,TimedSignal& pulse,
+    bool enabled,bool fresh,float t,float on,float off,
+    uint32_t now,uint32_t durationMs){
+  const bool condition=evaluate(threshold,enabled,fresh,t,on,off);
+  if(!condition){
+    pulse.armed=true;
+    pulse.running=false;
+    pulse.sounding=false;
+    return false;
+  }
+  if(pulse.armed){
+    pulse.armed=false;
+    pulse.running=true;
+    pulse.start_ms=now;
+  }
+  pulse.sounding=pulse.running && (uint32_t)(now-pulse.start_ms)<durationMs;
+  if(!pulse.sounding)pulse.running=false;
+  return pulse.sounding;
+}
+inline uint32_t remainingMs(const TimedSignal& pulse,uint32_t now,uint32_t durationMs){
+  if(!pulse.running || !pulse.sounding)return 0;
+  const uint32_t elapsed=(uint32_t)(now-pulse.start_ms);
+  return elapsed>=durationMs?0:(durationMs-elapsed);
+}
 inline const char* reasonText(Reason r){
   switch(r){
     case Disabled:return "DISABLED";
