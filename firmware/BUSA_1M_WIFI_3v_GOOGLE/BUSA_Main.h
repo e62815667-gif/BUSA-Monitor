@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-ONLINESTYLE-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-APPROVEDUI-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1728,30 +1728,63 @@ main>*{max-width:100%;min-width:0}
 <div class="approvedTemp temp1"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Колонна</span></div><strong id="t1">Н/Д</strong><small id="homeSet1">ВКЛ — · ВЫКЛ —</small></div>
 <div class="approvedTemp temp2"><div class="approvedTempTitle"><span class="approvedTempIcon">▣</span><span>Куб</span></div><strong id="t2">Н/Д</strong><small id="homeSet2">ВКЛ — · ВЫКЛ —</small></div>
 <div class="approvedTemp temp3"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Верх колонны</span></div><strong id="t3">Н/Д</strong><small id="homeSet3">ВКЛ — · ВЫКЛ —</small></div></div>
-  <div class="approvedRig"><svg viewBox="0 0 360 225" role="img" aria-label="Схема установки БУСА с датчиком YF-S401 на линии охлаждающей воды" preserveAspectRatio="xMidYMid meet">
-<defs><linearGradient id="steel" x1="0" x2="1"><stop stop-color="#71899a"/><stop offset=".45" stop-color="#e6f0f3"/><stop offset="1" stop-color="#768b9b"/></linearGradient><linearGradient id="water" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#31b6e8"/><stop offset="1" stop-color="#087eae"/></linearGradient></defs>
-<rect width="360" height="225" rx="14" fill="#f8fbfd"/>
-<path d="M88 179 V93 Q88 85 96 85 H164" fill="none" stroke="#738c9b" stroke-width="7"/>
-<rect x="26" y="144" width="126" height="63" rx="18" fill="url(#steel)" stroke="#607b8a" stroke-width="2"/>
-<rect x="40" y="155" width="99" height="38" rx="9" fill="#809aaa" stroke="#526d7e"/>
-<path d="M58 178 V160 M71 177 V157 M83 178 V157 M96 178 V157 M109 178 V157" stroke="#bde5f2" stroke-width="3"/>
-<rect x="83" y="22" width="24" height="126" rx="7" fill="url(#steel)" stroke="#6b8699" stroke-width="2"/>
-<g stroke="#657f91" stroke-width="3"><path d="M78 43 H112 M78 58 H112 M78 73 H112 M78 88 H112 M78 103 H112 M78 118 H112"/></g>
-<path d="M95 22 V16 H255 V49" fill="none" stroke="#798c99" stroke-width="6" stroke-linejoin="round"/>
-<rect x="230" y="48" width="57" height="81" rx="10" fill="url(#steel)" stroke="#6c8494" stroke-width="2"/>
-<path d="M242 59 Q272 65 242 72 T242 88 T242 103 T242 119" fill="none" stroke="#1e9dc9" stroke-width="4"/>
-<path d="M231 139 H317 V167" stroke="#1599ca" stroke-width="5" stroke-linecap="round" fill="none"/>
-<path d="M214 117 V139 H231" stroke="#1599ca" stroke-width="5" fill="none"/>
-<path d="M278 167 H321" stroke="#1687b9" stroke-width="5"/>
-<rect x="288" y="126" width="37" height="26" rx="7" fill="#dcf4fa" stroke="#087faf" stroke-width="3"/>
-<path d="M296 139 H316 M309 134 L316 139 L309 144" stroke="#0b749d" stroke-width="2" fill="none"/>
-<text x="306" y="122" text-anchor="middle" font-size="12" font-weight="bold" fill="#07668f">YF-S401</text>
-<text x="306" y="164" text-anchor="middle" font-size="10" fill="#176a91">ВОДА</text>
-<path d="M261 129 H341 V184" fill="none" stroke="#7c8c98" stroke-width="4"/>
-<rect x="312" y="183" width="32" height="33" rx="5" fill="#fff" stroke="#7b92a1" stroke-width="2"/>
-<rect x="315" y="199" width="26" height="13" rx="3" fill="#b4e4ed"/>
-<text x="95" y="217" text-anchor="middle" font-size="11" fill="#526779">Мониторинг температур T1–T4</text>
-<text x="254" y="41" text-anchor="middle" font-size="10" fill="#526779">Охлаждение</text>
+  <div class="approvedRig"><svg viewBox="0 0 190 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схематичная колонна БУСА: куб, колонна и охлаждение" preserveAspectRatio="xMidYMid meet">
+<defs>
+ <linearGradient id="busaSteel" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#475967"/><stop offset=".2" stop-color="#bfdae3"/><stop offset=".39" stop-color="#e4f0f3"/><stop offset=".62" stop-color="#6d8290"/><stop offset=".85" stop-color="#b7d0da"/><stop offset="1" stop-color="#435563"/></linearGradient>
+ <linearGradient id="busaGlass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081b2b"/><stop offset=".45" stop-color="#0d4160"/><stop offset="1" stop-color="#0a1a2b"/></linearGradient>
+ <linearGradient id="busaWater" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#13dcff"/><stop offset="1" stop-color="#065bcc"/></linearGradient>
+ <filter id="busaGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<g fill="none" stroke="#8da6b4" stroke-width="2">
+ <path d="M67 31 V15 H89 V23 H130 V59"/>
+ <path d="M67 54 H40 V99"/><path d="M76 133 H130"/>
+ <path d="M138 196 V231 H154 V253" />
+</g>
+<g>
+ <rect x="55" y="24" width="28" height="186" rx="7" fill="url(#busaSteel)" stroke="#c8e2f0" stroke-width="1.4"/>
+ <rect x="59" y="33" width="20" height="166" rx="3" fill="url(#busaGlass)" stroke="#829fb2" stroke-width="1"/>
+ <path d="M65 38 V191" stroke="#298dd0" stroke-opacity=".85" stroke-width="1.7"/>
+ <g stroke="#71c9ea" stroke-width="2">
+ <path d="M60 49 H78"/><path d="M60 63 H78"/><path d="M60 77 H78"/><path d="M60 91 H78"/><path d="M60 105 H78"/><path d="M60 119 H78"/><path d="M60 133 H78"/><path d="M60 147 H78"/><path d="M60 161 H78"/><path d="M60 175 H78"/></g>
+ <rect x="53" y="18" width="32" height="12" rx="3" fill="url(#busaSteel)" stroke="#a7c6d5"/>
+ <circle cx="69" cy="19" r="3" fill="#dbeff6" stroke="#52bdeb"/>
+ <rect x="60" y="4" width="17" height="13" rx="3" fill="#899daa" stroke="#d9edf5"/>
+ <rect x="51" y="200" width="38" height="15" rx="5" fill="url(#busaSteel)" stroke="#daeaf0"/>
+</g>
+<g>
+ <ellipse cx="76" cy="225" rx="56" ry="12" fill="#183b50"/>
+ <rect x="21" y="228" width="111" height="58" rx="11" fill="url(#busaSteel)" stroke="#c1dce8" stroke-width="1.5"/>
+ <ellipse cx="76" cy="228" rx="55" ry="10" fill="#bcd4de" stroke="#e4f3f9" stroke-width="1"/>
+ <ellipse cx="76" cy="284" rx="51" ry="7" fill="#596f7c" stroke="#abcbd9"/>
+ <rect x="59" y="249" width="31" height="22" rx="3" fill="#163b51" stroke="#5ecaff"/>
+ <path d="M64 252 V268 M70 252 V268 M76 252 V268 M82 252 V268" stroke="#219ccb" stroke-width="1" />
+ <rect x="31" y="280" width="10" height="14" rx="2" fill="#a4c5d7"/>
+ <rect x="110" y="280" width="10" height="14" rx="2" fill="#a4c5d7"/>
+ <circle cx="115" cy="245" r="4" fill="#1cc8ea"/>
+</g>
+<g>
+ <rect x="120" y="61" width="33" height="128" rx="10" fill="url(#busaSteel)" stroke="#c4deeb" stroke-width="1.4"/>
+ <rect x="127" y="69" width="18" height="109" rx="5" fill="#06253f" stroke="#58b3e0"/>
+ <path d="M136 73c-15 8 15 15 0 23s15 15 0 23s15 15 0 23s15 15 0 23" fill="none" stroke="#06c8fa" stroke-width="3"/>
+ <circle cx="136" cy="81" r="4" fill="#70efff"/>
+ <rect x="119" y="57" width="35" height="9" rx="3" fill="url(#busaSteel)"/>
+ <rect x="121" y="183" width="31" height="10" rx="3" fill="url(#busaSteel)"/>
+ <path d="M153 101 h13 v16" stroke="#1399d1" stroke-width="3" fill="none"/>
+ <path d="M119 172 h-10 v18" stroke="#1399d1" stroke-width="3" fill="none"/>
+</g>
+<g>
+ <path d="M151 195 V249 H173" fill="none" stroke="#899eac" stroke-width="4"/>
+ <path d="M151 196 V234 H171" fill="none" stroke="#00acdc" stroke-width="2"/>
+ <rect x="146" y="248" width="32" height="45" rx="5" fill="#18415d" fill-opacity=".8" stroke="#a5d5ef"/>
+ <rect x="150" y="262" width="24" height="26" rx="2" fill="url(#busaWater)" fill-opacity=".9"/>
+ <g fill="#56efff"><circle cx="157" cy="272" r="2"/><circle cx="167" cy="282" r="2"/></g>
+ <path d="M164 235 Q157 241 164 246 Q171 241 164 235" fill="#21ccff"/>
+</g>
+<g fill="#38e6ff" filter="url(#busaGlow)" opacity=".48">
+ <circle cx="69" cy="77" r="5"/><circle cx="69" cy="136" r="5"/><circle cx="137" cy="120" r="5"/>
+</g>
+<g fill="#27d8ff"><circle cx="69" cy="77" r="2.5"/><circle cx="69" cy="136" r="2.5"/><circle cx="137" cy="120" r="2.5"/></g>
+<text x="101" y="307" font-family="sans-serif" font-size="8" fill="#7ec4e6" text-anchor="middle">БУСА-1М · Схема мониторинга</text>
 </svg><div class="approvedRigLabel">СХЕМА УСТАНОВКИ</div></div>
 </div>
 <div class="approvedMetrics">
