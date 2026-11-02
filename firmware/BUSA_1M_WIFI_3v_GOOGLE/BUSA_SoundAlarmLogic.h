@@ -60,7 +60,7 @@ inline uint32_t remainingMs(const TimedSignal& pulse,uint32_t now,uint32_t durat
 // Pure state machine for temperature-driven 12V SOUND signals only.
 // T3: K1 continuous and K2 on T_ON; K3 on T_OFF.
 // T4: K4 continuous and K2 on T_ON; K3 on T_OFF.
-// Any K3 opening-sound event silences K1 until a NEW T3-on transition.
+// Only T3 OFF silences K1. T4 OFF leaves K1 unchanged.
 // No output can operate a valve or disconnect power.
 struct Routed {
   Channel t3,t4;
@@ -101,7 +101,7 @@ inline void evaluateRouted(Routed& r,const bool enable[4],
   const bool closingEvent=r.t3OnEvent||r.t4OnEvent;
   if(r.t3OnEvent)r.k1Hold=false;
   if(openingEvent){
-    r.k1Hold=true;
+    if(r.t3OffEvent)r.k1Hold=true;
     r.k2.running=false;r.k2.sounding=false;
     if(enable[2])startPulse(r.k3,now);
   }else if(closingEvent && enable[1] && !r.k3.running){
