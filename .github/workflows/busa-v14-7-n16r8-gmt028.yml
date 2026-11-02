@@ -198,7 +198,8 @@ jobs:
           assert 'waterSamplesRecorded' in landscape
           assert 'static void v13Graphs(bool layout)' in portrait
           assert 'function graphAllTemperatures(){' in p
-          assert 'let lo=Math.min(...all),hi=Math.max(...all);' in p
+          assert 'function chartLine(ctx,values,color,x,y,w,h,zero=false,slots=48)' in p
+          assert 'let low=zero?0:Math.min(...a),high=Math.max(...a)' in p
           assert 'Технические разделы' not in p
           assert 'static void v14Diagnostics' in landscape
           assert 'if(tftThemeMode==2){ // SYSTEM:' in landscape
