@@ -158,13 +158,13 @@ static void v13Temperatures(uint32_t now,bool layout){
   for(int i=0;i<4;i++){
     int y=51+i*53;
     screenField(v13Temp(i,now),147,y+19,81,hasTemp(i,now)?GREEN:YELLOW);
-    screenField("Зад:"+v13Ref(refTemp[i]),18,y+40,101,GRAY);
-    screenField("Пред:"+v13Ref(noticeTemp[i]),127,y+40,103,GRAY);
+    screenField("ВКЛ:"+v13Ref(refTemp[i]),18,y+40,101,GRAY);
+    screenField("ВЫКЛ:"+v13Ref(noticeTemp[i]),127,y+40,103,GRAY);
   }
   if(editingTemp){
     screen->fillRoundRect(9,141,224,68,7,PANEL);
     screen->drawRoundRect(9,141,224,68,7,YELLOW);
-    v13Text("ВВОД T"+String(selectedTemp+1)+(selectedField?" Пред":" Зад"),18,161,WHITE);
+    v13Text("ВВОД T"+String(selectedTemp+1)+(selectedField?" ВЫКЛ":" ВКЛ"),18,161,WHITE);
     screenField(editTempBuffer.length()?editTempBuffer:"(очистить)",20,183,204,YELLOW);
     v13Text("Ent ОК, Esc отмена",18,201,GRAY);
   }
