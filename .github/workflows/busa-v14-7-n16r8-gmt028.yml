@@ -1,8 +1,8 @@
-name: BUSA V14.7 I2C GPIO Readback and ACK Selftest
+name: BUSA V14.7 T1-T4 Sound Binding and GPIO2 Buzzer
 on:
   push:
     branches:
-      - release/busa-v14-7-i2c-gpio-ack-selftest-20261102
+      - release/busa-v14-7-sound-t3-t4-bindings-20261102
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-v14-7-n16r8-gmt028.yml'
@@ -36,7 +36,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          for term in ('14v7-N16R8-SMOOTH-GOOGLE-I2C-GPIOTEST-20261102','TPIN[4]={16,17,18,21}',
+          for term in ('14v7-N16R8-SMOOTH-GOOGLE-I2C-T1T4SOUND-20261102','TPIN[4]={16,17,18,21}',
                        'TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14',
                        'KPIN[4]={7,6,5,4}','BUS_SDA=8,BUS_SCL=9',
                        'FLOW_GPIO=15','RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false',
@@ -103,10 +103,27 @@ jobs:
           sound=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarms.h').read_text()
           logic=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarmLogic.h').read_text()
           assert '12V SOUND' in sound and 'BUSA_SOUND_ACTIVE_LOW=true' in sound
-          assert 'prefs.getBool(k.c_str(),false)' in sound
+          assert 'prefs.getBool((String("sndRoleEnable")+i).c_str(),true)' in sound
+          assert 'prefs.getBool((String("buzE")+i).c_str(),true)' in sound
+          assert 'BUSA_BUZZER_GPIO=2' in sound
+          assert 'soundRoute.t3OffEvent' in sound
+          assert 'buzzerSoundOn=sum' in sound
+          assert 'soundT4OffEvents' in sound
+          assert 'T4_OFF=K4_OFF+K3' in sound
           assert 'hasTemp(i,now)' in sound
+          assert 'hasTemp(2,now)' in sound and 'hasTemp(3,now)' in sound
+          assert 'BUSA_SOUND_TIMED_MS=90000UL' in sound
           assert 'soundOutputsOff()' in sound
+          assert 'buzzerPinLevel(false)' in sound
+          assert 'buzzerPinLevel(sum)' in sound
+          assert 'server.on("/api/buzzer/config"' in p
+          assert 'get(\'buzzerSave\').onclick' in p
+          assert 'soundOn0' in p and 'soundOff0' in p
+          assert 'soundOn3' in p and 'soundOff3' in p
+          assert 'buzzerOn0' in p and 'buzzerOff1' in p
           assert 'std::fabs(on-off)>=0.5f' in logic
+          assert 'if(r.t3OffEvent)r.k1Hold=true' in logic
+          assert 'if(openingEvent)' in logic
           print('PASS V14.7 baseline; N16R8 GPIOs; K1-K4 sound only; no power control')
           PY
       - name: Check embedded iPhone JavaScript syntax
@@ -161,6 +178,64 @@ jobs:
           g++ -std=c++17 -O2 -Wall -Wextra -Werror -I firmware/BUSA_1M_WIFI_3v_GOOGLE /tmp/test-busa-v147-sound.cpp -o /tmp/test-busa-v147-sound
           /tmp/test-busa-v147-sound
           echo 'PASS: alarm thresholds and missing sensors'
+      - name: Test T3/T4 sound event routing, 90-sec pulse and separate T1/T2 buzzer
+        shell: bash
+        run: |
+          cat >/tmp/test-busa-sound-routing.cpp <<'CPP'
+          #include "BUSA_SoundAlarmLogic.h"
+          #include <cassert>
+          #include <cmath>
+          int main(){
+            using namespace BusaSound;
+            const bool enabled[4]={true,true,true,true};
+            Routed r;
+            // Initial below the two activation points; no spontaneous pulse.
+            evaluateRouted(r,enabled,true,60,80,75,true,60,85,80,1000);
+            assert(!r.k[0]&&!r.k[1]&&!r.k[2]&&!r.k[3]);
+            // T3 activation: K1 ON, K2 90-second close notification.
+            evaluateRouted(r,enabled,true,81,80,75,true,60,85,80,1100);
+            assert(r.k[0] && r.k[1] && !r.k[2] && !r.k[3]);
+            evaluateRouted(r,enabled,true,81,80,75,true,60,85,80,91099);
+            assert(r.k[1]);
+            evaluateRouted(r,enabled,true,81,80,75,true,60,85,80,91100);
+            assert(r.k[0] && !r.k[1]);
+            // T4 activates: independent K4 ON, K2 again, K1 stays ON.
+            evaluateRouted(r,enabled,true,81,80,75,true,86,85,80,91200);
+            assert(r.k[0] && r.k[1] && r.k[3]);
+            // T4 OFF must switch K4 OFF and trigger K3 without touching K1.
+            evaluateRouted(r,enabled,true,81,80,75,true,79,85,80,91400);
+            assert(r.k[0] && !r.k[1] && r.k[2] && !r.k[3]);
+            assert(!r.k1Hold && !r.t3OffEvent && r.t4OffEvent);
+            evaluateRouted(r,enabled,true,81,80,75,true,79,85,80,181399);
+            assert(r.k[0] && r.k[2]);
+            evaluateRouted(r,enabled,true,81,80,75,true,79,85,80,181400);
+            assert(r.k[0] && !r.k[2]);
+            // T3 OFF is the only temperature event that silences K1.
+            evaluateRouted(r,enabled,true,74,80,75,true,79,85,80,181500);
+            assert(!r.k[0] && !r.k[3] && r.k[2] && r.t3OffEvent);
+            // Reaching ON threshold again re-enables K1.
+            evaluateRouted(r,enabled,true,81,80,75,true,79,85,80,182000);
+            assert(r.k[0]);
+            // Invalid T4 sensor must not itself generate K3 or silence K1.
+            resetRouted(r);
+            evaluateRouted(r,enabled,true,81,80,75,true,86,85,80,200000);
+            evaluateRouted(r,enabled,true,81,80,75,false,NAN,85,80,200200);
+            assert(r.k[0] && !r.t4OffEvent && !r.k[2]);
+            // Dedicated T1/T2 buzzer OR using independent channel thresholds.
+            Channel t1,t2;
+            assert(!evaluate(t1,true,true,25,30,29));
+            assert(!evaluate(t2,true,true,25,40,39));
+            assert(evaluate(t1,true,true,31,30,29));
+            assert(!evaluate(t2,true,true,25,40,39));
+            assert(!evaluate(t1,true,true,28,30,29));
+            assert(evaluate(t2,true,true,41,40,39));
+            assert(!evaluate(t2,true,true,38,40,39));
+            return 0;
+          }
+          CPP
+          g++ -std=c++17 -O2 -Wall -Wextra -Werror -I firmware/BUSA_1M_WIFI_3v_GOOGLE /tmp/test-busa-sound-routing.cpp -o /tmp/test-busa-sound-routing
+          /tmp/test-busa-sound-routing
+          echo 'PASS: routed K1-K4, T4 OFF retains K1, T1-T2 independent logic'
       - name: Prepare verified Google Trust Services TLS certificate bundle
         shell: bash
         run: |
@@ -205,15 +280,15 @@ jobs:
         run: |
           set -euo pipefail
           SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_I2C_GPIOTEST_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_I2C_GPIOTEST_N16R8_APP_OTA.bin
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_T1T4_SOUND_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_T1T4_SOUND_N16R8_APP_OTA.bin
           git rev-parse HEAD > build_busa_v147/SOURCE_COMMIT.txt
-          (cd build_busa_v147 && sha256sum BUSA_V14_7_I2C_GPIOTEST_N16R8_FULL_USB.bin BUSA_V14_7_I2C_GPIOTEST_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd build_busa_v147 && sha256sum BUSA_V14_7_T1T4_SOUND_N16R8_FULL_USB.bin BUSA_V14_7_T1T4_SOUND_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
           root=Path('build_busa_v147')
-          full=(root/'BUSA_V14_7_I2C_GPIOTEST_N16R8_FULL_USB.bin').read_bytes()
-          app=(root/'BUSA_V14_7_I2C_GPIOTEST_N16R8_APP_OTA.bin').read_bytes()
+          full=(root/'BUSA_V14_7_T1T4_SOUND_N16R8_FULL_USB.bin').read_bytes()
+          app=(root/'BUSA_V14_7_T1T4_SOUND_N16R8_APP_OTA.bin').read_bytes()
           assert 60000<len(app)<0x300000
           assert len(full)<16*1024*1024
           assert full[0x10000:0x10000+len(app)]==app, 'Merged USB and OTA content differs'
@@ -221,9 +296,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_V14_7_I2C_GPIOTEST_N16R8_USB_OTA_SHA256
+          name: BUSA_V14_7_T1T4_SOUND_N16R8_USB_OTA_SHA256
           path: |
-            build_busa_v147/BUSA_V14_7_I2C_GPIOTEST_N16R8_FULL_USB.bin
-            build_busa_v147/BUSA_V14_7_I2C_GPIOTEST_N16R8_APP_OTA.bin
+            build_busa_v147/BUSA_V14_7_T1T4_SOUND_N16R8_FULL_USB.bin
+            build_busa_v147/BUSA_V14_7_T1T4_SOUND_N16R8_APP_OTA.bin
             build_busa_v147/SHA256SUMS.txt
             build_busa_v147/SOURCE_COMMIT.txt
