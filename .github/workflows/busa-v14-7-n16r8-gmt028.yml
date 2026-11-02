@@ -194,8 +194,9 @@ jobs:
             assert(evaluate(c,true,true,80,80,75));
             assert(!evaluate(c,false,true,80,80,75));
             assert(!evaluate(d,true,true,80,80,79.95));
-            assert(evaluate(d,true,true,80,80,79.7));
             assert(d.reason==MissingThreshold);
+            assert(evaluate(d,true,true,80,80,79.7));
+            assert(d.reason==Sounding);
             assert(!evaluate(d,true,true,NAN,50,45));
             return 0;
           }
