@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-GRAPHLANES-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-FLICKERFIX-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1141,7 +1141,8 @@ String statusJSON(){
   s+=",\"cpu_240mhz\":"+(busaCpu240Ok?String("true"):String("false"));
   s+=",\"psram_detected\":"+(busaPsramDetected?String("true"):String("false"));
   s+=",\"psram_total_bytes\":"+String(ESP.getPsramSize());
-  s+=",\"psram_free_bytes\":"+String(ESP.getFreePsram())+"}";
+  s+=",\"psram_free_bytes\":"+String(ESP.getFreePsram());
+  s+=",\"wifi_tx_power_dbm\":"+String(((int)WiFi.getTxPower())/4.0f,1)+"}";
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"graph_view\":"+String(graphSubView)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"clock\":{\"synchronized\":"+(deviceClockValid()?String("true"):String("false"));
@@ -1832,29 +1833,28 @@ main>*{max-width:100%;min-width:0}
     <div class="grid approvedFieldGrid"><div><label for="tempOn3">ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOn3"></div>
     <div><label for="tempOff3">ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="tempOff3"></div></div>
   </details></div></div>
-<div class="card"><p class="hint">Пороги управляют звуковыми предупреждениями. Калибровка показаний находится в «Настройки → Температура».</p>
-<button id="temperatureSave" type="button" class="full">Сохранить пороги</button><p id="temperatureSaveResult" class="hint"></p></div></section>
+<div class="card"><button id="temperatureSave" type="button" class="full">Сохранить пороги</button><p id="temperatureSaveResult" class="hint"></p></div></section>
 <section class="page" data-section="2" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><strong>ОТБОР ЖИДКОСТИ</strong></div>
 <div class="approvedCollectionMetrics"><div class="approvedCollectionCell"><small>Текущий расход</small><strong>НЕТ ДАТЧИКА</strong><small>мл/мин</small></div>
 <div class="approvedCollectionCell"><small>Собрано жидкости</small><strong>Н/Д</strong><small>мл</small></div></div>
 <div class="card approvedGraphCard"><h2>График расхода (мл/мин)</h2><div class="approvedGraphPlaceholder"><div class="approvedGridLines"></div><span>Нет датчика отбора</span></div>
-<p class="hint">График и счётчик не подменяются данными YF-S401.</p></div>
+</div>
 <details class="card approvedAdditional"><summary>Данные охлаждающей воды</summary>
 <div class="row">Расход, л/мин (оценка) <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div>
-<p class="hint">Не откалибровано; вода охлаждения не является измерением отбора.</p></details></section>
+</details></section>
 <section class="page" data-section="3" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><strong>ГРАФИКИ</strong></div>
 <div class="card approvedBlackGraph"><div class="settingsTabs approvedGraphTabs"><button type="button" data-graph-tft="0" class="on">Температуры</button>
 <button type="button" data-graph-tft="1">Вода и отбор</button></div>
 <div class="graphPanel" data-graph-panel="0"><h3>Т1–Т4 · отдельные линии</h3>
 <canvas id="graphT" class="approvedLaneCanvas" width="600" height="420" aria-label="Четыре отдельных графика T1, T2, T3 и T4 сверху вниз"></canvas>
-<p class="hint">Чёрный фон и четыре дорожки: Т1 Вода, Т2 Колонна, Т3 Куб, Т4 Верх. Каждая дорожка имеет свой масштаб.</p></div>
+</div>
 <div class="graphPanel" data-graph-panel="1" hidden><h3>Вода и отбор · раздельно</h3>
 <canvas id="graphF" class="approvedWaterCanvas" width="600" height="280" aria-label="Охлаждающая вода сверху, отбор снизу"></canvas>
-<p class="hint">Сверху — реальные импульсы YF-S401 за 2 с (не калиброван). Снизу — отбор без датчика, линия не строится.</p></div>
-<div class="approvedSession">Текущая сессия · реальные данные</div></div></section>
+</div>
+</div></section>
 <section class="page" data-section="4" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h5"/></svg><strong>СОБЫТИЯ</strong></div>
 <div class="card"><div class="eventFilters"><button type="button" class="on" data-event="all">Все</button><button type="button" data-event="warn">Предупр.</button><button type="button" data-event="alarm">Аварии</button><button type="button" data-event="system">Система</button></div>
-<div id="events" class="approvedEvents">Ожидание...</div><p class="hint">Регистрируются только полученные события; исторические записи не выдумываются.</p></div></section>
+<div id="events" class="approvedEvents">Ожидание...</div></div></section>
 <section class="page" data-section="5" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><strong>НАСТРОЙКИ</strong></div>
 <div class="card approvedSettingsMain" id="settingsMenu"><button type="button" data-stab-btn="0" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg></span><span>Температура</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="1" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M2 8c6-5 14-5 20 0M5 12c4-4 10-4 14 0M8 16c2-2 6-2 8 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg></span><span>Wi-Fi</span><span class="approvedArrow">›</span></button>
@@ -1969,7 +1969,7 @@ main>*{max-width:100%;min-width:0}
 <p class="hint">Пока не откалиброван; значения расхода и объёма оценочные.</p></div>
 </div>
 </section>
-<footer class="hint">БУСА-1М №001 · мониторинг + 4 звуковых реле 12 В · силовое оборудование управляется вручную</footer></main>
+</main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let busaGraphData={temperature:[[],[],[],[]],water_pulses:[]},busaGraphFetchedAt=0,busaGraphLoading=false;
@@ -2275,6 +2275,7 @@ if(s.keypad){
      '\nPCA9685: отключён, не опрашивается';
    get('diagNetwork').textContent='Wi-Fi STA: '+(s.station.connected?'подключен':'нет связи')+
       '\nAP: '+(s.ap?.enabled?'работает':'нет')+' · '+(s.ap?.ip||'—')+
+      '\nМощность TX: '+(s.performance?.wifi_tx_power_dbm??'—')+' dBm'+
       '\nGoogle: '+(s.google?.configured?'настроен':'не настроен')+
       ' · HTTP '+s.google?.http+' · TLS '+s.google?.tls_error;
    get('diagRelay').textContent=(s.sound_alerts?.channels||[]).map(c=>
@@ -2492,6 +2493,10 @@ void setup(){
   // no STA password is embedded in this public source. Local AP fallback remains.
   apPassword="123456789"; // User-selected AP password, V14.7 original startup unchanged
   wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
+  // Use the supported ESP32-S3 radio power limit, not an undocumented boost.
+  // Actual RF range remains antenna- and environment-dependent.
+  const bool txSet=WiFi.setTxPower(WIFI_POWER_19_5dBm);
+  Serial0.printf("Wi-Fi configured TX <=19.5 dBm: %s\n",txSet?"OK":"FAILED");
   busaReportStage(wifiRunning?"AP_READY":"AP_FAILED");
   updateBootStage(1);
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
@@ -2964,10 +2969,8 @@ void loop(){
   }
     sampleFlow(now);
   v13Collect(now); // Shared graph sampling, including when TFT screen is asleep.
-  // Keep physical TFT graph refreshed as the shared history grows (one frame per 5 s).
-  if(currentPage==3 && v13HistoryCount && v13LastCapture!=busaGraphLastDrawnCapture){
-    tftDirty=true;busaGraphLastDrawnCapture=v13LastCapture;
-  }
+  // TFT graph is repainted inside its own plot border by v14RefreshLive().
+  // Never set tftDirty here: that would erase the entire screen every 5 s.
   // Landscape V14.7: repaint changed fields at 5 Hz; full frame only on page/theme change.
   // TFT driver writes are kept in the main loop so no concurrent SPI transactions occur.
   if(tftStarted && !tftDisplayOff && !otaActive && bootSplashComplete &&
