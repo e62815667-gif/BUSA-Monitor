@@ -1,0 +1,101 @@
+name: Build BUSA CLEANWIFI USB and OTA
+on:
+  push:
+    branches: [release/busa-v14-7-netstable-cleanwifi-20261103]
+    paths:
+      - '.github/workflows/busa-cleanwifi-build.yml'
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install toolchain
+        run: |
+          set -euo pipefail
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+          arduino-cli lib install "Adafruit BusIO@1.17.4"
+          arduino-cli lib install "OneWire@2.3.8"
+          arduino-cli lib install "DallasTemperature@4.0.6"
+          arduino-cli lib install "Adafruit GFX Library@1.13.0"
+          arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
+          arduino-cli lib install "Adafruit ILI9341@1.7.0"
+          arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+      - name: Generate verified Google CA bundle
+        run: |
+          python3 - <<'PY'
+          import hashlib,ssl,urllib.request
+          from pathlib import Path
+          fingerprints={
+            'gtsr1':'d947432abde7b7fa90fc2e6b59101b1280e0e1c7e4e40fa3c6887fff57a7f4cf',
+            'gtsr2':'8d25cd97229dbf70356bda4eb3cc734031e24cf00fafcfd32dc76eb5841c7ea8',
+            'gtsr3':'34d8a73ee208d9bcdb0d956520934b4e40e69482596e8b6f73c8426b010a6f48',
+            'gtsr4':'349dfa4058c5e263123b398ae795573c4e1313c83fe68f93556cd5e8031b3c7d'}
+          bundle=[]
+          for name,expected in fingerprints.items():
+            pem=urllib.request.urlopen('https://pki.goog/repo/certs/'+name+'.pem',timeout=20).read().decode()
+            assert hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()==expected,name
+            bundle.append(pem)
+          dest=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h')
+          dest.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+'\n'.join(bundle)+')GOOGLECERT";\n')
+          PY
+      - name: Validate changes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
+          assert 'CLEANWIFI-20261103' in s
+          assert 'WiFi.scanNetworks(true,false,false,80)' in s
+          assert 'manualSsid' not in s
+          assert 'get(\'net\').value,pass=get(\'pass\').value' in s
+          assert 'AbortSignal.timeout(16000)' in s
+          assert 'проверяю результат поиска' in s
+          assert 'setInterval(update,3000)' in s
+          assert 'statusFailures>=3' in s
+          assert 'AbortSignal.timeout(6000)' in s
+          assert 'elapsed(now,lastStationCheck,120000)' in s
+          assert 'busaGoogleNetworkBusy' in s
+          google=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
+          assert 'lastNetProbe' not in google and 'probe.connect(' not in google
+          assert 'request.setConnectTimeout(8000)' in google
+          assert 'request.setTimeout(10000)' in google
+          assert 'if(busaWifiScanRunning)continue;' in google
+          assert 'googleInternet=1;googleDns=1;' in google
+          assert 'WIFI_SCAN_FAILED' in s
+          assert 'KPIN[4]={7,6,5,4}' in s
+          assert 'BUSA_TFT_LIVE_REFRESH_MS=200' in s
+          print('PASS AP+STA/Google network stability regression checks')
+          PY
+      - name: Build ESP32-S3 N16R8
+        run: |
+          mkdir -p out
+          arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
+      - name: Generate full USB and OTA images
+        run: |
+          set -euo pipefail
+          SDK="$HOME/.arduino15/packages/esp32"
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o out/BUSA_V14_7_CLEANWIFI_N16R8_FULL_USB.bin 0x0 out/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 out/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_V14_7_CLEANWIFI_N16R8_APP_OTA.bin
+          (cd out && sha256sum BUSA_V14_7_CLEANWIFI_N16R8_FULL_USB.bin BUSA_V14_7_CLEANWIFI_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('out')
+          a=(p/'BUSA_V14_7_CLEANWIFI_N16R8_APP_OTA.bin').read_bytes()
+          b=(p/'BUSA_V14_7_CLEANWIFI_N16R8_FULL_USB.bin').read_bytes()
+          assert 60000<len(a)<3000000 and b[0x10000:0x10000+len(a)]==a
+          print('Verified USB/OTA sizes',len(b),len(a))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_V14_7_CLEANWIFI_USB_OTA
+          path: |
+            out/BUSA_V14_7_CLEANWIFI_N16R8_FULL_USB.bin
+            out/BUSA_V14_7_CLEANWIFI_N16R8_APP_OTA.bin
+            out/SHA256SUMS.txt
