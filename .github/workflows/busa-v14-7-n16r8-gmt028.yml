@@ -1,8 +1,8 @@
-name: BUSA V14.7 ESP32-S3 I2C Recovery N16R8
+name: BUSA V14.7 N16R8 Keypad GPIO40-41 (No PCA9685)
 on:
   push:
     branches:
-      - release/busa-v14-7-i2c-recovery-20261102
+      - release/busa-v14-7-keypad-gpio40-41-no-pca-20261102
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-v14-7-n16r8-gmt028.yml'
@@ -36,9 +36,9 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          for term in ('14v7-N16R8-SMOOTH-GOOGLE-I2C-RECOVERY-20261102','TPIN[4]={16,17,18,21}',
+          for term in ('14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-20261102','TPIN[4]={16,17,18,21}',
                        'TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14',
-                       'KPIN[4]={7,6,5,4}','BUS_SDA=8,BUS_SCL=9',
+                       'KPIN[4]={7,6,5,4}','BUS_SDA=40,BUS_SCL=41',
                        'FLOW_GPIO=15','RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false',
                        'SPI.begin(TFT_SCK,-1,TFT_MOSI,TFT_CS)',
                        'WiFi.mode(WIFI_AP_STA)','startScreen()'):
@@ -60,8 +60,8 @@ jobs:
           assert 'apPassword="123456789"' in p, 'Requested AP password must be set'
           assert 'String(TFT_MOSI)' in p and 'String(TFT_SCK)' in p and 'String(TFT_DC)' in p
           assert 'void busaReportStage(' in p and 'Serial.printf("BUSA STAGE ' in p
-          assert 'uint8_t busaI2cScanNext=0x08' in p
-          assert 'BUSA_I2C_SCAN_START=0x08,BUSA_I2C_SCAN_END=0x77' in p
+          assert 'uint8_t busaI2cScanNext=0x20' in p
+          assert 'BUSA_I2C_SCAN_START=0x20,BUSA_I2C_SCAN_END=0x3F' in p
           assert 'busaI2cIsPcfAddress(' in p
           assert 'pcaAddr' in p
           assert 'GPIO_MODE_INPUT_OUTPUT_OD' in p
@@ -73,7 +73,7 @@ jobs:
           assert 'gpio_get_level(static_cast<gpio_num_t>(BUS_SCL))' in p
           assert 'if(!busaI2cElectricalFault){' in p
           assert 'busaI2cElectricalFault=!busaI2cGpioTestPassed' in p
-          assert 'SDA_GPIO8_NOT_LOW' in p and 'busaI2cPadReinitCount' in p
+          assert 'SDA_GPIO40_NOT_LOW' in p and 'busaI2cPadReinitCount' in p
           assert 'GPIO_MODE_OUTPUT ' not in p
           assert 'pinMode(BUS_SDA,OUTPUT_OPEN_DRAIN)' not in p
           assert 'busaI2cRunGpioSelfTest()' in p and 'busaI2cConfigurePads()' in p
@@ -317,15 +317,15 @@ jobs:
         run: |
           set -euo pipefail
           SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_I2C_RECOVERY_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_I2C_RECOVERY_N16R8_APP_OTA.bin
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_KEYPAD40_41_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_KEYPAD40_41_N16R8_APP_OTA.bin
           git rev-parse HEAD > build_busa_v147/SOURCE_COMMIT.txt
-          (cd build_busa_v147 && sha256sum BUSA_V14_7_I2C_RECOVERY_N16R8_FULL_USB.bin BUSA_V14_7_I2C_RECOVERY_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd build_busa_v147 && sha256sum BUSA_V14_7_KEYPAD40_41_N16R8_FULL_USB.bin BUSA_V14_7_KEYPAD40_41_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
           root=Path('build_busa_v147')
-          full=(root/'BUSA_V14_7_I2C_RECOVERY_N16R8_FULL_USB.bin').read_bytes()
-          app=(root/'BUSA_V14_7_I2C_RECOVERY_N16R8_APP_OTA.bin').read_bytes()
+          full=(root/'BUSA_V14_7_KEYPAD40_41_N16R8_FULL_USB.bin').read_bytes()
+          app=(root/'BUSA_V14_7_KEYPAD40_41_N16R8_APP_OTA.bin').read_bytes()
           assert 60000<len(app)<0x300000
           assert len(full)<16*1024*1024
           assert full[0x10000:0x10000+len(app)]==app, 'Merged USB and OTA content differs'
@@ -333,9 +333,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_V14_7_I2C_RECOVERY_N16R8_USB_OTA_SHA256
+          name: BUSA_V14_7_KEYPAD40_41_N16R8_USB_OTA_SHA256
           path: |
-            build_busa_v147/BUSA_V14_7_I2C_RECOVERY_N16R8_FULL_USB.bin
-            build_busa_v147/BUSA_V14_7_I2C_RECOVERY_N16R8_APP_OTA.bin
+            build_busa_v147/BUSA_V14_7_KEYPAD40_41_N16R8_FULL_USB.bin
+            build_busa_v147/BUSA_V14_7_KEYPAD40_41_N16R8_APP_OTA.bin
             build_busa_v147/SHA256SUMS.txt
             build_busa_v147/SOURCE_COMMIT.txt
