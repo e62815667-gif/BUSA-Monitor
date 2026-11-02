@@ -36,7 +36,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          for term in ('14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-NAVF1-20261102','TPIN[4]={16,17,18,21}',
+          for term in ('14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-UISETDIAG-20261102','TPIN[4]={16,17,18,21}',
                        'TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14',
                        'KPIN[4]={7,6,5,4}','BUS_SDA=40,BUS_SCL=41',
                        'FLOW_GPIO=15','RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false',
@@ -120,6 +120,8 @@ jobs:
           # Keypad policy: LEFT/RIGHT switch tabs, UP/DOWN select 8 temperature fields,
           # #/* perform no action, and any threshold removal requires ENT confirmation.
           assert 'if(k==2 || k==3)return;' in p
+          assert 'if(calEditing)' in p
+          assert 'if(k==14){navigatePage(6);diagModule=0;}' in p
           assert 'moveApprovedTab(k==16?-1:+1);' in p
           assert 'item=(item+(k==7?7:1))%8;' in p
           assert 'if(deleteConfirmPending)' in p
@@ -166,6 +168,14 @@ jobs:
           assert 'v13Ref(noticeTemp[i])' in landscape
           assert '>ВКЛ: ' in landscape and '>ВЫКЛ: ' in landscape
           assert '>ВКЛ:' in portrait and '>ВЫКЛ:' in portrait
+          assert 'calibration_offsets' in p and 'float tempOffset[4]' in p
+          assert 'server.on("/api/temperature/calibration"' in p
+          assert 'server.on("/api/tft/theme"' in p
+          assert 'id="tempCalSave"' in p and 'id="themeModeSelect"' in p
+          assert 'data-section="6"' in p and 'data-diag-panel="relays"' in p
+          assert 'Технические разделы' not in p
+          assert 'static void v14Diagnostics' in landscape
+          assert 'static void v13Diagnostics' in portrait
           assert 'Зад.: ' not in landscape and 'Пред.: ' not in landscape
           assert 'std::fabs(on-off)>=0.099f' in logic
           assert 'if(r.t3OffEvent)r.k1Hold=true' in logic
@@ -328,15 +338,15 @@ jobs:
         run: |
           set -euo pipefail
           SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_NAVF1_KEYPAD40_41_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_NAVF1_KEYPAD40_41_N16R8_APP_OTA.bin
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_UISETDIAG_KEYPAD40_41_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_UISETDIAG_KEYPAD40_41_N16R8_APP_OTA.bin
           git rev-parse HEAD > build_busa_v147/SOURCE_COMMIT.txt
-          (cd build_busa_v147 && sha256sum BUSA_V14_7_NAVF1_KEYPAD40_41_N16R8_FULL_USB.bin BUSA_V14_7_NAVF1_KEYPAD40_41_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd build_busa_v147 && sha256sum BUSA_V14_7_UISETDIAG_KEYPAD40_41_N16R8_FULL_USB.bin BUSA_V14_7_UISETDIAG_KEYPAD40_41_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
           root=Path('build_busa_v147')
-          full=(root/'BUSA_V14_7_NAVF1_KEYPAD40_41_N16R8_FULL_USB.bin').read_bytes()
-          app=(root/'BUSA_V14_7_NAVF1_KEYPAD40_41_N16R8_APP_OTA.bin').read_bytes()
+          full=(root/'BUSA_V14_7_UISETDIAG_KEYPAD40_41_N16R8_FULL_USB.bin').read_bytes()
+          app=(root/'BUSA_V14_7_UISETDIAG_KEYPAD40_41_N16R8_APP_OTA.bin').read_bytes()
           assert 60000<len(app)<0x300000
           assert len(full)<16*1024*1024
           assert full[0x10000:0x10000+len(app)]==app, 'Merged USB and OTA content differs'
@@ -344,9 +354,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_V14_7_NAVF1_KEYPAD40_41_N16R8_USB_OTA_SHA256
+          name: BUSA_V14_7_UISETDIAG_KEYPAD40_41_N16R8_USB_OTA_SHA256
           path: |
-            build_busa_v147/BUSA_V14_7_NAVF1_KEYPAD40_41_N16R8_FULL_USB.bin
-            build_busa_v147/BUSA_V14_7_NAVF1_KEYPAD40_41_N16R8_APP_OTA.bin
+            build_busa_v147/BUSA_V14_7_UISETDIAG_KEYPAD40_41_N16R8_FULL_USB.bin
+            build_busa_v147/BUSA_V14_7_UISETDIAG_KEYPAD40_41_N16R8_APP_OTA.bin
             build_busa_v147/SHA256SUMS.txt
             build_busa_v147/SOURCE_COMMIT.txt
