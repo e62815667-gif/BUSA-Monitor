@@ -684,6 +684,7 @@ bool saveTempOffset(uint8_t sensor,float v){
  if(isfinite(temperature[sensor]))temperature[sensor]+=v-tempOffset[sensor];
  tempOffset[sensor]=v;tftDirty=true;return true;
 }
+extern bool tftThemeDark; // state declared below in TFT globals
 bool saveThemeMode(uint8_t mode){
  if(mode>2||prefs.putUChar("themeMode",mode)!=sizeof(uint8_t))return false;
  tftThemeMode=mode;tftThemeDark=mode==1;
@@ -1447,6 +1448,8 @@ main>*{max-width:100%;min-width:0}
 .settingsOverview button{min-width:0;min-height:52px;padding:8px 6px;white-space:normal;text-align:left;display:flex;align-items:center;gap:7px;font-size:12px}
 .settingsOverview .miniIcon{font-size:19px;color:var(--sea)}
 .settingsTools{margin:15px 0 8px}
+#settingsTabs,.diagTabs{display:flex;flex-wrap:wrap;gap:6px}
+#settingsTabs button,.diagTabs button{flex:1 1 100px}
 .settingsTools h2{font-size:15px}
 .settingsTabs button{min-width:0;font-size:12px}
 .eventFilters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}
@@ -1483,6 +1486,7 @@ main>*{max-width:100%;min-width:0}
 <button data-page="3"><span class="tabIcon">⌁</span><span>Графики</span></button>
 <button data-page="4"><span class="tabIcon">▤</span><span>События</span></button>
 <button data-page="5"><span class="tabIcon">⚙</span><span>Настройки</span></button>
+<button data-page="6"><span class="tabIcon">◈</span><span>Диагностика</span></button>
 </nav></header><main>
 <section class="page" data-section="0">
   <div class="homeHero"><div class="heroEyebrow">БУСА-1М №001 · ПАНЕЛЬ МОНИТОРИНГА</div>
@@ -1553,91 +1557,116 @@ main>*{max-width:100%;min-width:0}
 <button type="button" data-event="alarm">Аварии</button>
 <button type="button" data-event="system">Система</button></div>
 <div id="events">Ожидание...</div><p class="hint">Только события текущей сессии. Записи без подтверждения не создаются.</p></div></section>
-<section class="page" data-section="5" hidden><div class="card">
-<h2>Настройки</h2><div class="settingsOverview">
-<button type="button" data-settings-link="temp"><span class="miniIcon">♨</span>Температуры</button>
-<button type="button" data-settings-link="collection"><span class="miniIcon">♧</span>Отбор жидкости</button>
-<button type="button" data-settings-link="wifi"><span class="miniIcon">⌁</span>Wi-Fi</button>
-<button type="button" data-settings-link="display"><span class="miniIcon">▣</span>Экран и звук</button>
-<button type="button" data-settings-link="system"><span class="miniIcon">⚙</span>Система</button>
-<button type="button" data-settings-link="about"><span class="miniIcon">ⓘ</span>О системе</button>
-</div><p class="hint">Режим мониторинга: исполнительные выходы не включаются.</p></div>
-<div class="card settingsTools"><h2>Технические разделы</h2><div class="row">Экран TFT <b>ST7789 · 320×240</b></div>
-<div class="grid"><button type="button" id="tftUp">TFT ↑</button><button type="button" id="tftDown">TFT ↓</button></div>
-<p class="hint">Управление видом TFT; физические выходы не затрагиваются.</p></div>
-<div id="settingsTabs" class="settingsTabs"><button data-stab-btn="0" class="on">Wi-Fi</button><button data-stab-btn="1">Google</button><button data-stab-btn="2">Обновление</button><button data-stab-btn="3">Диагностика</button></div><div class="card settingCard" data-stab="0"><h2>Wi-Fi</h2>
+<section class="page" data-section="5" hidden>
+<div class="card"><h2>Настройки</h2>
+<div class="settingsTabs" id="settingsTabs">
+<button type="button" data-stab-btn="0" class="on">Температура</button>
+<button type="button" data-stab-btn="1">Wi-Fi</button>
+<button type="button" data-stab-btn="2">Экран</button>
+<button type="button" data-stab-btn="3">Google</button>
+<button type="button" data-stab-btn="4">О системе</button>
+</div></div>
+<div class="card settingCard" data-stab="0"><h2>Калибровка температуры</h2>
+<p class="hint">Поправки показаний T1–T4, шаг 0,1 °C, от −10 до +10 °C. Это НЕ пороги звуковых сигналов.</p>
+<div class="row"><label for="calOffset0">T1 · Вода</label><input id="calOffset0" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
+<div class="row"><label for="calOffset1">T2 · Колонна</label><input id="calOffset1" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
+<div class="row"><label for="calOffset2">T3 · Куб</label><input id="calOffset2" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
+<div class="row"><label for="calOffset3">T4 · Верх колонны</label><input id="calOffset3" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
+<button id="tempCalSave" type="button" class="full">Сохранить поправки</button>
+<p id="tempCalResult" role="status" class="hint">—</p></div>
+<div class="card settingCard" data-stab="1" hidden><h2>Wi-Fi</h2>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
-<label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select><p class="hint">Если нужной сети нет, включите на телефоне раздачу интернета и повторите поиск.</p>
+<label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select>
+<p class="hint">Если нужной сети нет, включите на телефоне раздачу интернета и повторите поиск.</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
-<p id="response" role="status"></p><p class="hint">Настройка доступна при подключении к защищённой сети БУСА. Пароль остаётся на контроллере.</p></div>
-<div class="card settingCard" data-stab="1" hidden><h2>Google Диск · диагностика БУСА</h2>
+<p id="response" role="status"></p><p class="hint">Настройка доступна только в защищённой локальной сети БУСА. Пароль хранится на ESP32.</p></div>
+<div class="card settingCard" data-stab="2" hidden><h2>Экран</h2>
+<p class="hint">Три темы: светлая, тёмная и системная с утверждёнными рисунками. Драйвер и распиновка не меняются.</p>
+<label for="themeModeSelect">Тема TFT</label><select id="themeModeSelect">
+<option value="0">Светлая</option><option value="1">Тёмная</option>
+<option value="2">Системная · утверждённые рисунки БУСА</option>
+</select>
+<button type="button" id="tftTheme" class="full">Применить и сохранить тему</button>
+<p id="tftThemeStatus" class="hint">—</p></div>
+<div class="card settingCard" data-stab="3" hidden><h2>Google · телеметрия БУСА</h2>
 <div class="row">Состояние канала <b id="googleState">НЕ НАСТРОЕН</b></div>
-<p class="hint">БУСА передаёт реальные показания и коды ошибок каждые 30 секунд в вашу Google Таблицу по HTTPS. Это только мониторинг, без управления внешним оборудованием.</p>
-<p class="hint"><b>Важно:</b> приложение «Google Диск» на iPhone показывает файлы, но само не принимает данные с ESP32. Один раз создайте свою Google Таблицу и установите Apps Script-приёмник, затем вставьте адрес /exec и секрет ниже.</p>
-<p><a href="https://github.com/e62815667-gif/BUSA-Monitor/blob/lab/busa-v14-3-final-display-google/google/README_BUSA_Google_Drive.md" target="_blank" rel="noopener noreferrer" style="color:#a6dfff">Пошаговая инструкция настройки Google Таблицы</a></p>
-<label for="googleUrl">Адрес Apps Script (ссылка /exec)</label>
+<p class="hint">БУСА передаёт измерения и диагностику в Google Таблицу. Настройка подключения сохранена.</p>
+<label for="googleUrl">Адрес Apps Script (/exec)</label>
 <input id="googleUrl" type="url" placeholder="https://script.google.com/macros/s/.../exec">
-<label for="googleToken">Секрет устройства (токен из Apps Script)</label>
-<input id="googleToken" type="password" autocomplete="off" placeholder="Вставить на устройстве, не в чат">
+<label for="googleToken">Секрет устройства (64 символа)</label>
+<input id="googleToken" type="password" autocomplete="off" placeholder="Не пересылайте секрет в чат">
 <button id="googleSave" type="button" class="full">Сохранить подключение Google</button>
-<button id="googleTest" type="button" class="full">Проверить отправку диагностики сейчас</button>
+<button id="googleTest" type="button" class="full">Проверить отправку диагностики</button>
 <button id="googleStop" type="button" class="full">Отключить передачу в Google</button>
-<p id="googleResult" role="status" class="hint">Отправка выключена до настройки.</p>
-</div><div class="card settingCard" data-stab="2" hidden><h2>Обновление ПО · вручную</h2>
-<p class="hint">Только через локальную сеть БУСА. Выберите APP BIN для ESP32-S3 N16R8,
-НЕ объединённый merged BIN. Только проверенные диагностические сборки.
-Перед обновлением отключите внешние исполнительные цепи.</p>
-<input type="file" accept=".bin" id="firmwareFile">
-<button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
-<p id="updateResult" role="status">Ожидание подтверждения</p>
-</div><div class="card settingCard" data-stab="3" hidden><h2>Диагностика</h2>
-<div class="row">Экран ST7789 <b id="displayState">—</b></div>
-<p class="hint">Экран гаснет только по F2 или кнопке на iPhone. Любая распознанная клавиша снова включает экран без выполнения команды. Датчики, Wi-Fi и отправка в Google продолжают работать. Подсветка, постоянно подключённая к питанию, может не погаснуть.</p>
+<p id="googleResult" role="status" class="hint">—</p></div>
+<div class="card settingCard" data-stab="4" hidden><h2>О системе</h2>
+<div class="row">Подключение к Wi-Fi <b id="aboutWifi">—</b></div>
+<div class="row">Передача в Google <b id="aboutGoogle">—</b></div>
+<div class="row">Прошивка <b id="aboutFirmware">—</b></div>
+<div class="row">Время работы <b id="aboutUptime">—</b></div></div>
+</section>
+<section class="page" data-section="6" hidden>
+<div class="card"><h2>Диагностика</h2>
+<div class="settingsTabs diagTabs">
+<button type="button" data-diag-btn="screen" class="on">Экран</button>
+<button type="button" data-diag-btn="keys">Клавиатура</button>
+<button type="button" data-diag-btn="relays">Реле</button>
+<button type="button" data-diag-btn="temps">Датчики</button>
+<button type="button" data-diag-btn="wifi">Wi-Fi / Google</button>
+<button type="button" data-diag-btn="esp">ESP32</button>
+<button type="button" data-diag-btn="flow">Расходомер</button>
+</div></div>
+<div class="card" data-diag-panel="screen"><h2>Экран TFT</h2>
+<div class="row">Состояние <b id="displayState">—</b></div>
+<div class="row">Контроллер <b id="tft">—</b></div>
+<p class="hint">ST7789 инициализируется программой; правильность изображения проверяется визуально.</p>
 <div class="grid"><button id="screenSleep" type="button">Погасить экран</button><button id="screenWake" type="button">Разбудить экран</button></div>
-<div class="row">Прошивка <b id="ver">—</b></div>
-<div class="row">Время работы <b id="uptime">—</b></div>
+<label for="tftDriver">Контроллер</label><select id="tftDriver"><option value="1">ST7789 320×240</option></select>
+<label for="tftRotation">Ориентация</label><select id="tftRotation"><option value="1">Горизонтальная · 1</option></select>
+<button id="tftSave" type="button" class="full">Сохранить профиль TFT</button>
+<button id="tftTest" type="button" class="full">Тест изображения</button>
+<p id="tftProfileStatus" class="hint">—</p></div>
+<div class="card" data-diag-panel="keys" hidden><h2>Клавиатура 5×4</h2>
 <div class="row">PCF8575 <b id="pcf">—</b></div>
-<div class="row">TFT <b id="tft">—</b></div>
-<h2>Калибровка клавиатуры 5×4</h2><p class="hint">Назначения: ↑ вверх, ↓ вниз, ← влево, → вправо, Ent ОК, Esc назад, F1 удалить с подтверждением.</p>
-<p class="hint">Не переставляй провода. После запуска нажимай кнопки последовательно слева направо, сверху вниз по фотографии. Полностью отпускай клавишу между нажатиями. Карта сохраняется в ESP32.</p>
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>
-<div class="row">Контакты <b id="keyRaw">—</b></div><p id="keyInfo" class="hint"></p>
-<h2>Диагностика V14 · все модули</h2>
-<p class="hint">Отображаются ответы интерфейсов, а не гарантии исправности оборудования. Отсутствие импульсов расходомера не доказывает отсутствия воды.</p>
-<pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание опроса DS18B20...</pre>
+<div class="row">Контакты <b id="keyRaw">—</b></div>
+<p id="keyInfo" class="hint">—</p>
 <pre id="diagKeyboard" style="white-space:pre-wrap;word-break:break-word">Ожидание PCF8575...</pre>
-<pre id="diagI2c" style="white-space:pre-wrap;word-break:break-word">Сканирование I2C...</pre>
-<pre id="diagOther" style="white-space:pre-wrap;word-break:break-word">TFT / ESP32 / Wi-Fi / YF-S401...</pre>
-<h2>Отчёт для анализа</h2>
-<p class="hint">Скопируй отчёт и пришли в наш чат. Wi-Fi пароли и Google-токены в отчёт не включены.</p>
+<pre id="diagI2c" style="white-space:pre-wrap;word-break:break-word">Ожидание I²C...</pre>
+<button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
+<button id="keyNext" type="button" class="full">Считать и далее →</button>
+<div class="grid"><button id="keyUndo" type="button">Назад на шаг</button>
+<button id="keyCancel" type="button">Отмена</button></div></div>
+<div class="card" data-diag-panel="relays" hidden><h2>Звуковые реле K1–K4</h2>
+<pre id="diagRelay" style="white-space:pre-wrap;word-break:break-word">Ожидание статуса...</pre>
+<p class="hint">Отчёт показывает команды реле, а не физический отклик звуковых оповещателей.</p></div>
+<div class="card" data-diag-panel="temps" hidden><h2>Датчики T1–T4</h2>
+<pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание DS18B20...</pre></div>
+<div class="card" data-diag-panel="wifi" hidden><h2>Wi-Fi / Google</h2>
+<pre id="diagNetwork" style="white-space:pre-wrap;word-break:break-word">Ожидание подключения...</pre></div>
+<div class="card" data-diag-panel="esp" hidden><h2>ESP32-S3</h2>
+<div class="row">Прошивка <b id="ver">—</b></div>
+<div class="row">Время работы <b id="uptime">—</b></div>
+<pre id="diagOther" style="white-space:pre-wrap;word-break:break-word">Ожидание системы...</pre>
+<h3>Диагностический отчёт</h3>
 <textarea id="diagReport" rows="9" readonly style="width:100%;font:11px ui-monospace,monospace;white-space:pre;overflow:auto">Ожидание диагностики...</textarea>
 <button type="button" id="diagCopy" class="full">Скопировать отчёт всех модулей</button>
 <p id="diagCopyResult" class="hint">—</p>
-<p class="hint">Температура: T1 GPIO16, T2 GPIO17, T3 GPIO18, T4 GPIO21. IDLE=1 — линия DATA высока в покое; IDLE=0 или LINE_LOW — линия низкая. AFTER — состояние после импульса сброса. NO_PRESENCE при IDLE=1 — нет ответа датчика, но это не доказывает, что сам датчик неисправен. NO_ROM — не найден адрес; ROM_CRC_BAD — неверная CRC.</p>
-<p class="hint">Клавиатура: idle_hex — линии в покое, low_hex — ответившие линии, scan_error — код ошибки опроса.</p>
-<p class="hint">После нажатия клавиши переход происходит автоматически. Если не произошёл, нажми «Считать и далее» в течение 10 секунд. Без распознанных контактов пропуск запрещён, чтобы не записать неверную раскладку.</p>
-<h2>Экран TFT · V14</h2>
-<p class="hint">Белый TFT может означать неверный контроллер дисплея или проблему SPI. Профиль выбирается вручную: ESP32 не умеет подтвердить, что пиксели действительно видны.</p>
-<label for="tftDriver">Драйвер TFT</label>
-<select id="tftDriver"><option value="1">ST7789 · горизонтально 320×240</option></select>
-<label for="tftRotation">Ориентация экрана</label>
-<select id="tftRotation"><option value="1">1 · Горизонтально 320×240</option></select>
-<button type="button" id="tftSave" class="full">Сохранить профиль и перезапустить ESP32</button>
-<button type="button" id="tftTest" class="full">Тест TFT: чёрный фон, BUSA 1M AI · 5 секунд</button>
-<p id="tftProfileStatus" class="hint">Драйвер ST7789 закреплён. Проверка физического экрана выполняется отдельно.</p>
-<p class="hint">Обе темы цветные: синяя вода, разноцветные датчики, оранжевые выделения. Аппаратная инверсия выключена. Драйвер ST7789 не меняется.</p>
-<button type="button" id="tftTheme" class="full">Переключить светлую / тёмную цветную тему TFT</button>
-<p id="tftThemeStatus" class="hint">—</p>
-<button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
-<button id="keyNext" type="button" class="full">Считать и далее →</button>
-<div class="grid"><button type="button" id="keyUndo">Назад на шаг</button>
-<button type="button" id="keyCancel">Отмена</button></div></div></section>
+<h3>Обновление прошивки</h3>
+<p class="hint">Для OTA выбирай APP_OTA.bin, подключившись к Wi-Fi БУСА. Не стирай NVS — раскладка клавиатуры и настройки сохраняются.</p>
+<input type="file" accept=".bin" id="firmwareFile">
+<button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
+<p id="updateResult" role="status">Ожидание подтверждения</p></div>
+<div class="card" data-diag-panel="flow" hidden><h2>Расходомер охлаждающей воды</h2>
+<pre id="diagFlow" style="white-space:pre-wrap;word-break:break-word">Ожидание импульсов...</pre>
+<p class="hint">Пока не откалиброван; значения расхода и объёма оценочные.</p></div>
+</section>
 <footer class="hint">БУСА-1М №001 · мониторинг + 4 звуковых реле 12 В · силовое оборудование управляется вручную</footer></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
-let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=false;
+let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=false,calInitialized=false;
 let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
 function networkLeds(info,ssid){
@@ -1679,13 +1708,9 @@ document.querySelectorAll('[data-event]').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('[data-event]').forEach(x=>x.classList.toggle('on',x===b));
  drawEvents();
 });
-document.querySelectorAll('[data-settings-link]').forEach(b=>b.onclick=()=>{
- const action=b.dataset.settingsLink;
- if(action==='temp'){page(1);return;}
- if(action==='collection'){page(2);return;}
- settingsTab(action==='wifi'?0:action==='display'||action==='system'||action==='about'?3:1);
- const top=get('settingsTabs').getBoundingClientRect().top+window.scrollY-115;
- window.scrollTo({top:Math.max(0,top),behavior:'smooth'});
+document.querySelectorAll('[data-diag-btn]').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('[data-diag-btn]').forEach(x=>x.classList.toggle('on',x===b));
+ document.querySelectorAll('[data-diag-panel]').forEach(x=>x.hidden=x.dataset.diagPanel!==b.dataset.diagBtn);
 });
 function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
 function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
@@ -1696,8 +1721,6 @@ document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=async()=>{
   document.querySelectorAll('[data-graph-panel]').forEach(p=>p.hidden=Number(p.dataset.graphPanel)!==n);
   await fetch('/api/graph-view?view='+n).catch(()=>{});
 });
-get('tftUp').onclick=()=>fetch('/api/tft/scroll?dir=up').catch(()=>{});
-get('tftDown').onclick=()=>fetch('/api/tft/scroll?dir=down').catch(()=>{});
 async function keyCommand(action){
  try{
    let r=await fetch('/api/keypad/'+action,{method:'POST',body:new URLSearchParams({confirm:'YES'})});
@@ -1744,12 +1767,28 @@ get('diagCopy').onclick=async()=>{
 };
 get('tftTheme').onclick=async()=>{
  try{
-   const r=await fetch('/api/tft/theme',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
-   const t=await r.text();
-   get('tftThemeStatus').textContent=t;
-   if(r.ok){document.documentElement.dataset.theme=
-     document.documentElement.dataset.theme==='dark'?'light':'dark';}
+  const mode=get('themeModeSelect').value;
+  const r=await fetch('/api/tft/theme',{method:'POST',body:new URLSearchParams({confirm:'YES',mode})});
+  get('tftThemeStatus').textContent=await r.text();
+  if(r.ok)document.documentElement.dataset.theme=mode==='1'?'dark':'light';
  }catch(e){get('tftThemeStatus').textContent='Ошибка: '+e.message}
+};
+get('tempCalSave').onclick=async()=>{
+ const button=get('tempCalSave'),data=new URLSearchParams({confirm:'YES'});
+ for(let i=0;i<4;i++){
+  const raw=get('calOffset'+i).value.trim(),n=Number(raw);
+  if(!raw||!Number.isFinite(n)||n< -10||n>10||Math.abs(n*10-Math.round(n*10))>0.02){
+   get('tempCalResult').textContent='T'+(i+1)+': от -10 до +10 °C с шагом 0,1';return;
+  }
+  data.set('offset'+i,String(n));
+ }
+ button.disabled=true;
+ try{
+  const r=await fetch('/api/temperature/calibration',{method:'POST',body:data});
+  if(!r.ok)throw Error(await r.text());
+  get('tempCalResult').textContent=await r.text();calInitialized=false;
+ }catch(e){get('tempCalResult').textContent='Ошибка: '+e.message}
+ button.disabled=false;
 };
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
@@ -1809,10 +1848,19 @@ if(s.station.connected&&s.station.ssid){
 }
 const cs=s.google;
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
-if(!themeInitialized && typeof s.tft_theme_dark==='boolean'){
-  document.documentElement.dataset.theme=s.tft_theme_dark?'dark':'light';
+if(!themeInitialized && typeof s.tft_theme_mode==='number'){
+  get('themeModeSelect').value=String(s.tft_theme_mode);
+  document.documentElement.dataset.theme=s.tft_theme_mode===1?'dark':'light';
   themeInitialized=true;
 }
+if(!calInitialized&&Array.isArray(s.calibration_offsets)){
+  s.calibration_offsets.forEach((v,i)=>{if(i<4)get('calOffset'+i).value=Number(v).toFixed(1)});
+  calInitialized=true;
+}
+get('aboutWifi').textContent=s.station.connected?'Подключён':'Нет связи';
+get('aboutGoogle').textContent=!s.google.configured?'Не настроена':s.google.state===6?'Ошибка':'Настроена';
+get('aboutFirmware').textContent=s.firmware;
+get('aboutUptime').textContent=Math.floor(s.uptime_ms/3600000)+' ч '+Math.floor((s.uptime_ms%3600000)/60000)+' мин';
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent+' · DNS '+(cs.dns??'?')+' · TLS '+(cs.tls_error??'?')+' · этап '+(cs.error_stage??'?');
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
@@ -1836,6 +1884,19 @@ if(s.keypad){
      '\nPCF8575: ACK='+d.pcf8575?.online+' read='+d.pcf8575?.read_ok+
      ' idle=0x'+d.pcf8575?.idle_pins_hex+
      '\nPCA9685: отключён, не опрашивается';
+   get('diagNetwork').textContent='Wi-Fi STA: '+(s.station.connected?'подключен':'нет связи')+
+      '\nAP: '+(s.ap?.enabled?'работает':'нет')+' · '+(s.ap?.ip||'—')+
+      '\nGoogle: '+(s.google?.configured?'настроен':'не настроен')+
+      ' · HTTP '+s.google?.http+' · TLS '+s.google?.tls_error;
+   get('diagRelay').textContent=(s.sound_alerts?.channels||[]).map(c=>
+     'K'+c.channel+' GPIO'+c.gpio+' '+(c.sound_on?'ЗВУК':'ОЖИДАНИЕ')+
+     ' · ВКЛ '+(c.on_c??'—')+' °C · ВЫКЛ '+(c.off_c??'—')+
+     ' °C · '+c.reason).join('\n')+
+     '\nЗуммер T1/T2: '+(s.sound_alerts?.buzzer?.sound_on?'ЗВУК':'ОЖИДАНИЕ');
+   get('diagFlow').textContent='GPIO15 · '+d.water_flow?.status+
+     '\nИмпульсы: '+d.water_flow?.pulses+
+     '\nКалибровка: отсутствует'+
+     '\nРасход (оценка): '+(s.water?.lpm??'—')+' л/мин';
    get('diagOther').textContent=
      'TFT: '+d.tft?.profile+' rotation='+d.tft?.rotation+
        ' init='+d.tft?.init_sent+' (pixels not verified by software)'+
@@ -1856,7 +1917,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
+get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (проверка изображения визуальная)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
 get('temperatureSave').onclick=async()=>{
  const button=get('temperatureSave'),result=get('temperatureSaveResult');
