@@ -39,7 +39,7 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-RESPONSIVE-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-240MHZ-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -47,6 +47,10 @@ uint32_t busaLastI2cStepMs=0,busaMaxI2cStepMs=0;
 uint32_t busaI2cSuspendedUntil=0,busaI2cErrorCount=0,busaI2cStallCount=0;
 uint32_t busaTempWorstMs=0,busaOneWireWorstMs=0,busaTftWorstMs=0;
 uint32_t busaI2cWorstMs=0,busaHttpWorstMs=0;
+// Generic ESP32-S3 performance telemetry; no change to sensor/control functionality.
+uint32_t busaCpuMhz=0,busaPsramBytes=0,busaPsramFreeBytes=0;
+bool busaCpu240Ok=false,busaPsramDetected=false;
+
 const char* busaSlowComponent="NONE";
 void busaObserve(const char* component,uint32_t started,uint32_t &worst){
   const uint32_t dt=millis()-started;
@@ -840,7 +844,12 @@ String statusJSON(){
   s+=",\"temp_worst_ms\":"+String(busaTempWorstMs);
   s+=",\"onewire_worst_ms\":"+String(busaOneWireWorstMs);
   s+=",\"http_worst_ms\":"+String(busaHttpWorstMs);
-  s+=",\"tft_worst_ms\":"+String(busaTftWorstMs)+"}";
+  s+=",\"tft_worst_ms\":"+String(busaTftWorstMs);
+  s+=",\"cpu_mhz\":"+String(ESP.getCpuFreqMHz());
+  s+=",\"cpu_240mhz\":"+(busaCpu240Ok?String("true"):String("false"));
+  s+=",\"psram_detected\":"+(busaPsramDetected?String("true"):String("false"));
+  s+=",\"psram_total_bytes\":"+String(ESP.getPsramSize());
+  s+=",\"psram_free_bytes\":"+String(ESP.getFreePsram())+"}";
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"clock\":{\"synchronized\":"+(deviceClockValid()?String("true"):String("false"));
@@ -1654,6 +1663,17 @@ void readConsole(){
 void setup(){
   Serial0.begin(115200);
   Serial.begin(115200);
+  // ESP32-S3 documented maximum CPU clock is 240 MHz; do not overclock.
+  // This call is idempotent when the board menu already selects 240 MHz.
+  const bool cpuClockSet=setCpuFrequencyMhz(240);
+  busaCpuMhz=ESP.getCpuFreqMHz();
+  busaCpu240Ok=cpuClockSet && (busaCpuMhz==240);
+  busaPsramDetected=psramFound();
+  busaPsramBytes=busaPsramDetected?ESP.getPsramSize():0;
+  busaPsramFreeBytes=busaPsramDetected?ESP.getFreePsram():0;
+  Serial.printf("BUSA PERFORMANCE CPU=%luMHz target=240 result=%d PSRAM=%d total=%lu free=%lu\n",
+     (unsigned long)busaCpuMhz,(int)busaCpu240Ok,(int)busaPsramDetected,
+     (unsigned long)busaPsramBytes,(unsigned long)busaPsramFreeBytes);
   busaBootAt=millis();
   busaReportStage("START");
   Serial.printf("BUSA N16R8 reset_reason=%d flash=%lu free_heap=%lu\n",
@@ -2077,5 +2097,5 @@ void loop(){
   const uint32_t loopMs=millis()-tickStart;
   if(loopMs>busaMaxLoopMs)busaMaxLoopMs=loopMs;
   if(loopMs>100)busaSlowLoops++;
-  delay(2);
+  delay(1); // Yield to Wi-Fi/RTOS each pass, with less idle latency than 2 ms.
 }
