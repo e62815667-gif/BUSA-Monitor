@@ -21,6 +21,7 @@
 #include <sys/time.h>
 #include <esp_system.h>
 #include <Wire.h>
+#include <driver/i2c.h>
 #include <Preferences.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -39,7 +40,7 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -219,14 +220,71 @@ uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
 uint8_t i2cFound[24]={0},i2cFoundCount=0;
 uint16_t i2cAckCount=0;
 uint32_t i2cFullScanAt=0;
+// ESP-IDF master transactions share I2C_NUM_0, installed by Wire.begin().
+// Arduino Wire.endTransmission() sometimes blocks near 1000ms despite
+// Wire.setTimeOut(25); use the native driver with an explicit 20ms budget.
+constexpr uint32_t BUSA_I2C_TX_BUDGET_MS=20;
+uint32_t busaI2cNackCount=0,busaI2cTimeoutCount=0;
+int busaI2cLastResult=0;
+uint8_t busaI2cLastAddress=0,busaI2cLastSda=1,busaI2cLastScl=1;
 bool busaI2cSuspended(uint32_t now){return busaI2cSuspendedUntil && (int32_t)(now-busaI2cSuspendedUntil)<0;}
-void busaI2cQuarantine(uint32_t now,uint32_t durationMs=60000){
+void busaI2cQuarantine(uint32_t now,uint32_t durationMs=2000){
+  // Only a real timeout or a held-low bus gets a bounded retry delay.
   busaI2cSuspendedUntil=now+durationMs;
   i2cAckCount=0;pcfDetected=false;pcaDetected=false;pcfAddr=0;
   ++busaI2cErrorCount;
 }
-// Do not start I2C transactions on a physically held-low SDA/SCL line.
-bool busaI2cLinesFree(){return digitalRead(BUS_SDA)==HIGH && digitalRead(BUS_SCL)==HIGH;}
+bool busaI2cLinesFree(){
+  busaI2cLastSda=(uint8_t)digitalRead(BUS_SDA);
+  busaI2cLastScl=(uint8_t)digitalRead(BUS_SCL);
+  return busaI2cLastSda==HIGH && busaI2cLastScl==HIGH;
+}
+esp_err_t busaI2cTransaction(uint8_t address,const uint8_t* tx,size_t txLen,uint8_t* rx,size_t rxLen){
+  const uint32_t started=millis();
+  if(!i2cOnline || busaI2cSuspended(started))return ESP_ERR_INVALID_STATE;
+  busaI2cLastAddress=address;
+  if(!busaI2cLinesFree()){
+    busaI2cLastResult=ESP_ERR_TIMEOUT;
+    ++busaI2cTimeoutCount;
+    busaI2cQuarantine(started);
+    return ESP_ERR_TIMEOUT;
+  }
+  i2c_cmd_handle_t cmd=i2c_cmd_link_create();
+  if(!cmd){busaI2cLastResult=ESP_ERR_NO_MEM;return ESP_ERR_NO_MEM;}
+  esp_err_t e=i2c_master_start(cmd);
+  // ACK probes use just a WRITE address. Read-only PCF8575 transactions use
+  // a READ address directly, and PCA registers use a combined repeated start.
+  if(e==ESP_OK && (txLen || !rxLen)){
+    e=i2c_master_write_byte(cmd,(uint8_t)(address<<1)|I2C_MASTER_WRITE,true);
+    if(e==ESP_OK && txLen)e=i2c_master_write(cmd,(uint8_t*)tx,txLen,true);
+  }
+  if(e==ESP_OK && rxLen){
+    if(txLen)e=i2c_master_start(cmd);
+    if(e==ESP_OK)e=i2c_master_write_byte(cmd,(uint8_t)(address<<1)|I2C_MASTER_READ,true);
+    if(e==ESP_OK && rxLen>1)e=i2c_master_read(cmd,rx,rxLen-1,I2C_MASTER_ACK);
+    if(e==ESP_OK)e=i2c_master_read_byte(cmd,rx+rxLen-1,I2C_MASTER_NACK);
+  }
+  if(e==ESP_OK)e=i2c_master_stop(cmd);
+  if(e==ESP_OK){
+    const TickType_t ticks=pdMS_TO_TICKS(BUSA_I2C_TX_BUDGET_MS);
+    e=i2c_master_cmd_begin(I2C_NUM_0,cmd,ticks?ticks:1);
+  }
+  i2c_cmd_link_delete(cmd);
+  const uint32_t elapsedMs=millis()-started;
+  busaLastI2cStepMs=elapsedMs;
+  if(elapsedMs>busaMaxI2cStepMs)busaMaxI2cStepMs=elapsedMs;
+  busaI2cLastResult=(int)e;
+  if(e==ESP_ERR_TIMEOUT || elapsedMs>100){
+    ++busaI2cTimeoutCount;
+    ++busaI2cStallCount;
+    busaSlowComponent="I2C_TIMEOUT";
+    busaI2cQuarantine(millis());
+  }else if(e==ESP_FAIL){
+    // Address not acknowledged is normal for an absent I2C module.
+    ++busaI2cNackCount;
+  }
+  return e;
+}
 
 int pcaMode1=-1,pcaMode2=-1;
 bool pcfIdleReadOk=false;
@@ -259,72 +317,38 @@ String clockStamp(bool compact=false){
   return String(buf);
 }
 bool ack(uint8_t address){
-  const uint32_t started=millis();
-  if(busaI2cSuspended(started))return false;
-  if(!busaI2cLinesFree()){
-    busaI2cQuarantine(started);
-    return false;
-  }
-  Wire.beginTransmission(address);
-  const uint8_t code=Wire.endTransmission();
-  const uint32_t ms=millis()-started;
-  if(ms>busaMaxI2cStepMs)busaMaxI2cStepMs=ms;
-  busaLastI2cStepMs=ms;
-  if(ms>100){
-    ++busaI2cStallCount;
-    busaSlowComponent="I2C_ACK";
-    busaI2cQuarantine(millis());
-  }
-  return code==0 && !busaI2cSuspended(millis());
+  return busaI2cTransaction(address,nullptr,0,nullptr,0)==ESP_OK;
 }
-// Only search actual supported low-voltage module addresses (PCF8575 and PCA9685).
-// One address per scheduled attempt. An unresponsive bus is quarantined for 60 s.
+// Probe configured PCF8575 first (0x20), then PCA9685 (0x40), and only
+// then the alternate PCF8575 strap addresses. One address per 600ms tick.
+constexpr uint8_t BUSA_I2C_PROBE_ADDRS[9]={0x20,0x40,0x21,0x22,0x23,0x24,0x25,0x26,0x27};
 uint8_t busaI2cScanNext=0;
 uint32_t busaI2cScanLastStep=0;
 void scanI2cAddresses(uint32_t now){
   if(!i2cOnline || busaI2cSuspended(now) || !elapsed(now,busaI2cScanLastStep,600))return;
   busaI2cScanLastStep=now;
-  const uint8_t addr=busaI2cScanNext<8?(uint8_t)(0x20+busaI2cScanNext):0x40;
-  busaI2cScanNext=(busaI2cScanNext+1)%9;
-  const bool ok=ack(addr);
-  if(busaI2cSuspended(millis())){i2cFoundCount=0;return;}
-  if(ok){
-    bool known=false;
-    for(uint8_t j=0;j<i2cFoundCount;j++)if(i2cFound[j]==addr)known=true;
-    if(!known && i2cFoundCount<24)i2cFound[i2cFoundCount++]=addr;
+  if(busaI2cScanNext==0){
+    // Refresh the cache each complete pass, not forever, so unplugged
+    // devices disappear and reconnected devices recover automatically.
+    i2cFoundCount=0;i2cAckCount=0;
   }
+  const uint8_t addr=BUSA_I2C_PROBE_ADDRS[busaI2cScanNext];
+  const bool ok=ack(addr);
+  if(busaI2cSuspended(millis()))return;
+  if(ok && i2cFoundCount<24)i2cFound[i2cFoundCount++]=addr;
+  busaI2cScanNext=(busaI2cScanNext+1)%9;
   if(busaI2cScanNext==0){
     i2cAckCount=i2cFoundCount;
     i2cFullScanAt=millis();
   }
 }
-bool busaI2cCheckTransfer(uint32_t started){
-  const uint32_t ms=millis()-started;
-  if(ms>busaMaxI2cStepMs)busaMaxI2cStepMs=ms;
-  busaLastI2cStepMs=ms;
-  if(ms>100){
-    ++busaI2cStallCount;
-    busaSlowComponent="I2C_TRANSFER";
-    busaI2cQuarantine(millis());
-    return false;
-  }
-  return true;
-}
 int readPcaReg(uint8_t reg){
-  if(!pcaDetected || busaI2cSuspended(millis()) || !busaI2cLinesFree())return -1;
-  const uint32_t started=millis();
-  int value=-1;
-  Wire.beginTransmission(0x40);
-  Wire.write(reg); // Register pointer only; never change PWM outputs.
-  if(Wire.endTransmission(false)==0 &&
-     Wire.requestFrom((uint8_t)0x40,(uint8_t)1)==(uint8_t)1){
-    value=Wire.read();
-  }
-  return busaI2cCheckTransfer(started)?value:-1;
+  if(!pcaDetected || busaI2cSuspended(millis()))return -1;
+  uint8_t result=0;
+  return busaI2cTransaction(0x40,&reg,1,&result,1)==ESP_OK?result:-1;
 }
 void probeI2c(uint32_t now){
   if(!i2cOnline || busaI2cSuspended(now))return;
-  // Use cached discoveries; never perform 8 serial address probes in one loop.
   pcfDetected=false;pcfAddr=0;pcaDetected=false;
   for(uint8_t j=0;j<i2cFoundCount;j++){
     const uint8_t addr=i2cFound[j];
@@ -333,36 +357,28 @@ void probeI2c(uint32_t now){
   }
   pcaMode1=readPcaReg(0x00);
   pcaMode2=readPcaReg(0x01);
-  // PCF8575 keypad inputs: release scanning lines then sample idle state.
   pcfIdleReadOk=false;
   if(pcfDetected){
-    Wire.beginTransmission(pcfAddr);
-    Wire.write((uint8_t)0xff);Wire.write((uint8_t)0xff);
-    if(Wire.endTransmission()==0 &&
-       Wire.requestFrom(pcfAddr,(uint8_t)2)==(uint8_t)2){
-      const uint8_t lo=(uint8_t)Wire.read();
-      const uint8_t hi=(uint8_t)Wire.read();
-      pcfIdleDirect=(uint16_t)lo|((uint16_t)hi<<8);
+    uint8_t releaseAll[2]={0xff,0xff},idle[2]={0,0};
+    if(busaI2cTransaction(pcfAddr,releaseAll,2,nullptr,0)==ESP_OK &&
+       busaI2cTransaction(pcfAddr,nullptr,0,idle,2)==ESP_OK){
+      pcfIdleDirect=(uint16_t)idle[0]|((uint16_t)idle[1]<<8);
       pcfIdleReadOk=true;
     }
   }
-  scanI2cAddresses(now);
   lastBusProbe=now;
 }
 bool pcfWrite(uint16_t v){
-  if(!pcfDetected || busaI2cSuspended(millis()) || !busaI2cLinesFree())return false;
-  const uint32_t started=millis();
-  Wire.beginTransmission(pcfAddr);
-  Wire.write((uint8_t)v);Wire.write((uint8_t)(v>>8));
-  const bool ok=Wire.endTransmission()==0;
-  return busaI2cCheckTransfer(started) && ok;
+  if(!pcfDetected || busaI2cSuspended(millis()))return false;
+  uint8_t bytes[2]={(uint8_t)v,(uint8_t)(v>>8)};
+  return busaI2cTransaction(pcfAddr,bytes,2,nullptr,0)==ESP_OK;
 }
 bool pcfRead(uint16_t &v){
-  if(!pcfDetected || busaI2cSuspended(millis()) || !busaI2cLinesFree())return false;
-  const uint32_t started=millis();
-  const bool ok=Wire.requestFrom(pcfAddr,(uint8_t)2)==(uint8_t)2;
-  if(ok){v=(uint8_t)Wire.read();v|=(uint16_t)((uint8_t)Wire.read())<<8;}
-  return busaI2cCheckTransfer(started) && ok;
+  if(!pcfDetected || busaI2cSuspended(millis()))return false;
+  uint8_t bytes[2]={0,0};
+  if(busaI2cTransaction(pcfAddr,nullptr,0,bytes,2)!=ESP_OK)return false;
+  v=(uint16_t)bytes[0]|((uint16_t)bytes[1]<<8);
+  return true;
 }
 uint8_t currentPage=0; // Six approved UI pages
 uint8_t graphSubView=0; // 0 T1-T4, 1 cooling water, 2 collection no sensor
@@ -971,6 +987,13 @@ String statusJSON(){
   s+=",\"raw_pair\":"+quoteJson(rawPair)+"}";
   s+=",\"i2c\":{\"sda_gpio\":8,\"scl_gpio\":9,\"controller_started\":"+(i2cOnline?String("true"):String("false"));
   s+=",\"last_scan_ms\":"+String(i2cFullScanAt);
+   s+=",\"last_result\":"+String(busaI2cLastResult);
+   s+=",\"last_address\":"+String(busaI2cLastAddress);
+   s+=",\"nack_count\":"+String(busaI2cNackCount);
+   s+=",\"timeout_count\":"+String(busaI2cTimeoutCount);
+   s+=",\"sda_level\":"+String(busaI2cLastSda);
+   s+=",\"scl_level\":"+String(busaI2cLastScl);
+   s+=",\"quarantined\":"+(busaI2cSuspended(millis())?String("true"):String("false"));
   s+=",\"ack_total\":"+String(i2cAckCount)+",\"addresses\":[";
   for(uint8_t i=0;i<i2cFoundCount;i++){if(i)s+=",";s+=String(i2cFound[i]);}
   s+="]}";
