@@ -50,6 +50,35 @@ nav button.active{background:#f7d5a9;border-color:#e8b274;color:#354b55;font-wei
 :root[data-theme="dark"] .rigs svg rect:first-of-type{fill:#183046}
 #connectStatus{display:flex;flex-wrap:wrap;gap:8px;margin:9px 0 3px;font-size:12px}\n.netChip{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;background:var(--paper);border-radius:9px;border:1px solid var(--border);font-weight:650}\n.netBulb{width:11px;height:11px;display:inline-block;flex-shrink:0;border-radius:50%;background:#d83b35}\n.netBulb.internetUp{background:#16a653}\n.netBulb.localUp{background:#137ee9}\n#themeSwitch{margin:7px 0 1px;padding:9px 13px;border:1px solid #cda275;border-radius:9px;background:#fff0d9;color:#3b5a69;font-size:13px;font-weight:600}
 :root[data-theme="dark"] #themeSwitch{background:#3b576b;color:#e1f4ff;border-color:#75a3bc}
+
+/* Same approved graphic arrangement as local BUSA, with honest offline state. */
+:root,:root[data-theme="dark"]{color-scheme:dark;--ink:#e5f7ff;--paper:#021021;--border:#14608a;background:#020b18;color:#e5f7ff}
+body,:root[data-theme="dark"] body{background:#020b18;color:#e5f7ff}
+header,:root[data-theme="dark"] header{background:#061b2e;border-color:#1178b8}
+header h1,header small{color:#f1f9ff}
+#home{color:#edf8ff}
+.refBoard{background:linear-gradient(160deg,#071b2f,#010b18);border:1px solid #0b5c95;padding:9px;border-radius:7px;max-width:660px;margin:0 auto}
+.refTop{display:flex;align-items:center;gap:12px;padding:7px 4px 12px;border-bottom:1px solid #1e5982;font-size:clamp(12px,3.4vw,20px)}
+.refTop strong{flex:1}.refWifi{color:#3fceff;font-size:25px}.refTop time{font-size:18px}.refLed{background:#27e426;width:17px;height:17px;border-radius:50%;box-shadow:0 0 9px #2eeb33}
+.refCenter{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:7px;padding:9px 0}
+.refTempStack{display:flex;flex-direction:column;gap:7px;min-width:0}
+.refTemp{display:flex;align-items:center;gap:5px;min-height:82px;border:1px solid #0878c9;border-radius:13px;background:linear-gradient(135deg,#08233b,#041322);padding:5px 7px;box-shadow:inset 0 0 8px #177ec524}
+.refTempIcon{width:30px;flex:none;text-align:center;font-size:28px;color:#1dd9ff;filter:drop-shadow(0 0 4px #03b7ff)}
+.refTempData{min-width:0}.refTempLabel{font-size:clamp(11px,2.6vw,15px);line-height:1.1}
+.refTemp strong{display:block;color:#2eec36;font-size:clamp(20px,4.6vw,34px);margin:5px 0 0}
+.refTemp small{display:block;color:#b3d8ed;font-size:11px}
+.refRig{display:flex;align-items:center;justify-content:center;background:#031120;min-width:0;overflow:hidden}
+.refRig svg{display:block;width:100%;max-height:360px;object-fit:contain}
+.refMetrics{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.refMetrics article{display:flex;align-items:center;gap:8px;background:#051b32;border:1px solid #087eca;border-radius:12px;padding:9px 7px}
+.refMetrics article>span{font-size:27px;color:#25c6ff}
+.refMetrics article div{min-width:0}.refMetrics small{display:block;color:#b1d9f1;font-size:11px}
+.refMetrics strong{display:block;color:#bcecff;font-size:24px}
+.refFoot{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;margin:8px 0;color:#3bea49;font-size:12px}
+.refFoot>span:first-child{color:#e3a4fa}.refOffline{font-size:11px;color:#8db1cb;line-height:1.4}
+nav,:root[data-theme="dark"] nav{background:#041528;border-color:#177bcd}
+nav button,:root[data-theme="dark"] nav button{background:#06182b;color:#d0eaff;border-color:#17466e}
+nav button.active,:root[data-theme="dark"] nav button.active{background:linear-gradient(140deg,#1678f9,#0954cd);color:#fff;border-color:#0bc7ff}
 </style></head><body>
 <header><h1>БУСА-1М №001</h1><small>Монитор · iPhone · две цветные темы</small>
 <div id="connectStatus" role="status"><span class="netChip"><span id="netInternet" class="netBulb"></span>ИНТЕРНЕТ <span id="netInternetText">проверка</span></span>
@@ -59,40 +88,64 @@ nav button.active{background:#f7d5a9;border-color:#e8b274;color:#354b55;font-wei
 <div class="card"><div class="row"><span>Подключение</span><b id="statusText" class="warn">Не подключено</b></div>
 <p class="muted">Живые показания открываются непосредственно из локальной сети ESP32-S3. Эта страница сохранит знакомые вкладки даже без интернета.</p>
 <a class="btn" href="http://192.168.4.1/">Открыть БУСА по Wi-Fi</a></div>
-<section id="home">
-<div class="hero"><small>СИСТЕМА МОНИТОРИНГА</small><h2>Главная</h2><span class="status">● Ожидается соединение с БУСА</span></div>
-<div class="card"><h2>Четыре температуры</h2><div class="grid">
-<div class="tile"><small><i class="point p1"></i>T1 Вода</small><strong>Н/Д</strong></div>
-<div class="tile"><small><i class="point p2"></i>T2 Колонна</small><strong>Н/Д</strong></div>
-<div class="tile"><small><i class="point p3"></i>T3 Куб</small><strong>Н/Д</strong></div>
-<div class="tile"><small><i class="point p4"></i>T4 Верх колонны</small><strong>Н/Д</strong></div>
-</div></div>
-<div class="card rigs"><h2>Схема установки</h2>
-<svg viewBox="0 0 360 225" role="img" aria-label="Рисунок установки с YF-S401 на линии охлаждающей воды">
-<defs><linearGradient id="silver" x1="0" x2="1"><stop stop-color="#738b9b"/><stop offset=".42" stop-color="#e6f1f4"/><stop offset="1" stop-color="#829aa7"/></linearGradient></defs>
-<rect width="360" height="225" rx="12" fill="#f7fbfd"/>
-<path d="M96 16 H255 V49" fill="none" stroke="#7d929d" stroke-width="6"/>
-<rect x="28" y="145" width="127" height="60" rx="18" fill="url(#silver)" stroke="#697e8b" stroke-width="2"/>
-<rect x="43" y="155" width="97" height="39" rx="9" fill="#7c96a5" stroke="#597b89"/>
-<rect x="82" y="22" width="27" height="126" rx="6" fill="url(#silver)" stroke="#648092" stroke-width="2"/>
-<g stroke="#71899b" stroke-width="3"><path d="M78 42 H114 M78 58 H114 M78 74 H114 M78 90 H114 M78 106 H114 M78 122 H114"/></g>
-<rect x="229" y="49" width="58" height="80" rx="11" fill="url(#silver)" stroke="#718b9a" stroke-width="2"/>
-<path d="M240 58 Q277 67 240 73 T240 89 T240 105 T240 120" fill="none" stroke="#0c9dd0" stroke-width="4"/>
-<path d="M216 111 V140 H331" fill="none" stroke="#078ebd" stroke-width="5"/>
-<rect x="285" y="126" width="39" height="27" rx="6" fill="#d8f4fb" stroke="#0a83ad" stroke-width="3"/>
-<path d="M291 139 H317 M310 133 L317 139 L310 145" stroke="#1778a4" fill="none" stroke-width="2"/>
-<text x="305" y="121" font-size="12" fill="#166e98" font-weight="bold" text-anchor="middle">YF-S401</text>
-<text x="304" y="167" font-size="11" fill="#287895" text-anchor="middle">ВОДА</text>
-<path d="M260 129 H339 V185" fill="none" stroke="#8595a0" stroke-width="4"/>
-<rect x="312" y="183" width="31" height="33" rx="5" fill="white" stroke="#8299a7" stroke-width="2"/>
-<rect x="315" y="199" width="25" height="13" rx="2" fill="#aeddeb"/>
-<text x="94" y="218" text-anchor="middle" fill="#6f8695" font-size="11">T1–T4</text>
-</svg>
-<p class="muted">YF-S401 показан на линии охлаждающей воды, не отбора. Изображение иллюстративное.</p></div>
-<div class="grid"><div class="card"><h2>Вода YF-S401</h2><span class="warn">Нет показаний</span><p class="muted">Импульсы и калибровка доступны в локальной панели.</p></div>
-<div class="card"><h2>Отбор</h2><span class="warn">Нет датчика</span><p class="muted">Показания не имитируются.</p></div></div>
-<div class="card"><h2>К1–К4</h2><div class="chips"><span>К1<b>БЛОК</b></span><span>К2<b>БЛОК</b></span><span>К3<b>БЛОК</b></span><span>К4<b>БЛОК</b></span></div></div>
-</section>
+<section id="home"><div class="refBoard"><div class="refTop"><strong>БУСА-1М №001</strong><span class="refWifi">◉</span><time id="refClock">--:--</time><span class="refLed" title="Состояние соединения"></span></div><div class="refCenter"><div class="refTempStack"><article class="refTemp"><span class="refTempIcon">💧</span><div class="refTempData"><div class="refTempLabel">Вода</div><strong id="onlineT0">Н/Д</strong><small id="onlineSet0">Зад: —</small></div></article><article class="refTemp"><span class="refTempIcon">♧</span><div class="refTempData"><div class="refTempLabel">Колонна</div><strong id="onlineT1">Н/Д</strong><small id="onlineSet1">Зад: —</small></div></article><article class="refTemp"><span class="refTempIcon">▣</span><div class="refTempData"><div class="refTempLabel">Куб</div><strong id="onlineT2">Н/Д</strong><small id="onlineSet2">Зад: —</small></div></article><article class="refTemp"><span class="refTempIcon">♧</span><div class="refTempData"><div class="refTempLabel">Верх колонны</div><strong id="onlineT3">Н/Д</strong><small id="onlineSet3">Зад: —</small></div></article></div><div class="refRig"><svg viewBox="0 0 190 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схематичная колонна БУСА: куб, колонна и охлаждение" preserveAspectRatio="xMidYMid meet">
+<defs>
+ <linearGradient id="busaSteel" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#475967"/><stop offset=".2" stop-color="#bfdae3"/><stop offset=".39" stop-color="#e4f0f3"/><stop offset=".62" stop-color="#6d8290"/><stop offset=".85" stop-color="#b7d0da"/><stop offset="1" stop-color="#435563"/></linearGradient>
+ <linearGradient id="busaGlass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081b2b"/><stop offset=".45" stop-color="#0d4160"/><stop offset="1" stop-color="#0a1a2b"/></linearGradient>
+ <linearGradient id="busaWater" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#13dcff"/><stop offset="1" stop-color="#065bcc"/></linearGradient>
+ <filter id="busaGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<g fill="none" stroke="#8da6b4" stroke-width="2">
+ <path d="M67 31 V15 H89 V23 H130 V59"/>
+ <path d="M67 54 H40 V99"/><path d="M76 133 H130"/>
+ <path d="M138 196 V231 H154 V253" />
+</g>
+<g>
+ <rect x="55" y="24" width="28" height="186" rx="7" fill="url(#busaSteel)" stroke="#c8e2f0" stroke-width="1.4"/>
+ <rect x="59" y="33" width="20" height="166" rx="3" fill="url(#busaGlass)" stroke="#829fb2" stroke-width="1"/>
+ <path d="M65 38 V191" stroke="#298dd0" stroke-opacity=".85" stroke-width="1.7"/>
+ <g stroke="#71c9ea" stroke-width="2">
+ <path d="M60 49 H78"/><path d="M60 63 H78"/><path d="M60 77 H78"/><path d="M60 91 H78"/><path d="M60 105 H78"/><path d="M60 119 H78"/><path d="M60 133 H78"/><path d="M60 147 H78"/><path d="M60 161 H78"/><path d="M60 175 H78"/></g>
+ <rect x="53" y="18" width="32" height="12" rx="3" fill="url(#busaSteel)" stroke="#a7c6d5"/>
+ <circle cx="69" cy="19" r="3" fill="#dbeff6" stroke="#52bdeb"/>
+ <rect x="60" y="4" width="17" height="13" rx="3" fill="#899daa" stroke="#d9edf5"/>
+ <rect x="51" y="200" width="38" height="15" rx="5" fill="url(#busaSteel)" stroke="#daeaf0"/>
+</g>
+<g>
+ <ellipse cx="76" cy="225" rx="56" ry="12" fill="#183b50"/>
+ <rect x="21" y="228" width="111" height="58" rx="11" fill="url(#busaSteel)" stroke="#c1dce8" stroke-width="1.5"/>
+ <ellipse cx="76" cy="228" rx="55" ry="10" fill="#bcd4de" stroke="#e4f3f9" stroke-width="1"/>
+ <ellipse cx="76" cy="284" rx="51" ry="7" fill="#596f7c" stroke="#abcbd9"/>
+ <rect x="59" y="249" width="31" height="22" rx="3" fill="#163b51" stroke="#5ecaff"/>
+ <path d="M64 252 V268 M70 252 V268 M76 252 V268 M82 252 V268" stroke="#219ccb" stroke-width="1" />
+ <rect x="31" y="280" width="10" height="14" rx="2" fill="#a4c5d7"/>
+ <rect x="110" y="280" width="10" height="14" rx="2" fill="#a4c5d7"/>
+ <circle cx="115" cy="245" r="4" fill="#1cc8ea"/>
+</g>
+<g>
+ <rect x="120" y="61" width="33" height="128" rx="10" fill="url(#busaSteel)" stroke="#c4deeb" stroke-width="1.4"/>
+ <rect x="127" y="69" width="18" height="109" rx="5" fill="#06253f" stroke="#58b3e0"/>
+ <path d="M136 73c-15 8 15 15 0 23s15 15 0 23s15 15 0 23s15 15 0 23" fill="none" stroke="#06c8fa" stroke-width="3"/>
+ <circle cx="136" cy="81" r="4" fill="#70efff"/>
+ <rect x="119" y="57" width="35" height="9" rx="3" fill="url(#busaSteel)"/>
+ <rect x="121" y="183" width="31" height="10" rx="3" fill="url(#busaSteel)"/>
+ <path d="M153 101 h13 v16" stroke="#1399d1" stroke-width="3" fill="none"/>
+ <path d="M119 172 h-10 v18" stroke="#1399d1" stroke-width="3" fill="none"/>
+</g>
+<g>
+ <path d="M151 195 V249 H173" fill="none" stroke="#899eac" stroke-width="4"/>
+ <path d="M151 196 V234 H171" fill="none" stroke="#00acdc" stroke-width="2"/>
+ <rect x="146" y="248" width="32" height="45" rx="5" fill="#18415d" fill-opacity=".8" stroke="#a5d5ef"/>
+ <rect x="150" y="262" width="24" height="26" rx="2" fill="url(#busaWater)" fill-opacity=".9"/>
+ <g fill="#56efff"><circle cx="157" cy="272" r="2"/><circle cx="167" cy="282" r="2"/></g>
+ <path d="M164 235 Q157 241 164 246 Q171 241 164 235" fill="#21ccff"/>
+</g>
+<g fill="#38e6ff" filter="url(#busaGlow)" opacity=".48">
+ <circle cx="69" cy="77" r="5"/><circle cx="69" cy="136" r="5"/><circle cx="137" cy="120" r="5"/>
+</g>
+<g fill="#27d8ff"><circle cx="69" cy="77" r="2.5"/><circle cx="69" cy="136" r="2.5"/><circle cx="137" cy="120" r="2.5"/></g>
+<text x="101" y="307" font-family="sans-serif" font-size="8" fill="#7ec4e6" text-anchor="middle">БУСА-1М · Схема мониторинга</text>
+</svg></div></div><div class="refMetrics"><article><span>◉</span><div><small>Расход</small><strong id="onlineFlow">Н/Д</strong><small>мл/мин</small></div></article><article><span>▥</span><div><small>Собрано</small><strong id="onlineCollected">Н/Д</strong><small>мл</small></div></article></div><div class="refFoot"><span>⚡ Питание: Н/Д</span><span>◉ Интернет</span><strong>Мониторинг</strong></div><p class="refOffline">Интернет-страница пока не получает показания напрямую с ESP32. Здесь не выводятся вымышленные значения. Для живых показаний открой локальную панель БУСА по Wi-Fi.</p></div></section>
 <section id="temps" hidden><div class="card"><h2>Температуры · T1–T4</h2>
 <div class="row"><span>Вода</span><b>Н/Д</b></div><div class="row"><span>Колонна</span><b>Н/Д</b></div><div class="row"><span>Куб</span><b>Н/Д</b></div><div class="row"><span>Верх колонны</span><b>Н/Д</b></div>
 <p class="muted">Настройка справочных порогов температуры и реальные показания доступны после открытия локальной панели БУСА.</p></div></section>
@@ -119,6 +172,7 @@ nav button.active{background:#f7d5a9;border-color:#e8b274;color:#354b55;font-wei
 </main>
 <nav aria-label="Разделы"><button data-tab="home" class="active">Главная</button><button data-tab="temps">T1–T4</button><button data-tab="collection">Отбор</button><button data-tab="settings">Настройки</button><button data-tab="graphs">Графики</button><button data-tab="events">События</button></nav>
 <script>
+(function(){function clock(){const c=document.getElementById("refClock");if(c)c.textContent=new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});}clock();setInterval(clock,30000);})();
 // Change the standalone iPhone page's palette only; the TFT palette is
 // changed from the controller's own Settings screen.
 let darkSaved=false;
