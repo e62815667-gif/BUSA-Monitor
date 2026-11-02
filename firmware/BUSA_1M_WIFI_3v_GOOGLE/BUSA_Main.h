@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-CLEANWIFI-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-KEYRESTORE-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -444,6 +444,8 @@ uint16_t pcfIdleMask=65535,pcfObservedLow=0;
 uint8_t pcfPairCount=0,pcfScanError=0;
 uint32_t pcfLastScanAt=0;
 Preferences prefs;
+Preferences keypadBackupPrefs;
+bool keypadBackupOpen=false;
 // Wall clock: phone supplies UTC epoch and local UTC offset via protected AP;
 // optional NTP keeps UTC updated when station internet is available.
 int32_t clockUtcOffsetMinutes=0;
@@ -575,6 +577,7 @@ uint8_t keyPairs[20],newPairs[20];
 uint8_t learnStep=0;
 bool keypadReady=false,keypadLearning=false;
 String keypadMessage="Обучение не выполнено",rawPair="—";
+String keypadStorageStatus="NOT_LOADED"; // NVS health only; never expose the physical keymap
 int candidatePair=-1;uint32_t candidateAt=0;
 uint8_t candidateStep=255;
 bool learnCommitPair(int pair); // Shared by auto capture and "Следующая" button
@@ -595,14 +598,51 @@ bool validKeymap(const uint8_t *m){
   }
   return r==5&&c==4;
 }
+// The primary "busa-r04/keys20" is fully compatible with the approved training.
+ // A second NVS namespace protects against a damaged/deleted individual record.
+ // A full-chip erase still destroys BOTH namespaces: USB updates must preserve NVS.
+bool readValidKeymap(Preferences &store,const char *key,uint8_t *dest){
+  if(store.getBytesLength(key)!=sizeof(keyPairs))return false;
+  if(store.getBytes(key,dest,sizeof(keyPairs))!=sizeof(keyPairs))return false;
+  return validKeymap(dest);
+}
+bool writeVerifiedKeymap(Preferences &store,const char *key,const uint8_t *src){
+  if(store.putBytes(key,src,sizeof(keyPairs))!=sizeof(keyPairs))return false;
+  uint8_t check[20]={0};
+  return readValidKeymap(store,key,check) && memcmp(check,src,sizeof(check))==0;
+}
 void loadKeymap(){
   memset(keyPairs,255,sizeof(keyPairs));
   memset(newPairs,255,sizeof(newPairs));
-  keypadReady=(prefs.getBytesLength("keys20")==sizeof(keyPairs) &&
-      prefs.getBytes("keys20",keyPairs,sizeof(keyPairs))==sizeof(keyPairs) &&
-      validKeymap(keyPairs));
-  if(!keypadReady)memset(keyPairs,255,sizeof(keyPairs));
-  keypadMessage=keypadReady?"Раскладка загружена":"Нужно обучить 20 клавиш";
+  uint8_t backup[20]={0};
+  const bool primaryOk=readValidKeymap(prefs,"keys20",keyPairs);
+  const bool backupOk=keypadBackupOpen && readValidKeymap(keypadBackupPrefs,"keys20",backup);
+  if(primaryOk){
+    keypadReady=true;
+    if(backupOk && memcmp(keyPairs,backup,sizeof(backup))==0){
+      keypadStorageStatus="PRIMARY_AND_BACKUP_OK";
+    }else if(keypadBackupOpen && writeVerifiedKeymap(keypadBackupPrefs,"keys20",keyPairs)){
+      keypadStorageStatus="PRIMARY_BACKUP_REPAIRED";
+    }else{
+      keypadStorageStatus="PRIMARY_BACKUP_UNAVAILABLE";
+    }
+    keypadMessage="Раскладка загружена";
+  }else if(backupOk){
+    memcpy(keyPairs,backup,sizeof(keyPairs));
+    keypadReady=true; // Always allow keys to work from a valid backup.
+    keypadStorageStatus=writeVerifiedKeymap(prefs,"keys20",keyPairs)?
+      "RESTORED_FROM_BACKUP":"BACKUP_ACTIVE_PRIMARY_WRITE_FAILED";
+    keypadMessage="Раскладка восстановлена";
+  }else{
+    memset(keyPairs,255,sizeof(keyPairs));
+    keypadReady=false;
+    keypadStorageStatus="NO_VALID_KEYMAP";
+    keypadMessage="Сохранённая раскладка не найдена: необходимо обучить 20 клавиш";
+  }
+  Serial0.printf("BUSA KEYPAD NVS: %s primary_len=%u backup_len=%u ready=%d\\n",
+    keypadStorageStatus.c_str(),(unsigned)prefs.getBytesLength("keys20"),
+    (unsigned)(keypadBackupOpen?keypadBackupPrefs.getBytesLength("keys20"):0),
+    (int)keypadReady);
 }
 // Detect a single closed physical pair on any two PCF8575 P0..P15.
 // Scan the 16 PCF8575 rows in four short transactions per pass, not all 16
@@ -835,10 +875,15 @@ bool learnCommitPair(int pair){
   candidatePair=-1;candidateStep=255;
   if(learnStep==20){
     if(validKeymap(newPairs) &&
-      prefs.putBytes("keys20",newPairs,sizeof(newPairs))==sizeof(newPairs)){
+      writeVerifiedKeymap(prefs,"keys20",newPairs)){
       memcpy(keyPairs,newPairs,sizeof(keyPairs));
       keypadReady=true;keypadLearning=false;
-      keypadMessage="Все 20 клавиш сохранены";
+      const bool backedUp=keypadBackupOpen &&
+        writeVerifiedKeymap(keypadBackupPrefs,"keys20",newPairs);
+      keypadStorageStatus=backedUp?"LEARNED_BACKED_UP":"LEARNED_PRIMARY_ONLY";
+      keypadMessage=backedUp?
+        "Все 20 клавиш сохранены и зарезервированы":
+        "Все 20 клавиш сохранены (резерв недоступен)";
     }else{
       learnStep=19;newPairs[19]=255;
       keypadMessage="Матрица не прошла проверку. Повтори Ent";
@@ -1191,7 +1236,10 @@ String statusJSON(){
   s+=",\"step\":"+String(learnStep);
   s+=",\"expected\":"+quoteJson(keypadLearning&&learnStep<20?String(KEY_CAPS[learnStep]):String(""));
   s+=",\"raw_pair\":"+quoteJson(rawPair);
-  s+=",\"message\":"+quoteJson(keypadMessage)+"}";
+  s+=",\"message\":"+quoteJson(keypadMessage);
+  s+=",\"storage\":"+quoteJson(keypadStorageStatus);
+  s+=",\"primary_bytes\":"+String(prefs.getBytesLength("keys20"));
+  s+=",\"backup_bytes\":"+String(keypadBackupOpen?keypadBackupPrefs.getBytesLength("keys20"):0)+"}";
   s+=",\"diagnostics\":{\"onewire\":[";
   for(int i=0;i<4;i++){
     if(i)s+=",";
@@ -2486,6 +2534,7 @@ void setup(){
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   prefs.begin("busa-r04",false);
+  keypadBackupOpen=keypadBackupPrefs.begin("busa-key20",false);
   // User-approved ST7789 320x240 rotation 1 and software-drawn light theme.
   if(!prefs.getBool("v14lightSt",false)){
     prefs.putUChar("tft",1);
