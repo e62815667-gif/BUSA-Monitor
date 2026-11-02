@@ -2383,6 +2383,10 @@ void setup(){
   // Direct ESP-IDF GPIO pads, not the ESP-IDF I2C controller. Enable both
   // the input buffer (for ACK/signal feedback) and open-drain output driver.
   // No push-pull HIGH: release the line to external + internal pull-up.
+  // Reclaim SDA/SCL from any prior peripheral routing before configuring
+  // the software I2C open-drain bus. Keep every other BUSA subsystem intact.
+  if(gpio_reset_pin(static_cast<gpio_num_t>(BUS_SDA))!=ESP_OK)++busaI2cGpioConfigErrors;
+  if(gpio_reset_pin(static_cast<gpio_num_t>(BUS_SCL))!=ESP_OK)++busaI2cGpioConfigErrors;
   gpio_config_t i2cPinCfg={};
   i2cPinCfg.pin_bit_mask=(1ULL<<BUS_SDA)|(1ULL<<BUS_SCL);
   i2cPinCfg.mode=GPIO_MODE_INPUT_OUTPUT_OD;
