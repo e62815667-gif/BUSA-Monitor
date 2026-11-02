@@ -579,6 +579,13 @@ function clearRemoteNumbers(){
   byId('errorT'+i).textContent='Нет данных';
  }
  byId('waterLive').textContent='Нет показаний';
+ byId('onlineFreshness').textContent='● Нет данных Google';
+ byId('onlineWaterPulses').textContent='—';
+ for(let i=0;i<4;i++){
+  byId('onlineSet'+i).textContent='Зад: —';
+  byId('onlineThreshold'+i).textContent='ВКЛ — · ВЫКЛ —';
+  byId('cloudRelay'+i).textContent='—';
+ }
  byId('heroStatus').textContent='● Нет подтверждённых измерений';
  byId('remoteEvents').textContent='Нет диагностических данных';
 }
@@ -710,6 +717,7 @@ function invalidateStaleRemote(){
    byId('detailT'+i).textContent='Н/Д';
  }
  byId('waterLive').textContent='Нет свежих показаний';
+ byId('onlineFreshness').textContent='● Данные устарели';
 }
 setInterval(invalidateStaleRemote,5000);
 function renderRemote(d,history,receivedAt){
@@ -730,6 +738,24 @@ function renderRemote(d,history,receivedAt){
   byId('detailT'+i).textContent=val;
   byId('errorT'+i).textContent=probe.result||'Нет диагностических данных';
  }
+ const refs=Array.isArray(d.display_references)?d.display_references:[];
+ const offsets=Array.isArray(d.calibration_offsets)?d.calibration_offsets:[];
+ for(let i=0;i<4;i++){
+  const p=refs[i]||{},fmt=v=>typeof v==='number'&&Number.isFinite(v)?v.toFixed(1)+'°':'—';
+  byId('onlineSet'+i).textContent='Зад: '+fmt(p.target);
+  byId('onlineThreshold'+i).textContent='ВКЛ '+fmt(p.target)+' · ВЫКЛ '+fmt(p.notice);
+  const channel=d.sound_alerts?.channels?.[i]||{};
+  byId('cloudRelay'+i).textContent=typeof channel.sound_on==='boolean'?(channel.sound_on?'ЗВУК':'ОЖИДАНИЕ'):'—';
+ }
+ byId('onlineCalibration').textContent=[0,1,2,3].map(i=>'Т'+(i+1)+' · '+(typeof offsets[i]==='number'?offsets[i].toFixed(1)+' °C':'—')).join('\n');
+ byId('onlineFreshness').textContent=fresh?'● Обновлено '+new Date(receivedAt).toLocaleTimeString('ru-RU'):'● Данные устарели';
+ byId('onlineTft').textContent=d.modules?.tft_boot_complete?'ST7789 · работает':'Нет подтверждения';
+ byId('onlineTftTheme').textContent=['Светлая','Тёмная','Системная'][d.tft_theme_mode]||'—';
+ byId('onlineAboutWifi').textContent=d.station?.connected?'Подключён':'Нет связи';
+ byId('onlineAboutGoogle').textContent=d.google?.configured?'Включена':'Нет подключения';
+ byId('onlineAboutFirmware').textContent=d.firmware||'—';
+ byId('onlineAboutUptime').textContent=typeof d.uptime_ms==='number'?Math.floor(d.uptime_ms/60000)+' мин':'—';
+ byId('onlineWaterPulses').textContent=typeof d.water?.pulses==='number'?String(d.water.pulses):'—';
  byId('waterLive').textContent=fresh&&d.water&&typeof d.water.pulses==='number'?
    d.water.pulses+' имп. (не откалибровано)':'Нет свежих показаний';
  byId('heroStatus').textContent=fresh?'● Последняя запись '+stampRussian(receivedAt):
