@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-KEYRESTORE-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-KEYRESTORE-APPROVED-UI-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1766,6 +1766,39 @@ main>*{max-width:100%;min-width:0}
 .approvedBack[hidden],#settingsMenu[hidden]{display:none!important}
 .settingCard[hidden]{display:none!important}
 
+
+/* Approved 03.11 BUSA №001 dashboard design; original actual telemetry preserved. */
+section[data-section="0"]{--ink:#e8f7ff;--paper:#03101f;--line:#116cab;--surface:#06182c;
+ color:#e8f7ff;background:linear-gradient(160deg,#041729,#020916);
+ border:1px solid #16496b;border-radius:6px;padding:7px 8px 12px}
+section[data-section="0"] .approvedHomeTitle{margin:0;padding:7px 3px 11px;border-bottom:1px solid #1f5a84}
+section[data-section="0"] .approvedHomeTitle strong{color:#f6faff}
+section[data-section="0"] .approvedDashboard{grid-template-columns:minmax(0,1fr) minmax(0,.87fr);gap:7px}
+section[data-section="0"] .approvedTemp{display:flex;flex-direction:column;justify-content:center;
+ background:linear-gradient(135deg,#071b31,#031022);border:1px solid #0d78be;
+ box-shadow:inset 0 0 9px #067bdb24,0 0 3px #159ce744;border-radius:11px;min-height:82px;padding:7px 6px}
+section[data-section="0"] .approvedTempTitle{font-size:clamp(10px,2.6vw,15px);color:#f3faff;gap:5px}
+section[data-section="0"] .approvedTempTitle>span:last-child{flex:1;min-width:0}
+section[data-section="0"] .approvedTempIcon{width:32px;min-width:32px;height:37px;flex:none}
+section[data-section="0"] .busaRefTempIcon{width:100%;height:100%;filter:drop-shadow(0 0 3px #00bcff91)}
+section[data-section="0"] .approvedTemp strong{color:#32ee2a!important;font-weight:800;font-size:clamp(20px,4.8vw,34px)}
+section[data-section="0"] .approvedTemp small{color:#b4d7ec!important;font-size:10px}
+section[data-section="0"] .approvedRig{background:#031021;border:0;border-radius:0;min-height:345px}
+section[data-section="0"] .approvedRig svg{max-height:345px}
+section[data-section="0"] .approvedRigLabel{display:none}
+section[data-section="0"] .approvedMetric{background:#051729;border:1px solid #0b80c7;
+ box-shadow:inset 0 0 8px #078bde18,0 0 3px #0a72bc;border-radius:10px;padding:9px}
+section[data-section="0"] .approvedMetric strong{font-size:clamp(18px,5vw,30px);color:#c9ecff!important}
+section[data-section="0"] .approvedMetric small{color:#c2dded!important}
+section[data-section="0"] .approvedStatus{background:#061c30;border-color:#0b80c7;color:#26ed45;font-weight:700}
+section[data-section="0"] .approvedAdditional{background:#061627;color:#c4dfec;border-color:#146798}
+.appTabs{background:linear-gradient(180deg,#06182b,#020c19)!important;border-color:#156db0!important}
+.appTabs button{color:#d4eaff!important;border:1px solid #123d62!important;background:#041325!important}
+.appTabs button.on{background:linear-gradient(160deg,#1378ff,#0351d7)!important;color:#fff!important;
+ border-color:#18b5ff!important;box-shadow:inset 0 0 11px #64d4ff88,0 0 6px #0576ff7c!important}
+.appTabs button .uiIcon{color:#40d4ff}
+.appTabs button.on .uiIcon{color:#fff}
+
 </style></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
@@ -1783,10 +1816,10 @@ main>*{max-width:100%;min-width:0}
 <button data-page="5"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><span>Настройки</span></button></nav></header><main><section class="page" data-section="0">
 <div class="approvedHomeTitle"><strong>БУСА-1М №001</strong><span id="mainwifi">Wi-Fi: ожидание</span></div>
 <div class="approvedDashboard">
-  <div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon">💧</span><span>Вода</span></div><strong id="t0">Н/Д</strong><small id="homeSet0">ВКЛ — · ВЫКЛ —</small></div>
-<div class="approvedTemp temp1"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Колонна</span></div><strong id="t1">Н/Д</strong><small id="homeSet1">ВКЛ — · ВЫКЛ —</small></div>
-<div class="approvedTemp temp2"><div class="approvedTempTitle"><span class="approvedTempIcon">▣</span><span>Куб</span></div><strong id="t2">Н/Д</strong><small id="homeSet2">ВКЛ — · ВЫКЛ —</small></div>
-<div class="approvedTemp temp3"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Верх колонны</span></div><strong id="t3">Н/Д</strong><small id="homeSet3">ВКЛ — · ВЫКЛ —</small></div></div>
+  <div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon0" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><path d="M24 4C17 17 7 28 7 37a17 17 0 0034 0C41 28 31 17 24 4Z" fill="url(#busaIcon0)" stroke="#28cdff" stroke-width="2"/><path d="M15 35q0 12 12 13" fill="none" stroke="#dcfaff" stroke-width="2.5" stroke-linecap="round"/></svg></span><span>Вода</span></div><strong id="t0">Н/Д</strong><small id="homeSet0">ВКЛ — · ВЫКЛ —</small></div>
+<div class="approvedTemp temp1"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon1" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon1)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></span><span>Колонна</span></div><strong id="t1">Н/Д</strong><small id="homeSet1">ВКЛ — · ВЫКЛ —</small></div>
+<div class="approvedTemp temp2"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon2" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="5" y="17" width="38" height="35" rx="7" stroke="#10b9f7" stroke-width="2.5" fill="#083357"/><path d="M8 31q8-5 16 0t16 0v18H8Z" fill="url(#busaIcon2)" opacity=".92"/><path d="M14 17V9h20v8" fill="none" stroke="#55d6ff" stroke-width="3"/></svg></span><span>Куб</span></div><strong id="t2">Н/Д</strong><small id="homeSet2">ВКЛ — · ВЫКЛ —</small></div>
+<div class="approvedTemp temp3"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon3" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon3)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></span><span>Верх колонны</span></div><strong id="t3">Н/Д</strong><small id="homeSet3">ВКЛ — · ВЫКЛ —</small></div></div>
   <div class="approvedRig"><svg viewBox="0 0 190 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схематичная колонна БУСА: куб, колонна и охлаждение" preserveAspectRatio="xMidYMid meet">
 <defs>
  <linearGradient id="busaSteel" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#475967"/><stop offset=".2" stop-color="#bfdae3"/><stop offset=".39" stop-color="#e4f0f3"/><stop offset=".62" stop-color="#6d8290"/><stop offset=".85" stop-color="#b7d0da"/><stop offset="1" stop-color="#435563"/></linearGradient>
