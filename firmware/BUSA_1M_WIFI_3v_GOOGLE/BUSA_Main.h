@@ -1931,7 +1931,7 @@ main>*{max-width:100%;min-width:0}
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=false,calInitialized=false;
-let active=0,connected=false,pollBusy=false,settingsActive=0,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
+let active=0,connected=false,pollBusy=false,settingsActive=-1,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
 function networkLeds(info,ssid){
  const online=info&&info.internet===true;
@@ -1960,7 +1960,14 @@ async function syncClock(){
 }
 function drawEvents(){
  const filtered=eventRecords.filter(e=>eventCategory==='all'||e.kind===eventCategory);
- get('events').textContent=filtered.length?filtered.map(e=>e.text).join('\n'):'Событий выбранного типа нет';
+ const holder=get('events');holder.replaceChildren();
+ if(!filtered.length){holder.textContent='Событий выбранного типа нет';return;}
+ filtered.forEach(e=>{
+  const row=document.createElement('div');row.className='eventRow '+e.kind;
+  const dot=document.createElement('span');dot.className='eventDot';
+  const label=document.createElement('span');label.textContent=e.text;
+  row.append(dot,label);holder.append(row);
+ });
 }
 function message(s,kind='system'){
  const text=new Date().toLocaleTimeString('ru-RU')+' · '+s;
@@ -1976,8 +1983,29 @@ document.querySelectorAll('[data-diag-btn]').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('[data-diag-btn]').forEach(x=>x.classList.toggle('on',x===b));
  document.querySelectorAll('[data-diag-panel]').forEach(x=>x.hidden=x.dataset.diagPanel!==b.dataset.diagBtn);
 });
-function page(n,send=true){active=n;document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==n);document.querySelectorAll('nav button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===n));if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{})}if(n===3)graphs()}
-function settingsTab(n,send=true){settingsActive=n;document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));if(send){lastLocalNav=Date.now();fetch('/api/settings-tab?n='+n).catch(()=>{})}}
+function page(n,send=true){
+ const inDiag=n===6,visible=inDiag?5:n;
+ active=visible;
+ document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==visible);
+ document.querySelectorAll('.appTabs button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===visible));
+ if(inDiag)settingsTab(6,false);
+ else if(visible===5&&send)settingsTab(-1,false);
+ if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{});}
+ if(visible===3)graphs();
+}
+function settingsTab(n,send=true){
+ settingsActive=n;
+ get('settingsMenu').hidden=n!==-1;
+ get('settingsBack').hidden=n===-1;
+ document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);
+ document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));
+ if(send){
+  lastLocalNav=Date.now();
+  if(n===6)fetch('/api/page?n=7').catch(()=>{});
+  else if(n>=0&&n<=4)fetch('/api/settings-tab?n='+n).catch(()=>{});
+ }
+}
+get('settingsBack').onclick=()=>settingsTab(-1,false);
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
 document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=async()=>{
   const n=Number(b.dataset.graphTft);
@@ -2060,29 +2088,37 @@ document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.d
 function plot(id,values){const c=get(id),x=c.getContext('2d');x.fillStyle=document.documentElement.dataset.theme==='light'?'#ffffff':'#183247';x.fillRect(0,0,600,200);const a=values.filter(v=>v!==null);if(!a.length){x.fillStyle='#d9bd75';x.fillText('НЕТ ДАННЫХ',24,60);return}let lo=Math.min(...a),hi=Math.max(...a);if(hi-lo<.1)hi=lo+.1;x.strokeStyle='#70e99b';x.beginPath();values.forEach((v,i)=>{if(v===null)return;let xx=10+i*580/80,yy=185-(v-lo)/(hi-lo)*165;if(i===0||values[i-1]===null)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke()}
 function graphAllTemperatures(){
  const c=get('graphT'),x=c.getContext('2d'),colors=['#078fbe','#df8744','#d65446','#3b9f74'];
- const isDark=document.documentElement.dataset.theme!=='light';
- x.fillStyle=isDark?'#183247':'#ffffff';x.fillRect(0,0,600,200);
- x.strokeStyle=isDark?'#496479':'#d7e3e9';
- for(let j=0;j<=4;j++){x.beginPath();x.moveTo(30,20+j*40);x.lineTo(595,20+j*40);x.stroke()}
- x.font='13px sans-serif';
- for(let k=0;k<4;k++){
-  x.fillStyle=colors[k];x.fillText(['T1 Вода','T2 Колонна','T3 Куб','T4 Верх'][k],33+k*139,13);
-  x.strokeStyle=colors[k];x.lineWidth=2;x.beginPath();
-  let began=false,arr=tlog4[k];
-  for(let i=0;i<arr.length;i++){
-   const v=arr[i],px=30+i*7,py=180-(v===null?0:Math.max(0,Math.min(v,125))*160/125);
-   if(v===null){began=false;continue}
-   if(!began){x.moveTo(px,py);began=true}else x.lineTo(px,py);
-  }
-  x.stroke();
- }
- if(!tlog4.some(a=>a.some(v=>v!==null))){x.fillStyle='#a43c24';x.fillText('НЕТ ИЗМЕРЕНИЙ T1–T4',180,107)}
+ const dark=document.documentElement.dataset.theme!=='light';
+ const arrs=tlog4.map(a=>a.slice(-80)),all=arrs.flat().filter(v=>v!==null&&Number.isFinite(v));
+ x.fillStyle=dark?'#081a2e':'#ffffff';x.fillRect(0,0,c.width,c.height);
+ x.strokeStyle=dark?'#255477':'#d7e3e9';x.lineWidth=1;
+ for(let j=0;j<=4;j++){const gy=22+j*38;x.beginPath();x.moveTo(37,gy);x.lineTo(592,gy);x.stroke();}
+ if(all.length<2){x.fillStyle=dark?'#9cc9e0':'#657e8a';x.font='15px sans-serif';
+  x.fillText('Недостаточно измерений',126,108);return;}
+ let lo=Math.min(...all),hi=Math.max(...all);
+ if(hi-lo<0.5){lo-=1;hi+=1}else{const pad=(hi-lo)*0.14;lo-=pad;hi+=pad;}
+ x.font='11px sans-serif';x.fillStyle=dark?'#a6d6ee':'#355366';
+ x.fillText(hi.toFixed(1)+'°',2,27);x.fillText(lo.toFixed(1)+'°',2,180);
+ arrs.forEach((a,k)=>{
+  x.strokeStyle=colors[k];x.lineWidth=3;x.beginPath();let moved=false;
+  a.forEach((v,i)=>{
+   if(v===null||!Number.isFinite(v)){moved=false;return;}
+   const px=38+(a.length<=1?0:i*550/(a.length-1));
+   const py=22+152*(1-(v-lo)/(hi-lo));
+   if(!moved){x.moveTo(px,py);moved=true}else x.lineTo(px,py);
+  });x.stroke();
+ });
 }
 function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
 async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;
-networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(Date.now()-lastLocalNav>1800){if(typeof s.ui_page==='number'&&s.ui_page-1!==active)page(s.ui_page-1,false);if(typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);}let names=['Вода','Колонна','Куб','Верх колонны'];
+networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(Date.now()-lastLocalNav>1800){
+ const physicalPage=(s.ui_page||1)-1;
+ if(typeof s.ui_page==='number'&&(physicalPage===6?active!==5||settingsActive!==6:physicalPage!==active))page(physicalPage,false);
+ if(physicalPage===5&&settingsActive>=0&&settingsActive<=4&&typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);
+}let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
- get('t'+i).textContent=t.c===null?'НЕТ ДАННЫХ':Number(t.c).toFixed(1)+' °C';
+ get('t'+i).textContent=t.c===null?'Н/Д':Number(t.c).toFixed(1)+' °C';
+ get('tempLive'+i).textContent=get('t'+i).textContent;
  const a=tlog4[i];a.push(t.c===null?null:Number(t.c));if(a.length>80)a.shift();
  if(i===0){tlog.push(t.c===null?null:Number(t.c));if(tlog.length>80)tlog.shift();}
 });
@@ -2091,7 +2127,8 @@ if(s.sound_alerts?.channels?.length===4 && s.sound_alerts?.buzzer?.sensors?.leng
  const pairs=[[b[0].on_c,b[0].off_c],[b[1].on_c,b[1].off_c],[c[0].on_c,c[0].off_c],[c[3].on_c,c[3].off_c]];
  pairs.forEach((p,i)=>{
   if(!temperatureThresholdsInitialized){get('tempOn'+i).value=p[0]??'';get('tempOff'+i).value=p[1]??'';}
-  get('homeSet'+i).textContent='ВКЛ '+(p[0]??'—')+'° · ВЫКЛ '+(p[1]??'—')+'°';
+  get('homeSet'+i).textContent='Зад: '+(p[0]??'—')+'°';
+   get('detailSet'+i).textContent='ВКЛ '+(p[0]??'—')+'° · ВЫКЛ '+(p[1]??'—')+'°';
  });
  temperatureThresholdsInitialized=true;
 }
@@ -2125,6 +2162,7 @@ if(!calInitialized&&Array.isArray(s.calibration_offsets)){
 get('aboutWifi').textContent=s.station.connected?'Подключён':'Нет связи';
 get('aboutGoogle').textContent=!s.google.configured?'Не настроена':s.google.state===6?'Ошибка':'Настроена';
 get('aboutFirmware').textContent=s.firmware;
+get('otaFirmware').textContent=s.firmware;
 get('aboutUptime').textContent=Math.floor(s.uptime_ms/3600000)+' ч '+Math.floor((s.uptime_ms%3600000)/60000)+' мин';
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent+' · DNS '+(cs.dns??'?')+' · TLS '+(cs.tls_error??'?')+' · этап '+(cs.error_stage??'?');
@@ -2269,6 +2307,8 @@ let sel=get('net');sel.innerHTML='<option value="">Выберите сеть</op
 catch(e){get('response').textContent='Ошибка поиска: '+e.message}this.disabled=false};
 get('save').onclick=async function(){let ssid=get('net').value,pass=get('pass').value;if(!ssid||pass.length<8||pass.length>63){get('response').textContent='Выбери сеть из списка и введи пароль (8–63 символа)';return}this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
 try{let r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass})});get('response').textContent=await r.text();if(r.ok){get('pass').value='';message('Настройки сети сохранены: '+ssid)}}catch(e){get('response').textContent='Ошибка: '+e.message}this.disabled=false};
+document.documentElement.dataset.theme='system';
+settingsTab(-1,false);
 message('Веб-приложение запущено');
 showPhoneClock();setInterval(showPhoneClock,1000);
 syncClock();setInterval(syncClock,300000);
