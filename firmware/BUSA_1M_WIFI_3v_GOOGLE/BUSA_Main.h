@@ -40,7 +40,7 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-SOUNDROLES-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-T3T4SOUND-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1443,7 +1443,7 @@ main>*{max-width:100%;min-width:0}
   </div>
   <div class="card"><h2>Состояние K1–K4</h2>
    <div class="relayGrid"><span>K1 <b id="soundStatus0">ВЫКЛ</b></span><span>K2 <b id="soundStatus1">ВЫКЛ</b></span><span>K3 <b id="soundStatus2">ВЫКЛ</b></span><span>K4 <b id="soundStatus3">ВЫКЛ</b></span></div>
-   <p class="hint">К1 — штатная температура куба; К2 — «Кран закрыт» 90 сек; К3 — «Кран открыт» 90 сек; К4 — аварийное звуковое предупреждение. Только звук, без управления оборудованием.</p>
+   <p class="hint">Т3 ВКЛ — К1 + К2 (90 сек); Т3 ВЫКЛ — К1 выкл + К3 (90 сек). Т4 ВКЛ — К4 + К2 (90 сек); Т4 ВЫКЛ — К4 выкл + К3 (90 сек), К1 тоже выключается. Все реле только звуковые.</p>
   </div></section>
 <section class="page" data-section="1" hidden><div class="card"><h2>Температуры · DS18B20</h2><div id="temperatures">Ожидание...</div>
 <p class="hint">Справочные значения экрана TFT. Звуковая сигнализация К1–К4 настраивается ниже.</p>
@@ -1458,14 +1458,22 @@ main>*{max-width:100%;min-width:0}
 <div><label>T4 Предупр., °C</label><input inputmode="decimal" type="number" min="0" max="125" step="0.1" id="nt3"></div>
 </div><button id="refsSave" type="button" class="full">Сохранить значения отображения</button>
 <p id="refsResult" class="hint">Редактирование только через локальную сеть БУСА.</p></div>
-<div class="card"><h2>Звуковая сигнализация · К1–К4</h2>
-<p class="hint">Только звуковые реле 12 В. К1 — штатный сигнал по температуре куба; К2 — «Кран закрыт» 90 сек; К3 — «Кран открыт» 90 сек; К4 — аварийный звуковой сигнал. Каждый сигнал настраивается по датчику, температуре ВКЛ и ВЫКЛ. К2 и К3 звучат один раз до 90 секунд, повтор только после снятия условия Твыкл. При отсутствии показаний звук не подаётся. Никакого управления оборудованием.</p>
+<div class="card"><h2>Звуковые реле · Привязка Т3 и Т4</h2>
+<p class="hint">Это только звуковая сигнализация, не управление краном или питанием. Т3 включает К1 и запускает К2 на 90 сек; при Т3-ВЫКЛ выключается К1 и запускается К3 на 90 сек. Т4 включает К4 и тоже запускает К2; при Т4-ВЫКЛ выключается К4, выключается К1 и звучит К3 на 90 сек. К1 включится снова только при следующем Т3-ВКЛ. К2 и К3 общие для обоих датчиков.</p>
 <div class="grid">
-<div><label><input type="checkbox" id="soundEn0"> K1 · Куб — штатный сигнал</label><label>Датчик температуры</label><select id="soundSensor0"><option value="0">T1 · Вода</option><option value="1">T2 · Колонна</option><option value="2">T3 · Куб</option><option value="3">T4 · Верх колонны</option></select><label>Твкл · звуковой сигнал, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn0"><label>Твыкл · звуковой сигнал, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff0"></div>
-<div><label><input type="checkbox" id="soundEn1"> K2 · Кран закрыт — звуковой сигнал 90 сек</label><label>Датчик температуры</label><select id="soundSensor1"><option value="0">T1 · Вода</option><option value="1">T2 · Колонна</option><option value="2">T3 · Куб</option><option value="3">T4 · Верх колонны</option></select><label>Твкл · звуковой сигнал, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn1"><label>Твыкл · звуковой сигнал, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff1"></div>
-<div><label><input type="checkbox" id="soundEn2"> K3 · Кран открыт — звуковой сигнал 90 сек</label><label>Датчик температуры</label><select id="soundSensor2"><option value="0">T1 · Вода</option><option value="1">T2 · Колонна</option><option value="2">T3 · Куб</option><option value="3">T4 · Верх колонны</option></select><label>Твкл · звуковой сигнал, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn2"><label>Твыкл · звуковой сигнал, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff2"></div>
-<div><label><input type="checkbox" id="soundEn3"> K4 · Аварийное отключение — только звуковое предупреждение</label><label>Датчик температуры</label><select id="soundSensor3"><option value="0">T1 · Вода</option><option value="1">T2 · Колонна</option><option value="2">T3 · Куб</option><option value="3">T4 · Верх колонны</option></select><label>Твкл · звуковой сигнал, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn3"><label>Твыкл · звуковой сигнал, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff3"></div>
-</div><button id="soundSave" type="button" class="full">Сохранить настройки звука</button><p id="soundSaveResult" class="hint">Четыре звуковых канала разрешены. Для подачи сигнала нужно задать Твкл и Твыкл.</p></div></section>
+<div><label><input type="checkbox" id="soundEn0"> К1 · Т3 · штатный звуковой сигнал</label></div>
+<div><label><input type="checkbox" id="soundEn1"> К2 · Т3/Т4 ВКЛ · звуковой сигнал 90 сек</label></div>
+<div><label><input type="checkbox" id="soundEn2"> К3 · Т3/Т4 ВЫКЛ · звуковой сигнал 90 сек (К1 выкл)</label></div>
+<div><label><input type="checkbox" id="soundEn3"> К4 · Т4 · аварийный звуковой сигнал</label></div>
+</div>
+<div class="grid">
+<div><h3>Т3 · Куб</h3><label>Температура ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn0">
+<label>Температура ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff0"></div>
+<div><h3>Т4 · Верх колонны</h3><label>Температура ВКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOn3">
+<label>Температура ВЫКЛ, °C</label><input type="number" inputmode="decimal" min="0" max="125" step="0.1" id="soundOff3"></div>
+</div>
+<button id="soundSave" type="button" class="full">Сохранить привязку и пороги звуковых сигналов</button>
+<p id="soundSaveResult" class="hint">К1–К4 доступны. Звук появится после установки температурных порогов.</p></div></section>
 <section class="page" data-section="2" hidden><div class="card"><h2>Отбор · ручной режим</h2><p class="hint">Блок 220 В и электропривод крана исключены. ESP32 не управляет ими.</p><div class="row">Расход, мл/мин <b class="warn">НЕТ ДАТЧИКА</b></div><div class="row">Собрано, мл <b class="warn">НЕТ ДАННЫХ</b></div><p class="hint">Датчик воды охлаждения не измеряет поток отбора.</p></div><div class="card"><h2>Вода охлаждения</h2><div class="row">Расход, л/мин <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div></div></section>
 <section class="page" data-section="3" hidden>
  <div class="card"><h2>Графики · реальные измерения</h2>
@@ -1728,10 +1736,14 @@ s.temperatures.forEach((t,i)=>{
 });
 get('temperatures').textContent=names.map((v,i)=>v+': '+get('t'+i).textContent).join(' | ');
 if(!soundInitialized && s.sound_alerts && Array.isArray(s.sound_alerts.channels)){
- s.sound_alerts.channels.forEach((ch,i)=>{get('soundEn'+i).checked=ch.enabled===true;get('soundSensor'+i).value=String(ch.sensor_index??[2,1,1,3][i]);get('soundOn'+i).value=ch.on_c===null?'':ch.on_c;get('soundOff'+i).value=ch.off_c===null?'':ch.off_c});
+ s.sound_alerts.channels.forEach((ch,i)=>{get('soundEn'+i).checked=ch.enabled===true;});
+ get('soundOn0').value=s.sound_alerts.channels[0].on_c??'';
+ get('soundOff0').value=s.sound_alerts.channels[0].off_c??'';
+ get('soundOn3').value=s.sound_alerts.channels[3].on_c??'';
+ get('soundOff3').value=s.sound_alerts.channels[3].off_c??'';
  soundInitialized=true;
 }
-if(s.sound_alerts && Array.isArray(s.sound_alerts.channels))s.sound_alerts.channels.forEach((ch,i)=>{get('soundStatus'+i).textContent=ch.sound_on?(ch.timed?'ЗВУК '+ch.remaining_seconds+'с':'ЗВУК'):(!ch.enabled?'ВЫКЛ':ch.reason==='SETPOINTS_REQUIRED'?'НУЖНЫ ПОРОГИ':ch.timed&&ch.rearm_required?'90с ЗАВЕРШЕНЫ':'ГОТОВ')});
+if(s.sound_alerts && Array.isArray(s.sound_alerts.channels))s.sound_alerts.channels.forEach((ch,i)=>{get('soundStatus'+i).textContent=ch.sound_on?(ch.timed?'ЗВУК '+ch.remaining_seconds+'с':'ЗВУК'):(!ch.enabled?'ВЫКЛ':ch.reason==='SETPOINTS_REQUIRED'?'НУЖНЫ ПОРОГИ':'ГОТОВ')});
 if(!refsInit && Array.isArray(s.display_references)){
   s.display_references.forEach((r,i)=>{get('ref'+i).value=r.target===null?'':r.target;get('nt'+i).value=r.notice===null?'':r.notice});
   refsInit=true;
@@ -1804,18 +1816,17 @@ get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
 get('soundSave').onclick=async()=>{
  const data=new URLSearchParams();
- for(let i=0;i<4;i++){
-  data.set('en'+i,get('soundEn'+i).checked?'1':'0');
-  data.set('sensor'+i,get('soundSensor'+i).value);
-  data.set('on'+i,get('soundOn'+i).value.trim());
-  data.set('off'+i,get('soundOff'+i).value.trim());
- }
- if(!confirm('Сохранить пороги К1–К4? Включённые каналы смогут подать звуковой сигнал по текущей температуре.'))return;
+ for(let i=0;i<4;i++)data.set('en'+i,get('soundEn'+i).checked?'1':'0');
+ data.set('t3on',get('soundOn0').value.trim());
+ data.set('t3off',get('soundOff0').value.trim());
+ data.set('t4on',get('soundOn3').value.trim());
+ data.set('t4off',get('soundOff3').value.trim());
+ if(!confirm('Сохранить Т3/Т4 и звуковые реле? Включённые сигналы могут сразу сработать по текущим температурам.'))return;
  get('soundSave').disabled=true;
  try{
   const r=await fetch('/api/sound/config',{method:'POST',body:data});
   if(!r.ok)throw Error(await r.text());
-  get('soundSaveResult').textContent='Настройки звуковых каналов сохранены';
+  get('soundSaveResult').textContent='Привязка Т3/Т4 и все настройки сохранены';
  }catch(e){get('soundSaveResult').textContent='Ошибка: '+e.message;}
  get('soundSave').disabled=false;
 };
@@ -2013,68 +2024,61 @@ void setup(){
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",statusJSON());
   });
-  // Local-only sound-alarm configuration: separate from V14 display references.
+  // Local AP only: T3/T4 sound relay configuration; no process actuation.
   server.on("/api/sound/config",HTTP_POST,[]{
     if(!apClient()){server.send(403,"text/plain","BUSA local AP only");return;}
-    bool requestedEnabled[4]={false,false,false,false};
-    uint8_t requestedSensor[4]={2,1,1,3};
-    float requestedOn[4],requestedOff[4];
-    // Parse and validate the ENTIRE request before changing any GPIO or NVS.
+    bool requestedEnabled[4]={};
     for(int i=0;i<4;i++){
-      String onKey=String("on")+i,offKey=String("off")+i,enKey=String("en")+i;
-      String sensorKey=String("sensor")+i;
-      if(!server.hasArg(onKey)||!server.hasArg(offKey)||!server.hasArg(enKey)||!server.hasArg(sensorKey)){
-        server.send(400,"text/plain","Missing sound alarm fields");return;
-      }
-      String onRaw=server.arg(onKey),offRaw=server.arg(offKey),enRaw=server.arg(enKey);
-      requestedEnabled[i]=enRaw=="1";
-      if(enRaw!="0" && enRaw!="1"){server.send(400,"text/plain","Invalid enable flag");return;}
-      const String sensorRaw=server.arg(sensorKey);
-      if(sensorRaw.length()!=1 || sensorRaw[0]<'0' || sensorRaw[0]>'3'){
-        server.send(400,"text/plain","Invalid temperature sensor");return;
-      }
-      requestedSensor[i]=(uint8_t)(sensorRaw[0]-'0');
-      if(onRaw.isEmpty() && offRaw.isEmpty() && !requestedEnabled[i]){
-        requestedOn[i]=NAN;requestedOff[i]=NAN;continue;
-      }
-      char *p=nullptr,*q=nullptr;
-      requestedOn[i]=strtof(onRaw.c_str(),&p);
-      bool onValid=!onRaw.isEmpty()&&p&&*p=='\0';
-      requestedOff[i]=strtof(offRaw.c_str(),&q);
-      bool offValid=!offRaw.isEmpty()&&q&&*q=='\0';
-      if(!onValid||!offValid||!BusaSound::valid(requestedOn[i],requestedOff[i])){
-        server.send(400,"text/plain","Require valid ON/OFF temperatures 0..125 C, hysteresis >=0.5 C");return;
-      }
+      const String key=String("en")+i;
+      if(!server.hasArg(key)){server.send(400,"text/plain","Missing sound enable");return;}
+      String flag=server.arg(key);
+      if(flag!="0" && flag!="1"){server.send(400,"text/plain","Invalid sound enable");return;}
+      requestedEnabled[i]=flag=="1";
     }
-    soundOutputsOff();
-    for(int i=0;i<4;i++)soundEnabled[i]=false; // No activation during multi-key write.
+    const char* keys[4]={"t3on","t3off","t4on","t4off"};
+    float requested[4]={NAN,NAN,NAN,NAN};
+    bool pairPresent[2]={false,false};
+    for(int pair=0;pair<2;pair++){
+      const int i=pair*2;
+      if(!server.hasArg(keys[i])||!server.hasArg(keys[i+1])){
+        server.send(400,"text/plain","Missing T3/T4 threshold fields");return;
+      }
+      const String a=server.arg(keys[i]),b=server.arg(keys[i+1]);
+      if(a.isEmpty() && b.isEmpty())continue; // enabled but silent until configured
+      char *endA=nullptr,*endB=nullptr;
+      requested[i]=strtof(a.c_str(),&endA);
+      requested[i+1]=strtof(b.c_str(),&endB);
+      if(a.isEmpty()||b.isEmpty()||!endA||*endA||!endB||*endB||
+         !BusaSound::valid(requested[i],requested[i+1])){
+        server.send(400,"text/plain","Invalid T3/T4 ON/OFF, require 0..125 C, delta >=0.5 C");return;
+      }
+      pairPresent[pair]=true;
+    }
+    // Store new T3/T4 keys. Sound outputs remain off until changes are valid.
+    soundOutputsOff();soundResetState();
     bool saved=true;
-    for(int i=0;i<4;i++){
-      String en=String("sndE")+i,on=String("sndOn")+i,off=String("sndOff")+i;
-      String sensor=String("sndS")+i;
-      if(!prefs.putBool(en.c_str(),false))saved=false;
-      if(!prefs.putUChar(sensor.c_str(),requestedSensor[i]))saved=false;
-      if(std::isfinite(requestedOn[i])){
-        if(!prefs.putFloat(on.c_str(),requestedOn[i]))saved=false;
-        if(!prefs.putFloat(off.c_str(),requestedOff[i]))saved=false;
-      }else{
-        if(prefs.isKey(on.c_str())&&!prefs.remove(on.c_str()))saved=false;
-        if(prefs.isKey(off.c_str())&&!prefs.remove(off.c_str()))saved=false;
-      }
-      soundOnC[i]=requestedOn[i];soundOffC[i]=requestedOff[i];soundSensorIndex[i]=requestedSensor[i];
-    }
-    if(saved){
-      for(int i=0;i<4;i++){
-        String en=String("sndE")+i;
-        if(!prefs.putBool(en.c_str(),requestedEnabled[i]))saved=false;
+    const char* stored[4]={"sndT3On","sndT3Off","sndT4On","sndT4Off"};
+    for(int pair=0;pair<2;pair++){
+      for(int j=0;j<2;j++){
+        const int i=pair*2+j;
+        if(pairPresent[pair]){
+          if(!prefs.putFloat(stored[i],requested[i]))saved=false;
+        }else{
+          if(prefs.isKey(stored[i]) && !prefs.remove(stored[i]))saved=false;
+        }
       }
     }
+    for(int i=0;i<4;i++)
+      if(!prefs.putBool((String("sndRoleEnable")+i).c_str(),requestedEnabled[i]))saved=false;
     if(!saved){
-      for(int i=0;i<4;i++){soundEnabled[i]=false;prefs.putBool((String("sndE")+i).c_str(),false);}
+      for(int i=0;i<4;i++){soundEnabled[i]=false;prefs.putBool((String("sndRoleEnable")+i).c_str(),false);}
       soundOutputsOff();
-      server.send(500,"text/plain","NVS error: sound outputs kept OFF");return;
+      server.send(500,"text/plain","NVS save failed, audible signals disabled");return;
     }
-    soundResetState();
+    soundOnC[0]=requested[0];soundOffC[0]=requested[1];
+    soundOnC[1]=soundOnC[2]=soundOnC[0];
+    soundOffC[1]=soundOffC[2]=soundOffC[0];
+    soundOnC[3]=requested[2];soundOffC[3]=requested[3];
     for(int i=0;i<4;i++)soundEnabled[i]=requestedEnabled[i];
     server.send(200,"application/json",soundJSON(millis()));
   });
