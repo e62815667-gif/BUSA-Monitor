@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-NETSTABLE-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-CLEANWIFI-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1878,9 +1878,7 @@ main>*{max-width:100%;min-width:0}
 <div class="card settingCard" data-stab="1" hidden><h2>Wi-Fi</h2>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select>
-<label for="manualSsid">Или впиши название Wi-Fi вручную (без сканирования)</label>
-<input id="manualSsid" type="text" maxlength="32" placeholder="Имя сети 2,4 ГГц" autocomplete="off">
-<p class="hint">Ручной ввод не прерывает локальную сеть. Поиск Wi-Fi временно переключает общий радиомодуль ESP32 на соседние каналы.</p>
+<p class="hint">Выбери найденную сеть из списка, введи пароль и нажми «Сохранить и подключить».</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна только в защищённой локальной сети БУСА. Пароль хранится на ESP32.</p></div>
@@ -2391,33 +2389,46 @@ get('manualUpdate').onclick=async function(){
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
   this.disabled=false;
 };
-get('net').onchange=()=>{if(get('net').value){get('manualSsid').value=get('net').value;get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.'}};
+get('net').onchange=()=>{if(get('net').value)get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.'};
 get('scan').onclick=async function(){
- this.disabled=true;get('response').textContent='Краткий поиск Wi-Fi...';
+ this.disabled=true;get('response').textContent='Поиск Wi-Fi 2,4 ГГц...';
  try{
-  let start=await fetch('/api/wifi/scan?start=1',{cache:'no-store',signal:AbortSignal.timeout(6000)});
-  let j=await start.json();
-  if(!start.ok)throw Error(j.error||'HTTP '+start.status);
-  for(let i=0;i<12&&j.scanning;i++){
-   await new Promise(r=>setTimeout(r,650));
-   const x=await fetch('/api/wifi/scan',{cache:'no-store',signal:AbortSignal.timeout(4500)});
-   j=await x.json();
-   if(!x.ok)throw Error(j.error||'HTTP '+x.status);
+  // Start only one radio scan; retry fetching its results if HTTP is delayed.
+  let j=null;
+  try{
+   const r=await fetch('/api/wifi/scan?start=1',{cache:'no-store',signal:AbortSignal.timeout(16000)});
+   j=await r.json();
+   if(!r.ok)throw Error(j.error||'HTTP '+r.status);
+  }catch(e){
+   if(e.name!=='TimeoutError'&&e.name!=='AbortError')throw e;
+   get('response').textContent='Ответ задерживается, проверяю результат поиска...';
   }
-  if(j.scanning)throw Error('scan_timeout');
-  let sel=get('net');sel.innerHTML='<option value="">Выберите сеть</option>';
-  let seen=new Set();(j.networks||[]).forEach(w=>{
+  for(let i=0;i<16 && (!j||j.scanning);i++){
+   await new Promise(r=>setTimeout(r,800));
+   try{
+    const r=await fetch('/api/wifi/scan',{cache:'no-store',signal:AbortSignal.timeout(10000)});
+    const result=await r.json();
+    if(!r.ok)throw Error(result.error||'HTTP '+r.status);
+    j=result;
+   }catch(e){
+    if(i===15)throw e;
+   }
+  }
+  if(!j||j.scanning)throw Error('Нет ответа от ESP32 при сканировании');
+  const sel=get('net');sel.innerHTML='<option value="">Выберите сеть</option>';
+  const seen=new Set();(j.networks||[]).forEach(w=>{
    if(!w.ssid||seen.has(w.ssid))return;
-   seen.add(w.ssid);sel.add(new Option(w.ssid+' ('+w.rssi+' dBm)',w.ssid));
+   seen.add(w.ssid);
+   sel.add(new Option(w.ssid+' ('+w.rssi+' dBm)',w.ssid));
   });
   get('response').textContent=sel.options.length>1?'Найдено сетей: '+(sel.options.length-1):
-   'Сети не обнаружены. Введи SSID вручную — это надёжнее при AP+STA.';
+   'Сети не найдены. Проверь режим 2,4 ГГц внешней точки доступа.';
  }catch(e){
-  get('response').textContent='Поиск недоступен ('+e.message+'). Введи имя сети вручную.';
+  get('response').textContent='Ошибка поиска Wi-Fi: '+e.message+'. Подключение БУСА не изменено.';
  }
  this.disabled=false;
 };
-get('save').onclick=async function(){let ssid=(get('manualSsid').value.trim()||get('net').value),pass=get('pass').value;if(!ssid||ssid.length>32||pass.length<8||pass.length>63){get('response').textContent='Введи название Wi-Fi 2,4 ГГц и пароль (8–63 символа)';return}this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
+get('save').onclick=async function(){let ssid=get('net').value,pass=get('pass').value;if(!ssid||ssid.length>32||pass.length<8||pass.length>63){get('response').textContent='Выбери найденную сеть и введи пароль (8–63 символа)';return}this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
 try{let r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass})});get('response').textContent=await r.text();if(r.ok){get('pass').value='';message('Настройки сети сохранены: '+ssid)}}catch(e){get('response').textContent='Ошибка: '+e.message}this.disabled=false};
 document.documentElement.dataset.theme='system';
 settingsTab(-1,false);
