@@ -4,6 +4,7 @@ on:
     branches:
       - release/busa-v14-7-keypad-gpio40-41-no-pca-20261102
       - release/busa-v14-7-online-design-20261102
+      - release/busa-v14-7-approved-iphone-20261102
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-v14-7-n16r8-gmt028.yml'
@@ -37,7 +38,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          for term in ('14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-ONLINESTYLE-20261102','TPIN[4]={16,17,18,21}',
+          for term in ('14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-APPROVEDUI-20261102','TPIN[4]={16,17,18,21}',
                        'TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14',
                        'KPIN[4]={7,6,5,4}','BUS_SDA=40,BUS_SCL=41',
                        'FLOW_GPIO=15','RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false',
@@ -173,13 +174,24 @@ jobs:
           assert 'server.on("/api/temperature/calibration"' in p
           assert 'server.on("/api/tft/theme"' in p
           assert 'id="tempCalSave"' in p and 'id="themeModeSelect"' in p
-          assert 'data-section="6"' in p and 'data-diag-panel="relays"' in p
+          assert 'data-stab="6"' in p and 'data-diag-panel="relays"' in p
+          assert p.count('data-page="') == 6
+          assert 'id="settingsMenu"' in p and 'id="settingsBack"' in p
+          assert 'id="otaFirmware"' in p and 'data-stab="5"' in p
+          assert 'id="tempLive0"' in p and 'id="tempLive3"' in p
+          assert '<svg viewBox="0 0 190 310"' in p
+          assert 'approvedSensorList' in p and 'approvedDashboard' in p
+          assert 'approvedCollectionMetrics' in p
+          assert 'function graphAllTemperatures(){' in p
+          assert 'let lo=Math.min(...all),hi=Math.max(...all);' in p
           assert 'Технические разделы' not in p
           assert 'static void v14Diagnostics' in landscape
           assert 'if(tftThemeMode==2){ // SYSTEM:' in landscape
           assert 'V14_GREEN=0x7736;' in landscape and 'V14_ORANGE=0x0cc9;' in landscape
           assert 'data-theme="system"' in p
           assert "mode==='2'?'system':'light'" in p
+          assert 'settingsActive=-1' in p
+          assert "if(n===6)fetch('/api/page?n=7')" in p
           assert "s.tft_theme_mode===2?'system':'light'" in p
           assert '#0b1928' in p and '#152a3d' in p and '#299bde' in p and '#0b994f' in p
           assert 'static void v13Diagnostics' in portrait
@@ -345,15 +357,15 @@ jobs:
         run: |
           set -euo pipefail
           SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_ONLINESTYLE_KEYPAD40_41_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_ONLINESTYLE_KEYPAD40_41_N16R8_APP_OTA.bin
+          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o build_busa_v147/BUSA_V14_7_APPROVEDUI_KEYPAD40_41_N16R8_FULL_USB.bin 0x0 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
+          cp build_busa_v147/BUSA_1M_WIFI_3v_GOOGLE.ino.bin build_busa_v147/BUSA_V14_7_APPROVEDUI_KEYPAD40_41_N16R8_APP_OTA.bin
           git rev-parse HEAD > build_busa_v147/SOURCE_COMMIT.txt
-          (cd build_busa_v147 && sha256sum BUSA_V14_7_ONLINESTYLE_KEYPAD40_41_N16R8_FULL_USB.bin BUSA_V14_7_ONLINESTYLE_KEYPAD40_41_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          (cd build_busa_v147 && sha256sum BUSA_V14_7_APPROVEDUI_KEYPAD40_41_N16R8_FULL_USB.bin BUSA_V14_7_APPROVEDUI_KEYPAD40_41_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
           root=Path('build_busa_v147')
-          full=(root/'BUSA_V14_7_ONLINESTYLE_KEYPAD40_41_N16R8_FULL_USB.bin').read_bytes()
-          app=(root/'BUSA_V14_7_ONLINESTYLE_KEYPAD40_41_N16R8_APP_OTA.bin').read_bytes()
+          full=(root/'BUSA_V14_7_APPROVEDUI_KEYPAD40_41_N16R8_FULL_USB.bin').read_bytes()
+          app=(root/'BUSA_V14_7_APPROVEDUI_KEYPAD40_41_N16R8_APP_OTA.bin').read_bytes()
           assert 60000<len(app)<0x300000
           assert len(full)<16*1024*1024
           assert full[0x10000:0x10000+len(app)]==app, 'Merged USB and OTA content differs'
@@ -361,9 +373,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_V14_7_ONLINESTYLE_KEYPAD40_41_N16R8_USB_OTA_SHA256
+          name: BUSA_V14_7_APPROVEDUI_KEYPAD40_41_N16R8_USB_OTA_SHA256
           path: |
-            build_busa_v147/BUSA_V14_7_ONLINESTYLE_KEYPAD40_41_N16R8_FULL_USB.bin
-            build_busa_v147/BUSA_V14_7_ONLINESTYLE_KEYPAD40_41_N16R8_APP_OTA.bin
+            build_busa_v147/BUSA_V14_7_APPROVEDUI_KEYPAD40_41_N16R8_FULL_USB.bin
+            build_busa_v147/BUSA_V14_7_APPROVEDUI_KEYPAD40_41_N16R8_APP_OTA.bin
             build_busa_v147/SHA256SUMS.txt
             build_busa_v147/SOURCE_COMMIT.txt
