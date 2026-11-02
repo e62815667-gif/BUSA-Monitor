@@ -52,6 +52,40 @@ static void v14ApplyPalette(bool dark){
      HQ_NAVY=0xffff;HQ_DEEP=0xffff;HQ_GLOW=0xe73c;HQ_GLASS=0xef7d;
      V14_CARD=0xffff;V14_PALE=0xffff;V14_BADGE=0xef7d;
    }
+   if(tftThemeMode==2){ // SYSTEM: exact design colors of public BUSA online monitor
+     HQ_MONO_DARK=false; // preserve color-coded temperature sensors and detailed artwork
+     HQ_NAVY=0x08c5;
+     HQ_DEEP=0x1147;
+     HQ_GLOW=0x2cdb;
+     HQ_AZURE=0x19a9;
+     HQ_SKY=0x869f;
+     HQ_CYAN=0x2cdb;
+     HQ_LIGHT=0xf7bf;
+     HQ_LIME=0x7736;
+     HQ_AQUA=0x3c15;
+     HQ_GLASS=0x1a0a;
+     HQ_STEEL=0x32ad;
+     HQ_SILVER=0xbebc;
+     HQ_METAL=0x7453;
+     HQ_DARKMETAL=0x2a8d;
+     V14_TEXT=0xf7bf;
+     V14_MUTED=0xae3a;
+     V14_WARN=0xda4a;
+     V14_GREEN=0x7736;
+     V14_BLUE=0x2cdb;
+     V14_ORANGE=0x0cc9;
+     V14_SEA=0x7e9f;
+     V14_CARD=0x1147;
+     V14_PALE=0x08c5;
+     V14_RULE=0x32ad;
+     V14_INFO=0x19a9;
+     V14_GRID=0x2a8d;
+     V14_BADGE=0x1247;
+     v14SeriesColors[0]=0x14b8;
+     v14SeriesColors[1]=0xd407;
+     v14SeriesColors[2]=0xc287;
+     v14SeriesColors[3]=0x3cee;
+   }
  }
 }
 static void v14Print(const String& txt,int x,int y,uint16_t col=V14_TEXT){
@@ -245,7 +279,7 @@ static void v14Graphs(bool layout){
   const int gx=31, gy=107,gw=265,gh=77;
   screen->drawFastVLine(gx,gy,gh,V14_RULE);
   screen->drawFastHLine(gx,gy+gh,gw,V14_RULE);
-  for(int j=1;j<4;j++)screen->drawFastHLine(gx,gy+j*gh/4,gw,0xe71c);
+  for(int j=1;j<4;j++)screen->drawFastHLine(gx,gy+j*gh/4,gw,V14_GRID);
   if(graphSubView==0){
     v14Tiny("T1",16,96,v14SeriesColors[0]);
     v14Tiny("T2",57,96,v14SeriesColors[1]);
@@ -298,7 +332,7 @@ static void v14Events(bool layout){
     screen->fillCircle(19,y-4,3,V14_ORANGE);
     // Never cut UTF-8 at arbitrary bytes; small font clips long labels at panel width.
     v14Tiny(v13Events[i],29,y,V14_TEXT);
-    if(i<4)screen->drawFastHLine(14,y+5,289,0xe71c);
+    if(i<4)screen->drawFastHLine(14,y+5,289,V14_GRID);
   }
 }
 static void v14Settings(bool layout){
