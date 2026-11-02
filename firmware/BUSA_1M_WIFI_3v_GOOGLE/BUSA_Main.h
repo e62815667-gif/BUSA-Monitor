@@ -39,11 +39,21 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-FASTDIAG-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-RESPONSIVE-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
 uint32_t busaLastI2cStepMs=0,busaMaxI2cStepMs=0;
+uint32_t busaI2cSuspendedUntil=0,busaI2cErrorCount=0,busaI2cStallCount=0;
+uint32_t busaTempWorstMs=0,busaOneWireWorstMs=0,busaTftWorstMs=0;
+uint32_t busaI2cWorstMs=0,busaHttpWorstMs=0;
+const char* busaSlowComponent="NONE";
+void busaObserve(const char* component,uint32_t started,uint32_t &worst){
+  const uint32_t dt=millis()-started;
+  if(dt>worst)worst=dt;
+  if(dt>=100){busaSlowComponent=component;Serial.printf("BUSA SLOW %s %lu ms\n",component,(unsigned long)dt);}
+}
+
 const char* busaBootStage="RESET";
 void busaReportStage(const char* stage){
   busaBootStage=stage;
@@ -60,6 +70,8 @@ float temperature[4]={NAN,NAN,NAN,NAN};
 bool tempPresent[4]={false,false,false,false};
 uint32_t tempAt[4]={0,0,0,0},tempCycle=0,tempRequestAt=0;
 bool tempInitialized[4]={false,false,false,false};
+DeviceAddress cachedTempRom[4]={};
+bool cachedTempValid[4]={false,false,false,false};
 uint32_t tempDiscoverAt[4]={0,0,0,0};
 bool tempConverting=false;
 // Read-only health checks; run only between conversion cycles.
@@ -77,7 +89,7 @@ bool elapsed(uint32_t now,uint32_t then,uint32_t ms){return (uint32_t)(now-then)
 void sampleTemperatures(uint32_t now){
   if(tempConverting && elapsed(now,tempRequestAt,825)){
     for(int i=0;i<4;i++){
-      float v=sensors[i]->getTempCByIndex(0);
+      float v=cachedTempValid[i]?sensors[i]->getTempC(cachedTempRom[i]):DEVICE_DISCONNECTED_C;
       if(tempPresent[i] && isfinite(v) && v>=-55 && v<=125 && v!=DEVICE_DISCONNECTED_C){
         temperature[i]=v;tempAt[i]=now;
       }else{temperature[i]=NAN;tempAt[i]=0;}
@@ -93,9 +105,10 @@ void sampleTemperatures(uint32_t now){
         sensors[i]->begin();
         tempInitialized[i]=true;
         tempDiscoverAt[i]=now;
-        tempPresent[i]=sensors[i]->getDeviceCount()>0;
+        tempPresent[i]=sensors[i]->getAddress(cachedTempRom[i],0);
+        cachedTempValid[i]=tempPresent[i];
         if(tempPresent[i]){
-          sensors[i]->setResolution(12);
+          sensors[i]->setResolution(cachedTempRom[i],12);
           sensors[i]->setWaitForConversion(false);
         }
       }
@@ -198,6 +211,15 @@ uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
 uint8_t i2cFound[24]={0},i2cFoundCount=0;
 uint16_t i2cAckCount=0;
 uint32_t i2cFullScanAt=0;
+bool busaI2cSuspended(uint32_t now){return busaI2cSuspendedUntil && (int32_t)(now-busaI2cSuspendedUntil)<0;}
+void busaI2cQuarantine(uint32_t now,uint32_t durationMs=60000){
+  busaI2cSuspendedUntil=now+durationMs;
+  i2cAckCount=0;pcfDetected=false;pcaDetected=false;pcfAddr=0;
+  ++busaI2cErrorCount;
+}
+// Do not start I2C transactions on a physically held-low SDA/SCL line.
+bool busaI2cLinesFree(){return digitalRead(BUS_SDA)==HIGH && digitalRead(BUS_SCL)==HIGH;}
+
 int pcaMode1=-1,pcaMode2=-1;
 bool pcfIdleReadOk=false;
 uint16_t pcfIdleDirect=0xffff;
@@ -229,31 +251,44 @@ String clockStamp(bool compact=false){
   return String(buf);
 }
 bool ack(uint8_t address){
-  Wire.beginTransmission(address);return Wire.endTransmission()==0;
+  const uint32_t started=millis();
+  if(busaI2cSuspended(started))return false;
+  if(!busaI2cLinesFree()){
+    busaI2cQuarantine(started);
+    return false;
+  }
+  Wire.beginTransmission(address);
+  const uint8_t code=Wire.endTransmission();
+  const uint32_t ms=millis()-started;
+  if(ms>busaMaxI2cStepMs)busaMaxI2cStepMs=ms;
+  busaLastI2cStepMs=ms;
+  if(ms>100){
+    ++busaI2cStallCount;
+    busaSlowComponent="I2C_ACK";
+    busaI2cQuarantine(millis());
+  }
+  return code==0 && !busaI2cSuspended(millis());
 }
-// I2C discovery is incremental (2 addresses per pass): never stall HTTP/TFT
-// by probing 112 addresses in a single main-loop iteration.
-uint8_t busaI2cScanNext=0x08;
+// Only search actual supported low-voltage module addresses (PCF8575 and PCA9685).
+// One address per scheduled attempt. An unresponsive bus is quarantined for 60 s.
+uint8_t busaI2cScanNext=0;
 uint32_t busaI2cScanLastStep=0;
 void scanI2cAddresses(uint32_t now){
-  if(!i2cOnline || !elapsed(now,busaI2cScanLastStep,30))return;
-  if(busaI2cScanNext>0x77){
-    if(!i2cFullScanAt || elapsed(now,i2cFullScanAt,15000)){
-      i2cFoundCount=0;i2cAckCount=0;busaI2cScanNext=0x08;
-    }else return;
-  }
+  if(!i2cOnline || busaI2cSuspended(now) || !elapsed(now,busaI2cScanLastStep,3000))return;
   busaI2cScanLastStep=now;
-  const uint32_t started=millis();
-  for(uint8_t n=0;n<2 && busaI2cScanNext<=0x77;n++){
-    const uint8_t address=busaI2cScanNext++;
-    if(ack(address)){
-      i2cAckCount++;
-      if(i2cFoundCount<24)i2cFound[i2cFoundCount++]=address;
-    }
+  const uint8_t addr=busaI2cScanNext<8?(uint8_t)(0x20+busaI2cScanNext):0x40;
+  busaI2cScanNext=(busaI2cScanNext+1)%9;
+  const bool ok=ack(addr);
+  if(busaI2cSuspended(millis())){i2cFoundCount=0;return;}
+  if(ok){
+    bool known=false;
+    for(uint8_t j=0;j<i2cFoundCount;j++)if(i2cFound[j]==addr)known=true;
+    if(!known && i2cFoundCount<24)i2cFound[i2cFoundCount++]=addr;
   }
-  busaLastI2cStepMs=millis()-started;
-  if(busaLastI2cStepMs>busaMaxI2cStepMs)busaMaxI2cStepMs=busaLastI2cStepMs;
-  if(busaI2cScanNext>0x77)i2cFullScanAt=millis();
+  if(busaI2cScanNext==0){
+    i2cAckCount=i2cFoundCount;
+    i2cFullScanAt=millis();
+  }
 }
 int readPcaReg(uint8_t reg){
   if(!pcaDetected)return -1;
@@ -264,12 +299,14 @@ int readPcaReg(uint8_t reg){
   return Wire.read();
 }
 void probeI2c(uint32_t now){
-  if(!i2cOnline)return;
-  pcfDetected=false;pcfAddr=0;
-  for(uint8_t i=0x20;i<=0x27;i++)if(ack(i)){
-    pcfDetected=true;pcfAddr=i;break;
+  if(!i2cOnline || busaI2cSuspended(now))return;
+  // Use cached discoveries; never perform 8 serial address probes in one loop.
+  pcfDetected=false;pcfAddr=0;pcaDetected=false;
+  for(uint8_t j=0;j<i2cFoundCount;j++){
+    const uint8_t addr=i2cFound[j];
+    if(addr>=0x20 && addr<=0x27){pcfDetected=true;pcfAddr=addr;}
+    if(addr==0x40)pcaDetected=true;
   }
-  pcaDetected=ack(0x40);
   pcaMode1=readPcaReg(0x00);
   pcaMode2=readPcaReg(0x01);
   // PCF8575 keypad inputs: release scanning lines then sample idle state.
@@ -554,7 +591,7 @@ bool tftDisplayOff=false;
 uint32_t tftDisplayActivityMs=0;
 // No inactivity auto-off. Only F2 or explicit iPhone screen button blanks TFT.
 void pollKeys(uint32_t now){
-  if(!pcfDetected||!elapsed(now,lastKeyScan,160))return;
+  if(!pcfDetected||busaI2cSuspended(now)||!busaI2cLinesFree()||!elapsed(now,lastKeyScan,160))return;
   if(busaKeySkipUntil && (int32_t)(now-busaKeySkipUntil)<0)return;
   lastKeyScan=now;
   const uint32_t keyStarted=millis();
@@ -563,7 +600,8 @@ void pollKeys(uint32_t now){
   if(busaLastKeyScanMs>busaMaxKeyScanMs)busaMaxKeyScanMs=busaLastKeyScanMs;
   // Misbehaving I2C bus can stall the keypad scanner; back off to protect HTTP.
   if(busaLastKeyScanMs>100){
-    busaKeySkipUntil=millis()+2000;
+    busaI2cQuarantine(millis());
+    busaKeySkipUntil=millis()+60000;
     Serial.printf("BUSA SLOW KEYPAD scan_ms=%lu backoff=2000\n",
       (unsigned long)busaLastKeyScanMs);
     return;
@@ -794,7 +832,15 @@ String statusJSON(){
   s+=",\"key_scan_last_ms\":"+String(busaLastKeyScanMs);
   s+=",\"key_scan_worst_ms\":"+String(busaMaxKeyScanMs);
   s+=",\"i2c_step_last_ms\":"+String(busaLastI2cStepMs);
-  s+=",\"i2c_step_worst_ms\":"+String(busaMaxI2cStepMs)+"}";
+  s+=",\"i2c_step_worst_ms\":"+String(busaMaxI2cStepMs);
+  s+=",\"i2c_errors\":"+String(busaI2cErrorCount);
+  s+=",\"i2c_stalls\":"+String(busaI2cStallCount);
+  s+=",\"i2c_quarantined\":"+(busaI2cSuspended(now)?String("true"):String("false"));
+  s+=",\"last_slow_component\":"+quoteJson(busaSlowComponent);
+  s+=",\"temp_worst_ms\":"+String(busaTempWorstMs);
+  s+=",\"onewire_worst_ms\":"+String(busaOneWireWorstMs);
+  s+=",\"http_worst_ms\":"+String(busaHttpWorstMs);
+  s+=",\"tft_worst_ms\":"+String(busaTftWorstMs)+"}";
   s+=",\"configuration\":{\"manual_external_controls\":true,\"mains_control_in_project\":false,\"motorized_valve_in_project\":false}";
   s+=",\"ui_page\":"+String(currentPage+1)+",\"ui_subtab\":"+String(settingsSubTab)+",\"tft_view\":"+String(tftView)+",\"uptime_ms\":"+String(now);
   s+=",\"clock\":{\"synchronized\":"+(deviceClockValid()?String("true"):String("false"));
@@ -1973,7 +2019,7 @@ void loop(){
   uint32_t now=millis();
   const uint32_t tickStart=now;
   soundPoll(now);
-  server.handleClient();
+  {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
   if(stationSsid.length() && stationPass.length()>=8 && WiFi.status()!=WL_CONNECTED && elapsed(now,lastStationCheck,20000)){
     lastStationCheck=now;
     WiFi.reconnect();
@@ -1986,8 +2032,8 @@ void loop(){
   if(otaActive){soundOutputsOff();delay(0);return;}
   if(tftRebootPending && elapsed(now,tftRebootAt,3000)){soundOutputsOff();ESP.restart();}
   if(googleRestart && elapsed(now,googleRestartAt,3500)){soundOutputsOff();ESP.restart();}
-  sampleTemperatures(now);
-  probeOneWire(now); // Diagnose on idle 1-Wire bus only
+  {const uint32_t started=millis();sampleTemperatures(now);busaObserve("TEMP",started,busaTempWorstMs);}
+  {const uint32_t started=millis();probeOneWire(now);busaObserve("ONEWIRE",started,busaOneWireWorstMs);} // Diagnose on idle 1-Wire bus only
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
   // Wi-Fi AP and HTTP server initialize during the splash.
   // Missing sensors must not delay the user interface.
@@ -1999,9 +2045,12 @@ void loop(){
   if(i2cOnline){
     // Query connected PCF/PCA once per 6 s. Scan at most two I2C addresses
     // per loop; prevent keypad bus errors from starving the web server.
-    if(!lastBusProbe || elapsed(now,lastBusProbe,6000))probeI2c(now);
-    scanI2cAddresses(now);
-    pollKeys(now);
+    // Profile each blocking component and quarantine a misbehaving I2C bus.
+    {const uint32_t started=millis();scanI2cAddresses(now);busaObserve("I2C_DISCOVERY",started,busaI2cWorstMs);}
+    if(!lastBusProbe || elapsed(now,lastBusProbe,6000)){
+      const uint32_t started=millis();probeI2c(now);busaObserve("I2C_DEVICES",started,busaI2cWorstMs);
+    }
+    {const uint32_t started=millis();pollKeys(now);busaObserve("KEYPAD",started,busaMaxKeyScanMs);}
   }
   // Landscape V14.6: rebuild background ONLY on explicit view/theme change.
   // A 2.5 s telemetry tick refreshes changed text without wiping the TFT.
@@ -2010,8 +2059,10 @@ void loop(){
      (tftDirty||lastRender==0 || elapsed(now,lastRender,2500))){
     const bool wholeFrame=tftDirty||lastRender==0;
     lastRender=now;
+    const uint32_t started=millis();
     if(screen->width()>=300 && !wholeFrame)v14RefreshLive(now);
     else renderScreen(now);
+    busaObserve("TFT",started,busaTftWorstMs);
   }
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
