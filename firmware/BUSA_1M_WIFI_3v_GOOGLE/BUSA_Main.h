@@ -1043,6 +1043,7 @@ void darkenTftDisplay(){
 // Note: a separately wired always-on TFT backlight may still glow in display-off.
  // Portrait-specific layout prevents 320px-wide landscape cards from clipping at 240px.
 bool busaSoundEnabled(uint8_t i); bool busaSoundActive(uint8_t i);
+extern volatile bool googleEnabled; // Google status read by both TFT renderers
 #include "BUSA_ApprovedUI_V13.h"
 
 #include "BUSA_ApprovedGraphics_HQ_V14.h"
