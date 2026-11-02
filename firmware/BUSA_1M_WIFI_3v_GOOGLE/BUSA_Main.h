@@ -33,7 +33,7 @@
 
 constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
-constexpr uint8_t BUS_SDA=8,BUS_SCL=9;
+constexpr uint8_t BUS_SDA=40,BUS_SCL=41; // Isolated PCF8575 keypad only; GPIO8/9 disconnected
 constexpr uint8_t TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14;
 constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr uint8_t BUSA_RESERVED_BUZZER_GPIO=2; // active 3.3V logic buzzer input, T1/T2
@@ -44,9 +44,9 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=TFT_DC && BUSA_RESERVED_BUZZER_GPIO!=TFT_RST &&
   BUSA_RESERVED_BUZZER_GPIO!=TFT_MOSI && BUSA_RESERVED_BUZZER_GPIO!=TFT_SCK,
   "Buzzer pin conflicts with I2C, TFT or flow pins");
-static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
+static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-RECOVERY-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -220,7 +220,7 @@ void sampleFlow(uint32_t now){
 }
 float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
 
-// I2C devices: PCF8575 keypad is monitored; PCA9685 ACK-only (never PWM).
+// Isolated 3.3V I2C keypad PCF8575/PCF8575A only; PCA9685 LED board detached.
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
 uint8_t pcfAddr=0,pcaAddr=0x40;uint32_t lastBusProbe=0;
 uint8_t i2cFound[24]={0},i2cFoundCount=0;
@@ -464,27 +464,21 @@ String clockStamp(bool compact=false){
 bool ack(uint8_t address){
   return busaI2cExchange(address,nullptr,0,nullptr,0);
 }
-// The PCF8575A uses 0x38..0x3F instead of 0x20..0x27.
-// The PCA9685 can use another address when A0..A5 are strapped.
-// Scan every non-reserved 7-bit address, with the two default addresses
-// and the PCF8575A first at startup. Never issue write-data during discovery.
-constexpr uint8_t BUSA_I2C_SCAN_START=0x08,BUSA_I2C_SCAN_END=0x77;
-constexpr uint8_t BUSA_I2C_PRIORITY_ADDRS[]={0x20,0x38,0x40,0x70};
-uint8_t busaI2cScanNext=0x08,busaI2cPriorityNext=0;
+// Only scan the PCF8575 (0x20..0x27) or PCF8575A (0x38..0x3F) address sets.
+// LED driver PCA9685 is disconnected and must not be addressed.
+constexpr uint8_t BUSA_I2C_SCAN_START=0x20,BUSA_I2C_SCAN_END=0x3F;
+constexpr uint8_t BUSA_I2C_PRIORITY_ADDRS[]={0x20,0x38};
+uint8_t busaI2cScanNext=0x20,busaI2cPriorityNext=0;
 uint32_t busaI2cScanLastStep=0;
 uint32_t busaI2cAddressLastSeen[128]={};
 uint16_t busaI2cAddressAckTotal[128]={};
 bool busaI2cIsPcfAddress(uint8_t a){
   return (a>=0x20 && a<=0x27)||(a>=0x38 && a<=0x3F);
 }
-bool busaI2cIsPcaCandidate(uint8_t a){
-  // 0x70 is also a group/all-call address, so do not identify it as unique PCA.
-  return a>=0x40 && a<=0x6F;
-}
 void busaI2cRebuildAddressCache(uint32_t now){
   i2cFoundCount=0;
   for(uint8_t a=BUSA_I2C_SCAN_START;a<=BUSA_I2C_SCAN_END;a++){
-    if(busaI2cAddressLastSeen[a] &&
+    if(busaI2cIsPcfAddress(a) && busaI2cAddressLastSeen[a] &&
        (uint32_t)(now-busaI2cAddressLastSeen[a])<=BUSA_I2C_ACK_FRESH_MS &&
        i2cFoundCount<sizeof(i2cFound)){
       i2cFound[i2cFoundCount++]=a;
@@ -501,6 +495,7 @@ void scanI2cAddresses(uint32_t now){
   if(busaI2cPriorityNext<sizeof(BUSA_I2C_PRIORITY_ADDRS)){
     address=BUSA_I2C_PRIORITY_ADDRS[busaI2cPriorityNext++];
   }else{
+    if(busaI2cScanNext==0x28)busaI2cScanNext=0x38;
     address=busaI2cScanNext++;
     if(busaI2cScanNext>BUSA_I2C_SCAN_END){
       busaI2cScanNext=BUSA_I2C_SCAN_START;
@@ -513,36 +508,23 @@ void scanI2cAddresses(uint32_t now){
     if(busaI2cAddressAckTotal[address]<UINT16_MAX)++busaI2cAddressAckTotal[address];
     if(busaI2cIsPcfAddress(address)){
       busaI2cLastPcfAckMs=millis();++busaI2cPcfAcks;
-    }else if(busaI2cIsPcaCandidate(address)){
-      busaI2cLastPcaAckMs=millis();++busaI2cPcaAcks;
     }
   }else if(busaI2cIsPcfAddress(address)){
     busaI2cLastPcfNackMs=millis();
-  }else if(busaI2cIsPcaCandidate(address)){
-    busaI2cLastPcaNackMs=millis();
   }
   busaI2cRebuildAddressCache(millis());
-}
-int readPcaReg(uint8_t reg){
-  if(!pcaDetected || busaI2cSuspended(millis()))return -1;
-  uint8_t result=0;
-  return busaI2cExchange(pcaAddr,&reg,1,&result,1)?result:-1;
 }
 void probeI2c(uint32_t now){
   if(!i2cOnline || busaI2cSuspended(now))return;
   busaI2cRebuildAddressCache(millis());
-  pcfDetected=false;pcfAddr=0;pcaDetected=false;pcaAddr=0x40;
-  // Prefer the known expected addresses, but permit PCF8575A or alternate
-  // PCA9685 address straps. Do not mistake the group address 0x70 for PCA.
+  pcfDetected=false;pcfAddr=0;pcaDetected=false;pcaAddr=0;
+  // Only PCF8575 keypad is installed; no LED driver discovery or reads.
   for(uint8_t j=0;j<i2cFoundCount;j++){
     const uint8_t address=i2cFound[j];
     if(busaI2cIsPcfAddress(address) &&
        (!pcfDetected || address==0x20)){pcfDetected=true;pcfAddr=address;}
-    if(busaI2cIsPcaCandidate(address) &&
-       (!pcaDetected || address==0x40)){pcaDetected=true;pcaAddr=address;}
   }
-  pcaMode1=readPcaReg(0x00);
-  pcaMode2=readPcaReg(0x01);
+  pcaMode1=-1;pcaMode2=-1;
   pcfIdleReadOk=false;
   if(pcfDetected){
     uint8_t allHigh[2]={0xff,0xff},received[2]={};
@@ -1142,7 +1124,7 @@ String statusJSON(){
   s+=",\"calibrated\":false,\"seen_pulses\":"+(flowSeen?String("true"):String("false"))+"}";
   s+=",\"collection\":{\"sensor_present\":false,\"ml_per_min\":null,\"total_ml\":null}";
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
-  s+=",\"pca9685_ack_only\":"+(pcaDetected?String("true"):String("false"));
+  s+=",\"pca9685_ack_only\":false,\"pca9685_enabled\":false";
   s+=",\"tft_attempted\":"+(tftStarted?String("true"):String("false"));
   s+=",\"tft_rotation\":"+String(tftRotation);
   s+=",\"tft_boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
@@ -1182,19 +1164,19 @@ String statusJSON(){
   s+=",\"pairs\":"+String(pcfPairCount);
   s+=",\"scan_error\":"+String(pcfScanError);
   s+=",\"raw_pair\":"+quoteJson(rawPair)+"}";
-  s+=",\"i2c\":{\"sda_gpio\":8,\"scl_gpio\":9,\"controller_started\":"+(i2cOnline?String("true"):String("false"));
+  s+=",\"i2c\":{\"sda_gpio\":"+String(BUS_SDA)+",\"scl_gpio\":"+String(BUS_SCL)+",\"controller_started\":"+(i2cOnline?String("true"):String("false"));
   s+=",\"last_scan_ms\":"+String(i2cFullScanAt);
-  s+=",\"scan_range\":\"0x08-0x77\"";
+  s+=",\"scan_range\":\"PCF_ONLY_0x20_0x27_0x38_0x3F\"";
   s+=",\"scan_next\":"+String(busaI2cScanNext);
   s+=",\"pcf_address\":"+String(pcfAddr);
-  s+=",\"pca_address\":"+String(pcaAddr);
+  s+=",\"pca_address\":null";
   s+=",\"ack_fresh_ms\":"+String(BUSA_I2C_ACK_FRESH_MS);
   s+=",\"pcf_last_ack_ms\":"+String(busaI2cLastPcfAckMs);
-  s+=",\"pca_last_ack_ms\":"+String(busaI2cLastPcaAckMs);
+  s+=",\"pca_last_ack_ms\":0";
   s+=",\"pcf_ack_total\":"+String(busaI2cPcfAcks);
-  s+=",\"pca_ack_total\":"+String(busaI2cPcaAcks);
+  s+=",\"pca_ack_total\":0";
   s+=",\"pcf_last_nack_ms\":"+String(busaI2cLastPcfNackMs);
-  s+=",\"pca_last_nack_ms\":"+String(busaI2cLastPcaNackMs);
+  s+=",\"pca_last_nack_ms\":0";
   s+=",\"driver\":\"IDF_INPUT_OUTPUT_OPEN_DRAIN\"";
   s+=",\"electrical_fault\":"+(busaI2cElectricalFault?String("true"):String("false"));
   s+=",\"scan_suppressed\":"+(busaI2cElectricalFault?String("true"):String("false"));
@@ -1204,8 +1186,8 @@ String statusJSON(){
   s+=",\"sda_idf_low_readback\":"+String(busaI2cSdaIdfLow);
   s+=",\"scl_idf_low_readback\":"+String(busaI2cSclIdfLow);
   s+=",\"fault_hint\":"+quoteJson(!busaI2cElectricalFault?String("NONE"):
-    busaI2cTestSdaForcedLow?String("SDA_GPIO8_NOT_LOW"):
-    busaI2cTestSclForcedLow?String("SCL_GPIO9_NOT_LOW"):
+    busaI2cTestSdaForcedLow?String("SDA_GPIO40_NOT_LOW"):
+    busaI2cTestSclForcedLow?String("SCL_GPIO41_NOT_LOW"):
     String("I2C_PAD_READBACK_FAILED"));
   s+=",\"gpio_test\":{\"count\":"+String(busaI2cGpioTests);
   s+=",\"tested_at_ms\":"+String(busaI2cLastGpioTestMs);
@@ -1240,7 +1222,7 @@ String statusJSON(){
   s+=",\"read_ok\":"+(pcfIdleReadOk?String("true"):String("false"));
   s+=",\"idle_pins_hex\":"+quoteJson(String(pcfIdleDirect,HEX));
   s+=",\"keyscan_error\":"+String(pcfScanError)+"}";
-  s+=",\"pca9685\":{\"expected_address\":64,\"address\":"+String(pcaAddr)+",\"ack\":"+(pcaDetected?String("true"):String("false"));
+  s+=",\"pca9685\":{\"expected_address\":64,\"installed\":false,\"address\":0,\"ack\":false";
   s+=",\"mode1\":"+String(pcaMode1)+",\"mode2\":"+String(pcaMode2);
   s+=",\"outputs_enabled\":false}";
   s+=",\"tft\":{\"spi_cs\":"+String(TFT_CS)+",\"spi_mosi\":"+String(TFT_MOSI)+",\"spi_sck\":"+String(TFT_SCK)+",\"dc\":"+String(TFT_DC)+",\"rst\":"+String(TFT_RST);
@@ -1563,7 +1545,7 @@ main>*{max-width:100%;min-width:0}
 <button id="googleStop" type="button" class="full">Отключить передачу в Google</button>
 <p id="googleResult" role="status" class="hint">Отправка выключена до настройки.</p>
 </div><div class="card settingCard" data-stab="2" hidden><h2>Обновление ПО · вручную</h2>
-<p class="hint">Только через локальную сеть БУСА. Выберите APP BIN для ESP32-S3 N8R2,
+<p class="hint">Только через локальную сеть БУСА. Выберите APP BIN для ESP32-S3 N16R8,
 НЕ объединённый merged BIN. Только проверенные диагностические сборки.
 Перед обновлением отключите внешние исполнительные цепи.</p>
 <input type="file" accept=".bin" id="firmwareFile">
@@ -1576,7 +1558,7 @@ main>*{max-width:100%;min-width:0}
 <div class="row">Прошивка <b id="ver">—</b></div>
 <div class="row">Время работы <b id="uptime">—</b></div>
 <div class="row">PCF8575 <b id="pcf">—</b></div>
-<div class="row">PCA9685 <b id="pca">—</b></div><div class="row">TFT <b id="tft">—</b></div>
+<div class="row">TFT <b id="tft">—</b></div>
 <h2>Калибровка клавиатуры 5×4</h2><p class="hint">Назначения: ↑ вверх, ↓ вниз, ← влево, → вправо, Ent ОК, Esc назад, F1 удалить значение.</p>
 <p class="hint">Не переставляй провода. После запуска нажимай кнопки последовательно слева направо, сверху вниз по фотографии. Полностью отпускай клавишу между нажатиями. Карта сохраняется в ESP32.</p>
 <div class="row">Состояние <b id="keyState">—</b></div>
@@ -1809,12 +1791,11 @@ if(s.keypad){
       ' | idle=0x'+k.idle_hex+' | low=0x'+k.low_hex+
       ' | pair='+k.raw_pair+' | error='+k.scan_error;
    const d=s.diagnostics,addresses=(d.i2c?.addresses||[]);
-   get('diagI2c').textContent='I2C GPIO8/9 | ACK total='+d.i2c?.ack_total+
+   get('diagI2c').textContent='I2C GPIO40/41 · клавиатура | ACK total='+d.i2c?.ack_total+
      ' | addresses='+addresses.map(a=>'0x'+Number(a).toString(16).padStart(2,'0')).join(', ')+
      '\nPCF8575: ACK='+d.pcf8575?.online+' read='+d.pcf8575?.read_ok+
      ' idle=0x'+d.pcf8575?.idle_pins_hex+
-     '\nPCA9685: ACK='+d.pca9685?.ack+' MODE1='+d.pca9685?.mode1+
-     ' MODE2='+d.pca9685?.mode2+' PWM disabled';
+     '\nPCA9685: отключён, не опрашивается';
    get('diagOther').textContent=
      'TFT: '+d.tft?.profile+' rotation='+d.tft?.rotation+
        ' init='+d.tft?.init_sent+' (pixels not verified by software)'+
@@ -1835,7 +1816,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('pca').textContent=s.modules.pca9685_ack_only?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
+get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/1000)+' сек';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (пиксели не подтверждены)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
 get('temperatureSave').onclick=async()=>{
  const button=get('temperatureSave'),result=get('temperatureSaveResult');
