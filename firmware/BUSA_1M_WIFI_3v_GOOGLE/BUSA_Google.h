@@ -49,6 +49,180 @@ void setupGoogleCloud(){
   googleEnabled=googleURLValid(googleEndpoint)&&googleTokenValid(googleSecret);
   googleState=googleEnabled?1:0;
 }
+
+// Authenticated remote administration: Google Apps Script retains a separate
+// administrator key. The device receives a whitelisted command only in its
+// own TLS-verified, BUSA_TOKEN-authenticated telemetry response.
+struct BusaCloudCommand{
+ char id[40];
+ char kind[16];
+ char url[160];
+ char sha[65];
+ char version[100];
+ int index,theme;
+ float on,off,offset;
+ uint32_t size;
+};
+QueueHandle_t busaCloudCommandQueue=nullptr;
+volatile bool busaCloudOtaActive=false,busaCloudRebootPending=false;
+String busaCloudAckId="",busaCloudAckResult="";
+String cloudControlAckJSON(){
+ return String("{\"id\":")+quoteJson(busaCloudAckId)+
+        ",\"result\":"+quoteJson(busaCloudAckResult)+"}";
+}
+static String busaCloudField(const String &json,const char* name){
+ const String key=String("\"")+name+"\":";
+ int start=json.indexOf(key);if(start<0)return "";
+ start+=key.length();while(start<(int)json.length()&&json[start]==' ')start++;
+ if(start>=(int)json.length())return "";
+ if(json[start]=='"'){
+   int stop=json.indexOf('"',start+1);if(stop<0)return "";
+   return json.substring(start+1,stop);
+ }
+ int end=start;
+ while(end<(int)json.length()&&json[end]!=','&&json[end]!='}'&&json[end]!=' ')end++;
+ return json.substring(start,end);
+}
+static bool busaHexShaValid(const String &s){
+ if(s.length()!=64)return false;
+ for(unsigned i=0;i<64;i++)if(!isxdigit((unsigned char)s[i]))return false;
+ return true;
+}
+static void busaCloudAck(const String &id,const String &result){
+ busaCloudAckId=id;busaCloudAckResult=result;
+ prefs.putString("cloudAckId",id);
+ prefs.putString("cloudAckRes",result);
+ googleTestRequested=true;
+}
+void setupBusaCloudCommandQueue(){
+ busaCloudCommandQueue=xQueueCreate(2,sizeof(BusaCloudCommand));
+ busaCloudAckId=prefs.getString("cloudAckId","");
+ busaCloudAckResult=prefs.getString("cloudAckRes","");
+}
+static void busaCloudReadReply(const String &reply){
+ const int start=reply.indexOf("\"command\":{");
+ if(start<0||!busaCloudCommandQueue)return;
+ const String payload=reply.substring(start);
+ BusaCloudCommand c={};
+ const String id=busaCloudField(payload,"id"),kind=busaCloudField(payload,"kind");
+ if(id.length()!=36||kind.length()<3||kind.length()>15)return;
+ // Ignore a command already executed or accepted after a transient reconnect.
+ if(id==busaCloudAckId)return;
+ id.toCharArray(c.id,sizeof(c.id));kind.toCharArray(c.kind,sizeof(c.kind));
+ c.index=busaCloudField(payload,"index").toInt();
+ c.on=busaCloudField(payload,"on").toFloat();
+ c.off=busaCloudField(payload,"off").toFloat();
+ c.offset=busaCloudField(payload,"offset").toFloat();
+ c.theme=busaCloudField(payload,"theme").toInt();
+ c.size=(uint32_t)busaCloudField(payload,"size").toInt();
+ busaCloudField(payload,"url").toCharArray(c.url,sizeof(c.url));
+ busaCloudField(payload,"sha256").toCharArray(c.sha,sizeof(c.sha));
+ busaCloudField(payload,"version").toCharArray(c.version,sizeof(c.version));
+ if(xQueueSend(busaCloudCommandQueue,&c,0)!=pdTRUE)
+   Serial0.println("CLOUD CMD: queue busy; retry on next telemetry");
+}
+// Restrict firmware downloads to this project's immutable filename on Pages.
+// Every installation additionally requires exact size, SHA-256 and a valid
+// inactive OTA partition; no unverified or arbitrary download URL is accepted.
+static const char* BUSA_CLOUD_OTA_URL=
+  "https://e62815667-gif.github.io/BUSA-Monitor/online/firmware/BUSA_APP_OTA.bin";
+static void busaCloudOtaTask(void *arg){
+ BusaCloudCommand c=*(BusaCloudCommand*)arg;
+ delete (BusaCloudCommand*)arg;
+ busaCloudOtaActive=true;
+ otaActive=true; // prevent competing local OTA writes
+ bool ok=false;String error="Ошибка загрузки";
+ WiFiClientSecure secure;
+ secure.setCACert(GOOGLE_TRUST_ANCHOR);
+ secure.setTimeout(15000);
+ HTTPClient request;
+ request.setConnectTimeout(15000);request.setTimeout(15000);
+ do{
+   if(!request.begin(secure,String(c.url))){error="TLS соединение";break;}
+   request.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+   int status=request.GET();
+   if(status!=HTTP_CODE_OK){error="HTTPS "+String(status);break;}
+   int total=request.getSize();
+   if(total>=0&&(uint32_t)total!=c.size){error="Размер не совпадает";break;}
+   if(!Update.begin(c.size,U_FLASH)){error="Нет свободного OTA-раздела";break;}
+   WiFiClient *stream=request.getStreamPtr();
+   mbedtls_sha256_context ctx;
+   mbedtls_sha256_init(&ctx);
+   mbedtls_sha256_starts_ret(&ctx,0);
+   uint8_t buf[1024],digest[32]={0};
+   uint32_t got=0;
+   uint32_t lastBytesAt=millis();
+   bool streamOk=true;
+   while(got<c.size){
+     if(!stream->available()){
+       if((uint32_t)(millis()-lastBytesAt)>15000){streamOk=false;error="Таймаут передачи";break;}
+       vTaskDelay(pdMS_TO_TICKS(10));continue;
+     }
+     size_t take=stream->readBytes(buf,min((uint32_t)sizeof(buf),c.size-got));
+     if(!take){streamOk=false;error="Пустой блок";break;}
+     if(got==0 && buf[0]!=0xE9){streamOk=false;error="Не APP BIN";break;}
+     mbedtls_sha256_update_ret(&ctx,buf,take);
+     if(Update.write(buf,take)!=take){streamOk=false;error="Ошибка Flash";break;}
+     got+=(uint32_t)take;lastBytesAt=millis();
+   }
+   mbedtls_sha256_finish_ret(&ctx,digest);
+   mbedtls_sha256_free(&ctx);
+   if(!streamOk||got!=c.size){Update.abort();break;}
+   char hex[65];for(int i=0;i<32;i++)sprintf(hex+2*i,"%02x",digest[i]);hex[64]=0;
+   if(!String(hex).equalsIgnoreCase(String(c.sha))){Update.abort();error="SHA-256 не совпал";break;}
+   if(!Update.end(true)){Update.abort();error="Не удалось активировать OTA";break;}
+   ok=true;
+ }while(false);
+ request.end();
+ otaActive=false;busaCloudOtaActive=false;
+ if(ok){
+   busaCloudAck(String(c.id),"restart_pending");
+   otaRestartAt=millis();busaCloudRebootPending=true;otaRestart=true;
+   Serial0.println("CLOUD OTA: checked SHA256, inactive image ready; restart pending");
+ }else{
+   busaCloudAck(String(c.id),String("failed: ")+error);
+   Serial0.printf("CLOUD OTA: failed: %s\n",error.c_str());
+ }
+ vTaskDelete(nullptr);
+}
+void processBusaCloudCommand(){
+ if(!busaCloudCommandQueue||busaCloudOtaActive||otaActive)return;
+ BusaCloudCommand c={};
+ if(xQueueReceive(busaCloudCommandQueue,&c,0)!=pdTRUE)return;
+ String id(c.id),kind(c.kind);
+ if(id==busaCloudAckId)return;
+ if(kind=="threshold"){
+   if(c.index<0||c.index>=4||!isfinite(c.on)||!isfinite(c.off)||
+      c.on<0||c.on>125||c.off<0||c.off>125||fabsf(c.on-c.off)<0.099f){
+      busaCloudAck(id,"rejected: thresholds");return;
+   }
+   bool ok=storeTempReference(c.index,0,c.on);
+   if(ok)ok=storeTempReference(c.index,1,c.off);
+   busaCloudAck(id,ok?"applied":"failed: NVS");return;
+ }
+ if(kind=="calibration"){
+   busaCloudAck(id,saveTempOffset(c.index,c.offset)?"applied":"rejected: calibration");return;
+ }
+ if(kind=="theme"){
+   busaCloudAck(id,saveThemeMode(c.theme)?"applied":"rejected: theme");return;
+ }
+ if(kind=="ota"){
+   if(!String(c.url).equals(BUSA_CLOUD_OTA_URL) || !busaHexShaValid(String(c.sha)) ||
+      c.size<60000||c.size>3000000||!String(c.version).startsWith("14v7-N16R8-") ||
+      WiFi.status()!=WL_CONNECTED){
+     busaCloudAck(id,"rejected: OTA manifest");return;
+   }
+   auto *copy=new BusaCloudCommand(c);
+   if(!copy){busaCloudAck(id,"failed: memory");return;}
+   busaCloudOtaActive=true;
+   if(xTaskCreatePinnedToCore(busaCloudOtaTask,"busa-cloud-ota",12288,copy,1,nullptr,0)!=pdPASS){
+      busaCloudOtaActive=false;delete copy;busaCloudAck(id,"failed: OTA task");return;
+   }
+   return;
+ }
+ busaCloudAck(id,"rejected: action");
+}
+
 void googleWorker(void* unused){
   (void)unused;
   configTime(0,0,"pool.ntp.org","time.google.com");
@@ -100,6 +274,8 @@ void googleWorker(void* unused){
     secure.setCACert(GOOGLE_TRUST_ANCHOR);
     secure.setTimeout(20000);
     HTTPClient request;
+    request.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+    request.setRedirectLimit(3);
     request.setConnectTimeout(20000);
     request.setTimeout(20000);
     int code=-1;
@@ -115,6 +291,7 @@ void googleWorker(void* unused){
       }else if(code==200){
         const String reply=request.getString();
         googleState=reply.indexOf("\"stored\":true")>=0?5:7;
+        if(googleState==5)busaCloudReadReply(reply);
         googleErrorStage=googleState==5?0:3;
         googleTlsError=0;
       }else if(code==302||code==303){
