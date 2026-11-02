@@ -39,7 +39,7 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-SOFTI2C-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-STABLE-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -219,18 +219,25 @@ uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
 uint8_t i2cFound[24]={0},i2cFoundCount=0;
 uint16_t i2cAckCount=0;
 uint32_t i2cFullScanAt=0;
+// A probe is a sample, not a state change. Keep each device's most recent
+// confirmed ACK, but report "online" only while confirmation is fresh.
+uint32_t busaI2cLastPcfAckMs=0,busaI2cLastPcaAckMs=0;
+uint32_t busaI2cPcfAcks=0,busaI2cPcaAcks=0;
+uint32_t busaI2cLastPcfNackMs=0,busaI2cLastPcaNackMs=0;
+constexpr uint32_t BUSA_I2C_ACK_FRESH_MS=15000;
 // GPIO-only, open-drain I2C. ESP32-S3 hardware controller previously blocked for
 // 1000ms even with Wire.setTimeOut(25). This avoids the controller entirely.
 // Every SCL-high wait is bounded, with no long global bus quarantine.
-constexpr uint32_t BUSA_SOFTI2C_HALF_PERIOD_US=7;
-constexpr uint32_t BUSA_SOFTI2C_SCL_WAIT_US=200;
+// ~18-25 kHz software I2C: allow slow pull-ups, long harnesses, and CPU preemption.
+constexpr uint32_t BUSA_SOFTI2C_HALF_PERIOD_US=20;
+constexpr uint32_t BUSA_SOFTI2C_SCL_WAIT_US=800;
 uint32_t busaI2cNackCount=0,busaI2cTimeoutCount=0,busaI2cRecoverCount=0;
 int busaI2cLastResult=0; // 0 OK, 1 NACK, 2 SCL held low, 3 SDA held low, 4 no bus
 uint8_t busaI2cLastAddress=0,busaI2cLastSda=1,busaI2cLastScl=1;
 bool busaI2cSuspended(uint32_t now){return busaI2cSuspendedUntil && (int32_t)(now-busaI2cSuspendedUntil)<0;}
 void busaI2cQuarantine(uint32_t now,uint32_t durationMs=500){
+  // Do not erase positive device discoveries on a single bad sample.
   busaI2cSuspendedUntil=now+durationMs;
-  i2cAckCount=0;pcfDetected=false;pcaDetected=false;pcfAddr=0;
   ++busaI2cErrorCount;
 }
 bool busaI2cLinesFree(){
@@ -374,19 +381,42 @@ bool ack(uint8_t address){
 constexpr uint8_t BUSA_I2C_PROBE_ADDRS[9]={0x20,0x40,0x21,0x22,0x23,0x24,0x25,0x26,0x27};
 uint8_t busaI2cScanNext=0;
 uint32_t busaI2cScanLastStep=0;
+uint32_t busaI2cAddressLastSeen[9]={};
+uint16_t busaI2cAddressAckTotal[9]={};
+void busaI2cRebuildAddressCache(uint32_t now){
+  i2cFoundCount=0;
+  for(uint8_t i=0;i<9;i++){
+    if(busaI2cAddressLastSeen[i] &&
+       (uint32_t)(now-busaI2cAddressLastSeen[i])<=BUSA_I2C_ACK_FRESH_MS){
+      i2cFound[i2cFoundCount++]=BUSA_I2C_PROBE_ADDRS[i];
+    }
+  }
+  i2cAckCount=i2cFoundCount;
+}
 void scanI2cAddresses(uint32_t now){
   if(!i2cOnline || busaI2cSuspended(now) || !elapsed(now,busaI2cScanLastStep,600))return;
   busaI2cScanLastStep=now;
-  if(busaI2cScanNext==0){i2cFoundCount=0;i2cAckCount=0;}
-  const uint8_t address=BUSA_I2C_PROBE_ADDRS[busaI2cScanNext];
+  const uint8_t index=busaI2cScanNext;
+  const uint8_t address=BUSA_I2C_PROBE_ADDRS[index];
   const bool found=ack(address);
-  // Advance even after a timeout; no bad address can starve another device.
-  busaI2cScanNext=(busaI2cScanNext+1)%9;
-  if(found && i2cFoundCount<24)i2cFound[i2cFoundCount++]=address;
-  if(busaI2cScanNext==0){
-    i2cAckCount=i2cFoundCount;
-    i2cFullScanAt=millis();
+  // Do not reset all discoveries at the beginning of each 9-address pass.
+  // A single NACK is not enough to erase a previous valid ACK.
+  if(found){
+    busaI2cAddressLastSeen[index]=millis();
+    if(busaI2cAddressAckTotal[index]<UINT16_MAX)++busaI2cAddressAckTotal[index];
+    if(address>=0x20 && address<=0x27){
+      busaI2cLastPcfAckMs=millis();++busaI2cPcfAcks;
+    }else if(address==0x40){
+      busaI2cLastPcaAckMs=millis();++busaI2cPcaAcks;
+    }
+  }else if(address>=0x20 && address<=0x27){
+    busaI2cLastPcfNackMs=millis();
+  }else if(address==0x40){
+    busaI2cLastPcaNackMs=millis();
   }
+  busaI2cScanNext=(index+1)%9;
+  if(busaI2cScanNext==0)i2cFullScanAt=millis();
+  busaI2cRebuildAddressCache(millis());
 }
 int readPcaReg(uint8_t reg){
   if(!pcaDetected || busaI2cSuspended(millis()))return -1;
@@ -395,6 +425,7 @@ int readPcaReg(uint8_t reg){
 }
 void probeI2c(uint32_t now){
   if(!i2cOnline || busaI2cSuspended(now))return;
+  busaI2cRebuildAddressCache(millis());
   pcfDetected=false;pcfAddr=0;pcaDetected=false;
   for(uint8_t j=0;j<i2cFoundCount;j++){
     const uint8_t address=i2cFound[j];
@@ -1033,6 +1064,12 @@ String statusJSON(){
   s+=",\"raw_pair\":"+quoteJson(rawPair)+"}";
   s+=",\"i2c\":{\"sda_gpio\":8,\"scl_gpio\":9,\"controller_started\":"+(i2cOnline?String("true"):String("false"));
   s+=",\"last_scan_ms\":"+String(i2cFullScanAt);
+  s+=",\"pcf_last_ack_ms\":"+String(busaI2cLastPcfAckMs);
+  s+=",\"pca_last_ack_ms\":"+String(busaI2cLastPcaAckMs);
+  s+=",\"pcf_ack_total\":"+String(busaI2cPcfAcks);
+  s+=",\"pca_ack_total\":"+String(busaI2cPcaAcks);
+  s+=",\"pcf_last_nack_ms\":"+String(busaI2cLastPcfNackMs);
+  s+=",\"pca_last_nack_ms\":"+String(busaI2cLastPcaNackMs);
   s+=",\"driver\":\"SOFTWARE_OPEN_DRAIN\"";
   s+=",\"last_result\":"+String(busaI2cLastResult);
   s+=",\"last_address\":"+String(busaI2cLastAddress);
