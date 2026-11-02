@@ -2136,31 +2136,59 @@ get('tempCalSave').onclick=async()=>{
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
 document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.dataset.page)));
-function plot(id,values){const c=get(id),x=c.getContext('2d');x.fillStyle=document.documentElement.dataset.theme==='light'?'#ffffff':'#183247';x.fillRect(0,0,600,200);const a=values.filter(v=>v!==null);if(!a.length){x.fillStyle='#d9bd75';x.fillText('НЕТ ДАННЫХ',24,60);return}let lo=Math.min(...a),hi=Math.max(...a);if(hi-lo<.1)hi=lo+.1;x.strokeStyle='#70e99b';x.beginPath();values.forEach((v,i)=>{if(v===null)return;let xx=10+i*580/80,yy=185-(v-lo)/(hi-lo)*165;if(i===0||values[i-1]===null)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke()}
-function graphAllTemperatures(){
- const c=get('graphT'),x=c.getContext('2d'),colors=['#078fbe','#df8744','#d65446','#3b9f74'];
- const dark=document.documentElement.dataset.theme!=='light';
- const arrs=tlog4.map(a=>a.slice(-80)),all=arrs.flat().filter(v=>v!==null&&Number.isFinite(v));
- x.fillStyle=dark?'#081a2e':'#ffffff';x.fillRect(0,0,c.width,c.height);
- x.strokeStyle=dark?'#255477':'#d7e3e9';x.lineWidth=1;
- for(let j=0;j<=4;j++){const gy=22+j*38;x.beginPath();x.moveTo(37,gy);x.lineTo(592,gy);x.stroke();}
- if(all.length<2){x.fillStyle=dark?'#9cc9e0':'#657e8a';x.font='15px sans-serif';
-  x.fillText('Недостаточно измерений',126,108);return;}
- let lo=Math.min(...all),hi=Math.max(...all);
- if(hi-lo<0.5){lo-=1;hi+=1}else{const pad=(hi-lo)*0.14;lo-=pad;hi+=pad;}
- x.font='11px sans-serif';x.fillStyle=dark?'#a6d6ee':'#355366';
- x.fillText(hi.toFixed(1)+'°',2,27);x.fillText(lo.toFixed(1)+'°',2,180);
- arrs.forEach((a,k)=>{
-  x.strokeStyle=colors[k];x.lineWidth=3;x.beginPath();let moved=false;
-  a.forEach((v,i)=>{
-   if(v===null||!Number.isFinite(v)){moved=false;return;}
-   const px=38+(a.length<=1?0:i*550/(a.length-1));
-   const py=22+152*(1-(v-lo)/(hi-lo));
-   if(!moved){x.moveTo(px,py);moved=true}else x.lineTo(px,py);
-  });x.stroke();
- });
+// One controller history feeds the TFT and iPhone: no invented collection values.
+function chartFrame(ctx,w,h){ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);ctx.strokeStyle='#2774a5';ctx.lineWidth=2;ctx.strokeRect(1,1,w-2,h-2);}
+function chartLine(ctx,values,color,x,y,w,h,zero=false){
+ const a=values.filter(v=>Number.isFinite(v));if(!a.length)return;
+ let low=zero?0:Math.min(...a),high=Math.max(...a);
+ if(zero)high=Math.max(1,high);else{let p=Math.max(.2,(high-low)*.22);low-=p;high+=p;}
+ if(high<=low)high=low+1;ctx.strokeStyle=color;ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();
+ let drawing=false;values.forEach((v,i)=>{
+  if(!Number.isFinite(v)){drawing=false;return;}
+  let xx=x+(values.length<2?w:i*w/(values.length-1));
+  let yy=y+h-3-Math.min(1,Math.max(0,(v-low)/(high-low)))*(h-6);
+  if(!drawing){ctx.moveTo(xx,yy);drawing=true}else ctx.lineTo(xx,yy);
+ });ctx.stroke();
 }
-function graphs(){graphAllTemperatures();plot('graphF',waterPulseLog)}
+function graphAllTemperatures(){
+ const c=get('graphT'),x=c.getContext('2d');chartFrame(x,c.width,c.height);
+ const names=['Т1 · Вода','Т2 · Колонна','Т3 · Куб','Т4 · Верх'];
+ const colors=['#36c5f3','#ffac56','#ff6965','#5ee897'],series=busaGraphData.temperature||[[],[],[],[]];
+ x.textBaseline='middle';
+ for(let k=0;k<4;k++){
+  const y=8+k*102,vals=series[k]||[],good=vals.filter(Number.isFinite);
+  if(k){x.strokeStyle='#28608b';x.lineWidth=2;x.beginPath();x.moveTo(8,y-3);x.lineTo(592,y-3);x.stroke();}
+  x.font='16px sans-serif';x.fillStyle=colors[k];x.textAlign='left';x.fillText(names[k],14,y+16);
+  x.textAlign='right';x.fillStyle='#e4f5ff';x.fillText(good.length?good[good.length-1].toFixed(1)+' °C':'Н/Д',582,y+16);x.textAlign='left';
+  x.strokeStyle='#17384f';x.lineWidth=1;x.strokeRect(12,y+34,576,61);
+  chartLine(x,vals,colors[k],17,y+38,566,53);
+  if(good.length<2){x.fillStyle='#799eb8';x.font='12px sans-serif';x.fillText('Ожидание измерений',22,y+72);}
+ }
+}
+function graphWaterAndCollection(){
+ const c=get('graphF'),x=c.getContext('2d');chartFrame(x,c.width,c.height);
+ x.textBaseline='middle';x.textAlign='left';x.font='18px sans-serif';x.fillStyle='#58d8ff';x.fillText('ВОДА · YF-S401',15,23);
+ x.font='13px sans-serif';x.fillStyle='#bce6fb';x.textAlign='right';x.fillText('Импульсы за 2 с · без калибровки',585,23);x.textAlign='left';
+ x.strokeStyle='#1a3f57';x.lineWidth=1;x.strokeRect(12,40,576,96);
+ chartLine(x,busaGraphData.water_pulses||[],'#37bcff',17,43,566,88,true);
+ x.strokeStyle='#28608b';x.lineWidth=2;x.beginPath();x.moveTo(8,146);x.lineTo(592,146);x.stroke();
+ x.font='18px sans-serif';x.fillStyle='#ffae65';x.fillText('ОТБОР',15,173);
+ x.fillStyle='#b6d6e9';x.font='17px sans-serif';x.fillText('НЕТ ДАТЧИКА ОТБОРА',20,215);
+ x.font='13px sans-serif';x.fillText('Измерения отсутствуют — линия не строится',20,245);
+}
+function graphs(){graphAllTemperatures();graphWaterAndCollection();}
+async function refreshGraphHistory(force=false){
+ if(busaGraphLoading||(!force&&Date.now()-busaGraphFetchedAt<4500))return;
+ busaGraphLoading=true;busaGraphFetchedAt=Date.now();
+ try{
+  const r=await fetch('/api/graph-history',{cache:'no-store'});
+  if(!r.ok)throw Error('HTTP '+r.status);
+  const j=await r.json();
+  if(j.ok&&Array.isArray(j.temperature)&&Array.isArray(j.water_pulses)){
+   busaGraphData=j;if(active===3)graphs();
+  }
+ }catch(e){}finally{busaGraphLoading=false;}
+}
 async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;
 networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(Date.now()-lastLocalNav>1800){
  const physicalPage=(s.ui_page||1)-1;
@@ -2271,7 +2299,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (проверка изображения визуальная)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)graphs();
+get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (проверка изображения визуальная)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)refreshGraphHistory();
 }catch(e){if(connected)message('Потеряна связь с ESP32');connected=false;networkLeds(null,'')}finally{pollBusy=false}}
 get('temperatureSave').onclick=async()=>{
  const button=get('temperatureSave'),result=get('temperatureSaveResult');
