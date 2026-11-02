@@ -235,7 +235,7 @@ static void v13Graphs(bool layout){
     screen->drawRoundRect(x,51,113,28,5,V13_CYAN);
     v13Text(j==0?"ТЕМПЕРАТУРЫ":"ВОДА И ОТБОР",x+5,70,WHITE);
   }
-  screen->fillRoundRect(7,86,226,152,5,BLACK);
+  screen->fillRoundRect(7,86,226,152,5,0x0000);
   screen->drawRoundRect(7,86,226,152,5,V13_CYAN);
   if(graphSubView==0){
     static const uint16_t colors[]={V13_CYAN,V13_ORANGE,V13_RED,GREEN};
