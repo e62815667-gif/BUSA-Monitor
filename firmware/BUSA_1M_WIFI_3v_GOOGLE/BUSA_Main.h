@@ -2194,6 +2194,10 @@ networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(Date
  const physicalPage=(s.ui_page||1)-1;
  if(typeof s.ui_page==='number'&&(physicalPage===6?active!==5||settingsActive!==6:physicalPage!==active))page(physicalPage,false);
  if(physicalPage===5&&settingsActive>=0&&settingsActive<=4&&typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);
+ if(physicalPage===3&&typeof s.graph_view==='number'){
+   const currentGraph=Number(document.querySelector('[data-graph-tft].on')?.dataset.graphTft||0);
+   if(currentGraph!==s.graph_view)selectGraphView(s.graph_view,false);
+ }
 }let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
  get('t'+i).textContent=t.c===null?'Н/Д':Number(t.c).toFixed(1)+' °C';
