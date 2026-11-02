@@ -39,7 +39,7 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-240MHZ-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -47,6 +47,10 @@ uint32_t busaLastI2cStepMs=0,busaMaxI2cStepMs=0;
 uint32_t busaI2cSuspendedUntil=0,busaI2cErrorCount=0,busaI2cStallCount=0;
 uint32_t busaTempWorstMs=0,busaOneWireWorstMs=0,busaTftWorstMs=0;
 uint32_t busaI2cWorstMs=0,busaHttpWorstMs=0;
+constexpr uint32_t BUSA_TFT_LIVE_REFRESH_MS=200; // Responsive changed-field refresh, not a full redraw
+constexpr uint32_t BUSA_KEYPAD_SLICE_MS=16; // four matrix rows per slice, max ~64 ms per sweep
+uint32_t busaLastTftRenderMs=0,busaTftFullRenderCount=0,busaTftLiveRenderCount=0;
+
 // Generic ESP32-S3 performance telemetry; no change to sensor/control functionality.
 uint32_t busaCpuMhz=0,busaPsramBytes=0,busaPsramFreeBytes=0;
 bool busaCpu240Ok=false,busaPsramDetected=false;
@@ -278,7 +282,7 @@ bool ack(uint8_t address){
 uint8_t busaI2cScanNext=0;
 uint32_t busaI2cScanLastStep=0;
 void scanI2cAddresses(uint32_t now){
-  if(!i2cOnline || busaI2cSuspended(now) || !elapsed(now,busaI2cScanLastStep,3000))return;
+  if(!i2cOnline || busaI2cSuspended(now) || !elapsed(now,busaI2cScanLastStep,600))return;
   busaI2cScanLastStep=now;
   const uint8_t addr=busaI2cScanNext<8?(uint8_t)(0x20+busaI2cScanNext):0x40;
   busaI2cScanNext=(busaI2cScanNext+1)%9;
@@ -395,32 +399,52 @@ void loadKeymap(){
   keypadMessage=keypadReady?"Раскладка загружена":"Нужно обучить 20 клавиш";
 }
 // Detect a single closed physical pair on any two PCF8575 P0..P15.
+// Scan the 16 PCF8575 rows in four short transactions per pass, not all 16
+// during a single UI frame. A partial scan returns -3 until all rows are tested.
+uint8_t busaKeyScanRow=0;
+int busaKeyScanFound=-1;
+bool busaKeyScanAmbiguous=false;
+void busaKeyScanReset(){busaKeyScanRow=0;busaKeyScanFound=-1;busaKeyScanAmbiguous=false;}
 int scanKeyPair(){
-  if(!pcfDetected){pcfScanError=1;return -1;}
-  pcfLastScanAt=millis();
-  pcfScanError=0;pcfPairCount=0;pcfObservedLow=0;
-  if(!pcfWrite(65535)){pcfScanError=2;return -2;}
-  delayMicroseconds(160);
-  if(!pcfRead(pcfIdleMask)){pcfScanError=3;return -2;}
-  int found=-1;bool ambiguous=false;
-  for(int a=0;a<16;a++){
-    if(!pcfWrite((uint16_t)(65535u & ~(1u<<a)))){pcfScanError=4;ambiguous=true;break;}
-    delayMicroseconds(160);
-    uint16_t v;
-    if(!pcfRead(v)){pcfScanError=5;ambiguous=true;break;}
-    uint16_t lows=(uint16_t)(~v) & (uint16_t)~(1u<<a);
+  if(!pcfDetected){pcfScanError=1;busaKeyScanReset();return -2;}
+  if(busaKeyScanRow==0){
+    pcfLastScanAt=millis();
+    pcfScanError=0;pcfPairCount=0;pcfObservedLow=0;
+    busaKeyScanFound=-1;busaKeyScanAmbiguous=false;
+    if(!pcfWrite(65535)){pcfScanError=2;return -2;}
+    delayMicroseconds(100);
+    if(!pcfRead(pcfIdleMask)){pcfScanError=3;return -2;}
+  }
+  for(uint8_t step=0;step<4 && busaKeyScanRow<16;step++){
+    const int a=busaKeyScanRow++;
+    if(!pcfWrite((uint16_t)(65535u & ~(1u<<a)))){
+      pcfScanError=4;busaKeyScanAmbiguous=true;break;
+    }
+    delayMicroseconds(100);
+    uint16_t v=0;
+    if(!pcfRead(v)){pcfScanError=5;busaKeyScanAmbiguous=true;break;}
+    const uint16_t lows=(uint16_t)(~v) & (uint16_t)~(1u<<a);
     pcfObservedLow|=lows;
     if(!lows)continue;
-    if(lows&(lows-1)){pcfScanError=6;ambiguous=true;break;}
+    if(lows&(lows-1)){pcfScanError=6;busaKeyScanAmbiguous=true;break;}
     int b=0;while(b<16 && !(lows&(1u<<b)))b++;
     if(b>=16)continue;
-    int p=(min(a,b)<<4)|max(a,b);
-    if(found>=0 && found!=p){pcfScanError=7;ambiguous=true;break;}
-    if(found<0)pcfPairCount=1;
-    found=p;
+    const int pair=(min(a,b)<<4)|max(a,b);
+    if(busaKeyScanFound>=0 && busaKeyScanFound!=pair){
+      pcfScanError=7;busaKeyScanAmbiguous=true;break;
+    }
+    if(busaKeyScanFound<0)pcfPairCount=1;
+    busaKeyScanFound=pair;
   }
-  if(!pcfWrite(65535)){pcfScanError=8;ambiguous=true;}
-  return ambiguous?-2:found;
+  if(busaKeyScanAmbiguous || busaKeyScanRow==16){
+    if(!pcfWrite(65535)){pcfScanError=8;busaKeyScanAmbiguous=true;}
+    const int result=busaKeyScanAmbiguous?-2:busaKeyScanFound;
+    busaKeyScanReset();
+    return result;
+  }
+  // End the slice with all PCF pins high while HTTP/TFT/1-Wire run.
+  if(!pcfWrite(65535)){pcfScanError=8;busaKeyScanReset();return -2;}
+  return -3;
 }
 String pairName(int p){
   if(p==-2)return "НЕСКОЛЬКО КНОПОК";
@@ -595,7 +619,10 @@ bool tftDisplayOff=false;
 uint32_t tftDisplayActivityMs=0;
 // No inactivity auto-off. Only F2 or explicit iPhone screen button blanks TFT.
 void pollKeys(uint32_t now){
-  if(!pcfDetected||busaI2cSuspended(now)||!busaI2cLinesFree()||!elapsed(now,lastKeyScan,160))return;
+  if(!pcfDetected||busaI2cSuspended(now)||!busaI2cLinesFree()){
+    busaKeyScanReset();return;
+  }
+  if(!elapsed(now,lastKeyScan,BUSA_KEYPAD_SLICE_MS))return;
   if(busaKeySkipUntil && (int32_t)(now-busaKeySkipUntil)<0)return;
   lastKeyScan=now;
   const uint32_t keyStarted=millis();
@@ -603,10 +630,11 @@ void pollKeys(uint32_t now){
   busaLastKeyScanMs=millis()-keyStarted;
   if(busaLastKeyScanMs>busaMaxKeyScanMs)busaMaxKeyScanMs=busaLastKeyScanMs;
   // Misbehaving I2C bus can stall the keypad scanner; back off to protect HTTP.
+  if(pair==-3)return; // incomplete four-row scan: leave debounce state untouched
   if(busaLastKeyScanMs>100){
     busaI2cQuarantine(millis());
     busaKeySkipUntil=millis()+60000;
-    Serial.printf("BUSA SLOW KEYPAD scan_ms=%lu backoff=2000\n",
+    Serial.printf("BUSA SLOW KEYPAD scan_ms=%lu backoff=60000\n",
       (unsigned long)busaLastKeyScanMs);
     return;
   }
@@ -845,6 +873,10 @@ String statusJSON(){
   s+=",\"onewire_worst_ms\":"+String(busaOneWireWorstMs);
   s+=",\"http_worst_ms\":"+String(busaHttpWorstMs);
   s+=",\"tft_worst_ms\":"+String(busaTftWorstMs);
+  s+=",\"tft_last_ms\":"+String(busaLastTftRenderMs);
+  s+=",\"tft_live_refresh_target_ms\":"+String(BUSA_TFT_LIVE_REFRESH_MS);
+  s+=",\"tft_full_render_count\":"+String(busaTftFullRenderCount);
+  s+=",\"tft_live_render_count\":"+String(busaTftLiveRenderCount);
   s+=",\"cpu_mhz\":"+String(ESP.getCpuFreqMHz());
   s+=",\"cpu_240mhz\":"+(busaCpu240Ok?String("true"):String("false"));
   s+=",\"psram_detected\":"+(busaPsramDetected?String("true"):String("false"));
@@ -2072,16 +2104,22 @@ void loop(){
     }
     {const uint32_t started=millis();pollKeys(now);busaObserve("KEYPAD",started,busaMaxKeyScanMs);}
   }
-  // Landscape V14.6: rebuild background ONLY on explicit view/theme change.
-  // A 2.5 s telemetry tick refreshes changed text without wiping the TFT.
+  // Landscape V14.7: repaint changed fields at 5 Hz; full frame only on page/theme change.
+  // TFT driver writes are kept in the main loop so no concurrent SPI transactions occur.
   if(tftStarted && !tftDisplayOff && !otaActive && bootSplashComplete &&
      elapsed(now,splashStartedAt,splashHoldMs) &&
-     (tftDirty||lastRender==0 || elapsed(now,lastRender,2500))){
+     (tftDirty||lastRender==0 || elapsed(now,lastRender,BUSA_TFT_LIVE_REFRESH_MS))){
     const bool wholeFrame=tftDirty||lastRender==0;
     lastRender=now;
     const uint32_t started=millis();
-    if(screen->width()>=300 && !wholeFrame)v14RefreshLive(now);
-    else renderScreen(now);
+    if(screen->width()>=300 && !wholeFrame){
+      v14RefreshLive(now);
+      busaTftLiveRenderCount++;
+    }else{
+      renderScreen(now);
+      busaTftFullRenderCount++;
+    }
+    busaLastTftRenderMs=millis()-started;
     busaObserve("TFT",started,busaTftWorstMs);
   }
   if(elapsed(now,lastUart,5000)){
