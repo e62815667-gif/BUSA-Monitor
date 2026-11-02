@@ -15,7 +15,12 @@ static void v13Log(const String &msg){
   for(int i=(int)v13EventCount-1;i>0;i--)v13Events[i]=v13Events[i-1];
   v13Events[0]=String(millis()/1000)+"с · "+msg;
 }
+static uint32_t v13LastCollectAt=0;
 static void v13Collect(uint32_t now){
+  // The display polls at 5 Hz; histories/event state need at most 1 Hz.
+  // Keep front-panel responsiveness without repeated Strings and Wi-Fi queries.
+  if(v13LastCollectAt && !elapsed(now,v13LastCollectAt,1000))return;
+  v13LastCollectAt=now;
   if(!v13EventBoot){
     v13EventBoot=true;
     v13Log("БУСА запущена (V13)");
