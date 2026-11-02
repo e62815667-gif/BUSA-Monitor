@@ -2957,7 +2957,7 @@ void loop(){
     Serial0.println("STA reconnect attempt; AP unaffected");
   }
   readConsole();
-  if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
+  if(otaRestart && elapsed(now,otaRestartAt,busaCloudRebootPending?15000:4000)){soundOutputsOff();ESP.restart();}
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
   if(otaActive){soundOutputsOff();delay(0);return;}
