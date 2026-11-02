@@ -184,12 +184,12 @@ static void v14Temperature(uint32_t now,bool layout){
     screen->fillCircle(x+14,y+15,4,v14SeriesColors[i]);
     v14Print(names[i],x+25,y+18,V14_TEXT);
     v14Metric(v13Temp(i,now),x+11,y+40,133,hasTemp(i,now));
-    v14Tiny(String("Зад.: ")+v13Ref(refTemp[i]),x+12,y+54,V14_MUTED);
-    v14Tiny(String("Пред.: ")+v13Ref(noticeTemp[i]),x+12,y+66,V14_MUTED);
+    v14Tiny(String("ВКЛ: ")+v13Ref(refTemp[i]),x+12,y+54,V14_MUTED);
+    v14Tiny(String("ВЫКЛ: ")+v13Ref(noticeTemp[i]),x+12,y+66,V14_MUTED);
   }
   if(editingTemp){
     hqPanel(43,73,234,114);
-    v14Big(String("Редактирование T")+String(selectedTemp+1),53,97,V14_TEXT);
+    v14Big(String("T")+String(selectedTemp+1)+(selectedField?" ВЫКЛ":" ВКЛ"),53,97,V14_TEXT);
     v14Metric(editTempBuffer.isEmpty()?"--":editTempBuffer,55,128,209,true);
     v14Print("ENT сохранить",53,150,V14_GREEN);
     v14Print("ESC отменить",53,171,V14_MUTED);
@@ -307,8 +307,8 @@ static void v14Settings(bool layout){
     screen->drawFastHLine(47,103,226,V14_RULE);
     switch(approvedSettingsItem){
       case 0:
-        v14Print("T1–T4: справочные поля",48,124,V14_TEXT);
-        v14Tiny("Заданное / Предупреждение",48,144,V14_MUTED);
+        v14Print("T1–T4: пороги звука",48,124,V14_TEXT);
+        v14Tiny("ВКЛ / ВЫКЛ",48,144,V14_MUTED);
         v14Tiny("ENT: открыть экран Т",48,174,V14_BLUE);break;
       case 1:
         v14Print("Датчика отбора нет",48,126,V14_WARN);
