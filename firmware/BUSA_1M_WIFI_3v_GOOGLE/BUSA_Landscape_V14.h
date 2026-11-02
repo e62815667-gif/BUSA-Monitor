@@ -184,10 +184,17 @@ static void v14Temperature(uint32_t now,bool layout){
     screen->fillCircle(x+14,y+15,4,v14SeriesColors[i]);
     v14Print(names[i],x+25,y+18,V14_TEXT);
     v14Metric(v13Temp(i,now),x+11,y+40,133,hasTemp(i,now));
-    v14Tiny(String("ВКЛ: ")+v13Ref(refTemp[i]),x+12,y+54,V14_MUTED);
-    v14Tiny(String("ВЫКЛ: ")+v13Ref(noticeTemp[i]),x+12,y+66,V14_MUTED);
+    v14Tiny(String(i==selectedTemp && selectedField==0?">ВКЛ: ":"ВКЛ: ")+v13Ref(refTemp[i]),x+12,y+54,(i==selectedTemp && selectedField==0)?V14_ORANGE:V14_MUTED);
+    v14Tiny(String(i==selectedTemp && selectedField==1?">ВЫКЛ: ":"ВЫКЛ: ")+v13Ref(noticeTemp[i]),x+12,y+66,(i==selectedTemp && selectedField==1)?V14_ORANGE:V14_MUTED);
   }
-  if(editingTemp){
+  if(deleteConfirmPending){
+    hqPanel(35,70,250,126);
+    v14Big("УДАЛИТЬ ПОРОГ?",43,94,V14_WARN);
+    v14Print(String("T")+String(selectedTemp+1)+
+      (selectedField?" ВЫКЛ":" ВКЛ"),43,120,V14_TEXT);
+    v14Print("ENT: удалить",43,150,V14_WARN);
+    v14Print("ESC: отмена",43,172,V14_GREEN);
+  }else if(editingTemp){
     hqPanel(43,73,234,114);
     v14Big(String("T")+String(selectedTemp+1)+(selectedField?" ВЫКЛ":" ВКЛ"),53,97,V14_TEXT);
     v14Metric(editTempBuffer.isEmpty()?"--":editTempBuffer,55,128,209,true);

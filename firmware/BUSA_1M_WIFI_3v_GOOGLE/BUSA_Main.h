@@ -557,6 +557,7 @@ float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
 // TFT temperature setpoints mirror the actual active sound threshold settings.
 int selectedTemp=0,selectedField=0;
 bool editingTemp=false;
+bool deleteConfirmPending=false; // Explicit confirmation for sound threshold removal
 String editTempBuffer="";
 uint8_t editCursor=0;
 bool storeTempReference(int sensor,int field,float value); // writes real sound setpoint
@@ -664,7 +665,7 @@ void startKeyLearning(){
 void navigatePage(uint8_t target){
   if(target>=6||target==currentPage)return;
   previousMainPage=currentPage;
-  currentPage=target;tftView=0;editingTemp=false;tftDirty=true;
+  currentPage=target;tftView=0;editingTemp=false;deleteConfirmPending=false;tftDirty=true;
 }
 void deleteSelectedReference(){
   if(currentPage!=1 || selectedTemp<0 || selectedTemp>3)return;
@@ -675,26 +676,39 @@ void deleteSelectedReference(){
 void moveApprovedTab(int direction); // declaration required by keypad navigation
 void darkenTftDisplay(); // manual screen-off via F2 or local iPhone UI
 void keypadAction(int k){
-  // Confirmed user assignments:
-  // UP=7, DOWN=11, LEFT=16, RIGHT=18, ENT=19, ESC=15, F1=0.
+  // # and * are deliberately unassigned: no navigation or other action.
+  if(k==2 || k==3)return;
+  // Confirmation is the only path that removes an existing sound threshold.
+  if(deleteConfirmPending){
+    if(k==19){ // ENT confirms delete
+      deleteSelectedReference();
+      deleteConfirmPending=false;
+    }else if(k==15 || k==0){ // ESC or F1 cancels
+      deleteConfirmPending=false;
+      keyMessage="Удаление отменено";
+    }else{
+      keyMessage="ENT: удалить, ESC: отменить";
+    }
+    tftDirty=true;return;
+  }
   if(editingTemp){
-    if(k==0){ // F1: delete the ENTIRE entered value
+    if(k==0){ // F1 clears only the input; the saved threshold is untouched
       editTempBuffer="";editCursor=0;
-      keyMessage="Ввод очищен. Ent сохранить, Esc отмена";
-    }else if(k==16){ // LEFT
+      keyMessage="Поле очищено. Введи число или ESC";
+    }else if(k==16){ // LEFT: move numeric cursor, not a page
       if(editCursor)editCursor--;
-    }else if(k==18){ // RIGHT
+    }else if(k==18){ // RIGHT: move numeric cursor, not a page
       if(editCursor<editTempBuffer.length())editCursor++;
-    }else if(k==7){ // UP: move caret to beginning
+    }else if(k==7){ // UP: beginning of input
       editCursor=0;
-    }else if(k==11){ // DOWN: move caret to end
+    }else if(k==11){ // DOWN: end of input
       editCursor=(uint8_t)editTempBuffer.length();
-    }else if(k==15){ // ESC: cancel and go BACK to selected reference
+    }else if(k==15){ // ESC: discard edits
       editingTemp=false;editTempBuffer="";
-    }else if(k==19){ // ENT: OK; accept 0..125 or cleared blank value
+      keyMessage="Изменение отменено";
+    }else if(k==19){ // ENT: save only a valid numeric value
       if(editTempBuffer.isEmpty()){
-        deleteSelectedReference();
-        editingTemp=false;
+        keyMessage="Пустое поле: введи число или ESC";
       }else if(storeTempReference(selectedTemp,selectedField,editTempBuffer.toFloat())){
         editingTemp=false;editTempBuffer="";
         keyMessage="Порог звука сохранён";
@@ -712,70 +726,63 @@ void keypadAction(int k){
     }
     tftDirty=true;return;
   }
-
-  // Fixed main menu shortcuts, independent of the four physical arrows.
-  if(k==2 || k==3){ // # previous / * next section
-    moveApprovedTab(k==2?-1:+1);
-  }else if(k==15){ // ESC: BACK (first close detail, then previous screen)
+  if(k==15){ // ESC: close detail or go back
     if(tftView){tftView=0;}
     else if(currentPage!=previousMainPage){
       uint8_t target=previousMainPage;
-      previousMainPage=currentPage;
-      currentPage=target;
+      previousMainPage=currentPage;currentPage=target;
     }else if(currentPage!=0){navigatePage(0);}
-  }else if(k==0){ // F1: remove selected informational value
-    deleteSelectedReference();
-  }else if(k==7 || k==11){ // UP / DOWN move vertically
+  }else if(k==0){ // F1: request delete confirmation on Temperatures only
     if(currentPage==1){
-      selectedTemp=(selectedTemp+(k==7?3:1))%4; // sensor row
+      deleteConfirmPending=true;
+      keyMessage=String("Удалить T")+String(selectedTemp+1)+
+        (selectedField?" ВЫКЛ":" ВКЛ")+"? ENT/ESC";
+    }
+  }else if(k==7 || k==11){ // UP/DOWN: move within current section
+    if(currentPage==1){
+      // Eight entries: T1 ON, T1 OFF, ... T4 ON, T4 OFF
+      int item=selectedTemp*2+selectedField;
+      item=(item+(k==7?7:1))%8;
+      selectedTemp=item/2;selectedField=item%2;
     }else if(currentPage==5){
       approvedSettingsItem=(approvedSettingsItem+(k==7?6:1))%7;
     }else if(currentPage==3){
       graphSubView=(graphSubView+(k==7?2:1))%3;
     }else{
-      tftView=k==7?0:1; // scroll between upper/lower information
+      tftView=k==7?0:1;
     }
-  }else if(k==16 || k==18){ // LEFT / RIGHT move horizontally
-    if(currentPage==1){
-      selectedField=k==16?0:1; // sound T_ON / T_OFF thresholds
-    }else if(currentPage==5){
-      approvedSettingsItem=(approvedSettingsItem+(k==16?6:1))%7;
-    }else if(currentPage==3){
-      graphSubView=(graphSubView+(k==16?2:1))%3;
-    }else{
-      moveApprovedTab(k==16?-1:+1);
-    }
-  }else if(k==19){ // ENT: OK / enter selected item
+  }else if(k==16 || k==18){ // LEFT/RIGHT: change sections everywhere
+    moveApprovedTab(k==16?-1:+1);
+  }else if(k==19){ // ENT: open selected element
     if(currentPage==1){
       editingTemp=true;
       float v=selectedField?noticeTemp[selectedTemp]:refTemp[selectedTemp];
       editTempBuffer=isfinite(v)?String(v,1):String("");
       editCursor=(uint8_t)editTempBuffer.length();
     }else if(currentPage==0){
-      navigatePage(1); // Open temperature cards from home
+      navigatePage(1);
     }else if(currentPage==5){
       if(tftView && approvedSettingsItem==0)navigatePage(1);
       else tftView=1;
     }else if(currentPage==3){
       graphSubView=(graphSubView+1)%3;
     }else{
-      tftView=1; // Open detailed read-only view
+      tftView=1;
     }
-  }else if(k==1){ // F2 outside numeric editor: display OFF, monitoring stays active
+  }else if(k==1){ // F2: display OFF; monitoring continues
     darkenTftDisplay();
     keyMessage="TFT погашен (ручной режим)";
   }else if(k==17 || k==4){navigatePage(0);} // 0,1 Home
-  else if(k==5){navigatePage(1);selectedTemp=0;} // 2 Temperatures
+  else if(k==5){navigatePage(1);selectedTemp=0;selectedField=0;} // 2 Temperatures
   else if(k==6){navigatePage(2);} // 3 Collection
   else if(k==8){navigatePage(3);} // 4 Graphs
   else if(k==9){navigatePage(4);} // 5 Events
   else if(k==10){navigatePage(5);} // 6 Settings
   else if(k==12){navigatePage(5);settingsSubTab=0;} // 7 Wi-Fi
   else if(k==13){navigatePage(5);settingsSubTab=1;} // 8 Google
-  else if(k==14){navigatePage(4);} // 9 Diagnostics
+  else if(k==14){navigatePage(4);} // 9 Events (existing assignment)
   tftDirty=true;
 }
-
 
 bool learnCommitPair(int pair){
   if(!keypadLearning||pair<0||pair>255||learnStep>=20)return false;
@@ -1559,7 +1566,7 @@ main>*{max-width:100%;min-width:0}
 <div class="row">Время работы <b id="uptime">—</b></div>
 <div class="row">PCF8575 <b id="pcf">—</b></div>
 <div class="row">TFT <b id="tft">—</b></div>
-<h2>Калибровка клавиатуры 5×4</h2><p class="hint">Назначения: ↑ вверх, ↓ вниз, ← влево, → вправо, Ent ОК, Esc назад, F1 удалить значение.</p>
+<h2>Калибровка клавиатуры 5×4</h2><p class="hint">Назначения: ↑ вверх, ↓ вниз, ← влево, → вправо, Ent ОК, Esc назад, F1 удалить с подтверждением.</p>
 <p class="hint">Не переставляй провода. После запуска нажимай кнопки последовательно слева направо, сверху вниз по фотографии. Полностью отпускай клавишу между нажатиями. Карта сохраняется в ESP32.</p>
 <div class="row">Состояние <b id="keyState">—</b></div>
 <div class="row">Следующая клавиша <b id="keyExpected">—</b></div>

@@ -117,6 +117,17 @@ jobs:
           assert 'Serial.printf("BUSA ALIVE ' in p
           assert 'N16R8 HEARTBEAT' in p and 'N8R2 HEARTBEAT' not in p
           assert 'if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}' in p
+          # Keypad policy: LEFT/RIGHT switch tabs, UP/DOWN select 8 temperature fields,
+          # #/* perform no action, and any threshold removal requires ENT confirmation.
+          assert 'if(k==2 || k==3)return;' in p
+          assert 'moveApprovedTab(k==16?-1:+1);' in p
+          assert 'item=(item+(k==7?7:1))%8;' in p
+          assert 'if(deleteConfirmPending)' in p
+          assert 'if(k==19){ // ENT confirms delete' in p
+          assert 'if(editTempBuffer.isEmpty()){' in p
+          assert 'Пустое поле: введи число или ESC' in p
+          assert 'deleteSelectedReference();' in p
+          assert 'moveApprovedTab(k==2?' not in p
           sound=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarms.h').read_text()
           logic=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarmLogic.h').read_text()
           assert '12V_SOUND_ONLY' in sound and 'BUSA_SOUND_ACTIVE_LOW=true' in sound

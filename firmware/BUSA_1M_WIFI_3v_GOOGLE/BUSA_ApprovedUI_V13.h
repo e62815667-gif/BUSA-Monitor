@@ -153,19 +153,26 @@ static void v13Temperatures(uint32_t now,bool layout){
       if(i==selectedTemp)screen->fillRect(7,y+3,3,43,V13_CYAN);
       v13Text(String(i+1)+". "+labels[i],18,y+19,WHITE);
     }
-    v13Text("Ent: изменить  F1: сброс",8,273,GRAY);
+    v13Text("UP/DN: выбор ENT:изм. F1:удал.",8,273,GRAY);
   }
   for(int i=0;i<4;i++){
     int y=51+i*53;
     screenField(v13Temp(i,now),147,y+19,81,hasTemp(i,now)?GREEN:YELLOW);
-    screenField("ВКЛ:"+v13Ref(refTemp[i]),18,y+40,101,GRAY);
-    screenField("ВЫКЛ:"+v13Ref(noticeTemp[i]),127,y+40,103,GRAY);
+    screenField(String(i==selectedTemp && selectedField==0?">ВКЛ:":"ВКЛ:")+v13Ref(refTemp[i]),18,y+40,101,(i==selectedTemp && selectedField==0)?V13_CYAN:GRAY);
+    screenField(String(i==selectedTemp && selectedField==1?">ВЫКЛ:":"ВЫКЛ:")+v13Ref(noticeTemp[i]),127,y+40,103,(i==selectedTemp && selectedField==1)?V13_CYAN:GRAY);
   }
-  if(editingTemp){
+  if(deleteConfirmPending){
+    screen->fillRoundRect(9,132,224,85,7,PANEL);
+    screen->drawRoundRect(9,132,224,85,7,YELLOW);
+    v13Text("УДАЛИТЬ ПОРОГ T"+String(selectedTemp+1)+
+      (selectedField?" ВЫКЛ?":" ВКЛ?"),17,155,WHITE);
+    v13Text("ENT - удалить",17,181,YELLOW);
+    v13Text("ESC - отменить",17,202,GREEN);
+  }else if(editingTemp){
     screen->fillRoundRect(9,141,224,68,7,PANEL);
     screen->drawRoundRect(9,141,224,68,7,YELLOW);
     v13Text("ВВОД T"+String(selectedTemp+1)+(selectedField?" ВЫКЛ":" ВКЛ"),18,161,WHITE);
-    screenField(editTempBuffer.length()?editTempBuffer:"(очистить)",20,183,204,YELLOW);
+    screenField(editTempBuffer.length()?editTempBuffer:"(пусто)",20,183,204,YELLOW);
     v13Text("Ent ОК, Esc отмена",18,201,GRAY);
   }
 }
