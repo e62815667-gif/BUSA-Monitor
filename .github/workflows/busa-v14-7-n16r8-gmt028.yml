@@ -164,8 +164,8 @@ jobs:
           portrait=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
           assert 'v13Ref(refTemp[i])' in landscape
           assert 'v13Ref(noticeTemp[i])' in landscape
-          assert 'String("ВКЛ: ")' in landscape and 'String("ВЫКЛ: ")' in landscape
-          assert 'screenField("ВКЛ:"' in portrait and 'screenField("ВЫКЛ:"' in portrait
+          assert '>ВКЛ: ' in landscape and '>ВЫКЛ: ' in landscape
+          assert '>ВКЛ:' in portrait and '>ВЫКЛ:' in portrait
           assert 'Зад.: ' not in landscape and 'Пред.: ' not in landscape
           assert 'std::fabs(on-off)>=0.099f' in logic
           assert 'if(r.t3OffEvent)r.k1Hold=true' in logic
