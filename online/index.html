@@ -550,7 +550,7 @@ document.querySelectorAll('[data-chart]').forEach(b=>b.addEventListener('click',
 
 // Read-only remote feed: user-owned Google Apps Script with separate VIEW token.
 // No cloud settings are hard-coded and the app never sends control commands.
-const byId=id=>document.getElementById(id);
+function byId(id){return document.getElementById(id);} // Hoisted: navigation handlers reference this before declaration.
 const remoteStorePrefix='busa-unified-online-v1-view-';
 let remoteEnabled=false,remoteTimer=null,remoteRequest=null,remoteTimeout=null;
 let remoteLastSample=null,remoteHistory=[],remoteErrors=[],eventFilter='all';
