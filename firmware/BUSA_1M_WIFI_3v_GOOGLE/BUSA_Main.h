@@ -1873,7 +1873,7 @@ get('tftTheme').onclick=async()=>{
   const mode=get('themeModeSelect').value;
   const r=await fetch('/api/tft/theme',{method:'POST',body:new URLSearchParams({confirm:'YES',mode})});
   get('tftThemeStatus').textContent=await r.text();
-  if(r.ok)document.documentElement.dataset.theme=mode==='1'?'dark':mode==='2'?'system':'light';
+  if(r.ok){document.documentElement.dataset.theme=mode==='1'?'dark':mode==='2'?'system':'light';if(active===3)graphs();}
  }catch(e){get('tftThemeStatus').textContent='Ошибка: '+e.message}
 };
 get('tempCalSave').onclick=async()=>{
@@ -1896,11 +1896,12 @@ get('tempCalSave').onclick=async()=>{
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
 document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.dataset.page)));
-function plot(id,values){const c=get(id),x=c.getContext('2d');x.fillStyle='#061b2c';x.fillRect(0,0,600,200);const a=values.filter(v=>v!==null);if(!a.length){x.fillStyle='#d9bd75';x.fillText('НЕТ ДАННЫХ',24,60);return}let lo=Math.min(...a),hi=Math.max(...a);if(hi-lo<.1)hi=lo+.1;x.strokeStyle='#70e99b';x.beginPath();values.forEach((v,i)=>{if(v===null)return;let xx=10+i*580/80,yy=185-(v-lo)/(hi-lo)*165;if(i===0||values[i-1]===null)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke()}
+function plot(id,values){const c=get(id),x=c.getContext('2d');x.fillStyle=document.documentElement.dataset.theme==='light'?'#ffffff':'#183247';x.fillRect(0,0,600,200);const a=values.filter(v=>v!==null);if(!a.length){x.fillStyle='#d9bd75';x.fillText('НЕТ ДАННЫХ',24,60);return}let lo=Math.min(...a),hi=Math.max(...a);if(hi-lo<.1)hi=lo+.1;x.strokeStyle='#70e99b';x.beginPath();values.forEach((v,i)=>{if(v===null)return;let xx=10+i*580/80,yy=185-(v-lo)/(hi-lo)*165;if(i===0||values[i-1]===null)x.moveTo(xx,yy);else x.lineTo(xx,yy)});x.stroke()}
 function graphAllTemperatures(){
- const c=get('graphT'),x=c.getContext('2d'),colors=['#048abe','#d46237','#a83c23','#38a878'];
- x.fillStyle='#fffdf3';x.fillRect(0,0,600,200);
- x.strokeStyle='#d4d6d6';
+ const c=get('graphT'),x=c.getContext('2d'),colors=['#078fbe','#df8744','#d65446','#3b9f74'];
+ const isDark=document.documentElement.dataset.theme!=='light';
+ x.fillStyle=isDark?'#183247':'#ffffff';x.fillRect(0,0,600,200);
+ x.strokeStyle=isDark?'#496479':'#d7e3e9';
  for(let j=0;j<=4;j++){x.beginPath();x.moveTo(30,20+j*40);x.lineTo(595,20+j*40);x.stroke()}
  x.font='13px sans-serif';
  for(let k=0;k<4;k++){
