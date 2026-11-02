@@ -140,30 +140,38 @@ jobs:
           g++ -std=c++17 -O2 -Wall -Wextra -Werror -I firmware/BUSA_1M_WIFI_3v_GOOGLE /tmp/test-busa-v147-sound.cpp -o /tmp/test-busa-v147-sound
           /tmp/test-busa-v147-sound
           echo 'PASS: alarm thresholds and missing sensors'
-      - name: Prepare Google root CA chain (GTS R1-R4 and GlobalSign cross-sign roots)
+      - name: Prepare verified Google Trust Services TLS certificate bundle
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          import re,subprocess
-          names=[
-            'GTS_Root_R1','GTS_Root_R2','GTS_Root_R3','GTS_Root_R4',
-            'GlobalSign_Root_CA_-_R3','GlobalSign_Root_CA_-_R6',
-          ]
-          chains=[]
-          for name in names:
-              pemfile=Path('/etc/ssl/certs')/(name+'.pem')
-              pem=pemfile.read_text().strip()
-              assert pem.count('-----BEGIN CERTIFICATE-----')==1, name
-              assert pem.count('-----END CERTIFICATE-----')==1, name
-              subprocess.run(['openssl','x509','-in',str(pemfile),'-noout','-checkend','86400'],check=True)
-              chains.append(pem)
-          bundle='\n'.join(chains)+'\n'
-          assert bundle.count('-----BEGIN CERTIFICATE-----')==len(names)
+          import hashlib,ssl,subprocess,urllib.request
+          # Google Trust Services' published SHA256 fingerprints (DER).
+          fingerprints={
+            'gtsr1':'d947432abde7b7fa90fc2e6b59101b1280e0e1c7e4e40fa3c6887fff57a7f4cf',
+            'gtsr2':'8d25cd97229dbf70356bda4eb3cc734031e24cf00fafcfd32dc76eb5841c7ea8',
+            'gtsr3':'34d8a73ee208d9bcdb0d956520934b4e40e69482596e8b6f73c8426b010a6f48',
+            'gtsr4':'349dfa4058c5e263123b398ae795573c4e1313c83fe68f93556cd5e8031b3c7d',
+          }
+          bundle=[]
+          for name,expected in fingerprints.items():
+              url='https://pki.goog/repo/certs/'+name+'.pem'
+              data=urllib.request.urlopen(url,timeout=20).read()
+              pem=data.decode('ascii').strip()
+              assert pem.count('-----BEGIN CERTIFICATE-----')==1,name
+              der=ssl.PEM_cert_to_DER_cert(pem)
+              digest=hashlib.sha256(der).hexdigest()
+              assert digest==expected, f'Untrusted {name}: {digest}'
+              path=Path('/tmp')/(name+'.pem')
+              path.write_text(pem+'\n')
+              subprocess.run(['openssl','x509','-in',str(path),'-noout','-checkend','86400'],check=True)
+              bundle.append(pem)
+              print(name,'SHA256',digest)
+          combined='\n'.join(bundle)+'\n'
+          assert combined.count('-----BEGIN CERTIFICATE-----')==4
           Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h').write_text(
-              'const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+bundle+')GOOGLECERT";\n')
-          print('Verified Google TLS trust anchors:', ', '.join(names))
+              'const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+combined+')GOOGLECERT";\n')
           PY
       - name: Compile V14.7 for ESP32-S3 N16R8
         shell: bash
