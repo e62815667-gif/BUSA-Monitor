@@ -237,8 +237,8 @@ clock();setInterval(clock,30000);
 document.querySelectorAll('[data-graph]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-graph]').forEach(x=>x.classList.toggle('selected',x===b));const v=b.dataset.graph;document.getElementById('graphTitle').textContent=v==='temp'?'Температуры, °C':v==='water'?'Импульсы воды YF-S401':'Отбор, мл/мин';document.getElementById('graphEmpty').textContent=v==='temp'?'НЕТ ИЗМЕРЕНИЙ T1–T4':v==='water'?'ДАННЫЕ ТОЛЬКО В ЛОКАЛЬНОЙ БУСА':'ДАТЧИК ОТБОРА ОТСУТСТВУЕТ'}));
 document.querySelectorAll('[data-events]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('[data-events]').forEach(x=>x.classList.toggle('selected',x===b))}));
 async function siteCheck(){let ok=false;try{const r=await fetch('./manifest.webmanifest?check=1',{cache:'no-store'});ok=r.ok}catch(e){}
-document.getElementById('siteConnectivity').textContent=ok?'Веб-приложение доступно · данные ESP32 через Wi-Fi':'Веб-приложение офлайн · сохранённый экран';
-document.getElementById('headConnection').textContent=ok?'САЙТ ОНЛАЙН · ESP32 ОТДЕЛЬНО':'САЙТ ОФЛАЙН · ESP32 ОТДЕЛЬНО'}
+const si=document.getElementById('siteConnectivity');if(si)si.textContent=ok?'Веб-приложение доступно · данные ESP32 через Wi-Fi':'Веб-приложение офлайн · сохранённый экран';
+document.getElementById('headConnection').textContent=ok?'САЙТ ОНЛАЙН · ESP32 ОТДЕЛЬНО':'САЙТ ОФЛАЙН · ESP32 ОТДЕЛЬНО';const led=document.querySelector('.refLed');if(led){led.style.background=ok?'#2ee62e':'#7b8b98';led.style.boxShadow=ok?'0 0 9px #2eeb33':'none';}}
 siteCheck();setInterval(siteCheck,20000);
 if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{})}
 })();
