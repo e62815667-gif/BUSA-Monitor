@@ -1573,6 +1573,140 @@ main>*{max-width:100%;min-width:0}
  .appTabs .tabIcon{font-size:15px}
 }
 
+
+/* USER APPROVED 20–21 OCTOBER SIX-SCREEN BUSA APP DESIGN.
+   Layout is compact, dark, cyan-outlined; this CSS affects the PHONE,
+   not the physical TFT and not sensor/relay/communications logic. */
+:root[data-theme="system"],:root[data-theme="dark"]{
+ --approved-bg:#04111f;--approved-panel:#071c32;--approved-panel-hi:#0c2947;
+ --approved-edge:#195486;--approved-glow:#078ff6;--approved-text:#e5f6ff;
+ --approved-number:#4ee84c;--approved-muted:#8cb8d8;
+}
+:root[data-theme="system"] body,:root[data-theme="dark"] body{
+ background:var(--approved-bg)!important;color:var(--approved-text)
+}
+:root[data-theme="system"] .appHeader,:root[data-theme="dark"] .appHeader{
+ background:#03111f!important;color:#dff4ff!important;border-bottom:1px solid #144b7b!important;box-shadow:none!important;
+}
+:root[data-theme="system"] .appHeader .netPill,:root[data-theme="dark"] .appHeader .netPill{
+ background:transparent!important;border-color:#20517a!important;color:#a7dcf5!important
+}
+:root[data-theme="system"] .appTabs,:root[data-theme="dark"] .appTabs{
+ background:#041423!important;border-top:1px solid #13568a!important;box-shadow:0 -4px 14px #0007!important
+}
+:root[data-theme="system"] .appTabs button,:root[data-theme="dark"] .appTabs button{
+ background:transparent!important;border:1px solid transparent!important;color:#b6d9eb!important
+}
+:root[data-theme="system"] .appTabs button.on,:root[data-theme="dark"] .appTabs button.on{
+ background:linear-gradient(160deg,#117cf2,#0344b4)!important;
+ border:1px solid #57bdff!important;color:#fff!important;box-shadow:0 0 12px #0a80ff77;
+}
+:root[data-theme="system"] .appTabs button .uiIcon,:root[data-theme="dark"] .appTabs button .uiIcon{color:#75d9ff}
+:root[data-theme="system"] .appTabs button.on .uiIcon,:root[data-theme="dark"] .appTabs button.on .uiIcon{color:#fff}
+:root[data-theme="system"] main .card,:root[data-theme="dark"] main .card{
+ background:var(--approved-panel)!important;border:1px solid var(--approved-edge)!important;color:var(--approved-text);box-shadow:inset 0 1px 0 #336f991a
+}
+:root[data-theme="system"] main h2,:root[data-theme="dark"] main h2{color:var(--approved-text)}
+:root[data-theme="system"] .settingsTabs button.on,:root[data-theme="dark"] .settingsTabs button.on,
+:root[data-theme="system"] .eventFilters button.on,:root[data-theme="dark"] .eventFilters button.on{
+ background:linear-gradient(160deg,#087fee,#03449b)!important;border-color:#45bfff!important;
+ color:white!important;box-shadow:0 0 10px #119afc77
+}
+:root[data-theme="system"] .approvedSensorLive,:root[data-theme="dark"] .approvedSensorLive,
+:root[data-theme="system"] .approvedTemp strong,:root[data-theme="dark"] .approvedTemp strong{color:#4ee84c!important}
+:root[data-theme="system"] .approvedSensor,:root[data-theme="dark"] .approvedSensor,
+:root[data-theme="system"] .approvedTemp,:root[data-theme="dark"] .approvedTemp,
+:root[data-theme="system"] .approvedMetric,:root[data-theme="dark"] .approvedMetric,
+:root[data-theme="system"] .approvedCollectionCell,:root[data-theme="dark"] .approvedCollectionCell{
+ background:linear-gradient(145deg,#0d3456,#06192f)!important;border-color:#145c9a!important
+}
+:root[data-theme="system"] .approvedPageTitle .uiIcon,:root[data-theme="dark"] .approvedPageTitle .uiIcon{color:#40c8ff}
+:root[data-theme="system"] .approvedMenuItem,:root[data-theme="dark"] .approvedMenuItem{
+ background:linear-gradient(90deg,#0c2844,#06192f)!important;border-color:#19568b!important;color:#e3f6ff!important
+}
+:root[data-theme="system"] .approvedMenuIcon,:root[data-theme="dark"] .approvedMenuIcon{color:#4ec7ff}
+:root[data-theme="system"] .approvedGraphPlaceholder,:root[data-theme="dark"] .approvedGraphPlaceholder{
+ background:#061b30;color:#88bcd6;border-color:#255b8a
+}
+:root[data-theme="system"] .approvedEvents .eventRow,:root[data-theme="dark"] .approvedEvents .eventRow{border-color:#205482}
+:root[data-theme="system"] .approvedSensor small,:root[data-theme="dark"] .approvedSensor small,
+:root[data-theme="system"] .approvedTemp small,:root[data-theme="dark"] .approvedTemp small,
+:root[data-theme="system"] .approvedMetric small,:root[data-theme="dark"] .approvedMetric small,
+:root[data-theme="system"] .approvedCollectionCell small,:root[data-theme="dark"] .approvedCollectionCell small{color:#92c9e7}
+:root[data-theme="system"] .approvedBack,:root[data-theme="dark"] .approvedBack{color:#79d2ff;border-color:#24639a;background:#08233c}
+.uiIcon{display:block;flex:0 0 auto;width:22px;height:22px}
+.appHeader .headerRow h1{font-size:18px}
+.appTabs{grid-template-columns:repeat(6,minmax(0,1fr))!important;padding:4px 3px max(6px,env(safe-area-inset-bottom))!important}
+.appTabs button{font-size:clamp(8px,2.45vw,11px)!important;min-height:50px;padding:7px 1px!important;gap:3px}
+.appTabs .uiIcon{width:22px;height:22px}
+@media(max-width:380px){.appTabs button{font-size:8px!important}.appTabs .uiIcon{width:20px;height:20px}}
+.approvedHomeTitle{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:11px 4px 8px;font-size:13px}
+.approvedHomeTitle strong{font-size:16px;color:#56cfff}
+.approvedHomeTitle span{color:#8dd9b0;font-size:11px}
+.approvedDashboard{display:grid;grid-template-columns:minmax(0,.91fr) minmax(0,1.09fr);gap:7px;align-items:stretch}
+.approvedTempGrid{display:flex;flex-direction:column;gap:6px;min-width:0}
+.approvedTemp{border:1px solid var(--line);border-radius:9px;padding:7px 7px 6px;min-height:68px;min-width:0}
+.approvedTempTitle{display:flex;align-items:center;gap:5px;line-height:1.1;font-size:12px}
+.approvedTempIcon{display:flex;align-items:center;justify-content:center;min-width:22px;font-size:21px;color:#3ccafa}
+.approvedTemp strong{display:block;font-size:clamp(17px,4.1vw,25px);line-height:1.12;margin:4px 0 0;color:#24965c}
+.approvedTemp small{display:block;white-space:normal;line-height:1.15;font-size:10px}
+.approvedRig{position:relative;overflow:hidden;min-width:0;min-height:292px;border:1px solid #115d92;border-radius:10px;background:radial-gradient(ellipse at 50% 45%,#17466a,#03121f 75%);display:flex;align-items:center;justify-content:center}
+.approvedRig svg{display:block;width:100%;height:100%;max-height:315px;min-width:0;overflow:hidden}
+.approvedRig svg rect:first-of-type{fill:transparent}
+.approvedRigLabel{position:absolute;bottom:3px;font:9px system-ui;letter-spacing:.4px;color:#70c6ff;background:#081c2ddd;padding:2px 5px;border-radius:5px}
+.approvedMetrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:8px 0}
+.approvedMetric{border:1px solid var(--line);border-radius:9px;padding:9px;display:flex;align-items:center;gap:8px;min-width:0}
+.approvedMetric>span{font-size:28px;color:#46bbff}
+.approvedMetric>div{display:flex;flex-direction:column;min-width:0}
+.approvedMetric small{font-size:10px}
+.approvedMetric strong{font-size:20px;color:#72d5ef;line-height:1.25}
+.approvedStatus{display:flex;gap:7px;justify-content:space-between;align-items:center;padding:8px 9px;background:#0c2740;border:1px solid #195c91;border-radius:9px;font-size:11px;color:#67e5a2}
+.approvedAdditional{font-size:13px}
+.approvedAdditional summary{cursor:pointer;font-weight:600;color:inherit}
+.approvedPageTitle{display:flex;align-items:center;gap:8px;margin:11px 0 8px;font-size:18px;font-weight:700;letter-spacing:.3px}
+.approvedPageTitle .uiIcon{width:24px;height:24px}
+.approvedSensorList{display:grid;grid-template-columns:1fr;gap:9px;margin-bottom:9px}
+.approvedSensor{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.approvedSensorHead{display:flex;align-items:center;gap:11px;padding:13px 11px;min-height:81px}
+.approvedSensorIcon{font-size:30px;width:42px;text-align:center;color:#53d4ff}
+.approvedSensorText{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.approvedSensorText strong{font-size:14px}
+.approvedSensorText small{font-size:11px;line-height:1.2}
+.approvedSensorLive{font-size:clamp(19px,5.5vw,29px);white-space:nowrap;color:#269657}
+.sensorEdit{border-top:1px solid #1c5984;padding:8px 11px 10px}
+.sensorEdit summary{font-size:12px;cursor:pointer;color:#70c5f2}
+.approvedFieldGrid{margin-top:8px}
+.approvedCollectionMetrics{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:10px}
+.approvedCollectionCell{border:1px solid var(--line);border-radius:10px;min-height:78px;padding:12px;display:flex;flex-direction:column;gap:5px}
+.approvedCollectionCell strong{font-size:23px;color:#74d6eb}
+.approvedCollectionCell small{font-size:12px}
+.approvedGraphCard{padding:12px}
+.approvedGraphPlaceholder{display:flex;align-items:center;justify-content:center;height:155px;position:relative;border:1px solid #27516d;border-radius:7px;overflow:hidden}
+.approvedGridLines{position:absolute;inset:10px;background:repeating-linear-gradient(to bottom,transparent 0,transparent 27px,#35628488 28px,#35628488 29px)}
+.approvedGraphPlaceholder>span{position:relative;z-index:1;background:#0b1e31cb;padding:4px 8px;border-radius:5px}
+.approvedGraphTabs{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.approvedGraphTabs button{font-size:12px;min-width:0;padding:8px 2px}
+.approvedLegend{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:10px;margin:5px 0 6px}
+.approvedLegend .temp0{color:#078fbe}.approvedLegend .temp1{color:#df8744}
+.approvedLegend .temp2{color:#d65446}.approvedLegend .temp3{color:#3b9f74}
+.approvedSession{display:block;text-align:center;font-size:11px;margin:10px 0 2px;color:var(--muted)}
+.approvedEvents{white-space:normal!important;font-size:13px}
+.approvedEvents .eventRow{padding:10px 2px;border-bottom:1px solid var(--line);display:flex;gap:9px;align-items:flex-start}
+.approvedEvents .eventRow:last-child{border-bottom:0}
+.approvedEvents .eventRow .eventDot{width:9px;height:9px;min-width:9px;background:#22aeff;border-radius:100%;margin-top:4px}
+.approvedEvents .eventRow.warn .eventDot{background:#efaa48}
+.approvedEvents .eventRow.alarm .eventDot{background:#ff5965}
+.approvedSettingsMain{display:flex;flex-direction:column;gap:0;padding:0!important;overflow:hidden}
+.approvedMenuItem{display:flex;align-items:center;gap:12px;width:100%;min-height:53px;text-align:left;border:0!important;border-radius:0!important;border-bottom:1px solid var(--line)!important;padding:9px 12px}
+.approvedMenuItem:last-child{border-bottom:0!important}
+.approvedMenuIcon{display:flex;width:30px;height:30px;align-items:center;justify-content:center;color:var(--sea)}
+.approvedMenuIcon .uiIcon{width:25px;height:25px}
+.approvedMenuItem>span:nth-child(2){flex:1}
+.approvedArrow{color:#71c7fa;font-size:30px;line-height:16px}
+.approvedBack{margin:4px 0 7px;padding:10px 12px;width:100%;text-align:left;border-radius:8px}
+.approvedBack[hidden],#settingsMenu[hidden]{display:none!important}
+.settingCard[hidden]{display:none!important}
+
 </style></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
