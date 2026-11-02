@@ -348,70 +348,58 @@ main .card{background:#071c32!important;border:1px solid #195486!important;box-s
 #googleSettings input,#settings input{color:#eaf6ff;background:#112b40;border:1px solid #4c819b}
 .approvedBlackGraph canvas{border-radius:9px}
 
+
+/* BUSA approved UI: same graphics across all online sections */
+:root{--paper:#03101f;--ink:#e9f8ff;--border:#155b8e;--muted:#b2d2e9;--orange:#1187e5;--sea:#47d1ff}
+html,body{background:#030e20!important;color:#eaf8ff!important}
+header.appHeader{background:#031427!important;border-color:#1778b6!important}
+main{padding-bottom:105px}
+main section[id]{color:#e7f7ff}
+main .card,main .settingCard,main .approvedSensor{background:linear-gradient(130deg,#071e34,#041425)!important;border:1px solid #18639d!important;color:#eaf7ff!important;border-radius:12px!important}
+main .row{border-color:#1f5a85!important}
+main .row span,main .muted{color:#b8d7e8!important}
+main .approvedPageTitle,main h2,main h3{color:#eaf9ff!important}
+main .approvedHomeTitle{border-bottom:1px solid #195a88;padding:9px 4px}
+main .approvedDashboard{grid-template-columns:minmax(0,1fr) minmax(0,.88fr);gap:8px}
+main .approvedTemp{background:linear-gradient(135deg,#0a2741,#031225)!important;border:1px solid #1082c7!important;border-radius:11px!important;min-height:84px;padding:6px!important;box-shadow:inset 0 0 9px #0c84d425}
+main .approvedTempTitle{color:#f5faff!important;font-size:clamp(10px,2.7vw,16px)}
+main .approvedTempIcon{min-width:30px;width:30px;height:38px;display:flex;align-items:center}
+.busaRefTempIcon{display:block;width:100%;height:100%;filter:drop-shadow(0 0 4px #29d8ff8f)}
+main .approvedTemp strong{font-size:clamp(20px,5vw,35px)!important;color:#30f23e!important;font-weight:800}
+main .approvedTemp small{color:#c2dced!important}
+main .approvedRig{background:#03101d!important;border:0!important;min-height:345px}
+main .approvedRigPhoto{display:block;width:100%;max-height:350px;object-fit:contain}
+main .approvedMetric,main .approvedCollectionCell{background:#061b32!important;border:1px solid #117bc9!important;color:#e3f7ff!important;border-radius:11px}
+main .approvedMetric strong,main .approvedCollectionCell strong{color:#cbeaff!important}
+main .approvedSensorHead{background:#082139!important}
+main .approvedSensorIcon{min-width:42px;height:48px;display:flex;justify-content:center;align-items:center}
+main .approvedSensorLive{color:#37f33d!important}
+main .approvedMenuItem{background:#061a2e!important;border-bottom:1px solid #27628e!important;color:#eaf7ff!important;border-radius:8px!important;margin:3px 0}
+main .approvedMenuIcon{color:#36c6ff!important}
+main .approvedBack{background:#0b3355!important;color:#a9e3ff!important;border-color:#2b80b7!important}
+main .approvedBlackGraph{background:#061526!important}
+main .approvedBlackGraph canvas{background:#000!important;border-color:#2b83b7!important}
+main .approvedGraphTabs button,main .eventTabs button{background:#114265!important;border:1px solid #478dbc!important;color:#d9f0ff!important;border-radius:10px}
+main .approvedGraphTabs button.on,main .eventTabs button.on{background:linear-gradient(150deg,#1984ff,#0a46b5)!important;color:#fff!important;border-color:#53d1ff!important}
+main #googleSettings input,main #settings input{color:#f0faff!important;background:#0a2a43!important;border:1px solid #4e86a7!important;padding:13px;border-radius:10px}
+main #googleSettings .actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+main #googleSettings .actions button{width:100%;min-width:0;background:#0e6ab4!important;color:#fff!important;border:1px solid #389cd8!important}
+main #googleSettings .actions button.secondary{background:#153c60!important}
+#viewState{overflow-wrap:anywhere;max-width:59%;line-height:1.4}
+.busaGoogleDiag{border:1px solid #2a6c9b;background:#09233a;color:#c4e3f8;border-radius:10px;padding:11px;font-size:12px;line-height:1.55;margin:13px 0}
+.busaGoogleDiag strong{color:#8edcff}
+.busaGoogleDiag button{display:block;width:100%;margin:8px 0 0;padding:11px;border:1px solid #44a6e1;border-radius:9px;background:#115f9d;color:#fff;font-weight:700}
+.appTabs{background:#041326!important;border-color:#176ca8!important}
+.appTabs button{color:#9bdbfa!important;border:1px solid #194c73!important;background:#071c33!important}
+.appTabs button.on,.appTabs button.active{background:linear-gradient(135deg,#177fff,#0747bd)!important;color:white!important;border:1px solid #46c3ff!important;box-shadow:inset 0 0 10px #5bbaff70!important}
+@media(max-width:375px){main .approvedTemp{min-height:76px}main .approvedRig{min-height:310px}main .approvedRigPhoto{max-height:315px}}
 </style></head><body>
 <header class="appHeader"><div class="headerRow"><div><div class="eyebrow">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div><span class="onlineReadOnly">● САЙТ ОТКРЫТ</span></div><div class="headerTime" id="clockDisplay">Время: —</div><div class="onlineNetwork"><span><i class="led" id="cloudInternet"></i> ИНТ <b id="cloudInternetLabel">—</b></span><span><i class="led" id="cloudLocal"></i> ЛОК <b id="cloudLocalLabel">—</b></span><span><i class="led" id="cloudData"></i> ДАН <b id="cloudDataLabel">—</b></span></div></header>
 <main>
 
 <section id="home"><div class="approvedHomeTitle"><strong>БУСА-1М №001</strong><span id="heroStatus">● Ожидание данных</span></div>
-<div id="onlineSetupBanner" class="onlineSetupBanner"><div><strong>Google не подключён</strong><p id="onlineSetupMessage">Для показа температур подключи защищённый просмотр Google. БУСА уже отправляет данные в таблицу.</p></div><button id="onlineOpenGoogle" type="button">Подключить</button></div><div class="approvedDashboard"><div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon">💧</span><span>Вода</span></div><strong id="remoteT0">Н/Д</strong><small id="onlineSet0">Зад: —</small></div><div class="approvedTemp temp1"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Колонна</span></div><strong id="remoteT1">Н/Д</strong><small id="onlineSet1">Зад: —</small></div><div class="approvedTemp temp2"><div class="approvedTempTitle"><span class="approvedTempIcon">▣</span><span>Куб</span></div><strong id="remoteT2">Н/Д</strong><small id="onlineSet2">Зад: —</small></div><div class="approvedTemp temp3"><div class="approvedTempTitle"><span class="approvedTempIcon">♧</span><span>Верх колонны</span></div><strong id="remoteT3">Н/Д</strong><small id="onlineSet3">Зад: —</small></div></div><div class="approvedRig"><svg viewBox="0 0 190 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схематичная колонна БУСА: куб, колонна и охлаждение" preserveAspectRatio="xMidYMid meet">
-<defs>
- <linearGradient id="busaSteel" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#475967"/><stop offset=".2" stop-color="#bfdae3"/><stop offset=".39" stop-color="#e4f0f3"/><stop offset=".62" stop-color="#6d8290"/><stop offset=".85" stop-color="#b7d0da"/><stop offset="1" stop-color="#435563"/></linearGradient>
- <linearGradient id="busaGlass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081b2b"/><stop offset=".45" stop-color="#0d4160"/><stop offset="1" stop-color="#0a1a2b"/></linearGradient>
- <linearGradient id="busaWater" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#13dcff"/><stop offset="1" stop-color="#065bcc"/></linearGradient>
- <filter id="busaGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2"/></filter>
-</defs>
-<g fill="none" stroke="#8da6b4" stroke-width="2">
- <path d="M67 31 V15 H89 V23 H130 V59"/>
- <path d="M67 54 H40 V99"/><path d="M76 133 H130"/>
- <path d="M138 196 V231 H154 V253" />
-</g>
-<g>
- <rect x="55" y="24" width="28" height="186" rx="7" fill="url(#busaSteel)" stroke="#c8e2f0" stroke-width="1.4"/>
- <rect x="59" y="33" width="20" height="166" rx="3" fill="url(#busaGlass)" stroke="#829fb2" stroke-width="1"/>
- <path d="M65 38 V191" stroke="#298dd0" stroke-opacity=".85" stroke-width="1.7"/>
- <g stroke="#71c9ea" stroke-width="2">
- <path d="M60 49 H78"/><path d="M60 63 H78"/><path d="M60 77 H78"/><path d="M60 91 H78"/><path d="M60 105 H78"/><path d="M60 119 H78"/><path d="M60 133 H78"/><path d="M60 147 H78"/><path d="M60 161 H78"/><path d="M60 175 H78"/></g>
- <rect x="53" y="18" width="32" height="12" rx="3" fill="url(#busaSteel)" stroke="#a7c6d5"/>
- <circle cx="69" cy="19" r="3" fill="#dbeff6" stroke="#52bdeb"/>
- <rect x="60" y="4" width="17" height="13" rx="3" fill="#899daa" stroke="#d9edf5"/>
- <rect x="51" y="200" width="38" height="15" rx="5" fill="url(#busaSteel)" stroke="#daeaf0"/>
-</g>
-<g>
- <ellipse cx="76" cy="225" rx="56" ry="12" fill="#183b50"/>
- <rect x="21" y="228" width="111" height="58" rx="11" fill="url(#busaSteel)" stroke="#c1dce8" stroke-width="1.5"/>
- <ellipse cx="76" cy="228" rx="55" ry="10" fill="#bcd4de" stroke="#e4f3f9" stroke-width="1"/>
- <ellipse cx="76" cy="284" rx="51" ry="7" fill="#596f7c" stroke="#abcbd9"/>
- <rect x="59" y="249" width="31" height="22" rx="3" fill="#163b51" stroke="#5ecaff"/>
- <path d="M64 252 V268 M70 252 V268 M76 252 V268 M82 252 V268" stroke="#219ccb" stroke-width="1" />
- <rect x="31" y="280" width="10" height="14" rx="2" fill="#a4c5d7"/>
- <rect x="110" y="280" width="10" height="14" rx="2" fill="#a4c5d7"/>
- <circle cx="115" cy="245" r="4" fill="#1cc8ea"/>
-</g>
-<g>
- <rect x="120" y="61" width="33" height="128" rx="10" fill="url(#busaSteel)" stroke="#c4deeb" stroke-width="1.4"/>
- <rect x="127" y="69" width="18" height="109" rx="5" fill="#06253f" stroke="#58b3e0"/>
- <path d="M136 73c-15 8 15 15 0 23s15 15 0 23s15 15 0 23s15 15 0 23" fill="none" stroke="#06c8fa" stroke-width="3"/>
- <circle cx="136" cy="81" r="4" fill="#70efff"/>
- <rect x="119" y="57" width="35" height="9" rx="3" fill="url(#busaSteel)"/>
- <rect x="121" y="183" width="31" height="10" rx="3" fill="url(#busaSteel)"/>
- <path d="M153 101 h13 v16" stroke="#1399d1" stroke-width="3" fill="none"/>
- <path d="M119 172 h-10 v18" stroke="#1399d1" stroke-width="3" fill="none"/>
-</g>
-<g>
- <path d="M151 195 V249 H173" fill="none" stroke="#899eac" stroke-width="4"/>
- <path d="M151 196 V234 H171" fill="none" stroke="#00acdc" stroke-width="2"/>
- <rect x="146" y="248" width="32" height="45" rx="5" fill="#18415d" fill-opacity=".8" stroke="#a5d5ef"/>
- <rect x="150" y="262" width="24" height="26" rx="2" fill="url(#busaWater)" fill-opacity=".9"/>
- <g fill="#56efff"><circle cx="157" cy="272" r="2"/><circle cx="167" cy="282" r="2"/></g>
- <path d="M164 235 Q157 241 164 246 Q171 241 164 235" fill="#21ccff"/>
-</g>
-<g fill="#38e6ff" filter="url(#busaGlow)" opacity=".48">
- <circle cx="69" cy="77" r="5"/><circle cx="69" cy="136" r="5"/><circle cx="137" cy="120" r="5"/>
-</g>
-<g fill="#27d8ff"><circle cx="69" cy="77" r="2.5"/><circle cx="69" cy="136" r="2.5"/><circle cx="137" cy="120" r="2.5"/></g>
-<text x="101" y="307" font-family="sans-serif" font-size="8" fill="#7ec4e6" text-anchor="middle">БУСА-1М · Схема мониторинга</text>
-</svg></div></div><div class="approvedMetrics"><div class="approvedMetric"><span>◉</span><div><small>Расход отбора</small><strong>Н/Д</strong><small>мл/мин · нет датчика</small></div></div><div class="approvedMetric"><span>▤</span><div><small>Собрано</small><strong>Н/Д</strong><small>мл · нет датчика</small></div></div></div><div class="approvedStatus"><span id="onlineFreshness">● Нет данных Google</span><span>4 звуковых реле</span></div><details class="card approvedAdditional"><summary>Охлаждающая вода и звуковые выходы</summary><div class="row"><span>YF-S401 · импульсы</span><b id="waterLive">Нет показаний</b></div><div class="relayGrid"><span>K1 <b id="cloudRelay0">—</b></span><span>K2 <b id="cloudRelay1">—</b></span><span>K3 <b id="cloudRelay2">—</b></span><span>K4 <b id="cloudRelay3">—</b></span></div></details></section>
-<section id="temps" hidden><div class="approvedPageTitle"><span>♨</span><strong>ТЕМПЕРАТУРЫ</strong></div><div class="approvedSensorList"><div class="approvedSensor temp0"><div class="approvedSensorHead"><div class="approvedSensorIcon">💧</div><div class="approvedSensorText"><strong>Вода</strong><small id="onlineThreshold0">ВКЛ — · ВЫКЛ —</small><small id="errorT0">Нет данных</small></div><strong id="detailT0" class="approvedSensorLive">Н/Д</strong></div></div><div class="approvedSensor temp1"><div class="approvedSensorHead"><div class="approvedSensorIcon">♧</div><div class="approvedSensorText"><strong>Колонна</strong><small id="onlineThreshold1">ВКЛ — · ВЫКЛ —</small><small id="errorT1">Нет данных</small></div><strong id="detailT1" class="approvedSensorLive">Н/Д</strong></div></div><div class="approvedSensor temp2"><div class="approvedSensorHead"><div class="approvedSensorIcon">▣</div><div class="approvedSensorText"><strong>Куб</strong><small id="onlineThreshold2">ВКЛ — · ВЫКЛ —</small><small id="errorT2">Нет данных</small></div><strong id="detailT2" class="approvedSensorLive">Н/Д</strong></div></div><div class="approvedSensor temp3"><div class="approvedSensorHead"><div class="approvedSensorIcon">♧</div><div class="approvedSensorText"><strong>Верх колонны</strong><small id="onlineThreshold3">ВКЛ — · ВЫКЛ —</small><small id="errorT3">Нет данных</small></div><strong id="detailT3" class="approvedSensorLive">Н/Д</strong></div></div></div><div class="card"><p class="muted">Показания и пороги поступают из Google. Изменение порогов доступно через локальное приложение БУСА.</p><a class="btn secondary" href="http://192.168.4.1/">Открыть локальные настройки</a></div></section>
+<div id="onlineSetupBanner" class="onlineSetupBanner"><div><strong>Google не подключён</strong><p id="onlineSetupMessage">Для показа температур подключи защищённый просмотр Google. БУСА уже отправляет данные в таблицу.</p></div><button id="onlineOpenGoogle" type="button">Подключить</button></div><div class="approvedDashboard"><div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon0" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><path d="M24 4C17 17 7 28 7 37a17 17 0 0034 0C41 28 31 17 24 4Z" fill="url(#busaIcon0)" stroke="#28cdff" stroke-width="2"/><path d="M15 35q0 12 12 13" fill="none" stroke="#dcfaff" stroke-width="2.5" stroke-linecap="round"/></svg></span><span>Вода</span></div><strong id="remoteT0">Н/Д</strong><small id="onlineSet0">Зад: —</small></div><div class="approvedTemp temp1"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon1" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon1)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></span><span>Колонна</span></div><strong id="remoteT1">Н/Д</strong><small id="onlineSet1">Зад: —</small></div><div class="approvedTemp temp2"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon2" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="5" y="17" width="38" height="35" rx="7" stroke="#10b9f7" stroke-width="2.5" fill="#083357"/><path d="M8 31q8-5 16 0t16 0v18H8Z" fill="url(#busaIcon2)" opacity=".92"/><path d="M14 17V9h20v8" fill="none" stroke="#55d6ff" stroke-width="3"/></svg></span><span>Куб</span></div><strong id="remoteT2">Н/Д</strong><small id="onlineSet2">Зад: —</small></div><div class="approvedTemp temp3"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon3" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon3)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></span><span>Верх колонны</span></div><strong id="remoteT3">Н/Д</strong><small id="onlineSet3">Зад: —</small></div></div><div class="approvedRig"><img class="approvedRigPhoto" src="data:image/jpeg;base64,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" alt="Утверждённое изображение установки БУСА"></div></div><div class="approvedMetrics"><div class="approvedMetric"><span>◉</span><div><small>Расход отбора</small><strong>Н/Д</strong><small>мл/мин · нет датчика</small></div></div><div class="approvedMetric"><span>▤</span><div><small>Собрано</small><strong>Н/Д</strong><small>мл · нет датчика</small></div></div></div><div class="approvedStatus"><span id="onlineFreshness">● Нет данных Google</span><span>4 звуковых реле</span></div><details class="card approvedAdditional"><summary>Охлаждающая вода и звуковые выходы</summary><div class="row"><span>YF-S401 · импульсы</span><b id="waterLive">Нет показаний</b></div><div class="relayGrid"><span>K1 <b id="cloudRelay0">—</b></span><span>K2 <b id="cloudRelay1">—</b></span><span>K3 <b id="cloudRelay2">—</b></span><span>K4 <b id="cloudRelay3">—</b></span></div></details></section>
+<section id="temps" hidden><div class="approvedPageTitle"><span>♨</span><strong>ТЕМПЕРАТУРЫ</strong></div><div class="approvedSensorList"><div class="approvedSensor temp0"><div class="approvedSensorHead"><div class="approvedSensorIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon0" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><path d="M24 4C17 17 7 28 7 37a17 17 0 0034 0C41 28 31 17 24 4Z" fill="url(#busaIcon0)" stroke="#28cdff" stroke-width="2"/><path d="M15 35q0 12 12 13" fill="none" stroke="#dcfaff" stroke-width="2.5" stroke-linecap="round"/></svg></div><div class="approvedSensorText"><strong>Вода</strong><small id="onlineThreshold0">ВКЛ — · ВЫКЛ —</small><small id="errorT0">Нет данных</small></div><strong id="detailT0" class="approvedSensorLive">Н/Д</strong></div></div><div class="approvedSensor temp1"><div class="approvedSensorHead"><div class="approvedSensorIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon1" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon1)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></div><div class="approvedSensorText"><strong>Колонна</strong><small id="onlineThreshold1">ВКЛ — · ВЫКЛ —</small><small id="errorT1">Нет данных</small></div><strong id="detailT1" class="approvedSensorLive">Н/Д</strong></div></div><div class="approvedSensor temp2"><div class="approvedSensorHead"><div class="approvedSensorIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon2" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="5" y="17" width="38" height="35" rx="7" stroke="#10b9f7" stroke-width="2.5" fill="#083357"/><path d="M8 31q8-5 16 0t16 0v18H8Z" fill="url(#busaIcon2)" opacity=".92"/><path d="M14 17V9h20v8" fill="none" stroke="#55d6ff" stroke-width="3"/></svg></div><div class="approvedSensorText"><strong>Куб</strong><small id="onlineThreshold2">ВКЛ — · ВЫКЛ —</small><small id="errorT2">Нет данных</small></div><strong id="detailT2" class="approvedSensorLive">Н/Д</strong></div></div><div class="approvedSensor temp3"><div class="approvedSensorHead"><div class="approvedSensorIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon3" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon3)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></div><div class="approvedSensorText"><strong>Верх колонны</strong><small id="onlineThreshold3">ВКЛ — · ВЫКЛ —</small><small id="errorT3">Нет данных</small></div><strong id="detailT3" class="approvedSensorLive">Н/Д</strong></div></div></div><div class="card"><p class="muted">Показания и пороги поступают из Google. Изменение порогов доступно через локальное приложение БУСА.</p><a class="btn secondary" href="http://192.168.4.1/">Открыть локальные настройки</a></div></section>
 <section id="collection" hidden><div class="approvedPageTitle"><span>♧</span><strong>ОТБОР ЖИДКОСТИ</strong></div><div class="approvedCollectionMetrics"><div class="approvedCollectionCell"><small>Текущий расход</small><strong>НЕТ ДАТЧИКА</strong><small>мл/мин</small></div><div class="approvedCollectionCell"><small>Собрано жидкости</small><strong>Н/Д</strong><small>мл</small></div></div><div class="card approvedGraphCard"><h2>График отбора</h2><div class="approvedGraphPlaceholder">Нет датчика отбора</div></div><details class="card approvedAdditional"><summary>Охлаждающая вода</summary><div class="row"><span>Импульсы YF-S401</span><b id="onlineWaterPulses">—</b></div></details></section>
 <section id="settings" hidden><div class="approvedPageTitle"><span>⚙</span><strong>НАСТРОЙКИ</strong></div><div class="card approvedSettingsMain" id="settingsMenu"><button type="button" class="approvedMenuItem" data-settings-target="settings-temps"><span class="approvedMenuIcon">♨</span><span>Температура</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="connection"><span class="approvedMenuIcon">⌁</span><span>Wi-Fi</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="settings-screen"><span class="approvedMenuIcon">▣</span><span>Экран</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="googleSettings"><span class="approvedMenuIcon">☁</span><span>Google</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="cloudUpdates"><span class="approvedMenuIcon">⇩</span><span>Обновление ПО</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="diagnostics"><span class="approvedMenuIcon">⊞</span><span>Диагностика</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="aboutSettings"><span class="approvedMenuIcon">ⓘ</span><span>О системе</span><span class="approvedArrow">›</span></button></div><button id="settingsBack" class="approvedBack" type="button" hidden>‹ Все настройки</button><div class="card settingCard" id="settings-temps" hidden><h2>Температура</h2><div id="onlineCalibration" class="diagList">Нет данных</div><p class="muted">Калибровка изменяется только в локальном приложении.</p></div><div class="card settingCard" id="settings-screen" hidden><h2>Экран</h2><div class="row"><span>TFT</span><b id="onlineTft">—</b></div><div class="row"><span>Тема контроллера</span><b id="onlineTftTheme">—</b></div><p class="muted">Тема интернет-приложения:</p><button type="button" id="themeSwitch" class="btn secondary">Сменить тему</button></div><div class="card" id="googleSettings"><h2>Удалённый мониторинг · Google</h2>
 <p class="muted">Введи адрес своего Google Apps Script и отдельный <b>ключ просмотра</b> BUSA_VIEW_TOKEN. Ключ отправки BUSA_TOKEN здесь не нужен.</p>
@@ -421,7 +409,12 @@ main .card{background:#071c32!important;border:1px solid #195486!important;box-s
 <input type="password" id="viewToken" placeholder="BUSA_VIEW_TOKEN (не BUSA_TOKEN)" autocomplete="off">
 <div class="actions"><button type="button" id="viewConnect" class="btn">Подключить данные</button>
 <button type="button" id="viewClear" class="btn secondary">Отключить</button></div>
-<div class="row"><span>Получение данных</span><b id="viewState">Не настроено</b></div>
+<div class="row"><span>Получение данных</span><b id="viewState" aria-live="polite">Не настроено</b></div>
+<div class="busaGoogleDiag" role="status">
+<strong>Проверка доступа Google</strong>
+<div id="busaGoogleDiagMessage">Проверяются ссылка Apps Script и отдельный ключ просмотра. Ключ отправки БУСА не требуется.</div>
+<button type="button" id="viewRetry">Повторить проверку Google</button>
+</div>
 <p class="muted">Данные обновляются примерно каждые 30 секунд, если БУСА отправляет их в Google. Ключ просмотра сохраняется только на этом iPhone. При утере телефона смени ключ в Apps Script.</p>
 <div class="actions"><a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/blob/main/google/README_BUSA_Google_Drive.md" target="_blank" rel="noopener">Инструкция Google</a></div></div>
 <div class="card settingCard" id="aboutSettings" hidden><h2>О системе</h2><div class="row"><span>Wi-Fi</span><b id="onlineAboutWifi">—</b></div><div class="row"><span>Google</span><b id="onlineAboutGoogle">—</b></div><div class="row"><span>Прошивка</span><b id="onlineAboutFirmware">—</b></div><div class="row"><span>Время работы</span><b id="onlineAboutUptime">—</b></div></div><div id="statusText" hidden>Нет удалённых данных</div></section>
@@ -572,6 +565,20 @@ function indicator(id,label,on,unknown=false){
 function remoteStatus(msg){
  byId('statusText').textContent=msg;
  byId('viewState').textContent=msg;
+ const message=byId('busaGoogleDiagMessage');
+ if(message){
+  if(msg.includes('Доступ к телеметрии не разрешён')){
+   message.textContent='Google Apps Script отклонил ключ просмотра. БУСА отправляет данные в таблицу отдельно. Проверь, что ссылка /exec ведёт в действующее развёртывание, а BUSA_VIEW_TOKEN совпадает с ключом в настройках этого Apps Script. Если код скрипта обновлялся, обнови развёртывание. Ключ не присылай.';
+  }else if(msg.includes('Нет ответа Google')||msg.includes('Ошибка загрузки из Google')){
+   message.textContent='Не удалось получить ответ Apps Script. Проверь доступность /exec, интернет и настройки развёртывания. Сохранённые ключи и адрес не удалены.';
+  }else if(msg==='Подключение к Google…'){
+   message.textContent='Выполняется проверка доступа. Данные с БУСА не подменяются примерными значениями.';
+  }else if(msg==='Подключено'){
+   message.textContent='Чтение из Google подтверждено. Температуры и остальные значения берутся из реальной телеметрии.';
+  }else{
+   message.textContent=msg;
+  }
+ }
  if(/^(Ошибка|Нет ответа|Нужен адрес|Укажи BUSA_VIEW_TOKEN|Таблица пока пуста|Некорректная телеметрия)/.test(msg)){
   byId('onlineSetupBanner').hidden=false;
   byId('onlineSetupMessage').textContent=msg;
@@ -871,6 +878,8 @@ window.busaViewReceive=function(data){
  }
  remoteLastSample=sample;
  renderRemote(sample.telemetry,data.history||[],at);
+ const diag=byId('busaGoogleDiagMessage');
+ if(diag)diag.textContent='Google Apps Script подтвердил ключ просмотра. Показаны фактические данные из таблицы.';
 };
 function loadGoogleLatest(){
  if(!remoteEnabled||!configUrl||!configToken)return;
@@ -879,7 +888,7 @@ function loadGoogleLatest(){
  const join=configUrl.includes('?')?'&':'?';
  script.src=configUrl+join+'mode=latest&callback=busaViewReceive&readToken='+
   encodeURIComponent(configToken)+'&t='+Date.now();
- script.onerror=()=>{if(remoteEnabled)remoteStatus('Ошибка загрузки из Google')};
+ script.onerror=()=>{if(remoteEnabled){clearTimeout(remoteTimeout);remoteStatus('Ошибка загрузки из Google')}};
  remoteRequest=script;document.head.appendChild(script);
  clearTimeout(remoteTimeout);
  remoteTimeout=setTimeout(()=>{if(remoteEnabled)remoteStatus('Нет ответа Google (проверь развёртывание)')},18000);
@@ -910,6 +919,17 @@ function connectRemote(url,token,persist=true){
 byId('viewConnect').addEventListener('click',()=>{
  connectRemote(byId('viewUrl').value.trim(),byId('viewToken').value.trim());
 });
+byId('viewRetry').addEventListener('click',()=>{
+ const url=byId('viewUrl').value.trim();
+ const token=byId('viewToken').value.trim();
+ if(!remoteEnabled||url!==configUrl||token!==configToken){
+  connectRemote(url,token,false);
+ }else{
+  remoteStatus('Подключение к Google…');
+  loadGoogleLatest();
+ }
+});
+
 byId('viewClear').addEventListener('click',()=>{
  stopRemote();configUrl='';configToken='';remoteHistory=[];remoteLastSample=null;
  byId('viewUrl').value='';byId('viewToken').value='';
