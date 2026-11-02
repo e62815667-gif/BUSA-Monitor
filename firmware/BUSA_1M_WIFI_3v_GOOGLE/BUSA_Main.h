@@ -298,13 +298,29 @@ void scanI2cAddresses(uint32_t now){
     i2cFullScanAt=millis();
   }
 }
+bool busaI2cCheckTransfer(uint32_t started){
+  const uint32_t ms=millis()-started;
+  if(ms>busaMaxI2cStepMs)busaMaxI2cStepMs=ms;
+  busaLastI2cStepMs=ms;
+  if(ms>100){
+    ++busaI2cStallCount;
+    busaSlowComponent="I2C_TRANSFER";
+    busaI2cQuarantine(millis());
+    return false;
+  }
+  return true;
+}
 int readPcaReg(uint8_t reg){
-  if(!pcaDetected)return -1;
+  if(!pcaDetected || busaI2cSuspended(millis()) || !busaI2cLinesFree())return -1;
+  const uint32_t started=millis();
+  int value=-1;
   Wire.beginTransmission(0x40);
-  Wire.write(reg); // Register pointer only, NOT a PWM/output value.
-  if(Wire.endTransmission(false)!=0)return -1;
-  if(Wire.requestFrom((uint8_t)0x40,(uint8_t)1)!=(uint8_t)1)return -1;
-  return Wire.read();
+  Wire.write(reg); // Register pointer only; never change PWM outputs.
+  if(Wire.endTransmission(false)==0 &&
+     Wire.requestFrom((uint8_t)0x40,(uint8_t)1)==(uint8_t)1){
+    value=Wire.read();
+  }
+  return busaI2cCheckTransfer(started)?value:-1;
 }
 void probeI2c(uint32_t now){
   if(!i2cOnline || busaI2cSuspended(now))return;
@@ -334,14 +350,19 @@ void probeI2c(uint32_t now){
   lastBusProbe=now;
 }
 bool pcfWrite(uint16_t v){
-  if(!pcfDetected)return false;
+  if(!pcfDetected || busaI2cSuspended(millis()) || !busaI2cLinesFree())return false;
+  const uint32_t started=millis();
   Wire.beginTransmission(pcfAddr);
   Wire.write((uint8_t)v);Wire.write((uint8_t)(v>>8));
-  return Wire.endTransmission()==0;
+  const bool ok=Wire.endTransmission()==0;
+  return busaI2cCheckTransfer(started) && ok;
 }
 bool pcfRead(uint16_t &v){
-  if(!pcfDetected||Wire.requestFrom(pcfAddr,(uint8_t)2)!=(uint8_t)2)return false;
-  v=(uint8_t)Wire.read();v|=(uint16_t)((uint8_t)Wire.read())<<8;return true;
+  if(!pcfDetected || busaI2cSuspended(millis()) || !busaI2cLinesFree())return false;
+  const uint32_t started=millis();
+  const bool ok=Wire.requestFrom(pcfAddr,(uint8_t)2)==(uint8_t)2;
+  if(ok){v=(uint8_t)Wire.read();v|=(uint16_t)((uint8_t)Wire.read())<<8;}
+  return busaI2cCheckTransfer(started) && ok;
 }
 uint8_t currentPage=0; // Six approved UI pages
 uint8_t graphSubView=0; // 0 T1-T4, 1 cooling water, 2 collection no sensor
@@ -2094,16 +2115,6 @@ void loop(){
     tftDirty=true;
   }
     sampleFlow(now);
-  if(i2cOnline){
-    // Query connected PCF/PCA once per 6 s. Scan at most two I2C addresses
-    // per loop; prevent keypad bus errors from starving the web server.
-    // Profile each blocking component and quarantine a misbehaving I2C bus.
-    {const uint32_t started=millis();scanI2cAddresses(now);busaObserve("I2C_DISCOVERY",started,busaI2cWorstMs);}
-    if(!lastBusProbe || elapsed(now,lastBusProbe,6000)){
-      const uint32_t started=millis();probeI2c(now);busaObserve("I2C_DEVICES",started,busaI2cWorstMs);
-    }
-    {const uint32_t started=millis();pollKeys(now);busaObserve("KEYPAD",started,busaMaxKeyScanMs);}
-  }
   // Landscape V14.7: repaint changed fields at 5 Hz; full frame only on page/theme change.
   // TFT driver writes are kept in the main loop so no concurrent SPI transactions occur.
   if(tftStarted && !tftDisplayOff && !otaActive && bootSplashComplete &&
@@ -2121,6 +2132,17 @@ void loop(){
     }
     busaLastTftRenderMs=millis()-started;
     busaObserve("TFT",started,busaTftWorstMs);
+  }
+  // Display updates take priority over peripheral diagnostics.
+  if(i2cOnline){
+    // Query connected PCF/PCA once per 6 s. Probe one supported I2C address
+    // per loop; prevent keypad bus errors from starving the web server.
+    // Profile each blocking component and quarantine a misbehaving I2C bus.
+    {const uint32_t started=millis();scanI2cAddresses(now);busaObserve("I2C_DISCOVERY",started,busaI2cWorstMs);}
+    if(!lastBusProbe || elapsed(now,lastBusProbe,6000)){
+      const uint32_t started=millis();probeI2c(now);busaObserve("I2C_DEVICES",started,busaI2cWorstMs);
+    }
+    {const uint32_t started=millis();pollKeys(now);busaObserve("KEYPAD",started,busaMaxKeyScanMs);}
   }
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
