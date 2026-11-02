@@ -40,7 +40,7 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-FULLSCAN-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-GPIOTEST-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -235,6 +235,17 @@ constexpr uint32_t BUSA_SOFTI2C_SCL_WAIT_US=800;
 uint32_t busaI2cNackCount=0,busaI2cTimeoutCount=0,busaI2cRecoverCount=0;
 int busaI2cLastResult=0; // 0 OK, 1 NACK, 2 SCL held low, 3 SDA held low, 4 no bus
 uint8_t busaI2cLastAddress=0,busaI2cLastSda=1,busaI2cLastScl=1;
+// Read-back at the ESP32 pads; not a substitute for sampling at the modules.
+uint32_t busaI2cLastGpioTestMs=0,busaI2cGpioTests=0;
+uint8_t busaI2cTestIdleSda=0,busaI2cTestIdleScl=0;
+uint8_t busaI2cTestSdaForcedLow=1,busaI2cTestSclForcedLow=1;
+uint8_t busaI2cTestSdaReleased=0,busaI2cTestSclReleased=0;
+uint8_t busaI2cTestSdaWhileSclLow=0,busaI2cTestSclWhileSdaLow=0;
+uint32_t busaI2cSdaOutputFaults=0,busaI2cAckUnstableCount=0;
+uint32_t busaI2cClockStretchCount=0,busaI2cLowDuringHighBits=0;
+uint8_t busaI2cAckSampleEarly=1,busaI2cAckSampleLate=1;
+uint8_t busaI2cLastTxByte=0;
+bool busaI2cGpioTestPassed=false;
 bool busaI2cSuspended(uint32_t now){return busaI2cSuspendedUntil && (int32_t)(now-busaI2cSuspendedUntil)<0;}
 void busaI2cQuarantine(uint32_t now,uint32_t durationMs=500){
   // Do not erase positive device discoveries on a single bad sample.
@@ -249,14 +260,38 @@ bool busaI2cLinesFree(){
 inline void busaSda(bool release){digitalWrite(BUS_SDA,release?HIGH:LOW);}
 inline void busaScl(bool release){digitalWrite(BUS_SCL,release?HIGH:LOW);}
 inline void busaI2cPause(){delayMicroseconds(BUSA_SOFTI2C_HALF_PERIOD_US);}
+void busaI2cRunGpioSelfTest(){
+  busaSda(true);busaScl(true);delayMicroseconds(200);
+  busaI2cTestIdleSda=digitalRead(BUS_SDA);
+  busaI2cTestIdleScl=digitalRead(BUS_SCL);
+  // Check clock-low drive, then release it before the brief SDA START/STOP.
+  busaScl(false);delayMicroseconds(30);
+  busaI2cTestSclForcedLow=digitalRead(BUS_SCL);
+  busaI2cTestSdaWhileSclLow=digitalRead(BUS_SDA);
+  busaScl(true);delayMicroseconds(200);
+  busaSda(false);delayMicroseconds(30);
+  busaI2cTestSdaForcedLow=digitalRead(BUS_SDA);
+  busaI2cTestSclWhileSdaLow=digitalRead(BUS_SCL);
+  busaSda(true);delayMicroseconds(200);
+  busaI2cTestSdaReleased=digitalRead(BUS_SDA);
+  busaI2cTestSclReleased=digitalRead(BUS_SCL);
+  busaI2cGpioTestPassed=busaI2cTestIdleSda && busaI2cTestIdleScl &&
+    !busaI2cTestSdaForcedLow && !busaI2cTestSclForcedLow &&
+    busaI2cTestSdaReleased && busaI2cTestSclReleased &&
+    busaI2cTestSdaWhileSclLow && busaI2cTestSclWhileSdaLow;
+  ++busaI2cGpioTests;busaI2cLastGpioTestMs=millis();
+}
 bool busaI2cClockHigh(){
   busaScl(true);
   const uint32_t started=micros();
+  bool stretched=false;
   while(digitalRead(BUS_SCL)==LOW){
+    stretched=true;
     if((uint32_t)(micros()-started)>=BUSA_SOFTI2C_SCL_WAIT_US){
       busaI2cLastResult=2;return false;
     }
   }
+  if(stretched)++busaI2cClockStretchCount;
   busaI2cPause();
   return true;
 }
@@ -264,7 +299,9 @@ bool busaI2cStart(){
   busaSda(true);busaI2cPause();
   if(!busaI2cClockHigh())return false;
   if(digitalRead(BUS_SDA)==LOW){busaI2cLastResult=3;return false;}
-  busaSda(false);busaI2cPause();busaScl(false);busaI2cPause();
+  busaSda(false);busaI2cPause();
+  if(digitalRead(BUS_SDA)!=LOW)++busaI2cSdaOutputFaults;
+  busaScl(false);busaI2cPause();
   return true;
 }
 bool busaI2cRestart(){
@@ -280,14 +317,23 @@ void busaI2cStop(){
   busaSda(true);busaScl(true);
 }
 bool busaI2cWriteByte(uint8_t value){
+  busaI2cLastTxByte=value;
   for(uint8_t mask=0x80;mask;mask>>=1){
-    busaSda((value&mask)!=0);busaI2cPause();
+    const bool high=(value&mask)!=0;
+    busaSda(high);busaI2cPause();
     if(!busaI2cClockHigh())return false;
+    const bool padHigh=digitalRead(BUS_SDA)==HIGH;
+    if(high && !padHigh)++busaI2cLowDuringHighBits;
+    if(!high && padHigh)++busaI2cSdaOutputFaults;
     busaScl(false);busaI2cPause();
   }
   busaSda(true);busaI2cPause();
   if(!busaI2cClockHigh())return false;
-  const bool ack=digitalRead(BUS_SDA)==LOW;
+  busaI2cAckSampleEarly=(uint8_t)digitalRead(BUS_SDA);
+  delayMicroseconds(5);
+  busaI2cAckSampleLate=(uint8_t)digitalRead(BUS_SDA);
+  if(busaI2cAckSampleEarly!=busaI2cAckSampleLate)++busaI2cAckUnstableCount;
+  const bool ack=busaI2cAckSampleEarly==LOW && busaI2cAckSampleLate==LOW;
   busaScl(false);busaI2cPause();
   if(!ack)busaI2cLastResult=1;
   return ack;
@@ -1096,6 +1142,24 @@ String statusJSON(){
   s+=",\"pcf_last_nack_ms\":"+String(busaI2cLastPcfNackMs);
   s+=",\"pca_last_nack_ms\":"+String(busaI2cLastPcaNackMs);
   s+=",\"driver\":\"SOFTWARE_OPEN_DRAIN\"";
+  s+=",\"gpio_test\":{\"count\":"+String(busaI2cGpioTests);
+  s+=",\"tested_at_ms\":"+String(busaI2cLastGpioTestMs);
+  s+=",\"passed\":"+(busaI2cGpioTestPassed?String("true"):String("false"));
+  s+=",\"idle_sda\":"+String(busaI2cTestIdleSda);
+  s+=",\"idle_scl\":"+String(busaI2cTestIdleScl);
+  s+=",\"sda_forced_low\":"+String(busaI2cTestSdaForcedLow);
+  s+=",\"scl_forced_low\":"+String(busaI2cTestSclForcedLow);
+  s+=",\"sda_released\":"+String(busaI2cTestSdaReleased);
+  s+=",\"scl_released\":"+String(busaI2cTestSclReleased);
+  s+=",\"sda_while_scl_low\":"+String(busaI2cTestSdaWhileSclLow);
+  s+=",\"scl_while_sda_low\":"+String(busaI2cTestSclWhileSdaLow)+"}";
+  s+=",\"ack_early_level\":"+String(busaI2cAckSampleEarly);
+  s+=",\"ack_late_level\":"+String(busaI2cAckSampleLate);
+  s+=",\"last_tx_byte\":"+String(busaI2cLastTxByte);
+  s+=",\"ack_unstable\":"+String(busaI2cAckUnstableCount);
+  s+=",\"sda_output_faults\":"+String(busaI2cSdaOutputFaults);
+  s+=",\"low_during_high_bits\":"+String(busaI2cLowDuringHighBits);
+  s+=",\"clock_stretch_events\":"+String(busaI2cClockStretchCount);
   s+=",\"last_result\":"+String(busaI2cLastResult);
   s+=",\"last_address\":"+String(busaI2cLastAddress);
   s+=",\"nack_count\":"+String(busaI2cNackCount);
@@ -2222,6 +2286,7 @@ void setup(){
   delayMicroseconds(300);
   busaI2cLinesFree();
   if(!busaI2cLastSda || !busaI2cLastScl)busaI2cRecover();
+  busaI2cRunGpioSelfTest(); // bounded, non-destructive bus-level selftest
   i2cOnline=true;
   updateBootStage(2);
   busaReportStage("I2C_READY");
@@ -2278,6 +2343,12 @@ void loop(){
   }
   // Display updates take priority over peripheral diagnostics.
   if(i2cOnline){
+    if(i2cFoundCount==0 && !busaI2cSuspended(now) &&
+       elapsed(now,busaI2cLastGpioTestMs,30000)){
+      const uint32_t started=millis();
+      busaI2cRunGpioSelfTest();
+      busaObserve("I2C_GPIO_TEST",started,busaI2cWorstMs);
+    }
     // Query connected PCF/PCA once per 6 s. Probe one supported I2C address
     // per loop; prevent keypad bus errors from starving the web server.
     // Profile each blocking component and quarantine a misbehaving I2C bus.
