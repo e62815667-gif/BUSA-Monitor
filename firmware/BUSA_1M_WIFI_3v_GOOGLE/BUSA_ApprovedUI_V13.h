@@ -227,22 +227,72 @@ static void v13TemperatureGraph(int x,int y,int w,int h){
   }
 }
 static void v13Graphs(bool layout){
-  if(layout){
-    v13Text("ГРАФИКИ",8,43,WHITE);
-    v13Panel(5,49,230,31);
-    v13Text("Температуры",13,70,V13_CYAN);v13Text("Расход",159,70,V13_CYAN);
-    v13Panel(5,86,230,153);
-    v13Text("Реальные измерения",15,106,GRAY);
-    v13Panel(5,242,230,30);
-    v13Text("Без имитации значений",13,261,YELLOW);
+  screen->fillRect(0,32,240,244,PANEL);
+  v13Text("ГРАФИКИ",8,45,WHITE);
+  for(int j=0;j<2;j++){
+    int x=4+j*117;
+    screen->fillRoundRect(x,51,113,28,5,graphSubView==j?BLUE:PANEL);
+    screen->drawRoundRect(x,51,113,28,5,V13_CYAN);
+    v13Text(j==0?"ТЕМПЕРАТУРЫ":"ВОДА И ОТБОР",x+5,70,WHITE);
   }
-  bool haveRealGraph=false;
-  for(int k=0;k<4;k++)for(int j=0;j<v13HistoryCount;j++)if(isfinite(v13History[k][j]))haveRealGraph=true;
-  if(v13HistoryCount<2||!haveRealGraph){
-    screen->fillRect(12,118,216,107,PANEL);
-    v13Text("Нет истории измерений",18,168,YELLOW);
+  screen->fillRoundRect(7,86,226,152,5,BLACK);
+  screen->drawRoundRect(7,86,226,152,5,V13_CYAN);
+  if(graphSubView==0){
+    static const uint16_t colors[]={V13_CYAN,V13_ORANGE,V13_RED,GREEN};
+    for(int k=0;k<4;k++){
+      const int y=92+k*34;
+      if(k)screen->drawFastHLine(11,y-2,218,GRAY);
+      v13Text("T"+String(k+1),12,y+13,colors[k]);
+      const int last=(v13HistoryHead+47)%48;
+      const float latest=v13HistoryCount?v13History[k][last]:NAN;
+      v13Text(isfinite(latest)?String(latest,1):String("Н/Д"),35,y+13,WHITE);
+      float low=INFINITY,high=-INFINITY;
+      for(int i=0;i<v13HistoryCount;i++){
+        const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
+        const float t=v13History[k][idx];
+        if(isfinite(t)){low=fminf(low,t);high=fmaxf(high,t);}
+      }
+      if(!isfinite(low)||!isfinite(high))continue;
+      const float pad=fmaxf(0.2f,(high-low)*0.22f);
+      low-=pad;high+=pad;
+      for(int i=0;i<v13HistoryCount;i++){
+        const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
+        const float v=v13History[k][idx];
+        if(!isfinite(v))continue;
+        int x=89+(i*136)/47;
+        int yt=y+27-(int)(fminf(1.0f,fmaxf(0.0f,(v-low)/(high-low)))*23.0f);
+        const int prior=(idx+47)%48;
+        if(!i||!isfinite(v13History[k][prior]))screen->drawPixel(x,yt,colors[k]);
+        else{
+          const int yp=y+27-(int)(fminf(1.0f,fmaxf(0.0f,(v13History[k][prior]-low)/(high-low)))*23.0f);
+          screen->drawLine(89+((i-1)*136)/47,yp,x,yt,colors[k]);
+        }
+      }
+    }
+    v13Text("Точки через 5 секунд",13,259,GRAY);
   }else{
-    v13TemperatureGraph(12,117,216,110);
+    v13Text("ВОДА · импульсы/2c",15,108,V13_CYAN);
+    const int px=16,py=115,pw=207,ph=40;
+    uint32_t maxv=1;
+    for(int i=0;i<waterSamplesRecorded;i++){
+      const int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
+      if(waterPulseHistory[idx]>maxv)maxv=waterPulseHistory[idx];
+    }
+    for(int i=0;i<waterSamplesRecorded;i++){
+      const int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
+      const int x=px+(i*pw)/39;
+      const int y=py+ph-1-(int)((uint64_t)waterPulseHistory[idx]*(ph-3)/maxv);
+      if(!i)screen->drawPixel(x,y,V13_CYAN);
+      else{
+        const int prev=(flowTraceHead+40-waterSamplesRecorded+i-1)%40;
+        const int yp=py+ph-1-(int)((uint64_t)waterPulseHistory[prev]*(ph-3)/maxv);
+        screen->drawLine(px+((i-1)*pw)/39,yp,x,y,V13_CYAN);
+      }
+    }
+    screen->drawFastHLine(12,172,216,GRAY);
+    v13Text("ОТБОР · нет датчика",15,191,YELLOW);
+    v13Text("Без выдуманных данных",15,217,GRAY);
+    v13Text("Вода не откалибрована",15,259,GRAY);
   }
 }
 static void v13EventsPage(bool layout){
