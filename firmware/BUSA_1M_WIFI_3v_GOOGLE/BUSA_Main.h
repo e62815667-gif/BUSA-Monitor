@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-UISETDIAG-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-ONLINESTYLE-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1471,6 +1471,108 @@ main>*{max-width:100%;min-width:0}
 .netDot{display:inline-block;width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:#d33a32;box-shadow:0 0 0 1px #73737355}
 .netDot.internetOn{background:#13a44c}.netDot.localOn{background:#168de3}
 .netText{font-size:10px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:145px}
+
+/* SYSTEM THEME: mirror the approved BUSA public online monitor UI.
+   Palette values are copied from online/index.html in main on 2026-11-02.
+   This is strictly presentation; existing local operations stay unchanged. */
+:root[data-theme="system"]{
+ color-scheme:dark;
+ --busa-bg:#0b1928;--busa-panel:#152a3d;--busa-edge:#34546a;
+ --busa-blue:#299bde;--busa-green:#0b994f;--busa-green-text:#eafff2;
+ --busa-red:#df4855;--busa-text:#f0f7ff;--busa-muted:#a9c5d7;
+ --ink:var(--busa-text);--muted:var(--busa-muted);--paper:var(--busa-bg);
+ --surface:var(--busa-panel);--line:var(--busa-edge);--sea:var(--busa-blue);
+ --orange:var(--busa-blue);--warn:#ff7584;
+ background:var(--busa-bg);color:var(--busa-text);
+}
+:root[data-theme="system"] body{background:var(--busa-bg)!important;color:var(--busa-text)}
+:root[data-theme="system"] header,
+:root[data-theme="system"] .appHeader{
+ background:#112436;color:var(--busa-text);border-bottom:2px solid var(--busa-blue);
+ box-shadow:0 3px 12px #0004;
+}
+:root[data-theme="system"] h1,:root[data-theme="system"] h2,
+:root[data-theme="system"] h3{color:var(--busa-text)}
+:root[data-theme="system"] .brandSmall{color:#73c9ff}
+:root[data-theme="system"] .brandSub,
+:root[data-theme="system"] .hint,
+:root[data-theme="system"] .clockBar,
+:root[data-theme="system"] #clockDisplay{color:var(--busa-muted)!important}
+:root[data-theme="system"] .readOnlyLabel{color:#72e4ad}
+:root[data-theme="system"] main .card{
+ background:var(--busa-panel);border:1px solid var(--busa-edge);
+ color:var(--busa-text);box-shadow:0 4px 12px #0002;
+}
+:root[data-theme="system"] .homeHero{
+ background:linear-gradient(125deg,#17374f,#0b2943);
+ border:1px solid #3878a1;
+}
+:root[data-theme="system"] .homeHero h2{color:var(--busa-text)}
+:root[data-theme="system"] .heroEyebrow{color:#8ecfec}
+:root[data-theme="system"] .heroStatus{color:#8ce6c3}
+:root[data-theme="system"] .tile{
+ background:#1a364b;border-color:#346583;color:var(--busa-text)
+}
+:root[data-theme="system"] .tile small{color:#b9d6e5}
+:root[data-theme="system"] .tile strong,
+:root[data-theme="system"] .green{color:#70e4b0}
+:root[data-theme="system"] .row{border-color:#2c5068}
+:root[data-theme="system"] .netPill,
+:root[data-theme="system"] .relayGrid span{
+ background:#17364a;border-color:#3c6a83;color:#dceefb;
+}
+:root[data-theme="system"] .relayGrid b{color:#70e4b0}
+:root[data-theme="system"] .netText{color:var(--busa-muted)}
+:root[data-theme="system"] .appTabs{
+ background:#10283b!important;border-top:2px solid var(--busa-blue)!important;
+}
+:root[data-theme="system"] .appTabs button{
+ background:transparent!important;color:#b3cadb;border:1px solid transparent;
+}
+:root[data-theme="system"] .appTabs button.on{
+ background:var(--busa-green)!important;color:var(--busa-green-text)!important;
+ border:1px solid #41d98d!important;font-weight:800;
+}
+:root[data-theme="system"] .tabIcon{color:#79d3ff}
+:root[data-theme="system"] .appTabs button.on .tabIcon{color:#e5fff0!important}
+:root[data-theme="system"] button{
+ background:#17425b;color:#ecfaff;border:1px solid #3d83aa;
+}
+:root[data-theme="system"] button:focus-visible,
+:root[data-theme="system"] input:focus-visible,
+:root[data-theme="system"] select:focus-visible{
+ outline:2px solid #4cdb94;outline-offset:2px;
+}
+:root[data-theme="system"] .settingsTabs button.on,
+:root[data-theme="system"] .eventFilters button.on,
+:root[data-theme="system"] .graphTabs button.on{
+ background:var(--busa-green)!important;color:#fff!important;
+ border-color:#41d98d!important;font-weight:800;
+}
+:root[data-theme="system"] input,
+:root[data-theme="system"] select,
+:root[data-theme="system"] textarea,
+:root[data-theme="system"] pre{
+ background:#112b40;color:#f4faff;border-color:#4c819b;
+}
+:root[data-theme="system"] input::placeholder{color:#a3bdce}
+:root[data-theme="system"] a{color:#82d0ff}
+:root[data-theme="system"] canvas{
+ background:#192f45;border:1px solid #34546a;
+}
+:root[data-theme="system"] .rigViewport{
+ box-shadow:inset 0 0 18px #0b2d4266;border-radius:13px;
+}
+:root[data-theme="system"] .rigViewport svg{filter:drop-shadow(0 6px 8px #0002)}
+/* Seven tabs: the extra Diagnostics section remains user-approved. */
+.appTabs{grid-template-columns:repeat(7,minmax(0,1fr))!important}
+.appTabs button{font-size:clamp(8px,2.1vw,10px)!important;padding:7px 0!important}
+.appTabs .tabIcon{font-size:17px}
+@media(max-width:380px){
+ .appTabs button{font-size:8px!important}
+ .appTabs .tabIcon{font-size:15px}
+}
+
 </style></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
@@ -1771,7 +1873,7 @@ get('tftTheme').onclick=async()=>{
   const mode=get('themeModeSelect').value;
   const r=await fetch('/api/tft/theme',{method:'POST',body:new URLSearchParams({confirm:'YES',mode})});
   get('tftThemeStatus').textContent=await r.text();
-  if(r.ok)document.documentElement.dataset.theme=mode==='1'?'dark':'light';
+  if(r.ok)document.documentElement.dataset.theme=mode==='1'?'dark':mode==='2'?'system':'light';
  }catch(e){get('tftThemeStatus').textContent='Ошибка: '+e.message}
 };
 get('tempCalSave').onclick=async()=>{
@@ -1851,7 +1953,7 @@ const cs=s.google;
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
 if(!themeInitialized && typeof s.tft_theme_mode==='number'){
   get('themeModeSelect').value=String(s.tft_theme_mode);
-  document.documentElement.dataset.theme=s.tft_theme_mode===1?'dark':'light';
+  document.documentElement.dataset.theme=s.tft_theme_mode===1?'dark':s.tft_theme_mode===2?'system':'light';
   themeInitialized=true;
 }
 if(!calInitialized&&Array.isArray(s.calibration_offsets)){
