@@ -30,6 +30,8 @@
 #include <Adafruit_ILI9341.h>
 #include <U8g2_for_Adafruit_GFX.h>
 #include <math.h>
+#include <freertos/queue.h>
+#include <mbedtls/sha256.h>
 
 constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
@@ -46,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-FLICKERFIX-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-CLOUDOTA-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1111,7 +1113,8 @@ bool storeTempReference(int sensor,int field,float value){
 }
 bool busaSoundEnabled(uint8_t i){return i<4&&soundEnabled[i];}
 bool busaSoundActive(uint8_t i){return i<4&&soundChannels[i].on;}
-String cloudJSON(); // forward declaration; read-only Google status
+String cloudJSON(); // forward declaration for Google diagnostic and OTA status
+String cloudControlAckJSON(); // remote admin command execution result
 extern volatile int googleInternet; // external TCP health, no credentials
 String statusJSON(){
   uint32_t now=millis();
@@ -1299,6 +1302,7 @@ String statusJSON(){
   s+=",\"ota\":"+otaJSON();
   s+=",\"bluetooth_enabled\":false";
   s+=",\"google\":"+cloudJSON();
+  s+=",\"cloud_control_ack\":"+cloudControlAckJSON();
   s+=",\"network_indicators\":{\"internet\":"+(googleInternet==1?String("true"):String("false"));
   s+=",\"local_client\":"+(WiFi.softAPgetStationNum()>0?String("true"):String("false"));
   s+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"))+"}";
@@ -2484,6 +2488,7 @@ void setup(){
     noticeTemp[i]=i<2?buzzerOffC[i]:soundOffC[i];
   }
   setupGoogleCloud();
+  setupBusaCloudCommandQueue();
   busaReportStage("WIFI_BEGIN");
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
@@ -2969,6 +2974,7 @@ void loop(){
   }
     sampleFlow(now);
   v13Collect(now); // Shared graph sampling, including when TFT screen is asleep.
+  processBusaCloudCommand(); // One bounded non-blocking command per main loop.
   // TFT graph is repainted inside its own plot border by v14RefreshLive().
   // Never set tftDirty here: that would erase the entire screen every 5 s.
   // Landscape V14.7: repaint changed fields at 5 Hz; full frame only on page/theme change.
