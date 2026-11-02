@@ -334,9 +334,11 @@ void scanI2cAddresses(uint32_t now){
   }
   const uint8_t addr=BUSA_I2C_PROBE_ADDRS[busaI2cScanNext];
   const bool ok=ack(addr);
+  // Advance even when a device times out; otherwise a bad 0x20 address
+  // could prevent the independent 0x40 module from being scanned forever.
+  busaI2cScanNext=(busaI2cScanNext+1)%9;
   if(busaI2cSuspended(millis()))return;
   if(ok && i2cFoundCount<24)i2cFound[i2cFoundCount++]=addr;
-  busaI2cScanNext=(busaI2cScanNext+1)%9;
   if(busaI2cScanNext==0){
     i2cAckCount=i2cFoundCount;
     i2cFullScanAt=millis();
