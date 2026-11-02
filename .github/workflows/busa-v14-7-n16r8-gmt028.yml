@@ -102,7 +102,7 @@ jobs:
           assert 'if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}' in p
           sound=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarms.h').read_text()
           logic=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarmLogic.h').read_text()
-          assert '12V SOUND' in sound and 'BUSA_SOUND_ACTIVE_LOW=true' in sound
+          assert '12V_SOUND_ONLY' in sound and 'BUSA_SOUND_ACTIVE_LOW=true' in sound
           assert 'prefs.getBool((String("sndRoleEnable")+i).c_str(),true)' in sound
           assert 'prefs.getBool((String("buzE")+i).c_str(),true)' in sound
           assert 'BUSA_BUZZER_GPIO=2' in sound
