@@ -1418,10 +1418,10 @@ main>*{max-width:100%;min-width:0}
   <div class="homeHero"><div class="heroEyebrow">БУСА-1М №001 · ПАНЕЛЬ МОНИТОРИНГА</div>
   <h2>Главная</h2><div class="heroStatus"><span>● Только показания</span><span id="mainwifi">Wi-Fi: ожидание</span></div></div>
   <div class="card"><h2>Температура · T1–T4</h2><div class="grid temps">
-    <div class="tile"><small><span class="tempDot t1"></span>T1 · Вода</small><strong id="t0">Н/Д</strong></div>
-    <div class="tile"><small><span class="tempDot t2"></span>T2 · Колонна</small><strong id="t1">Н/Д</strong></div>
-    <div class="tile"><small><span class="tempDot t3"></span>T3 · Куб</small><strong id="t2">Н/Д</strong></div>
-    <div class="tile"><small><span class="tempDot t4"></span>T4 · Верх колонны</small><strong id="t3">Н/Д</strong></div>
+    <div class="tile"><small><span class="tempDot t1"></span>T1 · Вода</small><strong id="t0">Н/Д</strong><small id="homeSet0">ВКЛ — · ВЫКЛ —</small></div>
+    <div class="tile"><small><span class="tempDot t2"></span>T2 · Колонна</small><strong id="t1">Н/Д</strong><small id="homeSet1">ВКЛ — · ВЫКЛ —</small></div>
+    <div class="tile"><small><span class="tempDot t3"></span>T3 · Куб</small><strong id="t2">Н/Д</strong><small id="homeSet2">ВКЛ — · ВЫКЛ —</small></div>
+    <div class="tile"><small><span class="tempDot t4"></span>T4 · Верх колонны</small><strong id="t3">Н/Д</strong><small id="homeSet3">ВКЛ — · ВЫКЛ —</small></div>
   </div></div>
   <div class="card rigCard"><h2>Схема установки</h2><div class="rigViewport">
   <svg viewBox="0 0 360 225" role="img" aria-label="Схема установки БУСА с датчиком YF-S401 на линии охлаждающей воды" preserveAspectRatio="xMidYMid meet">
@@ -1712,10 +1712,13 @@ s.temperatures.forEach((t,i)=>{
  const a=tlog4[i];a.push(t.c===null?null:Number(t.c));if(a.length>80)a.shift();
  if(i===0){tlog.push(t.c===null?null:Number(t.c));if(tlog.length>80)tlog.shift();}
 });
-if(!temperatureThresholdsInitialized && s.sound_alerts?.channels?.length===4 && s.sound_alerts?.buzzer?.sensors?.length===2){
+if(s.sound_alerts?.channels?.length===4 && s.sound_alerts?.buzzer?.sensors?.length===2){
  const c=s.sound_alerts.channels,b=s.sound_alerts.buzzer.sensors;
  const pairs=[[b[0].on_c,b[0].off_c],[b[1].on_c,b[1].off_c],[c[0].on_c,c[0].off_c],[c[3].on_c,c[3].off_c]];
- pairs.forEach((p,i)=>{get('tempOn'+i).value=p[0]??'';get('tempOff'+i).value=p[1]??'';});
+ pairs.forEach((p,i)=>{
+  if(!temperatureThresholdsInitialized){get('tempOn'+i).value=p[0]??'';get('tempOff'+i).value=p[1]??'';}
+  get('homeSet'+i).textContent='ВКЛ '+(p[0]??'—')+'° · ВЫКЛ '+(p[1]??'—')+'°';
+ });
  temperatureThresholdsInitialized=true;
 }
 if(s.sound_alerts?.channels?.length===4)
