@@ -1,4 +1,4 @@
-const CACHE="busa-monitor-v14.14-dual-themes-20261023";
+const CACHE="busa-monitor-approved-ui-20261103";
 const ASSETS=["./","./index.html","./manifest.webmanifest"];
 self.addEventListener("install",event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(
