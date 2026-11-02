@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-NAVF1-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-UISETDIAG-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -82,6 +82,7 @@ OneWire ow1(TPIN[0]),ow2(TPIN[1]),ow3(TPIN[2]),ow4(TPIN[3]);
 DallasTemperature ds1(&ow1),ds2(&ow2),ds3(&ow3),ds4(&ow4);
 DallasTemperature* sensors[4]={&ds1,&ds2,&ds3,&ds4};
 float temperature[4]={NAN,NAN,NAN,NAN};
+float tempOffset[4]={0,0,0,0}; // Celsius sensor correction, separate from alarms
 bool tempPresent[4]={false,false,false,false};
 uint32_t tempAt[4]={0,0,0,0},tempCycle=0,tempRequestAt=0;
 bool tempInitialized[4]={false,false,false,false};
@@ -106,7 +107,7 @@ void sampleTemperatures(uint32_t now){
     for(int i=0;i<4;i++){
       float v=cachedTempValid[i]?sensors[i]->getTempC(cachedTempRom[i]):DEVICE_DISCONNECTED_C;
       if(tempPresent[i] && isfinite(v) && v>=-55 && v<=125 && v!=DEVICE_DISCONNECTED_C){
-        temperature[i]=v;tempAt[i]=now;
+        temperature[i]=v+tempOffset[i];tempAt[i]=now;
       }else{temperature[i]=NAN;tempAt[i]=0;}
     }
     tempConverting=false;
@@ -548,10 +549,12 @@ bool pcfRead(uint16_t &value){
   value=(uint16_t)bytes[0]|((uint16_t)bytes[1]<<8);
   return true;
 }
-uint8_t currentPage=0; // Six approved UI pages
+uint8_t currentPage=0; // 7 tabs including Diagnostics
 uint8_t graphSubView=0; // 0 T1-T4, 1 cooling water, 2 collection no sensor
-uint8_t approvedSettingsItem=0; // The six approved settings rows on the physical TFT
+uint8_t approvedSettingsItem=0; // 5 approved settings
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
+uint8_t diagModule=0,calSensor=0,themeDraft=2,tftThemeMode=2;
+bool calEditing=false;float calDraft=0;
 bool tftDirty=true;
 float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
 // TFT temperature setpoints mirror the actual active sound threshold settings.
@@ -659,13 +662,13 @@ void startKeyLearning(){
   keypadMessage="Нажми F1, затем отпусти";
   // Stay in Settings / System keyboard diagnostics; never jump to Events.
   previousMainPage=currentPage;
-  currentPage=5;approvedSettingsItem=4;tftView=1;tftDirty=true;
+  currentPage=6;diagModule=1;tftView=1;tftDirty=true;
 }
 
 void navigatePage(uint8_t target){
-  if(target>=6||target==currentPage)return;
+  if(target>=7||target==currentPage)return;
   previousMainPage=currentPage;
-  currentPage=target;tftView=0;editingTemp=false;deleteConfirmPending=false;tftDirty=true;
+  currentPage=target;tftView=0;editingTemp=false;deleteConfirmPending=false;calEditing=false;tftDirty=true;
 }
 void deleteSelectedReference(){
   if(currentPage!=1 || selectedTemp<0 || selectedTemp>3)return;
@@ -674,10 +677,30 @@ void deleteSelectedReference(){
     (selectedField?" ВЫКЛ":" ВКЛ")+" - удалено";
 }
 void moveApprovedTab(int direction); // declaration required by keypad navigation
+bool saveTempOffset(uint8_t sensor,float v){
+ if(sensor>=4||!isfinite(v)||v< -10||v>10)return false;
+ v=roundf(v*10)/10.0f;String key="tCal"+String(sensor);
+ if(prefs.putFloat(key.c_str(),v)!=sizeof(float))return false;
+ if(isfinite(temperature[sensor]))temperature[sensor]+=v-tempOffset[sensor];
+ tempOffset[sensor]=v;tftDirty=true;return true;
+}
+bool saveThemeMode(uint8_t mode){
+ if(mode>2||prefs.putUChar("themeMode",mode)!=sizeof(uint8_t))return false;
+ tftThemeMode=mode;tftThemeDark=mode==1;
+ prefs.putBool("tftDarkColor",tftThemeDark);
+ tftDirty=true;return true;
+}
 void darkenTftDisplay(); // manual screen-off via F2 or local iPhone UI
 void keypadAction(int k){
   // # and * are deliberately unassigned: no navigation or other action.
   if(k==2 || k==3)return;
+  if(calEditing){
+    if(k==7||k==11){calDraft=constrain(roundf((calDraft+(k==7?0.1f:-0.1f))*10.0f)/10.0f,-10.0f,10.0f);}
+    else if(k==19){if(saveTempOffset(calSensor,calDraft)){calEditing=false;keyMessage="Калибровка сохранена";}}
+    else if(k==15){calEditing=false;keyMessage="Калибровка отменена";}
+    else if(k==16||k==18){calEditing=false;moveApprovedTab(k==16?-1:1);}
+    tftDirty=true;return;
+  }
   // Confirmation is the only path that removes an existing sound threshold.
   if(deleteConfirmPending){
     if(k==19){ // ENT confirms delete
@@ -745,7 +768,11 @@ void keypadAction(int k){
       item=(item+(k==7?7:1))%8;
       selectedTemp=item/2;selectedField=item%2;
     }else if(currentPage==5){
-      approvedSettingsItem=(approvedSettingsItem+(k==7?6:1))%7;
+      if(tftView && approvedSettingsItem==0)calSensor=(calSensor+(k==7?3:1))%4;
+      else if(tftView && approvedSettingsItem==2)themeDraft=(themeDraft+(k==7?2:1))%3;
+      else if(!tftView){approvedSettingsItem=(approvedSettingsItem+(k==7?4:1))%5;settingsSubTab=approvedSettingsItem;}
+    }else if(currentPage==6){
+      diagModule=(diagModule+(k==7?6:1))%7;tftView=0;
     }else if(currentPage==3){
       graphSubView=(graphSubView+(k==7?2:1))%3;
     }else{
@@ -762,8 +789,10 @@ void keypadAction(int k){
     }else if(currentPage==0){
       navigatePage(1);
     }else if(currentPage==5){
-      if(tftView && approvedSettingsItem==0)navigatePage(1);
-      else tftView=1;
+      if(!tftView){tftView=1;themeDraft=tftThemeMode;}
+      else if(approvedSettingsItem==0){calEditing=true;calDraft=tempOffset[calSensor];}
+      else if(approvedSettingsItem==2){if(saveThemeMode(themeDraft))keyMessage="Тема сохранена";}
+    }else if(currentPage==6){tftView=!tftView;
     }else if(currentPage==3){
       graphSubView=(graphSubView+1)%3;
     }else{
@@ -778,9 +807,9 @@ void keypadAction(int k){
   else if(k==8){navigatePage(3);} // 4 Graphs
   else if(k==9){navigatePage(4);} // 5 Events
   else if(k==10){navigatePage(5);} // 6 Settings
-  else if(k==12){navigatePage(5);settingsSubTab=0;} // 7 Wi-Fi
-  else if(k==13){navigatePage(5);settingsSubTab=1;} // 8 Google
-  else if(k==14){navigatePage(4);} // 9 Events (existing assignment)
+  else if(k==12){navigatePage(5);approvedSettingsItem=1;settingsSubTab=1;tftView=1;} // 7 Wi-Fi
+  else if(k==13){navigatePage(5);approvedSettingsItem=3;settingsSubTab=3;tftView=1;} // 8 Google
+  else if(k==14){navigatePage(6);diagModule=0;} // 9 Diagnostics
   tftDirty=true;
 }
 
@@ -888,11 +917,11 @@ uint32_t tftRebootAt=0;
 const char* tftProfileName(){return tftProfile==2?"ILI9341":"ST7789";}
 const uint16_t BG=0x080f,PANEL=0x10a3,BLUE=0x1c9f,GREEN=0x07e0,WHITE=0xffff,
                YELLOW=0xffe0,GRAY=0xbdf7;
-const char* pages[6]={"Главная","Температуры","Отбор","Графики","События","Настройки"};
-const uint8_t UI_ORDER[6]={0,1,2,5,3,4}; // Main T Collection Settings Graphs Events
+const char* pages[7]={"Главная","Температуры","Отбор","Графики","События","Настройки","Диагностика"};
+const uint8_t UI_ORDER[7]={0,1,2,5,6,3,4}; // Main T Collection Settings Graphs Events
 void navigatePage(uint8_t target); // forward declaration
-uint8_t orderSlot(uint8_t page){for(uint8_t i=0;i<6;i++)if(UI_ORDER[i]==page)return i;return 0;}
-void moveApprovedTab(int direction){int slot=(orderSlot(currentPage)+6+direction)%6;navigatePage(UI_ORDER[slot]);}
+uint8_t orderSlot(uint8_t page){for(uint8_t i=0;i<7;i++)if(UI_ORDER[i]==page)return i;return 0;}
+void moveApprovedTab(int direction){int slot=(orderSlot(currentPage)+7+direction)%7;navigatePage(UI_ORDER[slot]);}
 // Defined below with the web server; needed by the TFT renderer.
 extern String stationSsid,otaMessage,nearbyNames[5];
 extern uint8_t nearbyCount;
@@ -1123,7 +1152,8 @@ String statusJSON(){
     if(i)s+=",";
     s+="{\"name\":"+quoteJson(String(i==0?"Вода":i==1?"Колонна":i==2?"Куб":"Верх колонны"));
     s+=",\"gpio\":"+String(TPIN[i])+",\"present\":"+(tempPresent[i]?"true":"false");
-    s+=",\"c\":"+(hasTemp(i,now)?String(temperature[i],2):String("null"))+"}";
+    s+=",\"c\":"+(hasTemp(i,now)?String(temperature[i],2):String("null"));
+    s+=",\"offset_c\":"+String(tempOffset[i],1)+"}";
   }
   s+="],\"water\":{\"gpio\":15,\"pulses\":"+String(flowPulses());
   s+=",\"lpm\":"+(flowReady?String(flowLpm,3):String("null"));
@@ -1141,6 +1171,9 @@ String statusJSON(){
   s+=",\"last_key\":"+quoteJson(keyMessage)+"}";
   s+=",\"tft_theme_inverted\":"+(tftInverted?String("true"):String("false"));
   s+=",\"tft_theme_dark\":"+(tftThemeDark?String("true"):String("false"));
+  s+=",\"tft_theme_mode\":"+String(tftThemeMode);
+  s+=",\"calibration_offsets\":[";
+  for(int i=0;i<4;i++){if(i)s+=",";s+=String(tempOffset[i],1);}s+="]";
   s+=",\"display_sleep\":"+(tftDisplayOff?String("true"):String("false"));
   s+=",\"keypad\":{\"ready\":"+(keypadReady?String("true"):String("false"));
   s+=",\"learning\":"+(keypadLearning?String("true"):String("false"));
@@ -1972,7 +2005,13 @@ void setup(){
     prefs.putBool("v14lightSt",true);
   }
   tftProfile=1;tftRotation=1;tftInverted=false;
-  tftThemeDark=prefs.getBool("tftDarkColor",false);
+  uint8_t themeSaved=prefs.getUChar("themeMode",255);
+  tftThemeMode=themeSaved<=2?themeSaved:(prefs.getBool("tftDarkColor",false)?1:2);
+  tftThemeDark=tftThemeMode==1;
+  for(int i=0;i<4;i++){
+    String key="tCal"+String(i);float v=prefs.getFloat(key.c_str(),0);
+    tempOffset[i]=isfinite(v)&&v>=-10&&v<=10?roundf(v*10)/10:0;
+  }
   startedAt=millis();
   tftProfile=1; // ST7789 only
   // Preserve original V14.7 splash-first boot; time every operation.
@@ -2269,7 +2308,7 @@ void setup(){
   });
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
-    if(n<1||n>6){server.send(400,"application/json","{\"error\":\"page 1..6\"}");return;}
+    if(n<1||n>7){server.send(400,"application/json","{\"error\":\"page 1..7\"}");return;}
     navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;
     server.send(200,"application/json","{\"ok\":true}");
   });
@@ -2307,17 +2346,30 @@ void setup(){
       "Тест отправлен: 5 секунд чёрного фона и белой надписи BUSA 1M AI.");
   });
   server.on("/api/tft/theme",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){
-      server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
+    if(!server.hasArg("mode")){server.send(400,"text/plain","Выбери тему");return;}
+    int m=server.arg("mode").toInt();
+    if(m<0||m>2||!saveThemeMode((uint8_t)m)){server.send(400,"text/plain","Тема не сохранена");return;}
+    server.send(200,"text/plain; charset=utf-8",m==0?"Светлая тема":m==1?"Тёмная тема":"Системная тема");
+  });
+  server.on("/api/temperature/calibration",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
+    float values[4];
+    for(int i=0;i<4;i++){
+      String name="offset"+String(i);
+      if(!server.hasArg(name)){server.send(400,"text/plain","Нет поправки");return;}
+      String v=server.arg(name);v.trim();char* stop=nullptr;
+      float x=strtof(v.c_str(),&stop);
+      if(v.isEmpty()||*stop!='\0'||!isfinite(x)||x< -10||x>10||
+         fabsf(x*10-roundf(x*10))>0.02f){
+        server.send(400,"text/plain; charset=utf-8","Поправка от -10 до +10, шаг 0,1");return;
+      }
+      values[i]=x;
     }
-    const bool dark=!tftThemeDark;
-    if(prefs.putBool("tftDarkColor",dark)!=1){
-      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить тему");return;
+    for(int i=0;i<4;i++)if(!saveTempOffset(i,values[i])){
+      server.send(500,"text/plain; charset=utf-8","Ошибка сохранения поправок");return;
     }
-    tftThemeDark=dark;
-    tftDirty=true;lastRender=0;
-    server.send(200,"text/plain; charset=utf-8",
-      dark?"Тёмная ЦВЕТНАЯ тема включена":"Светлая ЦВЕТНАЯ тема включена");
+    server.send(200,"text/plain; charset=utf-8","Калибровка T1–T4 сохранена");
   });
   server.on("/api/keypad/start",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
@@ -2374,8 +2426,8 @@ void setup(){
   });
   server.on("/api/settings-tab",HTTP_GET,[]{
     int n=server.arg("n").toInt();
-    if(n<0||n>3){server.send(400,"text/plain","bad subtab");return;}
-    settingsSubTab=(uint8_t)n;tftDirty=true;lastRender=0;
+    if(n<0||n>4){server.send(400,"text/plain","bad subtab");return;}
+    settingsSubTab=(uint8_t)n;approvedSettingsItem=(uint8_t)n;tftDirty=true;lastRender=0;
     server.send(200,"application/json","{\"ok\":true}");
   });
   server.on("/api/tft/scroll",HTTP_GET,[]{
