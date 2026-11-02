@@ -254,73 +254,90 @@ static void v14Collection(bool layout){
   v14Print("Нет датчика отбора",69,176,V14_WARN);
   v14Tiny("YF-S401 относится только к охлаждающей воде",13,199,V14_MUTED);
 }
+// Approved diagnostic-style graph layout: two views, independent vertical lanes.
+// All samples come from the same 5s DS18B20 circular history as /api/graph-history.
 static void v14GraphTabs(){
-  static const char* names[]={"ТЕМПЕРАТУРЫ","ВОДА","ОТБОР"};
-  for(int j=0;j<3;j++){
-    int x=5+j*104;
-    screen->fillRoundRect(x,52,100,22,4,graphSubView==j?V14_ORANGE:V14_CARD);
-    screen->drawRoundRect(x,52,100,22,4,V14_RULE);
-    const String name=names[j];
-    ru.setFont(u8g2_font_6x13_t_cyrillic);
-    int w=ru.getUTF8Width(name.c_str());
-    v14Print(name,x+max(2,(100-w)/2),67,V14_TEXT);
+  static const char* names[]={"ТЕМПЕРАТУРЫ","ВОДА И ОТБОР"};
+  for(int j=0;j<2;j++){
+    int x=5+j*156;
+    screen->fillRoundRect(x,52,151,22,4,graphSubView==j?V14_ORANGE:V14_CARD);
+    screen->drawRoundRect(x,52,151,22,4,V14_RULE);
+    String label=names[j];
+    ru.setFont(u8g2_font_5x7_t_cyrillic);
+    int w=ru.getUTF8Width(label.c_str());
+    v14Tiny(label,x+max(3,(151-w)/2),67,V14_TEXT);
   }
 }
 static void v14Graphs(bool layout){
   v14GraphTabs();
   hqPanel(5,79,310,128);
-  if(graphSubView==2){
-    v14Print("График отбора",16,97,V14_TEXT);
-    screen->drawFastHLine(29,189,270,V14_RULE);
-    screen->drawFastVLine(29,109,80,V14_RULE);
-    v14Print("НЕТ ДАТЧИКА ОТБОРА",61,155,V14_WARN);
-    return;
-  }
-  const int gx=31, gy=107,gw=265,gh=77;
-  screen->drawFastVLine(gx,gy,gh,V14_RULE);
-  screen->drawFastHLine(gx,gy+gh,gw,V14_RULE);
-  for(int j=1;j<4;j++)screen->drawFastHLine(gx,gy+j*gh/4,gw,V14_GRID);
+  // Black plot background is mandatory in every theme, including light mode.
+  screen->fillRoundRect(10,84,300,119,5,0x0000);
+  screen->drawRoundRect(10,84,300,119,5,V14_BLUE);
   if(graphSubView==0){
-    v14Tiny("T1",16,96,v14SeriesColors[0]);
-    v14Tiny("T2",57,96,v14SeriesColors[1]);
-    v14Tiny("T3",98,96,v14SeriesColors[2]);
-    v14Tiny("T4",139,96,v14SeriesColors[3]);
-    v14Tiny("°C",288,96,V14_MUTED);
-    v14Tiny("125",8,111,V14_MUTED);
-    v14Tiny("0",17,185,V14_MUTED);
-    bool any=false;
+    const int x0=83,xw=215,bandY=92,bandH=26;
     for(int k=0;k<4;k++){
-      for(int i=1;i<v13HistoryCount;i++){
-        int a=(v13HistoryHead+48-v13HistoryCount+i-1)%48;
-        int b=(v13HistoryHead+48-v13HistoryCount+i)%48;
-        float va=v13History[k][a],vb=v13History[k][b];
-        if(!isfinite(va)||!isfinite(vb))continue;
-        any=true;
-        int x1=gx+(i-1)*(gw-2)/47,x2=gx+i*(gw-2)/47;
-        int y1=gy+gh-(int)(fminf(fmaxf(va,0.0f),125.0f)*gh/125.0f);
-        int y2=gy+gh-(int)(fminf(fmaxf(vb,0.0f),125.0f)*gh/125.0f);
-        screen->drawLine(x1,y1,x2,y2,v14SeriesColors[k]);
+      const int rowY=bandY+k*bandH;
+      if(k)screen->drawFastHLine(14,rowY-2,290,V14_RULE);
+      v14Tiny("T"+String(k+1),16,rowY+9,v14SeriesColors[k]);
+      // Show the current measured value alongside each independent trace.
+      const int lastIndex=(v13HistoryHead+47)%48;
+      const float latest=v13HistoryCount?v13History[k][lastIndex]:NAN;
+      v14Tiny(isfinite(latest)?String(latest,1):String("Н/Д"),36,rowY+9,V14_TEXT);
+      screen->drawFastVLine(x0-3,rowY+1,21,V14_RULE);
+      float lo=INFINITY,hi=-INFINITY;
+      for(int i=0;i<v13HistoryCount;i++){
+        const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
+        const float t=v13History[k][idx];
+        if(isfinite(t)){lo=fminf(lo,t);hi=fmaxf(hi,t);}
+      }
+      if(!isfinite(lo)||!isfinite(hi))continue;
+      const float padding=fmaxf(0.2f,(hi-lo)*0.22f);
+      lo-=padding;hi+=padding;
+      for(int i=0;i<v13HistoryCount;i++){
+        const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
+        const float t=v13History[k][idx];
+        if(!isfinite(t))continue;
+        const int x=x0+(v13HistoryCount<2?xw-1:(i*(xw-1))/47);
+        const int y=rowY+20-(int)(fminf(1.0f,fmaxf(0.0f,(t-lo)/(hi-lo)))*18.0f);
+        if(i==0 || !isfinite(v13History[k][(idx+47)%48])){
+          screen->drawPixel(x,y,v14SeriesColors[k]);
+        }else{
+          const int pidx=(idx+47)%48;
+          const float prev=v13History[k][pidx];
+          const int yp=rowY+20-(int)(fminf(1.0f,fmaxf(0.0f,(prev-lo)/(hi-lo)))*18.0f);
+          const int xp=x0+((i-1)*(xw-1))/47;
+          screen->drawLine(xp,yp,x,y,v14SeriesColors[k]);
+        }
       }
     }
-    if(!any)v14Print("Нет измерений T1–T4",69,151,V14_WARN);
+    v14Tiny("5 c/точка · 4 отдельных графика",15,201,V14_MUTED);
   }else{
-    v14Tiny("YF-S401, импульсы за интервал ~2 с",14,96,V14_TEXT);
-    uint32_t maxv=1;bool has=false;
-    for(int i=0;i<40;i++){
-      if(waterPulseHistory[i]>maxv)maxv=waterPulseHistory[i];
-      if(waterPulseHistory[i])has=true;
+    v14Tiny("ВОДА · YF-S401 · импульсы/2c",16,98,V14_BLUE);
+    screen->drawFastHLine(14,146,291,V14_RULE);
+    v14Tiny("ОТБОР · НЕТ ДАТЧИКА",16,163,V14_WARN);
+    v14Tiny("Линия отсутствует · данных нет",16,181,V14_MUTED);
+    const int px=77,py=109,pw=216,ph=30;
+    screen->drawFastVLine(px,py,ph,V14_RULE);
+    uint32_t vmax=1;
+    for(int i=0;i<waterSamplesRecorded;i++){
+      int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
+      if(waterPulseHistory[idx]>vmax)vmax=waterPulseHistory[idx];
     }
-    for(int i=0;i<40;i++){
-      int p=(flowTraceHead+i)%40;
-      int x=gx+2+i*6;
-      int h=(int)((uint64_t)waterPulseHistory[p]*(gh-3)/maxv);
-      if(h>0)screen->fillRect(x,gy+gh-h,4,h,V14_BLUE);
+    for(int i=0;i<waterSamplesRecorded;i++){
+      int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
+      int x=px+(i*pw)/39;
+      int y=py+ph-1-(int)((uint64_t)waterPulseHistory[idx]*(ph-3)/vmax);
+      if(i==0)screen->drawPixel(x,y,V14_SEA);
+      else{
+        int prev=(flowTraceHead+40-waterSamplesRecorded+i-1)%40;
+        int yprev=py+ph-1-(int)((uint64_t)waterPulseHistory[prev]*(ph-3)/vmax);
+        screen->drawLine(px+((i-1)*pw)/39,yprev,x,y,V14_SEA);
+      }
     }
-    v14Tiny(String("0–")+String(maxv)+" имп.",8,198,V14_MUTED);
-    v14Tiny(String("Последний интервал: ")+String(waterPulseDelta)+" имп.",151,198,V14_TEXT);
-    if(!has)v14Print("Импульсы не зарегистрированы",38,149,V14_WARN);
+    if(!waterSamplesRecorded)v14Tiny("Нет импульсов",88,125,V14_MUTED);
+    v14Tiny("Вода не откалибрована",158,201,V14_MUTED);
   }
-  v14Tiny("История текущего включения, без калибровки",33,205,V14_MUTED);
 }
 static void v14Events(bool layout){
   hqPanel(5,52,310,155);
