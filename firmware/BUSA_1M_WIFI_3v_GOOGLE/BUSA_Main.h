@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-APPROVEDUI-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-KEYPAD40-41-NOPCA-GRAPHLANES-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -550,7 +550,7 @@ bool pcfRead(uint16_t &value){
   return true;
 }
 uint8_t currentPage=0; // 7 tabs including Diagnostics
-uint8_t graphSubView=0; // 0 T1-T4, 1 cooling water, 2 collection no sensor
+uint8_t graphSubView=0; // 0 four isolated temperature lanes; 1 water + collection lanes
 uint8_t approvedSettingsItem=0; // 5 approved settings
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 uint8_t diagModule=0,calSensor=0,themeDraft=2,tftThemeMode=2;
@@ -775,7 +775,7 @@ void keypadAction(int k){
     }else if(currentPage==6){
       diagModule=(diagModule+(k==7?6:1))%7;tftView=0;
     }else if(currentPage==3){
-      graphSubView=(graphSubView+(k==7?2:1))%3;
+      graphSubView=(graphSubView+1)%2;
     }else{
       tftView=k==7?0:1;
     }
@@ -795,7 +795,7 @@ void keypadAction(int k){
       else if(approvedSettingsItem==2){if(saveThemeMode(themeDraft))keyMessage="Тема сохранена";}
     }else if(currentPage==6){tftView=!tftView;
     }else if(currentPage==3){
-      graphSubView=(graphSubView+1)%3;
+      graphSubView=(graphSubView+1)%2;
     }else{
       tftView=1;
     }
@@ -2823,9 +2823,37 @@ void setup(){
     tftDirty=true;
     server.send(200,"text/plain; charset=utf-8",keypadMessage);
   });
+  // One shared history source for the physical TFT and local iPhone.
+  // No invented collection values: only cooling-water pulse counts are sampled.
+  server.on("/api/graph-history",HTTP_GET,[]{
+    uint32_t now=millis();
+    String j="{\"ok\":true,\"sample_period_ms\":5000,\"temperature\":[";
+    for(int k=0;k<4;k++){
+      if(k)j+=",";
+      j+="[";
+      for(int i=0;i<v13HistoryCount;i++){
+        if(i)j+=",";
+        const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
+        const float v=v13History[k][idx];
+        j+=isfinite(v)?String(v,2):String("null");
+      }
+      j+="]";
+    }
+    j+="],\"water_pulses\":[";
+    const int waterCount=flowReady?40:0;
+    for(int i=0;i<waterCount;i++){
+      if(i)j+=",";
+      const int idx=(flowTraceHead+40-waterCount+i)%40;
+      j+=String(waterPulseHistory[idx]);
+    }
+    j+="],\"water_interval_ms\":2000,\"water_calibrated\":false,";
+    j+="\"collection_sensor\":false,\"time_ms\":"+String(now)+",";
+    j+="\"temperature_samples\":"+String(v13HistoryCount)+"}";
+    server.send(200,"application/json; charset=utf-8",j);
+  });
   server.on("/api/graph-view",HTTP_GET,[]{
     int n=server.arg("view").toInt();
-    if(n<0||n>2){server.send(400,"text/plain","Bad graph");return;}
+    if(n<0||n>1){server.send(400,"text/plain","Bad graph");return;}
     graphSubView=(uint8_t)n;tftDirty=true;lastRender=0;
     server.send(200,"application/json","{\"ok\":true}");
   });
