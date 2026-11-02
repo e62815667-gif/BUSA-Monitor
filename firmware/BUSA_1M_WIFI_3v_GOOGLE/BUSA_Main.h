@@ -21,6 +21,7 @@
 #include <sys/time.h>
 #include <esp_system.h>
 #include <Wire.h>
+#include <driver/gpio.h>
 #include <Preferences.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
@@ -39,7 +40,7 @@ constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==8 && BUS_SCL==9,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-ACKCACHE-20261102";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-SMOOTH-GOOGLE-I2C-FULLSCAN-20261102";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -215,7 +216,7 @@ float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
 
 // I2C devices: PCF8575 keypad is monitored; PCA9685 ACK-only (never PWM).
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
-uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
+uint8_t pcfAddr=0,pcaAddr=0x40;uint32_t lastBusProbe=0;
 uint8_t i2cFound[24]={0},i2cFoundCount=0;
 uint16_t i2cAckCount=0;
 uint32_t i2cFullScanAt=0;
@@ -224,7 +225,7 @@ uint32_t i2cFullScanAt=0;
 uint32_t busaI2cLastPcfAckMs=0,busaI2cLastPcaAckMs=0;
 uint32_t busaI2cPcfAcks=0,busaI2cPcaAcks=0;
 uint32_t busaI2cLastPcfNackMs=0,busaI2cLastPcaNackMs=0;
-constexpr uint32_t BUSA_I2C_ACK_FRESH_MS=15000;
+constexpr uint32_t BUSA_I2C_ACK_FRESH_MS=30000;
 // GPIO-only, open-drain I2C. ESP32-S3 hardware controller previously blocked for
 // 1000ms even with Wire.setTimeOut(25). This avoids the controller entirely.
 // Every SCL-high wait is bounded, with no long global bus quarantine.
@@ -376,61 +377,80 @@ String clockStamp(bool compact=false){
 bool ack(uint8_t address){
   return busaI2cExchange(address,nullptr,0,nullptr,0);
 }
-// 0x20 is the expected PCF8575, 0x40 the PCA9685; other PCF strap
-// addresses are searched after them. Missing addresses are NACK, not errors.
-constexpr uint8_t BUSA_I2C_PROBE_ADDRS[9]={0x20,0x40,0x21,0x22,0x23,0x24,0x25,0x26,0x27};
-uint8_t busaI2cScanNext=0;
+// The PCF8575A uses 0x38..0x3F instead of 0x20..0x27.
+// The PCA9685 can use another address when A0..A5 are strapped.
+// Scan every non-reserved 7-bit address, with the two default addresses
+// and the PCF8575A first at startup. Never issue write-data during discovery.
+constexpr uint8_t BUSA_I2C_SCAN_START=0x08,BUSA_I2C_SCAN_END=0x77;
+constexpr uint8_t BUSA_I2C_PRIORITY_ADDRS[]={0x20,0x38,0x40,0x70};
+uint8_t busaI2cScanNext=0x08,busaI2cPriorityNext=0;
 uint32_t busaI2cScanLastStep=0;
-uint32_t busaI2cAddressLastSeen[9]={};
-uint16_t busaI2cAddressAckTotal[9]={};
+uint32_t busaI2cAddressLastSeen[128]={};
+uint16_t busaI2cAddressAckTotal[128]={};
+bool busaI2cIsPcfAddress(uint8_t a){
+  return (a>=0x20 && a<=0x27)||(a>=0x38 && a<=0x3F);
+}
+bool busaI2cIsPcaCandidate(uint8_t a){
+  // 0x70 is also a group/all-call address, so do not identify it as unique PCA.
+  return a>=0x40 && a<=0x6F;
+}
 void busaI2cRebuildAddressCache(uint32_t now){
   i2cFoundCount=0;
-  for(uint8_t i=0;i<9;i++){
-    if(busaI2cAddressLastSeen[i] &&
-       (uint32_t)(now-busaI2cAddressLastSeen[i])<=BUSA_I2C_ACK_FRESH_MS){
-      i2cFound[i2cFoundCount++]=BUSA_I2C_PROBE_ADDRS[i];
+  for(uint8_t a=BUSA_I2C_SCAN_START;a<=BUSA_I2C_SCAN_END;a++){
+    if(busaI2cAddressLastSeen[a] &&
+       (uint32_t)(now-busaI2cAddressLastSeen[a])<=BUSA_I2C_ACK_FRESH_MS &&
+       i2cFoundCount<sizeof(i2cFound)){
+      i2cFound[i2cFoundCount++]=a;
     }
   }
   i2cAckCount=i2cFoundCount;
 }
 void scanI2cAddresses(uint32_t now){
-  if(!i2cOnline || busaI2cSuspended(now) || !elapsed(now,busaI2cScanLastStep,600))return;
+  if(!i2cOnline || busaI2cSuspended(now) || !elapsed(now,busaI2cScanLastStep,120))return;
   busaI2cScanLastStep=now;
-  const uint8_t index=busaI2cScanNext;
-  const uint8_t address=BUSA_I2C_PROBE_ADDRS[index];
+  uint8_t address;
+  if(busaI2cPriorityNext<sizeof(BUSA_I2C_PRIORITY_ADDRS)){
+    address=BUSA_I2C_PRIORITY_ADDRS[busaI2cPriorityNext++];
+  }else{
+    address=busaI2cScanNext++;
+    if(busaI2cScanNext>BUSA_I2C_SCAN_END){
+      busaI2cScanNext=BUSA_I2C_SCAN_START;
+      i2cFullScanAt=millis();
+    }
+  }
   const bool found=ack(address);
-  // Do not reset all discoveries at the beginning of each 9-address pass.
-  // A single NACK is not enough to erase a previous valid ACK.
   if(found){
-    busaI2cAddressLastSeen[index]=millis();
-    if(busaI2cAddressAckTotal[index]<UINT16_MAX)++busaI2cAddressAckTotal[index];
-    if(address>=0x20 && address<=0x27){
+    busaI2cAddressLastSeen[address]=millis();
+    if(busaI2cAddressAckTotal[address]<UINT16_MAX)++busaI2cAddressAckTotal[address];
+    if(busaI2cIsPcfAddress(address)){
       busaI2cLastPcfAckMs=millis();++busaI2cPcfAcks;
-    }else if(address==0x40){
+    }else if(busaI2cIsPcaCandidate(address)){
       busaI2cLastPcaAckMs=millis();++busaI2cPcaAcks;
     }
-  }else if(address>=0x20 && address<=0x27){
+  }else if(busaI2cIsPcfAddress(address)){
     busaI2cLastPcfNackMs=millis();
-  }else if(address==0x40){
+  }else if(busaI2cIsPcaCandidate(address)){
     busaI2cLastPcaNackMs=millis();
   }
-  busaI2cScanNext=(index+1)%9;
-  if(busaI2cScanNext==0)i2cFullScanAt=millis();
   busaI2cRebuildAddressCache(millis());
 }
 int readPcaReg(uint8_t reg){
   if(!pcaDetected || busaI2cSuspended(millis()))return -1;
   uint8_t result=0;
-  return busaI2cExchange(0x40,&reg,1,&result,1)?result:-1;
+  return busaI2cExchange(pcaAddr,&reg,1,&result,1)?result:-1;
 }
 void probeI2c(uint32_t now){
   if(!i2cOnline || busaI2cSuspended(now))return;
   busaI2cRebuildAddressCache(millis());
-  pcfDetected=false;pcfAddr=0;pcaDetected=false;
+  pcfDetected=false;pcfAddr=0;pcaDetected=false;pcaAddr=0x40;
+  // Prefer the known expected addresses, but permit PCF8575A or alternate
+  // PCA9685 address straps. Do not mistake the group address 0x70 for PCA.
   for(uint8_t j=0;j<i2cFoundCount;j++){
     const uint8_t address=i2cFound[j];
-    if(address>=0x20 && address<=0x27){pcfDetected=true;pcfAddr=address;}
-    if(address==0x40)pcaDetected=true;
+    if(busaI2cIsPcfAddress(address) &&
+       (!pcfDetected || address==0x20)){pcfDetected=true;pcfAddr=address;}
+    if(busaI2cIsPcaCandidate(address) &&
+       (!pcaDetected || address==0x40)){pcaDetected=true;pcaAddr=address;}
   }
   pcaMode1=readPcaReg(0x00);
   pcaMode2=readPcaReg(0x01);
@@ -1064,6 +1084,11 @@ String statusJSON(){
   s+=",\"raw_pair\":"+quoteJson(rawPair)+"}";
   s+=",\"i2c\":{\"sda_gpio\":8,\"scl_gpio\":9,\"controller_started\":"+(i2cOnline?String("true"):String("false"));
   s+=",\"last_scan_ms\":"+String(i2cFullScanAt);
+  s+=",\"scan_range\":\"0x08-0x77\"";
+  s+=",\"scan_next\":"+String(busaI2cScanNext);
+  s+=",\"pcf_address\":"+String(pcfAddr);
+  s+=",\"pca_address\":"+String(pcaAddr);
+  s+=",\"ack_fresh_ms\":"+String(BUSA_I2C_ACK_FRESH_MS);
   s+=",\"pcf_last_ack_ms\":"+String(busaI2cLastPcfAckMs);
   s+=",\"pca_last_ack_ms\":"+String(busaI2cLastPcaAckMs);
   s+=",\"pcf_ack_total\":"+String(busaI2cPcfAcks);
@@ -1086,7 +1111,7 @@ String statusJSON(){
   s+=",\"read_ok\":"+(pcfIdleReadOk?String("true"):String("false"));
   s+=",\"idle_pins_hex\":"+quoteJson(String(pcfIdleDirect,HEX));
   s+=",\"keyscan_error\":"+String(pcfScanError)+"}";
-  s+=",\"pca9685\":{\"expected_address\":64,\"ack\":"+(pcaDetected?String("true"):String("false"));
+  s+=",\"pca9685\":{\"expected_address\":64,\"address\":"+String(pcaAddr)+",\"ack\":"+(pcaDetected?String("true"):String("false"));
   s+=",\"mode1\":"+String(pcaMode1)+",\"mode2\":"+String(pcaMode2);
   s+=",\"outputs_enabled\":false}";
   s+=",\"tft\":{\"spi_cs\":"+String(TFT_CS)+",\"spi_mosi\":"+String(TFT_MOSI)+",\"spi_sck\":"+String(TFT_SCK)+",\"dc\":"+String(TFT_DC)+",\"rst\":"+String(TFT_RST);
@@ -2189,8 +2214,14 @@ void setup(){
   // No ESP-IDF or Wire controller is started, avoiding its 1-second waits.
   pinMode(BUS_SDA,OUTPUT_OPEN_DRAIN);
   pinMode(BUS_SCL,OUTPUT_OPEN_DRAIN);
+  // Internal weak pull-ups supplement the board pull-ups; high means released,
+  // never push 3.3V against a slave pulling the line low.
+  gpio_pullup_en(static_cast<gpio_num_t>(BUS_SDA));
+  gpio_pullup_en(static_cast<gpio_num_t>(BUS_SCL));
   busaSda(true);busaScl(true);
-  delayMicroseconds(30);
+  delayMicroseconds(300);
+  busaI2cLinesFree();
+  if(!busaI2cLastSda || !busaI2cLastScl)busaI2cRecover();
   i2cOnline=true;
   updateBootStage(2);
   busaReportStage("I2C_READY");
