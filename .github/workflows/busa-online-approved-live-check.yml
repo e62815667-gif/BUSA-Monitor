@@ -1,0 +1,71 @@
+name: BUSA Online ApprovedUI Live QA
+on:
+  push:
+    branches:
+      - feature/online-approved-live-20261102
+    paths:
+      - 'online/**'
+      - '.github/workflows/busa-online-approved-live-check.yml'
+  pull_request:
+    paths:
+      - 'online/**'
+      - '.github/workflows/busa-online-approved-live-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate approved remote UI, existing view-only Google flow, and HTML
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          import re
+          html=Path('online/index.html').read_text()
+          js=re.search(r'<script>(.*?)</script>',html,re.S).group(1)
+          Path('/tmp/busa-online-approved.js').write_text(js)
+          class Page(HTMLParser):
+            def __init__(self):
+              super().__init__();self.ids=[];self.nav=[];self.sections=[];self.charts=[]
+            def handle_starttag(self,tag,attrs):
+              a=dict(attrs)
+              if 'id' in a:self.ids.append(a['id'])
+              if tag=='section' and 'id' in a:self.sections.append(a['id'])
+              if 'data-tab' in a:self.nav.append(a['data-tab'])
+              if 'data-chart' in a:self.charts.append(a['data-chart'])
+          p=Page();p.feed(html)
+          assert len(p.ids)==len(set(p.ids)), 'Duplicate DOM IDs'
+          assert p.nav==['home','temps','collection','graphs','events','settings'],p.nav
+          assert p.charts==['0','1'],p.charts
+          assert set(['home','temps','collection','graphs','events','settings','connection','diagnostics','cloudUpdates']).issubset(p.sections)
+          required=['remoteT0','remoteT1','remoteT2','remoteT3','detailT0','detailT3','remoteGraphT','remoteGraphW','settingsMenu','settingsBack','googleSettings','viewUrl','viewToken','viewConnect','viewClear','viewState','statusText','cloudInternet','cloudLocal','cloudData','themeSwitch','remoteEvents','onlineInnerBack','onlineFreshness']
+          assert set(required).issubset(p.ids),set(required)-set(p.ids)
+          assert '<svg viewBox="0 0 190 310"' in html
+          assert 'Т1–Т4 · отдельные линии' in html
+          assert 'Вода и отбор' in html
+          assert 'busaViewReceive' in js and 'mode=latest&callback=busaViewReceive' in js
+          assert 'BUSA_VIEW_TOKEN' in html and 'BUSA_TOKEN' in html
+          assert 'function drawRemoteCharts()' in js and "function showOnlinePage(page)" in js
+          assert 'function settingsPanel(id)' in js
+          assert 'readToken=' in js and 'localStorage.getItem(remoteStorePrefix' in js
+          assert 'remoteTimer=setInterval(loadGoogleLatest,30000)' in js
+          assert 'function invalidateStaleRemote()' in js
+          assert 'НЕТ ДАТЧИКА ОТБОРА' in js
+          assert 'WIFI_POWER_19_5dBm' not in html
+          assert 'server.on(' not in js
+          sw=Path('online/sw.js').read_text()
+          assert 'v5-approved-live' in sw
+          assert 'network' not in sw or 'fetch(req)' in sw
+          print('PASS online six tabs, remote view-only connection, 2 graph modes, current/stale data and JS file extraction')
+          PY
+      - name: Check all embedded JavaScript
+        run: node --check /tmp/busa-online-approved.js
+      - name: Package independently checkable online files
+        run: zip -j /tmp/BUSA_ONLINE_APPROVEDUI.zip online/index.html online/sw.js online/manifest.webmanifest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_ONLINE_APPROVEDUI_QA
+          path: /tmp/BUSA_ONLINE_APPROVEDUI.zip
