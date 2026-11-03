@@ -73,7 +73,7 @@ jobs:
           assert 'v14Metric(v13Temp(i,now),21,27+i*44+37' in landscape
           assert 'hqPanel(3,y,116,34)' not in landscape
           assert 'v14Tiny("ENTER"' in landscape and 'v14Tiny("ESC"' in landscape
-          assert 'v14Tiny("назад"' in landscape and 'v14Tiny("0,"' not in landscape
+          assert 'v14Tiny("назад"' not in landscape and 'v14Tiny("0,"' not in landscape
           portrait=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
           assert 'v13Text("G"' in portrait and 'v13Text("E"' in portrait
           assert 'WiFi.scanNetworks(true,false,false,80)' in s
