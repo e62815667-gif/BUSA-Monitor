@@ -711,6 +711,8 @@ void startKeyLearning(){
   currentPage=6;diagModule=1;tftView=1;tftDirty=true;
 }
 
+bool busaStageStaCredentials(const String& ssid,const String& pass,bool fromBoot=false);
+void busaStaRestoreLocal();
 #include "BUSA_KeypadTFT_UI.h"
 void navigatePage(uint8_t target){
   if(target>=7||target==currentPage)return;
@@ -1179,6 +1181,11 @@ uint32_t otaBytes=0,otaRestartAt=0,otaTokenIssued=0,startedAt=0;
 String otaToken="",otaMessage="Ожидание",nearbyNames[5];
 uint8_t nearbyCount=0;
 volatile bool busaWifiScanRunning=false;
+volatile bool busaStaSwitchPending=false,busaStaSwitching=false;
+volatile int8_t busaStaLastResult=0; // 1 successful; -1 local fallback
+String busaStaNextSsid="",busaStaNextPass="",busaStaMessage="Готово";
+uint32_t busaStaSwitchAt=0;
+bool busaStaBootAttempt=false;
 uint32_t busaWifiScanStartedAt=0,busaWifiScanLastAt=0;
 bool screenAttempted=false;
 bool apClient(){return server.client().localIP()==WiFi.softAPIP();}
@@ -1187,6 +1194,81 @@ String apPassword="";
 bool wifiRunning=false;
 uint32_t lastRender=0,lastUart=0,lastStationCheck=0;
 String consoleLine="",stationSsid="",stationPass="";
+// Local AP and HTTP control take priority over optional external Wi-Fi STA.
+void busaStaRestoreLocal(){
+  WiFi.setAutoReconnect(false);
+  WiFi.disconnect(false,false);
+  WiFi.mode(WIFI_AP);
+  wifiRunning=(WiFi.softAPIP()!=IPAddress(0,0,0,0));
+  if(!wifiRunning)wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
+  lastStationCheck=millis();
+}
+bool busaStageStaCredentials(const String& ssid,const String& pass,bool fromBoot){
+  if(otaActive||busaStaSwitchPending||busaStaSwitching||
+     ssid.isEmpty()||ssid.length()>32||pass.length()<8||pass.length()>63)return false;
+  busaStaNextSsid=ssid;
+  busaStaNextPass=pass;
+  busaStaBootAttempt=fromBoot;
+  busaStaLastResult=0;
+  busaStaMessage="Проверка выбранной сети";
+  busaStaSwitchPending=true;
+  return true;
+}
+void busaStaService(){
+  const uint32_t now=millis();
+  if(busaStaSwitchPending && !otaActive && !busaGoogleNetworkBusy &&
+     !busaWifiScanRunning && !wifiUiScanPending && !wifiUiOwnsScan){
+    // Association is requested AFTER the HTTP 202 response is sent.
+    busaStaSwitchPending=false;
+    busaStaSwitching=true;
+    busaStaSwitchAt=now;
+    WiFi.setAutoReconnect(false);
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.disconnect(false,false);
+    WiFi.begin(busaStaNextSsid.c_str(),busaStaNextPass.c_str());
+    busaStaMessage="Подключение к выбранной сети";
+  }
+  if(busaStaSwitching){
+    if(WiFi.status()==WL_CONNECTED && WiFi.SSID()==busaStaNextSsid){
+      bool persisted=true;
+      if(!busaStaBootAttempt){
+        const String oldSsid=prefs.getString("ssid","");
+        const String oldPass=prefs.getString("pass","");
+        persisted=(prefs.putString("pass",busaStaNextPass)==busaStaNextPass.length() &&
+          prefs.putString("ssid",busaStaNextSsid)==busaStaNextSsid.length() &&
+          prefs.getString("pass","")==busaStaNextPass &&
+          prefs.getString("ssid","")==busaStaNextSsid);
+        if(!persisted){
+          prefs.putString("ssid",oldSsid);
+          prefs.putString("pass",oldPass);
+        }
+      }
+      if(persisted){
+        stationSsid=busaStaNextSsid;stationPass=busaStaNextPass;
+        busaStaMessage="Wi-Fi подключён, настройки сохранены";
+        busaStaLastResult=1;busaStaSwitching=false;
+      }else{
+        busaStaMessage="Ошибка записи NVS. Локальная сеть сохранена";
+        busaStaLastResult=-1;busaStaSwitching=false;
+        busaStaRestoreLocal();
+      }
+      busaStaNextPass="";busaStaNextSsid="";
+      tftDirty=true;
+    }else if((uint32_t)(now-busaStaSwitchAt)>=12000){
+      busaStaLastResult=-1;
+      busaStaMessage="Сеть недоступна. БУСА работает локально";
+      busaStaSwitching=false;
+      busaStaNextSsid="";busaStaNextPass="";
+      busaStaRestoreLocal();
+      tftDirty=true;
+    }
+  }else if(!busaStaSwitchPending && !otaActive &&
+      WiFi.getMode()==WIFI_AP_STA && WiFi.status()!=WL_CONNECTED){
+    // Never keep chasing a missing phone hotspot.
+    if((uint32_t)(now-lastStationCheck)>1800)busaStaRestoreLocal();
+  }
+  if(!wifiRunning && WiFi.softAPIP()!=IPAddress(0,0,0,0))wifiRunning=true;
+}
 String quoteJson(const String &x){
   String out="\"";
   for(unsigned i=0;i<x.length();i++){
@@ -1421,7 +1503,11 @@ String statusJSON(){
   s+=",\"network_indicators\":{\"internet\":"+(googleInternet==1?String("true"):String("false"));
   s+=",\"local_client\":"+(WiFi.softAPgetStationNum()>0?String("true"):String("false"));
   s+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"))+"}";
-  s+=",\"station\":{\"ssid\":"+quoteJson(stationSsid);
+  s+=",\"sta_switch\":{\"pending\":"+(busaStaSwitchPending?String("true"):String("false"))+
+    ",\"connecting\":"+(busaStaSwitching?String("true"):String("false"))+
+    ",\"result\":"+String((int)busaStaLastResult)+
+    ",\"message\":"+quoteJson(busaStaMessage)+"}";
+  s+=",\"station\":{\"ssid\":"+quoteJson(WiFi.status()==WL_CONNECTED?WiFi.SSID():stationSsid);
   s+=",\"connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():String(""))+"}";
   s+="}";
@@ -2343,8 +2429,9 @@ if(Number.isFinite(currentPulse)){
  if(waterPulseLog.length>80)waterPulseLog.shift();
 }
 let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:'Нет подключения. Нажмите «Найти сети Wi-Fi» и выберите сеть.';
-get('wstatus').textContent=ss;
-get('espAPStatus').textContent=s.ap?.enabled?'ESP32: ПОДКЛ · '+(s.ap.ip||'192.168.4.1'):'ESP32: ОТКЛ';
+get('wstatus').textContent=s.sta_switch?.connecting?("Проверяю Wi-Fi... "+(s.sta_switch.message||"")):
+  (s.sta_switch?.result===-1?(s.sta_switch.message+" · Локальная сеть доступна"):ss);
+get('espAPStatus').textContent=s.network_indicators?.local_client?'ESP32: ПОДКЛ · '+(s.ap?.ip||'192.168.4.1'):(s.ap?.enabled?'ESP32: сеть доступна · '+(s.ap?.ip||'192.168.4.1'):'ESP32: ОТКЛ');
 get('mainwifi').textContent='Wi-Fi '+(s.station.connected?'ПОДКЛ':'ОТКЛ')+' · Google '+(s.google?.configured&&s.network_indicators?.internet?'ПОДКЛ':'ОТКЛ')+' · ESP32 '+(s.network_indicators?.local_client?'ПОДКЛ':'ОТКЛ');
 if(s.station.connected&&s.station.ssid){
  let select=get('net'),found=Array.from(select.options).some(o=>o.value===s.station.ssid);
@@ -2550,7 +2637,7 @@ get('scan').onclick=async function(){
  this.disabled=false;
 };
 get('save').onclick=async function(){let ssid=get('net').value,pass=get('pass').value;if(!ssid||ssid.length>32||pass.length<8||pass.length>63){get('response').textContent='Выбери найденную сеть и введи пароль (8–63 символа)';return}this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
-try{let r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass})});get('response').textContent=await r.text();if(r.ok){get('pass').value='';message('Настройки сети сохранены: '+ssid)}}catch(e){get('response').textContent='Ошибка: '+e.message}this.disabled=false};
+try{let r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass})});get('response').textContent=await r.text();if(r.ok){get('pass').value='';message('Проверяю сеть: '+ssid+'; сохранение только после подключения')}}catch(e){get('response').textContent='Ошибка: '+e.message}this.disabled=false};
 document.documentElement.dataset.theme='system';
 settingsTab(-1,false);
 message('Веб-приложение запущено');
@@ -2644,7 +2731,9 @@ void setup(){
   }
   setupGoogleCloud();
   busaReportStage("WIFI_BEGIN");
-  WiFi.mode(WIFI_AP_STA);
+  WiFi.persistent(false); // Wi-Fi driver never overwrites stored NVS.
+  WiFi.setAutoReconnect(false); // No infinite retry against iPhone 12/16.
+  WiFi.mode(WIFI_AP);
   WiFi.setSleep(false); // Favor interactive local response over power saving
   configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
   clockNtpStarted=true;
@@ -2661,10 +2750,9 @@ void setup(){
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str(),apPassword.c_str());
   if(stationSsid.length() && stationPass.length()>=8){
-    WiFi.setAutoReconnect(true);
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-    Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
-  }else Serial0.println("STA config missing: preprovision NVS before use; AP stays available");
+    busaStageStaCredentials(stationSsid,stationPass,true);
+    Serial0.println("STA: one timed boot attempt; AP remains primary");
+  }else Serial0.println("STA not configured; AP-only local monitoring");
   server.on("/",HTTP_GET,[]{server.sendHeader("Cache-Control","no-store");server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
   server.on("/api/time/sync",HTTP_POST,[]{
     if(!apClient()){
@@ -2888,30 +2976,23 @@ void setup(){
       server.send(403,"application/json","{\"error\":\"Only protected local AP\"}");return;
     }
     if(server.hasArg("start") && server.arg("start")=="1"){
-      if(!wifiUiScanPending && !wifiUiOwnsScan)wifiUiBeginScan();
+      if(!wifiUiScanPending && !wifiUiOwnsScan && !busaStaSwitchPending && !busaStaSwitching)wifiUiBeginScan();
     }
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",wifiUiScanJSON());
   });
   server.on("/api/wifi",HTTP_POST,[]{
-    // Credentials may only be provisioned while connected to the protected local AP.
-    if(server.client().localIP()!=WiFi.softAPIP()){
-      server.send(403,"text/plain; charset=utf-8","Настройка Wi-Fi доступна только через сеть БУСА.");return;
-    }
-    String ssid=server.arg("ssid"),pass=server.arg("pass");
-    ssid.trim();
+    if(!apClient()){server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;}
+    String ssid=server.arg("ssid"),pass=server.arg("pass");ssid.trim();
     if(ssid.isEmpty()||ssid.length()>32||pass.length()<8||pass.length()>63){
-      server.send(400,"text/plain; charset=utf-8","Недопустимое имя сети или длина пароля (8–63).");return;
+      server.send(400,"text/plain; charset=utf-8","Имя сети или пароль некорректны");return;
     }
-    // NVS is encrypted only if board flash encryption is enabled; keep local AP secure.
-    bool ok=(prefs.putString("ssid",ssid)>0 && prefs.putString("pass",pass)>0);
-    if(!ok){server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;}
-    stationSsid=ssid;stationPass=pass;
-    // Do not force a STA disconnect while an HTTPS Google request is active.
-    // Save credentials now; start the new association after sending the reply.
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-    lastStationCheck=millis();
-    server.send(200,"text/plain; charset=utf-8","Wi-Fi сохранён. Подключение к сети запущено.");
+    if(!busaStageStaCredentials(ssid,pass)){
+      server.send(409,"text/plain; charset=utf-8","Wi-Fi занят или OTA; повтори позднее");return;
+    }
+    server.sendHeader("Cache-Control","no-store");
+    server.send(202,"text/plain; charset=utf-8",
+      "Проверяю сеть. Если недоступна, БУСА останется в локальной сети.");
   });
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
@@ -3096,18 +3177,8 @@ void loop(){
   const uint32_t tickStart=now;
   soundPoll(now);
   {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
-  // ESP-IDF auto-reconnect already runs in the Wi-Fi driver. Manual retries
-  // use a 2-min backoff and never interrupt a local AP client, an active
-  // Google HTTPS transfer, or a channel scan.
-  if(stationSsid.length() && stationPass.length()>=8 &&
-      WiFi.status()!=WL_CONNECTED && !busaWifiScanRunning &&
-      !wifiUiScanPending && !wifiUiConnectPending &&
-      !busaGoogleNetworkBusy && WiFi.softAPgetStationNum()==0 &&
-      elapsed(now,lastStationCheck,120000)){
-    lastStationCheck=now;
-    WiFi.reconnect();
-    Serial0.println("STA reconnect: no local clients, 120s backoff");
-  }
+  // Local AP continues even when no external hotspot exists.
+  busaStaService();
   readConsole();
   if(!otaActive)wifiUiPoll(); // nonblocking Wi-Fi scan and password-provisioning on physical TFT
   if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
