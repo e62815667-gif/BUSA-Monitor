@@ -6,8 +6,9 @@
 extern volatile bool googleEnabled;
 extern volatile int googleState;
 extern volatile int googleInternet;
-static const uint8_t v14Order[7]={0,1,2,5,6,3,4};
-static const char* const v14Tabs[7]={"Глав","Т","Отбор","Настр","Диаг","Граф","Событ"};
+static const char* const v14FooterSectionNames[7]={
+ "Главная","Температуры","Отбор","Графики","События","Настройки","Диагностика"
+};
 // V14 palette is software-defined. DO NOT use ST7789 invertDisplay(): it
 // inverts every accent and destroys the colored illustration.
 static uint16_t V14_TEXT=0x2104,V14_MUTED=0x632c,V14_WARN=0xa800,
@@ -156,38 +157,34 @@ static void v14Frame(uint32_t now){
   ru.setFont(u8g2_font_6x13_t_cyrillic);
   int tw=ru.getUTF8Width(dt.c_str());
   v14Print(dt,max(220,317-tw),15,V14_TEXT);
-  // Seven ordered top-level tabs, matching LEFT/RIGHT keypad navigation.
-  for(int i=0;i<7;i++){
-    int x=1+i*45;bool chosen=(v14Order[i]==currentPage);
-    screen->fillRoundRect(x,25,43,22,4,chosen?V14_ORANGE:V14_CARD);
-    screen->drawRoundRect(x,25,43,22,4,chosen?V14_ORANGE:V14_RULE);
-    if(chosen)screen->drawFastHLine(x+5,45,33,V14_WARN);
-    String title=v14Tabs[i];
-    int w=ru.getUTF8Width(title.c_str());
-    v14Tiny(title,x+max(1,(43-w)/2),40,V14_TEXT);
-  }
-  // Only the active keys are shown here; * and # are unused.
+  // Top-level tab labels intentionally removed. Sections are changed by LEFT/RIGHT.
+  // Current section is shown only in the bottom navigation bar.
+  // Simplified bottom bar: four navigation arrows, current section, ENTER, ESC/back.
+  // Visual change only: physical key codes, NVS mappings and key actions are unchanged.
   screen->fillRect(0,211,320,29,V14_CARD);
   screen->drawFastHLine(0,211,320,V14_ORANGE);
-  for(int i=0;i<7;i++){
-    const int x=3+i*45;
-    const int cx=x+21,cy=226;
-    screen->fillRoundRect(x,215,42,22,4,i==4?V14_BADGE:V14_CARD);
-    screen->drawRoundRect(x,215,42,22,4,V14_RULE);
-    if(i<4){v14FootArrow(x+13,i,V14_ORANGE);}
-    else if(i==4){ // hold 0 for comma (star and hash are unused).
-      v14Tiny("0,",cx-7,cy+3,V14_TEXT);
-    }else if(i==5){ // ENT/OK: checkmark only
-      screen->drawCircle(cx,cy,8,V14_GREEN);
-      screen->drawLine(cx-5,cy,cx-1,cy+4,V14_GREEN);
-      screen->drawLine(cx-1,cy+4,cx+6,cy-5,V14_GREEN);
-    }else{ // ESC/back: hooked left arrow
-      screen->drawFastHLine(cx-6,cy+3,13,V14_BLUE);
-      screen->drawFastVLine(cx+7,cy-5,9,V14_BLUE);
-      screen->drawLine(cx-6,cy+3,cx-1,cy-2,V14_BLUE);
-      screen->drawLine(cx-6,cy+3,cx-1,cy+8,V14_BLUE);
-    }
+  for(int i=0;i<4;i++){
+    const int x=3+i*34;
+    screen->fillRoundRect(x,215,31,22,4,V14_CARD);
+    screen->drawRoundRect(x,215,31,22,4,V14_RULE);
+    v14FootArrow(x+7,i,V14_ORANGE);
   }
+  // Section caption replaces the misleading '0,' button.
+  const int sectionX=139,sectionW=92;
+  screen->fillRoundRect(sectionX,215,sectionW,22,4,V14_BADGE);
+  screen->drawRoundRect(sectionX,215,sectionW,22,4,V14_ORANGE);
+  const char* section=v14FooterSectionNames[currentPage<7?currentPage:0];
+  ru.setFont(u8g2_font_5x7_t_cyrillic);
+  const int sectionTextW=ru.getUTF8Width(section);
+  v14Tiny(section,sectionX+max(2,(sectionW-sectionTextW)/2),229,V14_TEXT);
+  // Explicit text instead of unlabeled checkmark/back icons.
+  screen->fillRoundRect(234,215,39,22,4,V14_CARD);
+  screen->drawRoundRect(234,215,39,22,4,V14_RULE);
+  v14Tiny("ENTER",241,229,V14_GREEN);
+  screen->fillRoundRect(276,215,41,22,4,V14_CARD);
+  screen->drawRoundRect(276,215,41,22,4,V14_RULE);
+  v14Tiny("ESC",289,223,V14_BLUE);
+  v14Tiny("назад",283,233,V14_TEXT);
 }
 static void v14MiniRig(){
   // Approved stylized installation; YF-S401 is on the cooling-water line.
