@@ -268,24 +268,32 @@ static void v14Collection(bool layout){
 // All samples come from the same 5s DS18B20 circular history as /api/graph-history.
 static void v14GraphTabs(){
   static const char* names[]={"Температуры","Вода / Отбор"};
-  for(int j=0;j<2;j++){
-    const int x=5+j*156;
-    screen->fillRoundRect(x,26,151,23,4,graphSubView==j?V14_ORANGE:V14_CARD);
-    screen->drawRoundRect(x,26,151,23,4,V14_RULE);
-    const String label=names[j];
-    ru.setFont(u8g2_font_5x7_t_cyrillic);
-    const int w=ru.getUTF8Width(label.c_str());
-    v14Tiny(label,x+max(3,(151-w)/2),42,V14_TEXT);
+  if(!tftView){
+    // Same navigation model as Settings: UP/DOWN picks row, ENTER opens.
+    for(int j=0;j<2;j++){
+      const int x=8,y=27+j*91;
+      hqPanel(x,y,304,85);
+      if(graphMenuCursor==j)screen->fillRoundRect(x+4,y+4,5,77,2,V14_ORANGE);
+      v14Print(names[j],x+22,y+48,graphMenuCursor==j?V14_ORANGE:V14_TEXT);
+    }
+    return;
   }
+  // In the child screen, label only the opened chart (no misleading selectors).
+  screen->fillRoundRect(5,26,310,23,4,V14_CARD);
+  v14Print(names[graphSubView],13,43,V14_TEXT);
 }
 static void v14Graphs(bool layout){
+  if(!tftView){
+    if(layout)v14GraphTabs();
+    return; // Menu never draws a stale graph behind the selected item.
+  }
   if(layout){
     v14GraphTabs();
     hqPanel(5,54,310,153);
     screen->fillRoundRect(10,59,300,145,5,0x0000);
     screen->drawRoundRect(10,59,300,145,5,V14_BLUE);
   }else{
-    // Change graph pixels only: leave fixed header, selectors and footer intact.
+    // Repaint graph data only while an actual graph detail is open.
     screen->fillRect(12,61,296,141,0x0000);
   }
   if(graphSubView==0){
@@ -557,7 +565,7 @@ void v14RefreshLive(uint32_t now){
       v14SystemInfoRows();
     }
   }
-  if(currentPage==3 && v13HistoryCount && 
+  if(currentPage==3 && tftView && v13HistoryCount && 
      v13LastCapture!=busaGraphLastDrawnCapture){
     v14Graphs(false); // chart pixels only; prevents full-screen flashing
     busaGraphLastDrawnCapture=v13LastCapture;
