@@ -2077,8 +2077,9 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <p class="hint">Точка доступа БУСА для локального просмотра и настройки порогов звуковых оповещений.</p></div>
 <div class="busaWifiMode"><h3>Wi-Fi · роутер с интернетом</h3>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
-<label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select>
-<p class="hint">Выбери найденную сеть из списка, введи пароль и нажми «Сохранить и подключить».</p>
+<label for="net">Доступные сети Wi-Fi</label><select id="net"><option value="">Выберите сеть из списка</option></select>
+<label for="ssidManual">Или имя сети (SSID) вручную</label><input id="ssidManual" maxlength="32" placeholder="Например, домашний Wi-Fi" autocomplete="off">
+<p class="hint">Выбери сеть из списка или введи её точное имя, затем пароль и нажми «Сохранить и подключить». Поддерживается 2,4 ГГц.</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <p id="response" role="status"></p><p class="hint">Настройка доступна только в локальной сети ESP32. Пароль хранится на контроллере.</p></div></div>
@@ -2418,15 +2419,15 @@ if(Number.isFinite(currentPulse)){
  lastWaterPulse=currentPulse;waterPulseLog.push(delta);
  if(waterPulseLog.length>80)waterPulseLog.shift();
 }
-let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');
+let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:
+ s.station.last_error?'НЕ ПОДКЛЮЧЕНО: '+s.station.last_error:
+ s.station.connecting?'Подключаю: '+(s.station.target_ssid||'выбранную сеть'):
+ s.diagnostics?.wifi?.sta_disabled_by_user?'Внешняя сеть отключена':
+ 'НЕТ СОЕДИНЕНИЯ'+(s.station.target_ssid?' · выбрана '+s.station.target_ssid:'');
 get('wstatus').textContent=ss;
 get('espAPStatus').textContent=s.ap?.enabled?'ESP32: ПОДКЛ · '+(s.ap.ip||'192.168.4.1'):'ESP32: ОТКЛ';
 get('mainwifi').textContent='Wi-Fi '+(s.station.connected?'ПОДКЛ':'ОТКЛ')+' · Google '+(s.google?.configured&&s.network_indicators?.internet?'ПОДКЛ':'ОТКЛ')+' · ESP32 '+(s.network_indicators?.local_client?'ПОДКЛ':'ОТКЛ');
-if(s.station.connected&&s.station.ssid){
- let select=get('net'),found=Array.from(select.options).some(o=>o.value===s.station.ssid);
- if(!found)select.add(new Option(s.station.ssid+' (подключена)',s.station.ssid));
- if(!select.value)select.value=s.station.ssid;
-}
+// The browser's SSID picker is never automatically populated with old iPhone.
 const cs=s.google;
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
 if(!themeInitialized && typeof s.tft_theme_mode==='number'){
@@ -2580,7 +2581,7 @@ get('manualUpdate').onclick=async function(){
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
   this.disabled=false;
 };
-get('net').onchange=()=>{if(get('net').value)get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.'};
+get('net').onchange=()=>{if(get('net').value){get('ssidManual').value='';get('response').textContent='Выбрана сеть: '+get('net').value+'. Введите пароль для подключения.'}};
 get('scan').onclick=async function(){
  this.disabled=true;get('response').textContent='Поиск Wi-Fi 2,4 ГГц...';
  try{
@@ -2619,8 +2620,21 @@ get('scan').onclick=async function(){
  }
  this.disabled=false;
 };
-get('save').onclick=async function(){let ssid=get('net').value,pass=get('pass').value;if(!ssid||ssid.length>32||pass.length<8||pass.length>63){get('response').textContent='Выбери найденную сеть и введи пароль (8–63 символа)';return}this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
-try{let r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass})});get('response').textContent=await r.text();if(r.ok){get('pass').value='';message('Настройки сети сохранены: '+ssid)}}catch(e){get('response').textContent='Ошибка: '+e.message}this.disabled=false};
+get('save').onclick=async function(){
+ let ssid=(get('ssidManual').value.trim()||get('net').value).trim(),pass=get('pass').value;
+ if(!ssid||ssid.length>32||pass.length<8||pass.length>63){
+  get('response').textContent='Выбери сеть или введи SSID вручную. Пароль 8–63 символа.';return;
+ }
+ this.disabled=true;get('response').textContent='Подключаю к '+ssid+'...';
+ try{
+  let r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass}),signal:AbortSignal.timeout(12000)});
+  const reply=await r.text();
+  if(!r.ok)throw Error(reply||'HTTP '+r.status);
+  get('response').textContent=reply+' Проверка до 18 секунд.';
+  get('pass').value='';message('Новая сеть выбрана: '+ssid);
+ }catch(e){get('response').textContent='Ошибка: '+e.message}
+ this.disabled=false;
+};
 document.documentElement.dataset.theme='system';
 settingsTab(-1,false);
 message('Веб-приложение запущено');
