@@ -423,9 +423,16 @@ main #googleSettings .actions button.secondary{background:#153c60!important}
 #remoteAlarmSave{display:block;width:100%;margin-top:5px}
 #remoteAlarmSave:disabled{opacity:.48}
 #remoteAlarmMessage{padding:7px 0;font-size:13px}
+.busaModeSwitch{display:flex;justify-content:center;gap:8px;margin:8px auto 0;max-width:620px;padding:0 10px}
+.busaModeSwitch span,.busaModeSwitch a{flex:1;text-align:center;text-decoration:none;padding:9px 8px;border-radius:9px;background:#122e47;border:1px solid #2e658a;color:#addefc;font-weight:650;font-size:12px}
+.busaModeSwitch .active{background:#174d83;color:#fff;border-color:#489be9}
 .busaWifiMode{padding:12px 0;border-top:1px solid #2a536c}.busaWifiMode h3{margin:3px 0 5px}.busaWifiMode p{font-size:13px;color:var(--muted)}
 </style></head><body>
 <header class="appHeader"><div class="headerRow"><div><div class="eyebrow">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div><span class="onlineReadOnly">● САЙТ ОТКРЫТ</span></div><div class="headerTime" id="clockDisplay">Время: —</div><div class="onlineNetwork"><span><i class="led" id="cloudInternet"></i> Wi-Fi <b id="cloudInternetLabel">ОТКЛ</b></span><span><i class="led" id="cloudData"></i> Google <b id="cloudDataLabel">ОТКЛ</b></span><span><i class="led" id="cloudLocal"></i> ESP32 <b id="cloudLocalLabel">ОТКЛ</b></span></div></header>
+<div class="busaModeSwitch" aria-label="Режим связи">
+  <span class="active">Интернет · Google</span>
+  <a href="http://192.168.4.1/" title="Открыть локальный интерфейс ESP32 при подключении к Wi-Fi БУСА">ESP32 · локально</a>
+</div>
 <main>
 
 <section id="home"><div class="approvedHomeTitle"><strong>БУСА-1М №001</strong><span id="heroStatus">● Ожидание данных</span></div>
