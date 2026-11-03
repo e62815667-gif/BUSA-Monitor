@@ -362,7 +362,7 @@ static void v13Settings(uint32_t now,bool layout){
   default:
    v13Text(String("Wi-Fi ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),17,133,WHITE);
    v13Text(String("Google ")+(googleEnabled?"да":"нет"),17,155,WHITE);
-   v13Text("Прошивка V14.7",17,178,WHITE);
+   v13Text("Прошивка V14.8",17,178,WHITE);
    v13Text(String(millis()/60000)+" мин",17,200,WHITE);break;
  }
 }
