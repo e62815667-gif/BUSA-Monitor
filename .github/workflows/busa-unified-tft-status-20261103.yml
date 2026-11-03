@@ -1,7 +1,7 @@
 name: Build BUSA 15.0 Wi-Fi Google TFT N16R8 OTA preserves NVS
 on:
   push:
-    branches: [feature/busa-v15-0-wifi-google-tft-20261103]
+    branches: [feature/busa-v15-0-wifi-google-tft-20261103, fix/busa-v15-0-ap-recovery-20261103]
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
@@ -137,6 +137,14 @@ jobs:
           assert 'prefs.getBool("g-enabled",true)' in google
           assert 'prefs.putBool("g-enabled",enable)' in google
           assert '"enabled"' in google or 'enabled' in google
+          assert 'busaStageStaCredentials(ssid,pass)' in s
+          assert 'WiFi.setAutoReconnect(false)' in s
+          assert 'WiFi.persistent(false)' in s
+          assert 'busaStaRestoreLocal()' in s
+          assert 'busaStaSwitchPending' in google and 'busaStaSwitching' in google
+          assert 'WiFi.reconnect()' not in s
+          assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
+          assert 'APFIX-R1' in s
           assert 'googleUiChoice' in land and 'googleUiChoice' in portrait
           assert 'g-token' in google and 'g-url' in google
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
@@ -165,7 +173,7 @@ jobs:
         run: |
           mkdir -p out
           arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
-      - name: Produce APP-ONLY OTA and USB-at-0x10000 image
+      - name: Produce OTA and USB recovery package without erasing NVS
         run: |
           set -euo pipefail
           cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_15_0_WIFI_GOOGLE_N16R8_OTA_NVS_SAFE.bin
@@ -175,11 +183,52 @@ jobs:
           p=Path('out/BUSA_15_0_WIFI_GOOGLE_N16R8_OTA_NVS_SAFE.bin')
           assert 60000 < p.stat().st_size < 3000000
           print('APP-ONLY',p.stat().st_size,'bytes; OTA or esptool write_flash at 0x10000')
-          print('Do NOT use erase_flash, merged/full USB or erase NVS; preserve both keys20 namespaces')
+          print('Do NOT use erase_flash or merged/full USB: preserve original NVS keys20 map')
+          PY
+          # Four non-overlapping USB flash segments; do not use a merged 0x0 BIN,
+          # because its 0xFF padding would overwrite preserved Wi-Fi/keypad NVS.
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,zipfile
+          root=Path('out');prefix='BUSA_1M_WIFI_3v_GOOGLE.ino.'
+          package={
+             'bootloader.bin':root/(prefix+'bootloader.bin'),
+             'partitions.bin':root/(prefix+'partitions.bin'),
+             'boot_app0.bin':Path.home()/'.arduino15/packages/esp32/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin',
+             'app.bin':root/'BUSA_15_0_WIFI_GOOGLE_N16R8_OTA_NVS_SAFE.bin',
+          }
+          assert all(p.exists() for p in package.values()),package
+          assert package['bootloader.bin'].stat().st_size<0x8000
+          assert package['partitions.bin'].stat().st_size<=0x1000
+          assert package['boot_app0.bin'].stat().st_size<=0x2000
+          assert 60000<package['app.bin'].stat().st_size<0x300000
+          instructions=(
+            'BUSA 15.0 APFIX-R1 — USB recovery for ESP32-S3 N16R8\n'
+            'Preserve NVS. Do not use erase_flash, full/merged BIN or overwrite 0x9000.\n'
+            'Install esptool: python -m pip install esptool==4.7.0\n'
+            'Disconnect any external high-power loads. Use reliable USB/data cable.\n'
+            'Run FLASH_USB.bat COM8 on Windows (adjust COM port).\n'
+            'For Linux: python -m esptool --chip esp32s3 --port /dev/ttyACM0 --baud 460800 write_flash --flash_mode dio --flash_freq 40m --flash_size 16MB 0x0 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 app.bin\n'
+            'Do not flash this package from the Wi-Fi app: use the separate OTA BIN.\n'
+          )
+          bat=('@echo off\r\nsetlocal\r\nset \"PORT=%~1\"\r\nif \"%PORT%\"==\"\" set \"PORT=COM8\"\r\npython -m esptool --chip esp32s3 --port %PORT% --baud 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 16MB 0x0 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 app.bin\r\npause\r\n')
+          sums=''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+name+'\n' for name,p in package.items())
+          archive=root/'BUSA_15_0_APFIX_R1_USB_RECOVERY_KEEP_NVS.zip'
+          with zipfile.ZipFile(archive,'w',compression=zipfile.ZIP_DEFLATED) as z:
+            for name,p in package.items():z.write(p,name)
+            z.writestr('README.txt',instructions)
+            z.writestr('FLASH_USB.bat',bat)
+            z.writestr('SHA256SUMS.txt',sums)
+          with zipfile.ZipFile(archive) as z:
+            assert z.testzip() is None
+            assert len(z.read('app.bin'))==package['app.bin'].stat().st_size
+          print('USB PACKAGE VERIFIED:',archive,archive.stat().st_size)
+          PY
           PY
       - uses: actions/upload-artifact@v4
         with:
           name: BUSA_15_0_WIFI_GOOGLE_NVS_SAFE_OTA
           path: |
             out/BUSA_15_0_WIFI_GOOGLE_N16R8_OTA_NVS_SAFE.bin
+            out/BUSA_15_0_APFIX_R1_USB_RECOVERY_KEEP_NVS.zip
             out/SHA256SUMS.txt
