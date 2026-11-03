@@ -1,7 +1,7 @@
-name: Build BUSA 14.8 KEYBOARD N16R8 OTA preserves NVS
+name: Build BUSA 14.9 TFT SETTINGS N16R8 OTA preserves NVS
 on:
   push:
-    branches: [feature/busa-keyboard-14v8-nvs-20261103]
+    branches: [feature/busa-v14-9-tft-settings-20261103]
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
@@ -51,7 +51,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          assert '14v8-N16R8-KEYBOARD-NVS-20261103' in s
+          assert '14v9-N16R8-SETTINGS-KEYBOARD-NVS-20261103' in s
           assert 'busaRemoteAlarmApply()' in s and 'busaRemoteAlarmJSON()' in s
           remote=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_RemoteAlarm.h').read_text()
           assert 'portENTER_CRITICAL' in remote
@@ -102,7 +102,7 @@ jobs:
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
           ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert '#include "BUSA_KeypadTFT_UI.h"' in s
-          assert '14v8-N16R8-KEYBOARD-NVS-20261103' in s
+          assert '14v9-N16R8-SETTINGS-KEYBOARD-NVS-20261103' in s
           assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,80)' in ui
           assert 'WIFIUI_PASSWORD' in ui and 'wifiUiTypeDigit' in ui
           assert 'wifiUiModeCaption()' in ui and '"abc","ABC","123","SYM"' in ui
@@ -110,7 +110,22 @@ jobs:
           assert 'wifiUiDigitFromKey(k)>=0' in s
           assert 'case 1:' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Landscape_V14.h').read_text()
           assert 'case 1:' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
-          print('PASS Wi-Fi, 20-key NVS restore, numeric navigation, multi-tap keypad')
+          land=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Landscape_V14.h').read_text()
+          portrait=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
+          assert 'i<4;i++' in land and 'calDraft:tempOffset[i]' in land
+          assert '"Поиск сети"' in land and '"Сохранить"' in land
+          assert '"Рисунок БУСА"' in land and 'themeNames[tftThemeMode]' in land
+          assert 'v14SystemInfoRows()' in land and 'u' not in []
+          assert 'Wi-Fi подключён: ' in land and 'ESP32 Wi-Fi: ' in land
+          assert 'Прошивка: V14.9' in land and 'String(uptimeSeconds%60)' in land
+          assert 'v14Print("Прошивка: V14.9",17,163,V14_TEXT)' in land
+          assert 'Пороги звука не меняются' not in land
+          assert 'UP/DN выбор датчика' not in land
+          assert 'v13Text("Прошивка: V14.9"' in portrait
+          assert 'tftView=0; // One ENT saves and returns to Settings.' in s
+          assert 'saveTempOffset(calSensor,0.0f)' in s
+          assert 'KEY_CAPS[20]' in s and 'loadKeymap();' in s
+          print('PASS 14.9: nested menus, T1..T4, Wi-Fi search, saved themes, uniform About, NVS keys')
           PY
       - name: Verify both embedded and online JavaScript
         run: |
@@ -138,18 +153,18 @@ jobs:
       - name: Produce APP-ONLY OTA and USB-at-0x10000 image
         run: |
           set -euo pipefail
-          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_8_KEYBOARD_N16R8_OTA_NVS_SAFE.bin
-          (cd out && sha256sum BUSA_14_8_KEYBOARD_N16R8_OTA_NVS_SAFE.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin
+          (cd out && sha256sum BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('out/BUSA_14_8_KEYBOARD_N16R8_OTA_NVS_SAFE.bin')
+          p=Path('out/BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin')
           assert 60000 < p.stat().st_size < 3000000
           print('APP-ONLY',p.stat().st_size,'bytes; OTA or esptool write_flash at 0x10000')
           print('Do NOT use erase_flash, merged/full USB or erase NVS; preserve both keys20 namespaces')
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_14_8_KEYBOARD_NVS_SAFE_OTA
+          name: BUSA_14_9_SETTINGS_NVS_SAFE_OTA
           path: |
-            out/BUSA_14_8_KEYBOARD_N16R8_OTA_NVS_SAFE.bin
+            out/BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin
             out/SHA256SUMS.txt

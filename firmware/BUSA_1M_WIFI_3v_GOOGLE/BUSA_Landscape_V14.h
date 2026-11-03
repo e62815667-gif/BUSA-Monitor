@@ -1,5 +1,5 @@
 #pragma once
-// БУСА-1М №001 — V14.7: flicker-free TFT, monochrome dark theme, Internet / local Wi-Fi LED.
+// БУСА-1М №001 — V14.9: unified nested TFT Settings, 4x calibration, Wi-Fi picker, 3 themes, About.
 // THIS CODE ONLY DRAWS DATA. NO RELAY/POWER/PWM CONTROL.
 // No placeholder readings: water flow raw pulses only until calibrated.
 // Google transport is implemented later in BUSA_Google.h; TFT displays status only.
@@ -156,7 +156,7 @@ static void v14Frame(uint32_t now){
   ru.setFont(u8g2_font_6x13_t_cyrillic);
   int tw=ru.getUTF8Width(dt.c_str());
   v14Print(dt,max(220,317-tw),15,V14_TEXT);
-  // Six tabs, preserving internal IDs with the explicit approved visual order.
+  // Seven ordered top-level tabs, matching LEFT/RIGHT keypad navigation.
   for(int i=0;i<7;i++){
     int x=1+i*45;bool chosen=(v14Order[i]==currentPage);
     screen->fillRoundRect(x,25,43,22,4,chosen?V14_ORANGE:V14_CARD);
@@ -166,7 +166,7 @@ static void v14Frame(uint32_t now){
     int w=ru.getUTF8Width(title.c_str());
     v14Tiny(title,x+max(1,(43-w)/2),40,V14_TEXT);
   }
-  // Only approved input pictograms; the * key is the decimal comma in editors.
+  // Only the active keys are shown here; * and # are unused.
   screen->fillRect(0,211,320,29,V14_CARD);
   screen->drawFastHLine(0,211,320,V14_ORANGE);
   for(int i=0;i<7;i++){
@@ -175,10 +175,8 @@ static void v14Frame(uint32_t now){
     screen->fillRoundRect(x,215,42,22,4,i==4?V14_BADGE:V14_CARD);
     screen->drawRoundRect(x,215,42,22,4,V14_RULE);
     if(i<4){v14FootArrow(x+13,i,V14_ORANGE);}
-    else if(i==4){ // *
-      screen->drawFastVLine(cx,219,14,V14_GREEN);
-      screen->drawLine(cx-6,223,cx+6,230,V14_GREEN);
-      screen->drawLine(cx-6,230,cx+6,223,V14_GREEN);
+    else if(i==4){ // hold 0 for comma (star and hash are unused).
+      v14Tiny("0,",cx-7,cy+3,V14_TEXT);
     }else if(i==5){ // ENT/OK: checkmark only
       screen->drawCircle(cx,cy,8,V14_GREEN);
       screen->drawLine(cx-5,cy,cx-1,cy+4,V14_GREEN);
@@ -371,87 +369,129 @@ static void v14Events(bool layout){
     if(i<4)screen->drawFastHLine(14,y+5,289,V14_GRID);
   }
 }
+// Consistent nested settings presentation. Each ENT opens exactly one child
+// page; ESC returns to the five-item ordered list. No extra modal windows.
+static void v14SystemInfoRows(){
+  const bool staOk=(WiFi.status()==WL_CONNECTED);
+  const bool googleOk=googleEnabled && googleInternet==1 &&
+    googleState==5 && (googleHttp==200 || googleHttp==302);
+  const bool espApOk=(WiFi.getMode()==WIFI_AP || WiFi.getMode()==WIFI_AP_STA); // ESP32 local Wi-Fi AP
+  const uint32_t uptimeSeconds=millis()/1000;
+  v14Print(String("Wi-Fi подключён: ")+(staOk?"да":"нет"),17,103,V14_TEXT);
+  v14Print(String("Google: ")+(googleOk?"да":"нет"),17,123,V14_TEXT);
+  v14Print(String("ESP32 Wi-Fi: ")+(espApOk?"да":"нет"),17,143,V14_TEXT);
+  v14Print("Прошивка: V14.9",17,163,V14_TEXT);
+  v14Print("Работа: "+String(uptimeSeconds/60)+" мин "+
+           String(uptimeSeconds%60)+" сек",17,183,V14_TEXT);
+}
 static void v14Settings(bool layout){
  static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе"};
  if(!tftView){
+  // Vertical ordering matches UP/DOWN physical navigation: 1-2-3-4-5.
   for(int i=0;i<5;i++){
-   int x=5+(i%2)*157,y=53+(i/2)*45;
-   hqPanel(x,y,152,41);
-   if(i==approvedSettingsItem)screen->fillRoundRect(x+3,y+4,4,32,2,V14_ORANGE);
-   v14Print(names[i],x+15,y+24,V14_TEXT);
-   v14Tiny("ENT",x+127,y+24,V14_MUTED);
+   const int x=8,y=53+i*30;
+   hqPanel(x,y,304,28);
+   if(i==approvedSettingsItem)screen->fillRoundRect(x+4,y+4,5,20,2,V14_ORANGE);
+   v14Print(names[i],x+21,y+19,V14_TEXT);
   }
   return;
  }
- hqPanel(25,72,270,131);
- v14Big(String(names[approvedSettingsItem]),35,92,V14_TEXT);
- screen->drawFastHLine(35,100,250,V14_RULE);
+ // Child page occupies the Settings content area, never a floating popup.
+ hqPanel(7,53,306,153);
  switch(approvedSettingsItem){
-  case 0:
-   v14Print("T"+String(calSensor+1)+" · поправка: "+String(tempOffset[calSensor],1)+" C",35,123,V14_TEXT);
-   if(calEditing){
-    v14Big("ВВОД: "+String(calDraft,1)+" C",35,147,V14_ORANGE);
-    v14Tiny("UP/DN +-0.1 · ENT сохранить",35,170,V14_BLUE);
-    v14Tiny("ESC отменить",35,188,V14_MUTED);
-   }else{
-    v14Tiny("UP/DN выбор датчика · ENT поправка",35,149,V14_BLUE);
-    v14Tiny("Пороги звука не меняются",35,173,V14_MUTED);
-   }break;
-  case 1: { // Physical TFT uses discovery; SSID is NEVER typed manually.
-   switch(wifiUiStage){
-    case WIFIUI_SCANNING:
-     v14Print("Ищу сети Wi-Fi...",35,127,V14_BLUE);
-     v14Tiny("Поиск без блокировки датчиков",35,150,V14_MUTED);
-     break;
-    case WIFIUI_NETWORKS:
-     v14Tiny("Доступные сети: "+String(wifiUiCount),35,116,V14_BLUE);
-     for(int j=0;j<3;j++){
-       int n=(int)wifiUiIndex+j-1;
-       if(n<0||n>=wifiUiCount)continue;
-       String name=wifiUiNetworks[n];
-       if(name.length()>23)name=name.substring(0,22)+"...";
-       v14Tiny(String(n==wifiUiIndex?"> ":"  ")+name,35,139+j*19,
-               n==wifiUiIndex?V14_ORANGE:V14_TEXT);
-     }
-     v14Tiny("UP/DN выбор · ENT пароль",35,195,V14_MUTED);
-     break;
-    case WIFIUI_PASSWORD:{
-     String ssid=wifiUiSelectedSsid;
-     if(ssid.length()>22)ssid=ssid.substring(0,21)+"...";
-     v14Tiny("Сеть: "+ssid,35,115,V14_TEXT);
-     v14Print(String("Режим ")+wifiUiModeCaption(),35,137,V14_ORANGE);
-     String masked=wifiUiPasswordMask();
-     if(masked.length()>28)masked="..."+masked.substring(masked.length()-25);
-     v14Tiny("Пароль: "+masked,35,156,V14_BLUE);
-     v14Tiny("UP/DN режим · F1 удалить",35,176,V14_MUTED);
-     v14Tiny("0 долго: запятая · ENT ОК",35,195,V14_MUTED);
-     break;
+  case 0: { // All four temperature calibration offsets are shown together.
+   v14Big("Температура",17,75,V14_TEXT);
+   screen->drawFastHLine(17,82,280,V14_RULE);
+   for(int i=0;i<4;i++){
+    const int y=87+i*28;
+    hqPanel(14,y,291,25);
+    if(i==calSensor){
+      screen->fillRoundRect(18,y+4,4,17,2,V14_ORANGE);
     }
-    case WIFIUI_CONNECTING:
-     v14Print("Подключаю Wi-Fi...",35,125,V14_BLUE);
-     v14Tiny("Сеть: "+wifiUiSelectedSsid,35,147,V14_TEXT);
-     v14Tiny(wifiUiFeedback,35,172,V14_MUTED);
-     break;
-    default:
-     v14Print(WiFi.status()==WL_CONNECTED?"Wi-Fi подключён":"Wi-Fi нет связи",35,122,V14_TEXT);
-     v14Tiny("ENT: искать доступные сети",35,147,V14_BLUE);
-     v14Tiny(wifiUiFeedback,35,172,V14_MUTED);
+    const float offset=(calEditing&&i==calSensor)?calDraft:tempOffset[i];
+    const String correction=String(offset>=0?"+":"")+String(offset,1)+" °C";
+    v14Print("T"+String(i+1),29,y+17,V14_TEXT);
+    v14Print(correction,181,y+17,i==calSensor?V14_ORANGE:V14_TEXT);
    }
    break;
   }
-  case 2:
-   v14Print(themeDraft==0?"Светлая":themeDraft==1?"Тёмная":"Системная",35,126,V14_TEXT);
-   v14Tiny("UP/DN выбор · ENT сохранить",35,152,V14_BLUE);
-   v14Tiny("Системная: рисунки БУСА",35,177,V14_MUTED);break;
+  case 1: { // Search list and password belong to this same Wi-Fi child page.
+   v14Big("Wi-Fi",17,75,V14_TEXT);
+   screen->drawFastHLine(17,82,280,V14_RULE);
+   switch(wifiUiStage){
+    case WIFIUI_SCANNING:
+     v14Print("Поиск сети",24,110,V14_TEXT);
+     v14Print("Поиск...",24,142,V14_TEXT);
+     break;
+    case WIFIUI_NETWORKS: {
+     v14Print("Поиск сети",24,101,V14_TEXT);
+     const int start=(wifiUiIndex/4)*4;
+     for(int row=0;row<4;row++){
+       const int idx=start+row;
+       if(idx>=wifiUiCount)break;
+       const int y=108+row*22;
+       if(idx==wifiUiIndex){
+         screen->fillRoundRect(18,y+1,4,16,2,V14_ORANGE);
+       }
+       String ssid=wifiUiNetworks[idx];
+       if(ssid.length()>37)ssid=ssid.substring(0,34)+"...";
+       v14Print(ssid,27,y+15,V14_TEXT);
+     }
+     break;
+    }
+    case WIFIUI_PASSWORD: {
+     String ssid=wifiUiSelectedSsid;
+     if(ssid.length()>35)ssid=ssid.substring(0,32)+"...";
+     v14Print("Сеть: "+ssid,23,104,V14_TEXT);
+     v14Print("Регистр: "+String(wifiUiModeCaption()),23,128,V14_TEXT);
+     String masked=wifiUiPasswordMask();
+     if(masked.length()>32)masked="..."+masked.substring(masked.length()-29);
+     v14Print("Пароль: "+masked,23,151,V14_TEXT);
+     // ENT saves without another confirmation and returns to Settings.
+     screen->fillRoundRect(20,173,277,26,4,V14_CARD);
+     v14Print("Сохранить",109,191,V14_TEXT);
+     break;
+    }
+    case WIFIUI_CONNECTING:
+     v14Print("Подключение...",23,113,V14_TEXT);
+     v14Print("Сеть: "+wifiUiSelectedSsid,23,143,V14_TEXT);
+     break;
+    default:
+     screen->fillRoundRect(19,93,279,31,4,V14_CARD);
+     v14Print("Поиск сети",97,113,V14_TEXT);
+     if(WiFi.status()==WL_CONNECTED){
+       v14Print("Подключено: "+WiFi.SSID(),23,153,V14_TEXT);
+     }else{
+       v14Print("Нет подключения",23,153,V14_TEXT);
+     }
+     if(!wifiUiFeedback.isEmpty())v14Tiny(wifiUiFeedback,23,179,V14_TEXT);
+     break;
+   }
+   break;
+  }
+  case 2: { // A single "Select theme" screen, no deeper Settings submenu.
+   static const char* themeNames[]={"Светлая","Тёмная","Рисунок БУСА"};
+   v14Big("Выбор темы",17,75,V14_TEXT);
+   screen->drawFastHLine(17,82,280,V14_RULE);
+   v14Print(String("Выбрана: ")+themeNames[tftThemeMode],20,102,V14_TEXT);
+   for(int i=0;i<3;i++){
+     const int y=113+i*29;
+     hqPanel(19,y,278,27);
+     if(i==themeDraft)screen->fillRoundRect(23,y+5,4,18,2,V14_ORANGE);
+     v14Print(themeNames[i],36,y+19,V14_TEXT);
+   }
+   break;
+  }
   case 3:
-   v14Print(googleEnabled?"Google: настроен":"Google: не настроен",35,125,V14_TEXT);
-   v14Tiny("Передача: "+String(googleState==5?"подтверждена":googleState==6?"ошибка":"проверяется"),35,149,V14_BLUE);
-   v14Tiny("Параметры подключения: iPhone",35,175,V14_MUTED);break;
+   v14Big("Google",17,75,V14_TEXT);
+   screen->drawFastHLine(17,82,280,V14_RULE);
+   v14Print(googleEnabled?"Google: настроен":"Google: не настроен",23,114,V14_TEXT);
+   v14Print(String("Передача: ")+(googleState==5?"да":"нет"),23,142,V14_TEXT);
+   break;
   default:
-   v14Tiny(String("Wi-Fi: ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),35,118,V14_TEXT);
-   v14Tiny(String("Google: ")+(googleEnabled?"да":"нет"),35,138,V14_TEXT);
-   v14Tiny("Прошивка: V14.8 KEYBOARD",35,158,V14_BLUE);
-   v14Tiny(String("Работа: ")+(millis()/60000)+" мин",35,180,V14_TEXT);
+   v14Big("О системе",17,75,V14_TEXT);
+   screen->drawFastHLine(17,82,280,V14_RULE);
+   v14SystemInfoRows();
  }
 }
 static void v14Diagnostics(bool layout){
@@ -527,6 +567,15 @@ void renderLandscape(uint32_t now){
 void v14RefreshLive(uint32_t now){
   v13Collect(now);
   v14NetIndicators();
+  if(currentPage==5 && tftView && approvedSettingsItem==4){
+    // Update uptime and connection flags each second without clearing TFT.
+    static uint32_t lastInfoRefresh=0;
+    if(!lastInfoRefresh || (uint32_t)(now-lastInfoRefresh)>=1000){
+      lastInfoRefresh=now;
+      screen->fillRect(15,87,283,105,HQ_DEEP);
+      v14SystemInfoRows();
+    }
+  }
   if(currentPage==3 && v13HistoryCount && 
      v13LastCapture!=busaGraphLastDrawnCapture){
     v14Graphs(false); // chart pixels only; prevents full-screen flashing
