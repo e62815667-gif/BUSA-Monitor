@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-TEMP-VERTICAL-PSRAM-NVS-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-MENU-STA-NVS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -720,8 +720,8 @@ void startKeyLearning(){
 #include "BUSA_KeypadTFT_UI.h"
 void navigatePage(uint8_t target){
   if(target>=7||target==currentPage)return;
-  if(currentPage==5 && target!=5 && wifiUiStage==WIFIUI_PASSWORD){
-    wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();wifiUiStage=WIFIUI_STATUS;
+  if(currentPage==5 && target!=5 && approvedSettingsItem==1 && tftView){
+    wifiUiLeave(); // scrub unsaved password; AP BUSA keeps running
   }
   previousMainPage=currentPage;
   currentPage=target;tftView=0;editingTemp=false;deleteConfirmPending=false;calEditing=false;tftDirty=true;
@@ -886,7 +886,13 @@ void keypadAction(int k){
         // Settings is a real page; ENT opens the selected nested page.
         tftView=1;
         themeDraft=tftThemeMode;
-        if(approvedSettingsItem==1)wifiUiBeginScan();
+        if(approvedSettingsItem==1){
+          // Enter the five-action Wi-Fi menu without starting a scan.
+          wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
+          wifiUiFeedback=wifiUiStaDisabled?
+            "Внешняя сеть отключена; AP БУСА работает":
+            (WiFi.status()==WL_CONNECTED?"Подключено: "+WiFi.SSID():"Внешняя сеть не подключена");
+        }
       }else if(approvedSettingsItem==0){
         calEditing=true;calDraft=tempOffset[calSensor];
       }else if(approvedSettingsItem==2){
@@ -1483,6 +1489,7 @@ String statusJSON(){
   s+=",\"wifi\":{\"ap_running\":"+(wifiRunning?String("true"):String("false"));
   s+=",\"ap_clients\":"+String(WiFi.softAPgetStationNum());
   s+=",\"sta_connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
+  s+=",\"sta_disabled_by_user\":"+(wifiUiStaDisabled?String("true"):String("false"));
   s+=",\"sta_rssi_dbm\":"+(WiFi.status()==WL_CONNECTED?String(WiFi.RSSI()):String("null"));
   s+=",\"station_credentials_protected\":true}";
   s+="}";
@@ -2699,6 +2706,7 @@ void setup(){
   busaReportStage("TFT_READY");
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
+  wifiUiStaDisabled=prefs.getBool("staOff",false); // AP remains available even when STA is disabled
   loadKeymap();
   clockZoneKnown=prefs.getBool("clkZone",false);
   clockUtcOffsetMinutes=prefs.getInt("clkTz",0);
@@ -2726,11 +2734,16 @@ void setup(){
   updateBootStage(1);
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str(),apPassword.c_str());
-  if(stationSsid.length() && stationPass.length()>=8){
+  if(!wifiUiStaDisabled && stationSsid.length() && stationPass.length()>=8){
     WiFi.setAutoReconnect(true);
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
     Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
-  }else Serial0.println("STA config missing: preprovision NVS before use; AP stays available");
+  }else{
+    WiFi.setAutoReconnect(false);
+    Serial0.println(wifiUiStaDisabled?
+      "STA manually disabled in NVS; BUSA softAP remains ON":
+      "STA credentials missing; BUSA softAP remains ON");
+  }
   server.on("/",HTTP_GET,[]{server.sendHeader("Cache-Control","no-store");server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
   server.on("/api/time/sync",HTTP_POST,[]{
     if(!apClient()){
@@ -3012,12 +3025,22 @@ void setup(){
       server.send(400,"text/plain; charset=utf-8","Недопустимое имя сети или длина пароля (8–63).");return;
     }
     // NVS is encrypted only if board flash encryption is enabled; keep local AP secure.
-    bool ok=(prefs.putString("ssid",ssid)>0 && prefs.putString("pass",pass)>0);
-    if(!ok){server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;}
-    stationSsid=ssid;stationPass=pass;
-    // Do not force a STA disconnect while an HTTPS Google request is active.
-    // Save credentials now; start the new association after sending the reply.
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    // Local app uses the same NVS flag as TFT. A saved network re-enables
+    // only the external STA; the local AP never stops during provisioning.
+    const String prevSsid=prefs.getString("ssid","");
+    const String prevPass=prefs.getString("pass","");
+    const bool prevOff=prefs.getBool("staOff",false);
+    const bool ok=(prefs.putString("pass",pass)==pass.length() &&
+      prefs.putString("ssid",ssid)==ssid.length() &&
+      prefs.putBool("staOff",false));
+    if(!ok){
+      prefs.putString("ssid",prevSsid);prefs.putString("pass",prevPass);
+      prefs.putBool("staOff",prevOff);
+      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;
+    }
+    stationSsid=ssid;stationPass=pass;wifiUiStaDisabled=false;wifiUiDisablePending=false;
+    wifiUiConnectPending=true; // in loop, after current local response and HTTPS transaction
+    wifiUiConnectAt=millis();
     lastStationCheck=millis();
     server.send(200,"text/plain; charset=utf-8","Wi-Fi сохранён. Подключение к сети запущено.");
   });
@@ -3207,7 +3230,7 @@ void loop(){
   // ESP-IDF auto-reconnect already runs in the Wi-Fi driver. Manual retries
   // use a 2-min backoff and never interrupt a local AP client, an active
   // Google HTTPS transfer, or a channel scan.
-  if(stationSsid.length() && stationPass.length()>=8 &&
+  if(!wifiUiStaDisabled && stationSsid.length() && stationPass.length()>=8 &&
       WiFi.status()!=WL_CONNECTED && !busaWifiScanRunning &&
       !busaGoogleNetworkBusy && WiFi.softAPgetStationNum()==0 &&
       elapsed(now,lastStationCheck,120000)){
