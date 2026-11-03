@@ -187,7 +187,7 @@ static void v14Frame(uint32_t now){
 }
 static void v14MiniRig(){
   // Enlarged approved illustration; only drawing coordinates have changed.
-  hqRig(120,27,125,179);
+  hqRig(117,25,130,181,false);
 }
 static void v14Home(uint32_t now,bool layout){
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -200,7 +200,6 @@ static void v14Home(uint32_t now,bool layout){
     screen->fillCircle(11,y+11,4,v14SeriesColors[i]);
     v14Print(names[i],21,y+16,V14_TEXT);
     v14Metric(v13Temp(i,now),21,y+37,94,hasTemp(i,now),HQ_NAVY);
-    if(i<3)screen->drawFastHLine(5,y+42,111,V14_RULE);
   }
   hqPanel(248,27,69,84);
   v14Tiny("ОТБОР",253,41,V14_TEXT);
@@ -214,82 +213,80 @@ static void v14Home(uint32_t now,bool layout){
 }
 static void v14Temperature(uint32_t now,bool layout){
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
+  // Four larger cards fill the former 25..50px blank navigation strip.
   for(int i=0;i<4;i++){
-    int x=4+(i%2)*158,y=52+(i/2)*77;
-    hqPanel(x,y,153,73);
-    if(i==selectedTemp)screen->fillRoundRect(x+3,y+3,4,65,2,V14_ORANGE);
+    const int x=4+(i%2)*158,y=25+(i/2)*92;
+    hqPanel(x,y,153,87);
+    if(i==selectedTemp)screen->fillRoundRect(x+3,y+3,4,81,2,V14_ORANGE);
     screen->fillCircle(x+14,y+15,4,v14SeriesColors[i]);
-    v14Print(names[i],x+25,y+18,V14_TEXT);
-    v14Metric(v13Temp(i,now),x+11,y+40,133,hasTemp(i,now));
-    v14Tiny(String(i==selectedTemp && selectedField==0?">ВКЛ: ":"ВКЛ: ")+v13Ref(refTemp[i]),x+12,y+54,(i==selectedTemp && selectedField==0)?V14_ORANGE:V14_MUTED);
-    v14Tiny(String(i==selectedTemp && selectedField==1?">ВЫКЛ: ":"ВЫКЛ: ")+v13Ref(noticeTemp[i]),x+12,y+66,(i==selectedTemp && selectedField==1)?V14_ORANGE:V14_MUTED);
+    v14Print(names[i],x+25,y+19,V14_TEXT);
+    v14Metric(v13Temp(i,now),x+11,y+45,133,hasTemp(i,now));
+    v14Tiny(String(i==selectedTemp && selectedField==0?">ВКЛ: ":"ВКЛ: ")+v13Ref(refTemp[i]),
+      x+12,y+65,(i==selectedTemp && selectedField==0)?V14_ORANGE:V14_MUTED);
+    v14Tiny(String(i==selectedTemp && selectedField==1?">ВЫКЛ: ":"ВЫКЛ: ")+v13Ref(noticeTemp[i]),
+      x+12,y+80,(i==selectedTemp && selectedField==1)?V14_ORANGE:V14_MUTED);
   }
   if(deleteConfirmPending){
-    hqPanel(35,70,250,126);
-    v14Big("УДАЛИТЬ ПОРОГ?",43,94,V14_WARN);
+    hqPanel(35,46,250,152);
+    v14Big("УДАЛИТЬ ПОРОГ?",43,74,V14_WARN);
     v14Print(String("T")+String(selectedTemp+1)+
-      (selectedField?" ВЫКЛ":" ВКЛ"),43,120,V14_TEXT);
-    v14Print("ENT: удалить",43,150,V14_WARN);
-    v14Print("ESC: отмена",43,172,V14_GREEN);
+      (selectedField?" ВЫКЛ":" ВКЛ"),43,110,V14_TEXT);
+    v14Print("ENT: удалить",43,149,V14_WARN);
+    v14Print("ESC: отмена",43,178,V14_GREEN);
   }else if(editingTemp){
-    hqPanel(43,73,234,114);
-    v14Big(String("T")+String(selectedTemp+1)+(selectedField?" ВЫКЛ":" ВКЛ"),53,97,V14_TEXT);
-    v14Metric(editTempBuffer.isEmpty()?"--":editTempBuffer,55,128,209,true);
-    v14Print("ENT сохранить",53,150,V14_GREEN);
-    v14Print("ESC отменить",53,171,V14_MUTED);
+    hqPanel(43,46,234,152);
+    v14Big(String("T")+String(selectedTemp+1)+(selectedField?" ВЫКЛ":" ВКЛ"),53,72,V14_TEXT);
+    v14Metric(editTempBuffer.isEmpty()?"--":editTempBuffer,55,113,209,true);
+    v14Print("ENT сохранить",53,151,V14_GREEN);
+    v14Print("ESC отменить",53,180,V14_MUTED);
   }
 }
 static void v14Collection(bool layout){
-  hqPanel(5,52,151,62);
-  v14Print("Расход отбора",13,70,V14_TEXT);
-  v14Metric("НЕТ ДАТЧИКА",13,98,137,false);
-  hqPanel(162,52,153,62);
-  v14Print("Собрано, мл",170,70,V14_TEXT);
-  v14Metric("Н/Д",170,98,138,false);
-  hqPanel(5,121,310,86);
-  v14Print("ГРАФИК ОТБОРА",15,140,V14_TEXT);
-  screen->drawFastHLine(27,191,271,V14_RULE);
-  screen->drawFastVLine(27,150,42,V14_RULE);
-  v14Print("Нет датчика отбора",69,176,V14_WARN);
-  v14Tiny("YF-S401 относится только к охлаждающей воде",13,199,V14_MUTED);
+  // The flow graph is shown only under "Графики"; no duplicate here.
+  hqPanel(5,25,151,181);
+  v14Print("Расход отбора",13,47,V14_TEXT);
+  v14Metric("НЕТ ДАТЧИКА",14,113,137,false);
+  v14Print("мл/мин",17,146,V14_MUTED);
+  hqPanel(162,25,153,181);
+  v14Print("Собрано",170,47,V14_TEXT);
+  v14Metric("Н/Д",174,113,128,false);
+  v14Print("мл",174,146,V14_MUTED);
 }
 // Approved diagnostic-style graph layout: two views, independent vertical lanes.
 // All samples come from the same 5s DS18B20 circular history as /api/graph-history.
 static void v14GraphTabs(){
-  static const char* names[]={"ТЕМПЕРАТУРЫ","ВОДА И ОТБОР"};
+  static const char* names[]={"Температуры","Вода / Отбор"};
   for(int j=0;j<2;j++){
-    int x=5+j*156;
-    screen->fillRoundRect(x,52,151,22,4,graphSubView==j?V14_ORANGE:V14_CARD);
-    screen->drawRoundRect(x,52,151,22,4,V14_RULE);
-    String label=names[j];
+    const int x=5+j*156;
+    screen->fillRoundRect(x,26,151,23,4,graphSubView==j?V14_ORANGE:V14_CARD);
+    screen->drawRoundRect(x,26,151,23,4,V14_RULE);
+    const String label=names[j];
     ru.setFont(u8g2_font_5x7_t_cyrillic);
-    int w=ru.getUTF8Width(label.c_str());
-    v14Tiny(label,x+max(3,(151-w)/2),67,V14_TEXT);
+    const int w=ru.getUTF8Width(label.c_str());
+    v14Tiny(label,x+max(3,(151-w)/2),42,V14_TEXT);
   }
 }
 static void v14Graphs(bool layout){
   if(layout){
     v14GraphTabs();
-    hqPanel(5,79,310,128);
-    screen->fillRoundRect(10,84,300,119,5,0x0000);
-    screen->drawRoundRect(10,84,300,119,5,V14_BLUE);
+    hqPanel(5,54,310,153);
+    screen->fillRoundRect(10,59,300,145,5,0x0000);
+    screen->drawRoundRect(10,59,300,145,5,V14_BLUE);
   }else{
-    // Repaint only pixels inside the already drawn chart border.
-    // Header, tabs, footer and fixed frame never disappear on a 5s sample.
-    screen->fillRect(12,86,296,115,0x0000);
+    // Change graph pixels only: leave fixed header, selectors and footer intact.
+    screen->fillRect(12,61,296,141,0x0000);
   }
   if(graphSubView==0){
-    const int x0=83,xw=215,bandY=92,bandH=26;
+    const int x0=83,xw=215,bandY=66,bandH=33;
     for(int k=0;k<4;k++){
       const int rowY=bandY+k*bandH;
-      if(k)screen->drawFastHLine(14,rowY-2,290,V14_RULE);
+      if(k)screen->drawFastHLine(14,rowY-3,290,V14_RULE);
       static const char* names[]={"T1 Вода","T2 Кол.","T3 Куб","T4 Верх"};
-      v14Tiny(names[k],15,rowY+8,v14SeriesColors[k]);
-      // Show the current measured value alongside each independent trace.
+      v14Tiny(names[k],15,rowY+9,v14SeriesColors[k]);
       const int lastIndex=(v13HistoryHead+47)%48;
       const float latest=v13HistoryCount?v13History[k][lastIndex]:NAN;
-      v14Tiny(isfinite(latest)?String(latest,1):String("Н/Д"),26,rowY+20,V14_TEXT);
-      screen->drawFastVLine(x0-3,rowY+1,21,V14_RULE);
+      v14Tiny(isfinite(latest)?String(latest,1):String("Н/Д"),26,rowY+27,V14_TEXT);
+      screen->drawFastVLine(x0-3,rowY+1,26,V14_RULE);
       float lo=INFINITY,hi=-INFINITY;
       for(int i=0;i<v13HistoryCount;i++){
         const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
@@ -304,57 +301,53 @@ static void v14Graphs(bool layout){
         const float t=v13History[k][idx];
         if(!isfinite(t))continue;
         const int x=x0+(v13HistoryCount<2?xw-1:(i*(xw-1))/47);
-        const int y=rowY+20-(int)(fminf(1.0f,fmaxf(0.0f,(t-lo)/(hi-lo)))*18.0f);
-        if(i==0 || !isfinite(v13History[k][(idx+47)%48])){
-          screen->drawPixel(x,y,v14SeriesColors[k]);
-        }else{
+        const int y=rowY+26-(int)(fminf(1.0f,fmaxf(0.0f,(t-lo)/(hi-lo)))*23.0f);
+        if(i==0 || !isfinite(v13History[k][(idx+47)%48]))screen->drawPixel(x,y,v14SeriesColors[k]);
+        else{
           const int pidx=(idx+47)%48;
           const float prev=v13History[k][pidx];
-          const int yp=rowY+20-(int)(fminf(1.0f,fmaxf(0.0f,(prev-lo)/(hi-lo)))*18.0f);
+          const int yp=rowY+26-(int)(fminf(1.0f,fmaxf(0.0f,(prev-lo)/(hi-lo)))*23.0f);
           const int xp=x0+((i-1)*(xw-1))/47;
           screen->drawLine(xp,yp,x,y,v14SeriesColors[k]);
         }
       }
     }
-
   }else{
-    v14Tiny("ВОДА · YF-S401 · импульсы/2c",16,98,V14_BLUE);
-    screen->drawFastHLine(14,146,291,V14_RULE);
-    v14Tiny("ОТБОР · НЕТ ДАТЧИКА",16,163,V14_WARN);
-    v14Tiny("Линия отсутствует · данных нет",16,181,V14_MUTED);
-    const int px=77,py=109,pw=216,ph=30;
+    // Only essential names/values. Preserve real water pulse trace; no demo data.
+    v14Tiny("Вода",16,76,V14_BLUE);
+    screen->drawFastHLine(14,149,291,V14_RULE);
+    v14Tiny("Отбор",16,166,V14_WARN);
+    v14Tiny("Н/Д",16,192,V14_MUTED);
+    const int px=77,py=82,pw=216,ph=56;
     screen->drawFastVLine(px,py,ph,V14_RULE);
     uint32_t vmax=1;
     for(int i=0;i<waterSamplesRecorded;i++){
-      int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
+      const int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
       if(waterPulseHistory[idx]>vmax)vmax=waterPulseHistory[idx];
     }
     for(int i=0;i<waterSamplesRecorded;i++){
-      int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
-      int x=px+(i*pw)/39;
-      int y=py+ph-1-(int)((uint64_t)waterPulseHistory[idx]*(ph-3)/vmax);
+      const int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
+      const int x=px+(i*pw)/39;
+      const int y=py+ph-1-(int)((uint64_t)waterPulseHistory[idx]*(ph-3)/vmax);
       if(i==0)screen->drawPixel(x,y,V14_SEA);
       else{
-        int prev=(flowTraceHead+40-waterSamplesRecorded+i-1)%40;
-        int yprev=py+ph-1-(int)((uint64_t)waterPulseHistory[prev]*(ph-3)/vmax);
+        const int prev=(flowTraceHead+40-waterSamplesRecorded+i-1)%40;
+        const int yprev=py+ph-1-(int)((uint64_t)waterPulseHistory[prev]*(ph-3)/vmax);
         screen->drawLine(px+((i-1)*pw)/39,yprev,x,y,V14_SEA);
       }
     }
-    if(!waterSamplesRecorded)v14Tiny("Нет импульсов",88,125,V14_MUTED);
-
   }
 }
 static void v14Events(bool layout){
-  hqPanel(5,52,310,155);
-  v14Print("ЖУРНАЛ СОБЫТИЙ",14,70,V14_TEXT);
-  screen->drawFastHLine(14,76,290,V14_RULE);
-  int count=min((int)v13EventCount,5);
+  hqPanel(5,25,310,181);
+  v14Print("ЖУРНАЛ СОБЫТИЙ",14,46,V14_TEXT);
+  screen->drawFastHLine(14,54,290,V14_RULE);
+  const int count=min((int)v13EventCount,5);
   for(int i=0;i<count;i++){
-    int y=96+i*21;
+    const int y=80+i*24;
     screen->fillCircle(19,y-4,3,V14_ORANGE);
-    // Never cut UTF-8 at arbitrary bytes; small font clips long labels at panel width.
     v14Tiny(v13Events[i],29,y,V14_TEXT);
-    if(i<4)screen->drawFastHLine(14,y+5,289,V14_GRID);
+    if(i<4)screen->drawFastHLine(14,y+6,289,V14_GRID);
   }
 }
 // Consistent nested settings presentation. Each ENT opens exactly one child
@@ -363,173 +356,161 @@ static void v14SystemInfoRows(){
   const bool staOk=(WiFi.status()==WL_CONNECTED);
   const bool googleOk=googleEnabled && googleInternet==1 &&
     googleState==5 && (googleHttp==200 || googleHttp==302);
-  const bool espApOk=(WiFi.getMode()==WIFI_AP || WiFi.getMode()==WIFI_AP_STA); // ESP32 local Wi-Fi AP
+  const bool espApOk=(WiFi.getMode()==WIFI_AP || WiFi.getMode()==WIFI_AP_STA);
   const uint32_t uptimeSeconds=millis()/1000;
-  v14Print(String("Wi-Fi подключён: ")+(staOk?"да":"нет"),17,103,V14_TEXT);
-  v14Print(String("Google: ")+(googleOk?"да":"нет"),17,123,V14_TEXT);
-  v14Print(String("ESP32 Wi-Fi: ")+(espApOk?"да":"нет"),17,143,V14_TEXT);
-  v14Print("Прошивка: V14.9",17,163,V14_TEXT);
+  v14Print(String("Wi-Fi подключён: ")+(staOk?"да":"нет"),17,91,V14_TEXT);
+  v14Print(String("Google: ")+(googleOk?"да":"нет"),17,113,V14_TEXT);
+  v14Print(String("ESP32 Wi-Fi: ")+(espApOk?"да":"нет"),17,135,V14_TEXT);
+  v14Print("Прошивка: V14.9",17,157,V14_TEXT);
   v14Print("Работа: "+String(uptimeSeconds/60)+" мин "+
-           String(uptimeSeconds%60)+" сек",17,183,V14_TEXT);
+           String(uptimeSeconds%60)+" сек",17,179,V14_TEXT);
 }
 static void v14Settings(bool layout){
- static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе"};
- if(!tftView){
-  // Vertical ordering matches UP/DOWN physical navigation: 1-2-3-4-5.
-  for(int i=0;i<5;i++){
-   const int x=8,y=53+i*30;
-   hqPanel(x,y,304,28);
-   if(i==approvedSettingsItem)screen->fillRoundRect(x+4,y+4,5,20,2,V14_ORANGE);
-   v14Print(names[i],x+21,y+19,V14_TEXT);
+  static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе"};
+  if(!tftView){
+    for(int i=0;i<5;i++){
+      const int x=8,y=26+i*36;
+      hqPanel(x,y,304,33);
+      if(i==approvedSettingsItem)screen->fillRoundRect(x+4,y+4,5,25,2,V14_ORANGE);
+      v14Print(names[i],x+21,y+22,V14_TEXT);
+    }
+    return;
   }
-  return;
- }
- // Child page occupies the Settings content area, never a floating popup.
- hqPanel(7,53,306,153);
- switch(approvedSettingsItem){
-  case 0: { // All four temperature calibration offsets are shown together.
-   v14Big("Температура",17,75,V14_TEXT);
-   screen->drawFastHLine(17,82,280,V14_RULE);
-   for(int i=0;i<4;i++){
-    const int y=87+i*28;
-    hqPanel(14,y,291,25);
-    if(i==calSensor){
-      screen->fillRoundRect(18,y+4,4,17,2,V14_ORANGE);
+  hqPanel(7,25,306,181);
+  switch(approvedSettingsItem){
+    case 0:{
+      v14Big("Температура",17,48,V14_TEXT);
+      screen->drawFastHLine(17,55,280,V14_RULE);
+      for(int i=0;i<4;i++){
+        const int y=68+i*33;
+        hqPanel(14,y,291,30);
+        if(i==calSensor)screen->fillRoundRect(18,y+4,4,22,2,V14_ORANGE);
+        const float offset=(calEditing&&i==calSensor)?calDraft:tempOffset[i];
+        const String correction=String(offset>=0?"+":"")+String(offset,1)+" °C";
+        v14Print("T"+String(i+1),29,y+21,V14_TEXT);
+        v14Print(correction,181,y+21,i==calSensor?V14_ORANGE:V14_TEXT);
+      }
+      break;
     }
-    const float offset=(calEditing&&i==calSensor)?calDraft:tempOffset[i];
-    const String correction=String(offset>=0?"+":"")+String(offset,1)+" °C";
-    v14Print("T"+String(i+1),29,y+17,V14_TEXT);
-    v14Print(correction,181,y+17,i==calSensor?V14_ORANGE:V14_TEXT);
-   }
-   break;
-  }
-  case 1: { // Search list and password belong to this same Wi-Fi child page.
-   v14Big("Wi-Fi",17,75,V14_TEXT);
-   screen->drawFastHLine(17,82,280,V14_RULE);
-   switch(wifiUiStage){
-    case WIFIUI_SCANNING:
-     v14Print("Поиск сети",24,110,V14_TEXT);
-     v14Print("Поиск...",24,142,V14_TEXT);
-     break;
-    case WIFIUI_NETWORKS: {
-     v14Print("Поиск сети",24,101,V14_TEXT);
-     const int start=(wifiUiIndex/4)*4;
-     for(int row=0;row<4;row++){
-       const int idx=start+row;
-       if(idx>=wifiUiCount)break;
-       const int y=108+row*22;
-       if(idx==wifiUiIndex){
-         screen->fillRoundRect(18,y+1,4,16,2,V14_ORANGE);
-       }
-       String ssid=wifiUiNetworks[idx];
-       if(ssid.length()>37)ssid=ssid.substring(0,34)+"...";
-       v14Print(ssid,27,y+15,V14_TEXT);
-     }
-     break;
+    case 1:{
+      v14Big("Wi-Fi",17,48,V14_TEXT);
+      screen->drawFastHLine(17,55,280,V14_RULE);
+      switch(wifiUiStage){
+        case WIFIUI_SCANNING:
+          v14Print("Поиск сети",24,87,V14_TEXT);
+          v14Print("Поиск...",24,132,V14_TEXT);break;
+        case WIFIUI_NETWORKS:{
+          v14Print("Поиск сети",24,76,V14_TEXT);
+          const int start=(wifiUiIndex/5)*5;
+          for(int row=0;row<5;row++){
+            const int idx=start+row;
+            if(idx>=wifiUiCount)break;
+            const int y=86+row*22;
+            if(idx==wifiUiIndex)screen->fillRoundRect(18,y+1,4,16,2,V14_ORANGE);
+            String ssid=wifiUiNetworks[idx];
+            if(ssid.length()>37)ssid=ssid.substring(0,34)+"...";
+            v14Print(ssid,27,y+15,V14_TEXT);
+          }
+          break;
+        }
+        case WIFIUI_PASSWORD:{
+          String ssid=wifiUiSelectedSsid;
+          if(ssid.length()>35)ssid=ssid.substring(0,32)+"...";
+          v14Print("Сеть: "+ssid,23,82,V14_TEXT);
+          v14Print("Регистр: "+String(wifiUiModeCaption()),23,111,V14_TEXT);
+          String masked=wifiUiPasswordMask();
+          if(masked.length()>32)masked="..."+masked.substring(masked.length()-29);
+          v14Print("Пароль: "+masked,23,140,V14_TEXT);
+          screen->fillRoundRect(20,166,277,29,4,V14_CARD);
+          v14Print("Сохранить",109,186,V14_TEXT);
+          break;
+        }
+        case WIFIUI_CONNECTING:
+          v14Print("Подключение...",23,93,V14_TEXT);
+          v14Print("Сеть: "+wifiUiSelectedSsid,23,131,V14_TEXT);break;
+        default:
+          screen->fillRoundRect(19,70,279,34,4,V14_CARD);
+          v14Print("Поиск сети",97,93,V14_TEXT);
+          if(WiFi.status()==WL_CONNECTED)v14Print("Подключено: "+WiFi.SSID(),23,131,V14_TEXT);
+          else v14Print("Нет подключения",23,131,V14_TEXT);
+          if(!wifiUiFeedback.isEmpty())v14Tiny(wifiUiFeedback,23,175,V14_TEXT);
+          break;
+      }
+      break;
     }
-    case WIFIUI_PASSWORD: {
-     String ssid=wifiUiSelectedSsid;
-     if(ssid.length()>35)ssid=ssid.substring(0,32)+"...";
-     v14Print("Сеть: "+ssid,23,104,V14_TEXT);
-     v14Print("Регистр: "+String(wifiUiModeCaption()),23,128,V14_TEXT);
-     String masked=wifiUiPasswordMask();
-     if(masked.length()>32)masked="..."+masked.substring(masked.length()-29);
-     v14Print("Пароль: "+masked,23,151,V14_TEXT);
-     // ENT saves without another confirmation and returns to Settings.
-     screen->fillRoundRect(20,173,277,26,4,V14_CARD);
-     v14Print("Сохранить",109,191,V14_TEXT);
-     break;
+    case 2:{
+      static const char* themeNames[]={"Светлая","Тёмная","Рисунок БУСА"};
+      v14Big("Выбор темы",17,48,V14_TEXT);
+      screen->drawFastHLine(17,55,280,V14_RULE);
+      v14Print(String("Выбрана: ")+themeNames[tftThemeMode],20,77,V14_TEXT);
+      for(int i=0;i<3;i++){
+        const int y=89+i*35;
+        hqPanel(19,y,278,31);
+        if(i==themeDraft)screen->fillRoundRect(23,y+5,4,21,2,V14_ORANGE);
+        v14Print(themeNames[i],36,y+21,V14_TEXT);
+      }
+      break;
     }
-    case WIFIUI_CONNECTING:
-     v14Print("Подключение...",23,113,V14_TEXT);
-     v14Print("Сеть: "+wifiUiSelectedSsid,23,143,V14_TEXT);
-     break;
+    case 3:
+      v14Big("Google",17,48,V14_TEXT);
+      screen->drawFastHLine(17,55,280,V14_RULE);
+      v14Print(googleEnabled?"Google: настроен":"Google: не настроен",23,103,V14_TEXT);
+      v14Print(String("Передача: ")+(googleState==5?"да":"нет"),23,141,V14_TEXT);
+      break;
     default:
-     screen->fillRoundRect(19,93,279,31,4,V14_CARD);
-     v14Print("Поиск сети",97,113,V14_TEXT);
-     if(WiFi.status()==WL_CONNECTED){
-       v14Print("Подключено: "+WiFi.SSID(),23,153,V14_TEXT);
-     }else{
-       v14Print("Нет подключения",23,153,V14_TEXT);
-     }
-     if(!wifiUiFeedback.isEmpty())v14Tiny(wifiUiFeedback,23,179,V14_TEXT);
-     break;
-   }
-   break;
+      v14Big("О системе",17,48,V14_TEXT);
+      screen->drawFastHLine(17,55,280,V14_RULE);
+      v14SystemInfoRows();
   }
-  case 2: { // A single "Select theme" screen, no deeper Settings submenu.
-   static const char* themeNames[]={"Светлая","Тёмная","Рисунок БУСА"};
-   v14Big("Выбор темы",17,75,V14_TEXT);
-   screen->drawFastHLine(17,82,280,V14_RULE);
-   v14Print(String("Выбрана: ")+themeNames[tftThemeMode],20,102,V14_TEXT);
-   for(int i=0;i<3;i++){
-     const int y=113+i*29;
-     hqPanel(19,y,278,27);
-     if(i==themeDraft)screen->fillRoundRect(23,y+5,4,18,2,V14_ORANGE);
-     v14Print(themeNames[i],36,y+19,V14_TEXT);
-   }
-   break;
-  }
-  case 3:
-   v14Big("Google",17,75,V14_TEXT);
-   screen->drawFastHLine(17,82,280,V14_RULE);
-   v14Print(googleEnabled?"Google: настроен":"Google: не настроен",23,114,V14_TEXT);
-   v14Print(String("Передача: ")+(googleState==5?"да":"нет"),23,142,V14_TEXT);
-   break;
-  default:
-   v14Big("О системе",17,75,V14_TEXT);
-   screen->drawFastHLine(17,82,280,V14_RULE);
-   v14SystemInfoRows();
- }
 }
 static void v14Diagnostics(bool layout){
- static const char* modules[]={"Экран TFT","Клавиатура","Реле K1-K4","Датчики T1-T4",
- "Wi-Fi / Google","ESP32","Расходомер"};
- if(!tftView){
-  for(int i=0;i<7;i++){
-   int x=4+(i%2)*158,y=53+(i/2)*38;
-   hqPanel(x,y,153,34);
-   if(i==diagModule)screen->fillRoundRect(x+3,y+3,4,28,2,V14_ORANGE);
-   v14Tiny(modules[i],x+14,y+20,V14_TEXT);
+  static const char* modules[]={"Экран TFT","Клавиатура","Реле K1-K4","Датчики T1-T4",
+    "Wi-Fi / Google","ESP32","Расходомер"};
+  if(!tftView){
+    for(int i=0;i<7;i++){
+      const int x=4+(i%2)*158,y=26+(i/2)*45;
+      hqPanel(x,y,153,41);
+      if(i==diagModule)screen->fillRoundRect(x+3,y+4,4,32,2,V14_ORANGE);
+      v14Tiny(modules[i],x+14,y+23,V14_TEXT);
+    }
+    return;
   }
-  return;
- }
- hqPanel(19,69,282,135);
- v14Print(String(modules[diagModule]),28,89,V14_TEXT);
- screen->drawFastHLine(28,98,263,V14_RULE);
- switch(diagModule){
-  case 0:
-   v14Tiny("ST7789 320x240 · SPI",28,121,V14_TEXT);
-   v14Tiny("Изображение: визуальный тест",28,148,V14_MUTED);
-   v14Tiny(tftStarted?"Запуск выполнен":"Не запущен",28,173,V14_BLUE);break;
-  case 1:
-   v14Tiny(pcfDetected?"PCF8575 0x20: отвечает":"PCF8575: нет связи",28,121,V14_TEXT);
-   v14Tiny(String("Карта 20: ")+(keypadReady?"сохранена":"нет"),28,145,V14_BLUE);
-   v14Tiny(String("Ошибка: ")+pcfScanError,28,170,V14_TEXT);break;
-  case 2:
-   for(int i=0;i<4;i++)
-    v14Tiny(String("K")+String(i+1)+": "+(busaSoundActive(i)?"ЗВУК":"ОЖИДАНИЕ"),
-     28+(i%2)*132,121+(i/2)*27,V14_TEXT);
-   v14Tiny("Физическое срабатывание: отдельно",28,181,V14_MUTED);break;
-  case 3:
-   for(int i=0;i<4;i++)
-    v14Tiny(String("T")+String(i+1)+": "+
-     (hasTemp(i,millis())?String(temperature[i],1)+" C":"Н/Д"),
-     28+(i%2)*132,121+(i/2)*27,V14_TEXT);
-   v14Tiny("Поправки: Настройки",28,181,V14_MUTED);break;
-  case 4:
-   v14Tiny(WiFi.status()==WL_CONNECTED?"Wi-Fi STA: да":"Wi-Fi STA: нет",28,122,V14_TEXT);
-   v14Tiny(googleEnabled?"Google: настроен":"Google: нет",28,146,V14_BLUE);
-   v14Tiny("AP: "+WiFi.softAPIP().toString(),28,171,V14_TEXT);break;
-  case 5:
-   v14Tiny("ESP32-S3 · 240 МГц",28,121,V14_TEXT);
-   v14Tiny("RAM: "+String(ESP.getFreeHeap()/1024)+" КБ",28,144,V14_BLUE);
-   v14Tiny("Uptime: "+String(millis()/60000)+" мин",28,170,V14_TEXT);break;
-  case 6:
-   v14Tiny("GPIO15 · YF-S401",28,121,V14_TEXT);
-   v14Tiny("Импульсы: "+String(flowPulses()),28,146,V14_BLUE);
-   v14Tiny("Калибровка: НЕТ",28,171,V14_MUTED);break;
- }
+  hqPanel(19,27,282,179);
+  v14Print(String(modules[diagModule]),28,50,V14_TEXT);
+  screen->drawFastHLine(28,57,263,V14_RULE);
+  switch(diagModule){
+    case 0:
+      v14Tiny("ST7789 320x240 · SPI",28,87,V14_TEXT);
+      v14Tiny("Изображение: визуальный тест",28,125,V14_MUTED);
+      v14Tiny(tftStarted?"Запуск выполнен":"Не запущен",28,168,V14_BLUE);break;
+    case 1:
+      v14Tiny(pcfDetected?"PCF8575 0x20: отвечает":"PCF8575: нет связи",28,87,V14_TEXT);
+      v14Tiny(String("Карта 20: ")+(keypadReady?"сохранена":"нет"),28,125,V14_BLUE);
+      v14Tiny(String("Ошибка: ")+pcfScanError,28,168,V14_TEXT);break;
+    case 2:
+      for(int i=0;i<4;i++)
+        v14Tiny(String("K")+String(i+1)+": "+(busaSoundActive(i)?"ЗВУК":"ОЖИДАНИЕ"),
+          28+(i%2)*132,100+(i/2)*40,V14_TEXT);
+      v14Tiny("Физическое срабатывание: отдельно",28,185,V14_MUTED);break;
+    case 3:
+      for(int i=0;i<4;i++)
+        v14Tiny(String("T")+String(i+1)+": "+
+          (hasTemp(i,millis())?String(temperature[i],1)+" C":"Н/Д"),
+          28+(i%2)*132,100+(i/2)*40,V14_TEXT);
+      v14Tiny("Поправки: Настройки",28,185,V14_MUTED);break;
+    case 4:
+      v14Tiny(WiFi.status()==WL_CONNECTED?"Wi-Fi STA: да":"Wi-Fi STA: нет",28,90,V14_TEXT);
+      v14Tiny(googleEnabled?"Google: настроен":"Google: нет",28,133,V14_BLUE);
+      v14Tiny("AP: "+WiFi.softAPIP().toString(),28,174,V14_TEXT);break;
+    case 5:
+      v14Tiny("ESP32-S3 · 240 МГц",28,90,V14_TEXT);
+      v14Tiny("RAM: "+String(ESP.getFreeHeap()/1024)+" КБ",28,133,V14_BLUE);
+      v14Tiny("Uptime: "+String(millis()/60000)+" мин",28,174,V14_TEXT);break;
+    case 6:
+      v14Tiny("GPIO15 · YF-S401",28,90,V14_TEXT);
+      v14Tiny("Импульсы: "+String(flowPulses()),28,133,V14_BLUE);
+      v14Tiny("Калибровка: НЕТ",28,174,V14_MUTED);break;
+  }
 }
 // Called on TFT startup, page switch, theme change or keypad action.
 void renderLandscape(uint32_t now){
@@ -560,7 +541,7 @@ void v14RefreshLive(uint32_t now){
     static uint32_t lastInfoRefresh=0;
     if(!lastInfoRefresh || (uint32_t)(now-lastInfoRefresh)>=1000){
       lastInfoRefresh=now;
-      screen->fillRect(15,87,283,105,HQ_DEEP);
+      screen->fillRect(15,82,283,109,HQ_DEEP);
       v14SystemInfoRows();
     }
   }
@@ -574,8 +555,8 @@ void v14RefreshLive(uint32_t now){
       v14Metric(v13Temp(i,now),21,27+i*44+37,94,hasTemp(i,now),HQ_NAVY);
   } else if(currentPage==1 && !editingTemp && !deleteConfirmPending){
     for(int i=0;i<4;i++){
-      int x=4+(i%2)*158,y=52+(i/2)*77;
-      v14Metric(v13Temp(i,now),x+11,y+40,133,hasTemp(i,now));
+      int x=4+(i%2)*158,y=25+(i/2)*92;
+      v14Metric(v13Temp(i,now),x+11,y+45,133,hasTemp(i,now));
     }
   }
   String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
