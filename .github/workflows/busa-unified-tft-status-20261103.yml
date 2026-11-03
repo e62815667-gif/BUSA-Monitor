@@ -102,7 +102,7 @@ jobs:
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
           ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert '#include "BUSA_KeypadTFT_UI.h"' in s
-          assert 'KEYBOARD14_8' in s
+          assert '14v8-N16R8-KEYBOARD-NVS-20261103' in s
           assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,80)' in ui
           assert 'WIFIUI_PASSWORD' in ui and 'wifiUiTypeDigit' in ui
           assert 'wifiUiModeCaption()' in ui and '"abc","ABC","123","SYM"' in ui
