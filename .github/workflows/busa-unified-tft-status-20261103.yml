@@ -1,15 +1,10 @@
-name: Build BUSA UNIFIED APP TFT N16R8 USB OTA
+name: Build BUSA 14.8 KEYBOARD N16R8 OTA preserves NVS
 on:
   push:
-    branches: [feature/busa-unified-tft-status-20261103]
+    branches: [feature/busa-keyboard-14v8-nvs-20261103]
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
-  pull_request:
-    branches: [fix/busa-local-ui-crisp-temp-icons-20261103]
-    paths:
-      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
-      - '.github/workflows/busa-unified-tft-status-20261103.yml'
   workflow_dispatch:
 permissions:
   contents: write
@@ -105,7 +100,17 @@ jobs:
           assert Path('assets/BUSA_approved_rig_276.webp').stat().st_size>10000
           assert 'validKeymap(newPairs)' in s and 'return r==5&&c==4;' in s
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
-          print('PASS Wi-Fi and 20-key primary+backup NVS restore regression checks')
+          ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
+          assert '#include "BUSA_KeypadTFT_UI.h"' in s
+          assert 'KEYBOARD14_8' in s
+          assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,80)' in ui
+          assert 'WIFIUI_PASSWORD' in ui and 'wifiUiTypeDigit' in ui
+          assert 'wifiUiModeCaption()' in ui and '"abc","ABC","123","SYM"' in ui
+          assert 'keypadDeferredZero' in s and 'wifiUiLongZero' in s
+          assert 'wifiUiDigitFromKey(k)>=0' in s
+          assert 'case 1:' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Landscape_V14.h').read_text()
+          assert 'case 1:' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
+          print('PASS Wi-Fi, 20-key NVS restore, numeric navigation, multi-tap keypad')
           PY
       - name: Verify both embedded and online JavaScript
         run: |
@@ -130,35 +135,21 @@ jobs:
         run: |
           mkdir -p out
           arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
-      - name: Generate full USB and OTA images
+      - name: Produce APP-ONLY OTA and USB-at-0x10000 image
         run: |
           set -euo pipefail
-          SDK="$HOME/.arduino15/packages/esp32"
-          python3 "$SDK/tools/esptool_py/4.5.1/esptool.py" --chip esp32s3 merge_bin --flash_mode dio --flash_freq 40m --flash_size 16MB -o out/BUSA_V14_7_UNIFIED_NETWORK_N16R8_FULL_USB.bin 0x0 out/BUSA_1M_WIFI_3v_GOOGLE.ino.bootloader.bin 0x8000 out/BUSA_1M_WIFI_3v_GOOGLE.ino.partitions.bin 0xe000 "$SDK/hardware/esp32/2.0.17/tools/partitions/boot_app0.bin" 0x10000 out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin
-          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_V14_7_UNIFIED_NETWORK_N16R8_APP_OTA.bin
-          (cd out && sha256sum BUSA_V14_7_UNIFIED_NETWORK_N16R8_FULL_USB.bin BUSA_V14_7_UNIFIED_NETWORK_N16R8_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_8_KEYBOARD_N16R8_OTA_NVS_SAFE.bin
+          (cd out && sha256sum BUSA_14_8_KEYBOARD_N16R8_OTA_NVS_SAFE.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('out')
-          a=(p/'BUSA_V14_7_UNIFIED_NETWORK_N16R8_APP_OTA.bin').read_bytes()
-          b=(p/'BUSA_V14_7_UNIFIED_NETWORK_N16R8_FULL_USB.bin').read_bytes()
-          assert 60000<len(a)<3000000 and b[0x10000:0x10000+len(a)]==a
-          print('Verified USB/OTA sizes',len(b),len(a))
-          PY
-      - name: Verify updater never overwrites NVS when flashing app-only
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          app=Path('out/BUSA_V14_7_UNIFIED_NETWORK_N16R8_APP_OTA.bin').read_bytes()
-          merged=Path('out/BUSA_V14_7_UNIFIED_NETWORK_N16R8_FULL_USB.bin').read_bytes()
-          assert merged[0x10000:0x10000+len(app)]==app
-          assert all(x==255 for x in merged[0x9000:0xE000]), "Unexpected merged NVS-area content"
-          print('PASS: APP_ONLY USB/OTA image flashes at 0x10000 without writing NVS at 0x9000')
+          p=Path('out/BUSA_14_8_KEYBOARD_N16R8_OTA_NVS_SAFE.bin')
+          assert 60000 < p.stat().st_size < 3000000
+          print('APP-ONLY',p.stat().st_size,'bytes; OTA or esptool write_flash at 0x10000')
+          print('Do NOT use erase_flash, merged/full USB or erase NVS; preserve both keys20 namespaces')
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_V14_7_UNIFIED_NETWORK_USB_OTA
+          name: BUSA_14_8_KEYBOARD_NVS_SAFE_OTA
           path: |
-            out/BUSA_V14_7_UNIFIED_NETWORK_N16R8_FULL_USB.bin
-            out/BUSA_V14_7_UNIFIED_NETWORK_N16R8_APP_OTA.bin
+            out/BUSA_14_8_KEYBOARD_N16R8_OTA_NVS_SAFE.bin
             out/SHA256SUMS.txt
