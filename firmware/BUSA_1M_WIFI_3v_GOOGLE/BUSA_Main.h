@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-LAYOUT2-NVS-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-TEMP-TABS-NVS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -564,6 +564,13 @@ bool tftDirty=true;
 float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
 // TFT temperature setpoints mirror the actual active sound threshold settings.
 int selectedTemp=0,selectedField=0;
+// Visual navigation order ONLY: T1 Water, T3 Cube, T2 Column, T4 Top.
+// Keep the physical sensor indices, GPIO, saved thresholds and telemetry unchanged.
+static const uint8_t tempMenuOrder[4]={0,2,1,3};
+int selectedTempOrderIndex(){
+  for(int i=0;i<4;i++)if(tempMenuOrder[i]==selectedTemp)return i;
+  return 0;
+}
 bool editingTemp=false;
 bool deleteConfirmPending=false; // Explicit confirmation for sound threshold removal
 String editTempBuffer="";
@@ -807,7 +814,7 @@ void keypadAction(int k){
     tftDirty=true;return;
   }
   if(k==15){ // ESC: close detail or go back
-    if(tftView){tftView=0;}
+    if(tftView){tftView=0;if(currentPage==1)selectedField=0;}
     else if(currentPage!=previousMainPage){
       uint8_t target=previousMainPage;
       previousMainPage=currentPage;currentPage=target;
@@ -818,17 +825,23 @@ void keypadAction(int k){
       if(saveTempOffset(calSensor,0.0f)){
         keyMessage="Поправка T"+String(calSensor+1)+" удалена";
       }else keyMessage="Ошибка сброса поправки";
-    }else if(currentPage==1){
+    }else if(currentPage==1 && tftView){
+      // Removal is available only inside the selected sensor's settings page.
       deleteConfirmPending=true;
       keyMessage=String("Удалить T")+String(selectedTemp+1)+
         (selectedField?" ВЫКЛ":" ВКЛ")+"? ENT/ESC";
     }
   }else if(k==7 || k==11){ // UP/DOWN: move within current section
     if(currentPage==1){
-      // Eight entries: T1 ON, T1 OFF, ... T4 ON, T4 OFF
-      int item=selectedTemp*2+selectedField;
-      item=(item+(k==7?7:1))%8;
-      selectedTemp=item/2;selectedField=item%2;
+      if(tftView){
+        // Sensor subpage: navigate between ON and OFF, without another popup.
+        selectedField=(selectedField+1)%2;
+      }else{
+        // Sensor index order: Water -> Cube -> Column -> Top.
+        const int pos=selectedTempOrderIndex();
+        selectedTemp=tempMenuOrder[(pos+(k==7?3:1))%4];
+        selectedField=0;
+      }
     }else if(currentPage==5){
       if(!tftView){
         approvedSettingsItem=(approvedSettingsItem+(k==7?4:1))%5;
@@ -850,11 +863,17 @@ void keypadAction(int k){
     moveApprovedTab(k==16?-1:+1);
   }else if(k==19){ // ENT: open selected element
     if(currentPage==1){
-      editingTemp=true;
-      float v=selectedField?noticeTemp[selectedTemp]:refTemp[selectedTemp];
-      editTempBuffer=isfinite(v)?String(v,1):String("");
-      editTempBuffer.replace('.',',');
-      editCursor=(uint8_t)editTempBuffer.length();
+      if(!tftView){
+        // First ENTER opens the chosen sensor's full inline settings page.
+        tftView=1;selectedField=0;
+      }else{
+        // Second ENTER edits the selected ON/OFF row in place.
+        editingTemp=true;
+        float v=selectedField?noticeTemp[selectedTemp]:refTemp[selectedTemp];
+        editTempBuffer=isfinite(v)?String(v,1):String("");
+        editTempBuffer.replace('.',',');
+        editCursor=(uint8_t)editTempBuffer.length();
+      }
     }else if(currentPage==0){
       navigatePage(1);
     }else if(currentPage==5){
