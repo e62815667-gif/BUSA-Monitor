@@ -387,6 +387,7 @@ static void v13Settings(uint32_t now,bool layout){
      }
    }
    break;
+  }
   case 2:{
    static const char* themes[]={"Светлая","Тёмная","Рисунок БУСА"};
    v13Text("Выбор темы",17,105,WHITE);
