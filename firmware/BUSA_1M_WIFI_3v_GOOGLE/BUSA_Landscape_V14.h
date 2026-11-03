@@ -380,7 +380,7 @@ static void v14SystemInfoRows(){
   v14Print(String("Wi-Fi подключён: ")+(staOk?"да":"нет"),17,103,V14_TEXT);
   v14Print(String("Google: ")+(googleOk?"да":"нет"),17,123,V14_TEXT);
   v14Print(String("ESP32 Wi-Fi: ")+(espApOk?"да":"нет"),17,143,V14_TEXT);
-  v14Print("Прошивка: V14.9",17,163,V14_TEXT);
+  v14Print("Прошивка: V15.0",17,163,V14_TEXT);
   v14Print("Работа: "+String(uptimeSeconds/60)+" мин "+
            String(uptimeSeconds%60)+" сек",17,183,V14_TEXT);
 }
@@ -460,11 +460,11 @@ static void v14Settings(bool layout){
      screen->fillRoundRect(19,93,279,31,4,V14_CARD);
      v14Print("Поиск сети",97,113,V14_TEXT);
      if(WiFi.status()==WL_CONNECTED){
-       v14Print("Подключено: "+WiFi.SSID(),23,153,V14_TEXT);
+       v14Print("Wi-Fi подключён",23,153,V14_TEXT);
      }else{
        v14Print("Нет подключения",23,153,V14_TEXT);
      }
-     if(!wifiUiFeedback.isEmpty())v14Tiny(wifiUiFeedback,23,179,V14_TEXT);
+     // Search is started with ENT; no obsolete connection-error banner.
      break;
    }
    break;
@@ -482,12 +482,22 @@ static void v14Settings(bool layout){
    }
    break;
   }
-  case 3:
+  case 3: {
    v14Big("Google",17,75,V14_TEXT);
    screen->drawFastHLine(17,82,280,V14_RULE);
-   v14Print(googleEnabled?"Google: настроен":"Google: не настроен",23,114,V14_TEXT);
-   v14Print(String("Передача: ")+(googleState==5?"да":"нет"),23,142,V14_TEXT);
+   v14Print(!busaGoogleSavedCredentials()?"Не настроено":
+     (googleEnabled?"Подключено":"Отключено"),23,105,V14_TEXT);
+   static const char* googleActions[]={"Подключить","Отключить"};
+   for(int i=0;i<2;i++){
+     const int y=117+i*33;
+     hqPanel(19,y,276,29);
+     if(i==googleUiChoice)screen->fillRoundRect(23,y+4,5,20,2,V14_ORANGE);
+     v14Print(googleActions[i],39,y+20,V14_TEXT);
+   }
+   if(!busaGoogleSavedCredentials())
+     v14Tiny("URL/токен: в приложении один раз",23,198,V14_TEXT);
    break;
+  }
   default:
    v14Big("О системе",17,75,V14_TEXT);
    screen->drawFastHLine(17,82,280,V14_RULE);
