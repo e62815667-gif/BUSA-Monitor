@@ -1,10 +1,18 @@
 {
-  "name": "БУСА-1М №001 — Онлайн",
-  "short_name": "БУСА Онлайн",
-  "start_url": "./index.html?v=crisp-vector-20261103",
+  "name": "БУСА-1М №001 — Монитор",
+  "short_name": "БУСА-1М",
+  "start_url": "./index.html?v=unified-20261103",
   "scope": "./",
   "display": "standalone",
   "background_color": "#0b1928",
   "theme_color": "#031427",
-  "lang": "ru"
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "./busa-approved-rig.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
 }
