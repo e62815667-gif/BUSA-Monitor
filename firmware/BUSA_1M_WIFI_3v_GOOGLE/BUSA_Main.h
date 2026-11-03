@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-KEYRESTORE-APPROVED-UI-UNIFIED-STATUS-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-KEYRESTORE-APPROVED-UI-REMOTE-ALARMS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1134,6 +1134,7 @@ String quoteJson(const String &x){
 }
 String otaJSON(); // forward declaration
 #include "BUSA_SoundAlarms.h"
+#include "BUSA_RemoteAlarm.h"
 // Shared TFT/editor setpoint writer; controls sound notifications only.
 bool storeTempReference(int sensor,int field,float value){
   if(sensor<0||sensor>3||field<0||field>1||(isfinite(value)&&(value<0||value>125)))return false;
@@ -1204,6 +1205,7 @@ String statusJSON(){
   }
   s+="]";
   s+=",\"sound_alerts\":"+soundJSON(now);
+  s+=",\"remote_alarm\":"+busaRemoteAlarmJSON();
   s+=",\"temperatures\":[";
   for(int i=0;i<4;i++){
     if(i)s+=",";
@@ -2532,6 +2534,7 @@ void setup(){
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   prefs.begin("busa-r04",false);
+  busaRemoteAlarmInit();
   keypadBackupOpen=keypadBackupPrefs.begin("busa-key20",false);
   // User-approved ST7789 320x240 rotation 1 and software-drawn light theme.
   if(!prefs.getBool("v14lightSt",false)){
@@ -3080,6 +3083,7 @@ void loop(){
   if(otaActive){soundOutputsOff();delay(0);return;}
   if(tftRebootPending && elapsed(now,tftRebootAt,3000)){soundOutputsOff();ESP.restart();}
   if(googleRestart && elapsed(now,googleRestartAt,3500)){soundOutputsOff();ESP.restart();}
+  busaRemoteAlarmApply(); // remote sound thresholds only; writes NVS in main loop
   {const uint32_t started=millis();sampleTemperatures(now);busaObserve("TEMP",started,busaTempWorstMs);}
   {const uint32_t started=millis();probeOneWire(now);busaObserve("ONEWIRE",started,busaOneWireWorstMs);} // Diagnose on idle 1-Wire bus only
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
