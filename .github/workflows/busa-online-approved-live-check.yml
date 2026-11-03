@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate approved remote UI, existing view-only Google flow, and HTML
+      - name: Validate approved remote UI, persistent credentials, sound threshold editor, and HTML
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -55,11 +55,12 @@ jobs:
           assert 'function invalidateStaleRemote()' in js
           assert 'НЕТ ДАТЧИКА ОТБОРА' in js
           assert 'WIFI_POWER_19_5dBm' not in html
+          assert 'remoteAlarmSave' in p.ids and 'remoteAlarmShowCommandStatus(data)' in js
           assert 'server.on(' not in js
           sw=Path('online/sw.js').read_text()
-          assert 'v5-approved-live' in sw
+          assert 'busa-unified-online-v9-remote-alarms-20261103' in sw
           assert 'network' not in sw or 'fetch(req)' in sw
-          print('PASS online six tabs, remote view-only connection, 2 graph modes, current/stale data and JS file extraction')
+          print('PASS unified BUSA PWA, remote alarm editor, persistent Google access and approved 6-tab layout')
           PY
       - name: Check all embedded JavaScript
         run: node --check /tmp/busa-online-approved.js
