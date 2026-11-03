@@ -83,7 +83,7 @@ jobs:
           assert 'request.setTimeout(10000)' in google
           assert 'if(busaWifiScanRunning)continue;' in google
           assert 'googleInternet=1;googleDns=1;' in google
-          assert 'WIFI_SCAN_FAILED' in ui
+          assert 'WIFI_SCAN_FAILED' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert 'KPIN[4]={7,6,5,4}' in s
           assert 'BUSA_TFT_LIVE_REFRESH_MS=200' in s
           assert 'keypadBackupOpen=keypadBackupPrefs.begin("busa-key20",false)' in s
