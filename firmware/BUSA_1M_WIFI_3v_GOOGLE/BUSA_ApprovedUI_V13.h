@@ -1,4 +1,5 @@
 #pragma once
+extern volatile int googleState,googleInternet,googleHttp;
 // BUSA-1M-001 V13: approved six-page portrait interface on a passive 240x320 TFT.
 // Visual layout based on the approved 20.10.2026 mockup.
 // Values are real measurements or explicitly unavailable/uncalibrated.
@@ -397,7 +398,7 @@ static void v13Settings(uint32_t now,bool layout){
    const uint32_t secs=millis()/1000;
    v13Text(String("Wi-Fi подключён: ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),17,112,WHITE);
    v13Text(String("Google: ")+(googleOk?"да":"нет"),17,143,WHITE);
-   v13Text(String("ESP32 Wi-Fi: ")+(wifiRunning?"да":"нет"),17,174,WHITE);
+   v13Text(String("ESP32 Wi-Fi: ")+((WiFi.getMode()==WIFI_AP || WiFi.getMode()==WIFI_AP_STA)?"да":"нет"),17,174,WHITE);
    v13Text("Прошивка: V14.9",17,205,WHITE);
    v13Text("Работа: "+String(secs/60)+" мин "+String(secs%60)+" сек",17,236,WHITE);
   }
