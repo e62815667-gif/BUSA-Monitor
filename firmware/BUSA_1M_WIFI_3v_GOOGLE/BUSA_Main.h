@@ -2989,67 +2989,92 @@ void setup(){
     server.send(otaSuccess?200:400,"application/json",otaJSON());
   },uploadOTA);
   server.on("/api/wifi/scan",HTTP_GET,[]{
-    if(server.client().localIP()!=WiFi.softAPIP()){
+    if(!apClient()){
       server.send(403,"application/json","{\"error\":\"Only protected local AP\"}");return;
     }
     const uint32_t now=millis();
-    // TFT and web UI share one radio / scan-result buffer. Never let a
-    // browser polling for scans consume+delete the result of the TFT scan.
     if(wifiUiOwnsScan || (wifiUiStage==WIFIUI_SCANNING && wifiUiScanRetryAt)){
-      server.send(409,"application/json",
-        "{\"scanning\":true,\"error\":\"tft_scan_active\",\"networks\":[]}");return;
+      server.send(409,"application/json","{\"error\":\"tft_scan_active\"}");return;
     }
     if(server.hasArg("start") && server.arg("start")=="1"){
-      // A STA scan shares one 2.4-GHz radio with the local AP.
-      // One short passive scan per request, bounded to avoid lengthy AP stalls.
-      if(busaWifiScanRunning){
-        server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
-      }
-      if(busaGoogleNetworkBusy){
-        server.send(503,"application/json","{\"scanning\":false,\"error\":\"google_upload_active\",\"networks\":[]}");return;
-      }
-      if(busaWifiScanLastAt && !elapsed(now,busaWifiScanLastAt,5000)){
-        server.send(429,"application/json","{\"scanning\":false,\"error\":\"repeat_too_soon\",\"networks\":[]}");return;
-      }
-      // Restore AP+STA if the STA part was disabled by a previous station
-      // disconnect, without ever disabling the BUSA access point.
-      if(WiFi.getMode()!=WIFI_AP_STA && !WiFi.mode(WIFI_AP_STA)){
-        server.send(503,"application/json",
-          "{\"scanning\":false,\"error\":\"sta_unavailable\",\"networks\":[]}");return;
-      }
-      WiFi.scanDelete();
-      busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
-      const int started=WiFi.scanNetworks(true,false,false,120);
-      busaWifiScanRunning=(started==WIFI_SCAN_RUNNING);
-      if(started==WIFI_SCAN_FAILED){
-        busaWifiScanRunning=false;
-        server.send(503,"application/json","{\"scanning\":false,\"error\":\"scan_failed\",\"networks\":[]}");return;
-      }
-    }
-    int n=WiFi.scanComplete();
-    if(n==WIFI_SCAN_RUNNING){
-      if(busaWifiScanRunning && elapsed(now,busaWifiScanStartedAt,9000)){
-        WiFi.scanDelete();busaWifiScanRunning=false;
-        server.send(504,"application/json","{\"scanning\":false,\"error\":\"scan_timeout\",\"networks\":[]}");return;
+      if(!busaWifiScanRunning){
+        if(otaActive || busaGoogleNetworkBusy){
+          server.send(503,"application/json","{\"error\":\"network_busy\"}");return;
+        }
+        if(busaWifiScanLastAt && !elapsed(now,busaWifiScanLastAt,4000)){
+          server.send(429,"application/json","{\"error\":\"repeat_too_soon\"}");return;
+        }
+        if(WiFi.getMode()!=WIFI_AP_STA && !WiFi.mode(WIFI_AP_STA)){
+          server.send(503,"application/json","{\"error\":\"sta_unavailable\"}");return;
+        }
+        WiFi.scanDelete();
+        busaWebScanResumeSTA=!wifiUiStaDisabled && WiFi.status()==WL_CONNECTED &&
+          stationSsid.length() && stationPass.length()>=8;
+        if(WiFi.status()==WL_CONNECTED){
+          WiFi.setAutoReconnect(false);
+          WiFi.disconnect(false,false); // STA only, BUSA softAP remains ON
+        }
+        busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
+        busaWebScanAttempts=0;busaWebScanPassive=false;
+        busaWebScanStartDueAt=now+650;busaWebScanPending=true;
+        busaWifiScanRunning=true;
       }
       server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
     }
-    if(n==WIFI_SCAN_FAILED){
-      busaWifiScanRunning=false;
-      server.send(503,"application/json","{\"scanning\":false,\"error\":\"scan_failed\",\"networks\":[]}");return;
+    // A scan is conducted asynchronously by the radio, NOT in the HTTP request.
+    // The browser polls until complete; a disappeared browser is recovered by
+    // loop() timeout after 27 sec to keep Google transmission alive.
+    if(!busaWifiScanRunning){
+      server.send(200,"application/json","{\"scanning\":false,\"networks\":[],\"error\":\"scan_not_started\"}");return;
     }
-    busaWifiScanRunning=false;
+    if(busaWebScanPending){
+      if((int32_t)(now-busaWebScanStartDueAt)<0){
+        server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
+      }
+      busaWebScanPending=false;busaWebScanStartDueAt=0;
+      ++busaWebScanAttempts;
+      WiFi.scanDelete();
+      WiFi.setSleep(false);
+      int started=busaWebScanPassive?
+        WiFi.scanNetworks(true,true,true,350):
+        WiFi.scanNetworks(true,true,false,180);
+      if(started==WIFI_SCAN_FAILED){
+        if(busaWebScanAttempts<2){
+          busaWebScanPassive=true;busaWebScanPending=true;
+          busaWebScanStartDueAt=now+900;
+          server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
+        }
+        busaWebScanFinish();
+        server.send(503,"application/json","{\"error\":\"scan_failed\"}");return;
+      }
+    }
+    const int n=WiFi.scanComplete();
+    if(n==WIFI_SCAN_RUNNING){
+      server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
+    }
+    if(n<=0){
+      WiFi.scanDelete();
+      if(busaWebScanAttempts<2){
+        busaWebScanPassive=true;busaWebScanPending=true;
+        busaWebScanStartDueAt=now+900;
+        server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
+      }
+      busaWebScanFinish();
+      if(n==0)server.send(200,"application/json","{\"scanning\":false,\"networks\":[]}");
+      else server.send(503,"application/json","{\"error\":\"scan_failed\"}");
+      return;
+    }
     nearbyCount=0;
-    for(int i=0;i<n && nearbyCount<5;i++){
-      if(WiFi.SSID(i).length()>0)nearbyNames[nearbyCount++]=WiFi.SSID(i);
-    }
+    for(int i=0;i<n && nearbyCount<5;i++)
+      if(WiFi.SSID(i).length())nearbyNames[nearbyCount++]=WiFi.SSID(i);
     String out="{\"scanning\":false,\"networks\":[";
-    for(int i=0;i<n&&i<28;i++){
+    for(int i=0;i<n && i<35;i++){
       if(i)out+=",";
       out+="{\"ssid\":"+quoteJson(WiFi.SSID(i));
       out+=",\"rssi\":"+String(WiFi.RSSI(i))+"}";
     }
-    out+="]}";WiFi.scanDelete();
+    out+="]}";
+    busaWebScanFinish(); // restore only previous STA, never change the AP
     server.send(200,"application/json; charset=utf-8",out);
   });
   server.on("/api/wifi",HTTP_POST,[]{
