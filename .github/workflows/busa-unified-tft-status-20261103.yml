@@ -1,7 +1,7 @@
-name: Build BUSA 15.0 Wi-Fi Google TFT N16R8 OTA preserves NVS
+name: Build BUSA 15.0 APFIX-R2 Wi-Fi Scan N16R8 OTA + USB
 on:
   push:
-    branches: [feature/busa-v15-0-wifi-google-tft-20261103, fix/busa-v15-0-ap-recovery-20261103]
+    branches: [feature/busa-v15-0-wifi-google-tft-20261103, fix/busa-v15-0-ap-recovery-20261103, fix/busa-v15-0-wifi-scan-r2-20261103]
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
@@ -81,7 +81,7 @@ jobs:
           assert 'lastNetProbe' not in google and 'probe.connect(' not in google
           assert 'request.setConnectTimeout(8000)' in google
           assert 'request.setTimeout(10000)' in google
-          assert 'busaWifiScanRunning||busaStaSwitchPending||busaStaSwitching' in google
+          assert 'busaWifiScanRunning||wifiUiScanPending||wifiUiOwnsScan' in google
           assert 'googleInternet=1;googleDns=1;' in google
           assert 'WIFI_SCAN_FAILED' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert 'KPIN[4]={7,6,5,4}' in s
@@ -103,7 +103,7 @@ jobs:
           ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert '#include "BUSA_KeypadTFT_UI.h"' in s
           assert '15v0-N16R8-WIFI-GOOGLE-TFT-NVS-20261103' in s
-          assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,160)' in ui
+          assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,180)' in ui
           assert 'WIFIUI_PASSWORD' in ui and 'wifiUiTypeDigit' in ui
           assert 'wifiUiModeCaption()' in ui and '"abc","ABC","123","SYM"' in ui
           assert 'keypadDeferredZero' in s and 'wifiUiLongZero' in s
@@ -126,7 +126,7 @@ jobs:
           assert 'saveTempOffset(calSensor,0.0f)' in s
           assert 'KEY_CAPS[20]' in s and 'loadKeymap();' in s
           assert 'wifiUiScanJSON()' in s
-          assert 'wifiUiScanJSON()' in ui and 'wifiUiRetries<2' in ui
+          assert 'wifiUiScanJSON()' in ui and 'WIFIUI_MAX_SCAN_ATTEMPTS=3' in ui
           assert 'wifiUiScanPending=true' in ui
           assert 'get(\'googleStart\').onclick' in s
           assert 'googleUiChoice' in s and 'busaGoogleUiToggle(enable)' in s
@@ -144,7 +144,7 @@ jobs:
           assert 'busaStaSwitchPending' in google and 'busaStaSwitching' in google
           assert 'WiFi.reconnect()' not in s
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
-          assert 'APFIX-R1' in s
+          assert 'APFIX-R2' in s and 'server.on("/api/wifi/disconnect"' in s
           assert 'googleUiChoice' in land and 'googleUiChoice' in portrait
           assert 'g-token' in google and 'g-url' in google
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
@@ -203,7 +203,7 @@ jobs:
           assert package['boot_app0.bin'].stat().st_size<=0x2000
           assert 60000<package['app.bin'].stat().st_size<0x300000
           instructions=(
-            'BUSA 15.0 APFIX-R1 — USB recovery for ESP32-S3 N16R8\n'
+            'BUSA 15.0 APFIX-R2 — USB recovery for ESP32-S3 N16R8\n'
             'Preserve NVS. Do not use erase_flash, full/merged BIN or overwrite 0x9000.\n'
             'Install esptool: python -m pip install esptool==4.7.0\n'
             'Disconnect any external high-power loads. Use reliable USB/data cable.\n'
@@ -213,7 +213,7 @@ jobs:
           )
           bat=('@echo off\r\nsetlocal\r\nset \"PORT=%~1\"\r\nif \"%PORT%\"==\"\" set \"PORT=COM8\"\r\npython -m esptool --chip esp32s3 --port %PORT% --baud 460800 --before default_reset --after hard_reset write_flash --flash_mode dio --flash_freq 40m --flash_size 16MB 0x0 bootloader.bin 0x8000 partitions.bin 0xe000 boot_app0.bin 0x10000 app.bin\r\npause\r\n')
           sums=''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+name+'\n' for name,p in package.items())
-          archive=root/'BUSA_15_0_APFIX_R1_USB_RECOVERY_KEEP_NVS.zip'
+          archive=root/'BUSA_15_0_APFIX_R2_USB_RECOVERY_KEEP_NVS.zip'
           with zipfile.ZipFile(archive,'w',compression=zipfile.ZIP_DEFLATED) as z:
             for name,p in package.items():z.write(p,name)
             z.writestr('README.txt',instructions)
@@ -226,8 +226,8 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_15_0_WIFI_GOOGLE_NVS_SAFE_OTA
+          name: BUSA_15_0_APFIX_R2_SCAN_FIX_OTA_USB
           path: |
             out/BUSA_15_0_WIFI_GOOGLE_N16R8_OTA_NVS_SAFE.bin
-            out/BUSA_15_0_APFIX_R1_USB_RECOVERY_KEEP_NVS.zip
+            out/BUSA_15_0_APFIX_R2_USB_RECOVERY_KEEP_NVS.zip
             out/SHA256SUMS.txt
