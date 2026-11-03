@@ -1,7 +1,7 @@
-name: Build BUSA 14.9 temperature vertical and PSRAM flickerless TFT N16R8 OTA
+name: Build BUSA 14.9 Wi-Fi five-item menu STA-only disconnect always-on AP N16R8 OTA
 on:
   push:
-    branches: [fix/busa-v14-9-temp-vertical-no-flicker-20261103]
+    branches: [fix/busa-v14-9-wifi-menu-radio-off-20261103]
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
@@ -51,7 +51,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          assert '14v9-N16R8-TEMP-VERTICAL-PSRAM-NVS-20261103' in s
+          assert '14v9-N16R8-WIFI-MENU-STA-NVS-20261103' in s
           assert 'busaRemoteAlarmApply()' in s and 'busaRemoteAlarmJSON()' in s
           remote=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_RemoteAlarm.h').read_text()
           assert 'portENTER_CRITICAL' in remote
@@ -151,9 +151,26 @@ jobs:
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
           ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert '#include "BUSA_KeypadTFT_UI.h"' in s
-          assert '14v9-N16R8-TEMP-VERTICAL-PSRAM-NVS-20261103' in s
+          assert '14v9-N16R8-WIFI-MENU-STA-NVS-20261103' in s
           assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,80)' in ui
           assert 'WIFIUI_PASSWORD' in ui and 'wifiUiTypeDigit' in ui
+          assert 'wifiUiMenuIndex=0' in ui and 'wifiUiMenuIndex=(wifiUiMenuIndex+' in ui
+          assert 'wifiUiRequestStationDisconnect' in ui
+          assert 'WiFi.disconnect(false,false)' in ui
+          assert 'WiFi.setAutoReconnect(false)' in ui
+          assert 'WiFi.mode(WIFI_OFF)' not in ui and 'WiFi.softAPdisconnect' not in ui
+          assert 'wifiUiRadioOff' not in ui and 'wifiUiTemporaryRadio' not in ui
+          assert 'prefs.putBool("staOff",true)' in ui and 'prefs.putBool("staOff",false)' in ui
+          assert 'wifiUiStaDisabled=false' in ui
+          assert 'wifiUiLeave()' in s
+          assert 'wifiUiStaDisabled=prefs.getBool("staOff",false)' in s
+          assert 'if(!wifiUiStaDisabled && stationSsid.length()' in s
+          assert 'STA manually disabled in NVS; BUSA softAP remains ON' in s
+          assert 'WiFi.mode(WIFI_AP_STA)' in s
+          assert 'WiFi.softAP("BUSA-1M-001-R04"' in s
+          assert 'if(approvedSettingsItem==1)wifiUiBeginScan()' not in s
+          assert 'sta_disabled_by_user' in s
+          assert 'wifiUiStaDisabled || wifiUiDisablePending' in google
           assert 'wifiUiModeCaption()' in ui and '"abc","ABC","123","SYM"' in ui
           assert 'keypadDeferredZero' in s and 'wifiUiLongZero' in s
           assert 'wifiUiDigitFromKey(k)>=0' in s
@@ -162,7 +179,9 @@ jobs:
           land=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Landscape_V14.h').read_text()
           portrait=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
           assert 'i<4;i++' in land and 'calDraft:tempOffset[i]' in land
-          assert '"Поиск сети"' in land and '"Сохранить"' in land
+          assert '"Поиск сети Wi-Fi"' in land and '"Сохранить подключение"' in land
+          assert '"Отключить внешнюю сеть"' in land and '"AP БУСА: ВКЛ"' in land
+          assert 'wifiUiMenuIndex==i' in land and 'wifiUiStage==WIFIUI_NETWORKS' in land
           assert '"Рисунок БУСА"' in land and 'themeNames[tftThemeMode]' in land
           assert 'v14SystemInfoRows()' in land and 'u' not in []
           assert 'Wi-Fi подключён: ' in land and 'ESP32 Wi-Fi: ' in land
@@ -202,18 +221,18 @@ jobs:
       - name: Produce APP-ONLY OTA and USB-at-0x10000 image
         run: |
           set -euo pipefail
-          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_TEMP_VERTICAL_NO_FLICKER_APP_OTA.bin
-          (cd out && sha256sum BUSA_14_9_TEMP_VERTICAL_NO_FLICKER_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_WIFI_MENU_STA_ONLY_APP_OTA.bin
+          (cd out && sha256sum BUSA_14_9_WIFI_MENU_STA_ONLY_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('out/BUSA_14_9_TEMP_VERTICAL_NO_FLICKER_APP_OTA.bin')
+          p=Path('out/BUSA_14_9_WIFI_MENU_STA_ONLY_APP_OTA.bin')
           assert 60000 < p.stat().st_size < 3000000
           print('APP-ONLY',p.stat().st_size,'bytes; OTA or esptool write_flash at 0x10000')
           print('Do NOT use erase_flash, merged/full USB or erase NVS; preserve both keys20 namespaces')
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_14_9_TEMP_VERTICAL_NO_FLICKER_APP_OTA
+          name: BUSA_14_9_WIFI_MENU_STA_ONLY_APP_OTA
           path: |
-            out/BUSA_14_9_TEMP_VERTICAL_NO_FLICKER_APP_OTA.bin
+            out/BUSA_14_9_WIFI_MENU_STA_ONLY_APP_OTA.bin
             out/SHA256SUMS.txt
