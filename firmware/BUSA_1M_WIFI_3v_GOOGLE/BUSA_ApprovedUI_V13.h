@@ -72,8 +72,14 @@ static void v13Frame(uint32_t now){
   screen->fillScreen(BG);
   screen->fillRect(0,0,240,28,PANEL);
   v13Line(0,27,240);
-  v13Text("БУСА-1М №001",6,18,WHITE);
-  screen->fillCircle(229,11,5,WiFi.getMode()!=WIFI_OFF?GREEN:V13_RED);
+  v13Text("БУСА-1М",6,18,WHITE);
+  // Portrait: compact W/G/E legend (Wi-Fi, Google, ESP32) to preserve the clock.
+  screen->fillCircle(76,11,3,WiFi.status()==WL_CONNECTED?GREEN:V13_RED);
+  v13Text("W",81,18,WHITE);
+  screen->fillCircle(101,11,3,(googleEnabled&&googleInternet==1&&(googleHttp==200||googleHttp==302))?GREEN:V13_RED);
+  v13Text("G",106,18,WHITE);
+  screen->fillCircle(125,11,3,WiFi.softAPgetStationNum()>0?GREEN:V13_RED);
+  v13Text("E",130,18,WHITE);
   // Local STA status and clock; never infer that the AP is connected to the Internet.
   v13Text(deviceClockValid()?clockStamp(true):"--:--",165,18,GRAY);
   const char* tab[]={"Глав","Темп","Отбор","Граф","Событ","Настр","Диаг"};
@@ -384,6 +390,10 @@ void renderPortrait(uint32_t now){
     case 6:v13Diagnostics(now,layout);break;
     default:break;
   }
+  // Refresh status dots with no full-screen redraw, preserving W/G/E labels.
+  screen->fillCircle(76,11,3,WiFi.status()==WL_CONNECTED?GREEN:V13_RED);
+  screen->fillCircle(101,11,3,(googleEnabled&&googleInternet==1&&(googleHttp==200||googleHttp==302))?GREEN:V13_RED);
+  screen->fillCircle(125,11,3,WiFi.softAPgetStationNum()>0?GREEN:V13_RED);
   // Update clock without repainting the whole UI.
   screen->fillRect(162,5,60,19,PANEL);
   v13Text(deviceClockValid()?clockStamp(true):"--:--",165,18,WHITE);

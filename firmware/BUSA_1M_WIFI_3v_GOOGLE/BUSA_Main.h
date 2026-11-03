@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-KEYRESTORE-APPROVED-UI-RIG-ICONS-FIX-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-KEYRESTORE-APPROVED-UI-REMOTE-ALARMS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1095,6 +1095,7 @@ void darkenTftDisplay(){
  // Portrait-specific layout prevents 320px-wide landscape cards from clipping at 240px.
 bool busaSoundEnabled(uint8_t i); bool busaSoundActive(uint8_t i);
 extern volatile bool googleEnabled; // Google status read by both TFT renderers
+extern volatile int googleInternet,googleHttp; // TFT indicators; definitions in Google module
 #include "BUSA_ApprovedUI_V13.h"
 
 #include "BUSA_ApprovedGraphics_HQ_V14.h"
@@ -1133,6 +1134,7 @@ String quoteJson(const String &x){
 }
 String otaJSON(); // forward declaration
 #include "BUSA_SoundAlarms.h"
+#include "BUSA_RemoteAlarm.h"
 // Shared TFT/editor setpoint writer; controls sound notifications only.
 bool storeTempReference(int sensor,int field,float value){
   if(sensor<0||sensor>3||field<0||field>1||(isfinite(value)&&(value<0||value>125)))return false;
@@ -1203,6 +1205,7 @@ String statusJSON(){
   }
   s+="]";
   s+=",\"sound_alerts\":"+soundJSON(now);
+  s+=",\"remote_alarm\":"+busaRemoteAlarmJSON();
   s+=",\"temperatures\":[";
   for(int i=0;i<4;i++){
     if(i)s+=",";
@@ -1522,13 +1525,15 @@ main>*{max-width:100%;min-width:0}
 @media(min-width:650px){.appTabs{max-width:620px;margin:auto;border-left:1px solid var(--line);border-right:1px solid var(--line)}}
 @media(max-width:350px){.appTabs button{font-size:9px!important}.tabIcon{font-size:16px}.card{padding:10px}}
 
-/* Two always-visible independent network badges; fixed colors in every theme. */
+/* Three independent network badges; red disconnected, green connected. */
 .netIndicators{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:5px auto 3px;max-width:620px;font-size:11px;line-height:1.3}
 .netPill{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--line);background:var(--surface);border-radius:8px;font-weight:700;color:var(--ink);max-width:100%}
 .netDot{display:inline-block;width:10px;height:10px;flex:0 0 10px;border-radius:50%;background:#d33a32;box-shadow:0 0 0 1px #73737355}
-.netDot.internetOn{background:#13a44c}.netDot.localOn{background:#168de3}
+.netDot.internetOn,.netDot.localOn,.netDot.googleOn{background:#13a44c}
 .netText{font-size:10px;font-weight:500;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:145px}
 
+.busaWifiMode{padding:10px 0;border-top:1px solid var(--line)}
+.busaWifiMode h3{font-size:14px;margin:5px 0 8px}
 /* SYSTEM THEME: mirror the approved BUSA public online monitor UI.
    Palette values are copied from online/index.html in main on 2026-11-02.
    This is strictly presentation; existing local operations stay unchanged. */
@@ -1812,9 +1817,10 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
 <span class="readOnlyLabel">● МОНИТОРИНГ</span></div>
 <div id="clockDisplay" class="clockBar" aria-live="off">Время синхронизируется…</div>
-<div class="netIndicators" role="status" aria-label="Два подключения БУСА">
-<span class="netPill"><span id="internetLed" class="netDot"></span>ИНТЕРНЕТ <span id="internetLabel" class="netText">нет связи</span></span>
-<span class="netPill"><span id="localLed" class="netDot"></span>БУСА Wi-Fi <span id="localLabel" class="netText">нет клиента</span></span>
+<div class="netIndicators" role="status" aria-label="Три подключения БУСА">
+<span class="netPill"><span id="internetLed" class="netDot"></span>Wi-Fi <span id="internetLabel" class="netText">ОТКЛ</span></span>
+<span class="netPill"><span id="googleLed" class="netDot"></span>Google <span id="googleLabel" class="netText">ОТКЛ</span></span>
+<span class="netPill"><span id="localLed" class="netDot"></span>ESP32 <span id="localLabel" class="netText">ОТКЛ</span></span>
 </div>
 <nav class="appTabs" aria-label="Шесть разделов БУСА"><button data-page="0" class="on"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-7h6v7"/></svg><span>Главная</span></button>
 <button data-page="1"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg><span>Температуры</span></button>
@@ -1908,12 +1914,16 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <p id="tempCalResult" role="status" class="hint">—</p></div>
 
 <div class="card settingCard" data-stab="1" hidden><h2>Wi-Fi</h2>
+<div class="busaWifiMode"><h3>ESP32 · локальная сеть</h3>
+<div id="espAPStatus">Проверка сети ESP32…</div>
+<p class="hint">Точка доступа БУСА для локального просмотра и настройки порогов звуковых оповещений.</p></div>
+<div class="busaWifiMode"><h3>Wi-Fi · роутер с интернетом</h3>
 <div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select>
 <p class="hint">Выбери найденную сеть из списка, введи пароль и нажми «Сохранить и подключить».</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
-<p id="response" role="status"></p><p class="hint">Настройка доступна только в защищённой локальной сети БУСА. Пароль хранится на ESP32.</p></div>
+<p id="response" role="status"></p><p class="hint">Настройка доступна только в локальной сети ESP32. Пароль хранится на контроллере.</p></div></div>
 
 <div class="card settingCard" data-stab="2" hidden><h2>Экран</h2>
 <p class="hint">Три темы: светлая, тёмная и системная с утверждёнными рисунками. Драйвер и распиновка не меняются.</p>
@@ -2010,13 +2020,16 @@ let busaGraphData={temperature:[[],[],[],[]],water_pulses:[]},busaGraphFetchedAt
 let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=false,calInitialized=false;
 let active=0,connected=false,pollBusy=false,statusFailures=0,settingsActive=-1,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
-function networkLeds(info,ssid){
- const online=info&&info.internet===true;
- const local=info&&info.local_client===true;
- get('internetLed').classList.toggle('internetOn',!!online);
- get('localLed').classList.toggle('localOn',!!local);
- get('internetLabel').textContent=online?(ssid||'есть сеть'):'нет связи';
- get('localLabel').textContent=local?'клиент подключён':'нет клиента';
+function networkLeds(info,station,google){
+ const wifi=station?.connected===true,local=info?.local_client===true;
+ // 302 means Apps Script accepted the POST redirect; do not treat "configured" as proof.
+ const cloud=google?.configured===true&&info?.internet===true&&[200,302].includes(google?.http);
+ get('internetLed').classList.toggle('internetOn',wifi);
+ get('googleLed').classList.toggle('googleOn',cloud);
+ get('localLed').classList.toggle('localOn',local);
+ get('internetLabel').textContent=wifi?'ПОДКЛ':'ОТКЛ';
+ get('googleLabel').textContent=cloud?'ПОДКЛ':'ОТКЛ';
+ get('localLabel').textContent=local?'ПОДКЛ':'ОТКЛ';
 }
 
 let lastDiagnosticReport='';
@@ -2227,7 +2240,7 @@ async function refreshGraphHistory(force=false){
  }catch(e){}finally{busaGraphLoading=false;}
 }
 async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;statusFailures=0;
-networkLeds(s.network_indicators,s.station?.connected?s.station.ssid:'');if(Date.now()-lastLocalNav>1800){
+networkLeds(s.network_indicators,s.station,s.google);if(Date.now()-lastLocalNav>1800){
  const physicalPage=(s.ui_page||1)-1;
  if(typeof s.ui_page==='number'&&(physicalPage===6?active!==5||settingsActive!==6:physicalPage!==active))page(physicalPage,false);
  if(physicalPage===5&&settingsActive>=0&&settingsActive<=4&&typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);
@@ -2262,7 +2275,10 @@ if(Number.isFinite(currentPulse)){
  lastWaterPulse=currentPulse;waterPulseLog.push(delta);
  if(waterPulseLog.length>80)waterPulseLog.shift();
 }
-let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');get('wstatus').textContent=ss;get('mainwifi').textContent=s.station.connected?'Подключено':'Локальная сеть';
+let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');
+get('wstatus').textContent=ss;
+get('espAPStatus').textContent=s.ap?.enabled?'ESP32: ПОДКЛ · '+(s.ap.ip||'192.168.4.1'):'ESP32: ОТКЛ';
+get('mainwifi').textContent='Wi-Fi '+(s.station.connected?'ПОДКЛ':'ОТКЛ')+' · Google '+(s.google?.configured&&s.network_indicators?.internet?'ПОДКЛ':'ОТКЛ')+' · ESP32 '+(s.network_indicators?.local_client?'ПОДКЛ':'ОТКЛ');
 if(s.station.connected&&s.station.ssid){
  let select=get('net'),found=Array.from(select.options).some(o=>o.value===s.station.ssid);
  if(!found)select.add(new Option(s.station.ssid+' (подключена)',s.station.ssid));
@@ -2518,6 +2534,7 @@ void setup(){
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   prefs.begin("busa-r04",false);
+  busaRemoteAlarmInit();
   keypadBackupOpen=keypadBackupPrefs.begin("busa-key20",false);
   // User-approved ST7789 320x240 rotation 1 and software-drawn light theme.
   if(!prefs.getBool("v14lightSt",false)){
@@ -3066,6 +3083,7 @@ void loop(){
   if(otaActive){soundOutputsOff();delay(0);return;}
   if(tftRebootPending && elapsed(now,tftRebootAt,3000)){soundOutputsOff();ESP.restart();}
   if(googleRestart && elapsed(now,googleRestartAt,3500)){soundOutputsOff();ESP.restart();}
+  busaRemoteAlarmApply(); // remote sound thresholds only; writes NVS in main loop
   {const uint32_t started=millis();sampleTemperatures(now);busaObserve("TEMP",started,busaTempWorstMs);}
   {const uint32_t started=millis();probeOneWire(now);busaObserve("ONEWIRE",started,busaOneWireWorstMs);} // Diagnose on idle 1-Wire bus only
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
