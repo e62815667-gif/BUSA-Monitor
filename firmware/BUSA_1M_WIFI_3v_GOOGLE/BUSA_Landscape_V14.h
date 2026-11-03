@@ -418,48 +418,57 @@ static void v14Settings(bool layout){
       break;
     }
     case 1:{
+      // Ordered Wi-Fi settings only. Never disconnect the always-on BUSA AP.
       v14Big("Wi-Fi",17,48,V14_TEXT);
+      v14Tiny("AP БУСА: ВКЛ",215,45,V14_GREEN);
       screen->drawFastHLine(17,55,280,V14_RULE);
-      switch(wifiUiStage){
-        case WIFIUI_SCANNING:
-          v14Print("Поиск сети",24,87,V14_TEXT);
-          v14Print("Поиск...",24,132,V14_TEXT);break;
-        case WIFIUI_NETWORKS:{
-          v14Print("Поиск сети",24,76,V14_TEXT);
-          const int start=(wifiUiIndex/5)*5;
-          for(int row=0;row<5;row++){
-            const int idx=start+row;
-            if(idx>=wifiUiCount)break;
-            const int y=86+row*22;
-            if(idx==wifiUiIndex)screen->fillRoundRect(18,y+1,4,16,2,V14_ORANGE);
-            String ssid=wifiUiNetworks[idx];
-            if(ssid.length()>37)ssid=ssid.substring(0,34)+"...";
-            v14Print(ssid,27,y+15,V14_TEXT);
-          }
-          break;
+      if(wifiUiStage==WIFIUI_SCANNING){
+        v14Print("Поиск сетей...",24,103,V14_TEXT);
+        v14Tiny("ESC: отменить поиск",24,149,V14_MUTED);
+      }else if(wifiUiStage==WIFIUI_NETWORKS){
+        v14Tiny("Выбери сеть: UP/DOWN, ENTER",21,67,V14_MUTED);
+        const int first=(wifiUiIndex/5)*5;
+        for(int row=0;row<5;row++){
+          const int index=first+row;
+          if(index>=wifiUiCount)break;
+          const int y=72+row*25;
+          hqPanel(17,y,285,23);
+          if(index==wifiUiIndex)screen->fillRoundRect(20,y+4,4,15,2,V14_ORANGE);
+          String ssid=wifiUiNetworks[index];
+          if(ssid.length()>33)ssid=ssid.substring(0,30)+"...";
+          v14Print(ssid,29,y+17,index==wifiUiIndex?V14_ORANGE:V14_TEXT);
         }
-        case WIFIUI_PASSWORD:{
-          String ssid=wifiUiSelectedSsid;
-          if(ssid.length()>35)ssid=ssid.substring(0,32)+"...";
-          v14Print("Сеть: "+ssid,23,82,V14_TEXT);
-          v14Print("Регистр: "+String(wifiUiModeCaption()),23,111,V14_TEXT);
-          String masked=wifiUiPasswordMask();
-          if(masked.length()>32)masked="..."+masked.substring(masked.length()-29);
-          v14Print("Пароль: "+masked,23,140,V14_TEXT);
-          screen->fillRoundRect(20,166,277,29,4,V14_CARD);
-          v14Print("Сохранить",109,186,V14_TEXT);
-          break;
+      }else if(wifiUiStage==WIFIUI_PASSWORD){
+        String ssid=wifiUiSelectedSsid;
+        if(ssid.length()>32)ssid=ssid.substring(0,29)+"...";
+        v14Print("Сеть: "+ssid,23,81,V14_TEXT);
+        v14Print("Режим: "+String(wifiUiModeCaption()),23,108,V14_TEXT);
+        String masked=wifiUiPasswordMask();
+        if(masked.length()>35)masked="..."+masked.substring(masked.length()-32);
+        v14Print("Пароль: "+masked,23,138,V14_TEXT);
+        v14Tiny("UP/DOWN: abc/ABC/123/SYM",23,164,V14_MUTED);
+        v14Tiny("F1: стереть. ENT: к сохранению",23,187,V14_GREEN);
+      }else{
+        static const char* menu[]={
+          "Поиск сети Wi-Fi","Выбор сети Wi-Fi","Ввести пароль",
+          "Сохранить подключение","Отключить внешнюю сеть"
+        };
+        // Five fully selectable menu rows, like Settings: UP/DOWN selects,
+        // ENTER performs the action, ESC returns. No automatic search popup.
+        for(int i=0;i<5;i++){
+          const int x=16,y=61+i*27;
+          hqPanel(x,y,288,25);
+          const bool selected=(wifiUiMenuIndex==i);
+          if(selected)screen->fillRoundRect(x+3,y+3,5,19,2,V14_ORANGE);
+          v14Print(menu[i],x+15,y+18,selected?V14_ORANGE:V14_TEXT);
         }
-        case WIFIUI_CONNECTING:
-          v14Print("Подключение...",23,93,V14_TEXT);
-          v14Print("Сеть: "+wifiUiSelectedSsid,23,131,V14_TEXT);break;
-        default:
-          screen->fillRoundRect(19,70,279,34,4,V14_CARD);
-          v14Print("Поиск сети",97,93,V14_TEXT);
-          if(WiFi.status()==WL_CONNECTED)v14Print("Подключено: "+WiFi.SSID(),23,131,V14_TEXT);
-          else v14Print("Нет подключения",23,131,V14_TEXT);
-          if(!wifiUiFeedback.isEmpty())v14Tiny(wifiUiFeedback,23,175,V14_TEXT);
-          break;
+        String message=wifiUiFeedback;
+        if(message.isEmpty()){
+          message=wifiUiStaDisabled?"Внешняя сеть отключена":
+            (WiFi.status()==WL_CONNECTED?"Подключено: "+WiFi.SSID():"Внешняя сеть не подключена");
+        }
+        if(message.length()>51)message=message.substring(0,48)+"...";
+        v14Tiny(message,19,204,wifiUiStaDisabled?V14_MUTED:V14_TEXT);
       }
       break;
     }
