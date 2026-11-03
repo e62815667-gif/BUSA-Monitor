@@ -17,6 +17,8 @@ volatile int googleTlsError=0;
 volatile int googleErrorStage=0; // 0 OK/idle, 1 DNS, 2 HTTPS, 3 HTTP
 
 String googleEndpoint,googleSecret;
+// Both are stored in ESP32 NVS, never in the publicly built firmware.
+
 volatile bool busaGoogleNetworkBusy=false; // Distinguishes HTTPS transactions from AP scans
 // Device-initiated HTTPS command polling accepts only verified T1–T4 sound thresholds.
 bool googleURLValid(const String &s){
@@ -35,8 +37,22 @@ bool googleTokenValid(const String &s){
   for(unsigned i=0;i<s.length();i++)if(!isxdigit((unsigned char)s[i]))return false;
   return true;
 }
+bool busaGoogleSavedCredentials(){
+  return googleURLValid(googleEndpoint)&&googleTokenValid(googleSecret);
+}
+bool busaGoogleUiToggle(bool enable){
+  // Simple reversible switch. Never erase the existing token on OFF.
+  if(enable && !busaGoogleSavedCredentials())return false;
+  if(prefs.putBool("g-enabled",enable)!=sizeof(bool))return false;
+  googleEnabled=enable && busaGoogleSavedCredentials();
+  googleTestRequested=false;
+  googleState=googleEnabled?1:0;
+  if(!googleEnabled){googleInternet=0;googleDns=-1;}
+  return true;
+}
 String cloudJSON(){
- return String("{\"configured\":")+(googleEnabled?"true":"false")+
+ return String("{\"configured\":")+(busaGoogleSavedCredentials()?"true":"false")+
+  ",\"enabled\":"+(googleEnabled?"true":"false")+
   ",\"state\":"+String((int)googleState)+
   ",\"http\":"+String((int)googleHttp)+
   ",\"sent\":"+String((uint32_t)googleSent)+
@@ -47,7 +63,7 @@ String cloudJSON(){
 void setupGoogleCloud(){
   googleEndpoint=prefs.getString("g-url","");
   googleSecret=prefs.getString("g-token","");
-  googleEnabled=googleURLValid(googleEndpoint)&&googleTokenValid(googleSecret);
+  googleEnabled=busaGoogleSavedCredentials() && prefs.getBool("g-enabled",true);
   googleState=googleEnabled?1:0;
 }
 // Parse ONLY the fixed Apps Script notification-threshold payload.
@@ -203,12 +219,16 @@ void addGoogleRoutes(){
     if(!googleURLValid(url)||!googleTokenValid(token)){
       server.send(400,"text/plain","Некорректный URL Apps Script или токен");return;
     }
-    googleEnabled=false; // Do not race with network task.
-    if(prefs.putString("g-url",url)==0||prefs.putString("g-token",token)==0){
+    googleEnabled=false; // Stop new transfers while credentials are changed.
+    if(prefs.putString("g-url",url)!=url.length()||
+       prefs.putString("g-token",token)!=token.length()){
       server.send(500,"text/plain","Не удалось сохранить");return;
     }
-    googleRestart=true;googleRestartAt=millis();
-    server.send(200,"text/plain","Настройка сохранена; перезапуск БУСА для применения");
+    googleEndpoint=url;googleSecret=token;
+    if(!busaGoogleUiToggle(true)){
+      server.send(500,"text/plain","Настройки сохранены, включение не удалось");return;
+    }
+    server.send(200,"text/plain; charset=utf-8","Google сохранён и подключён. Повторный ввод токена не требуется.");
   });
   server.on("/api/google/test",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){
@@ -220,15 +240,26 @@ void addGoogleRoutes(){
     googleTestRequested=true;
     server.send(200,"text/plain; charset=utf-8","Запрос отправки принят. Статус появится после попытки HTTPS.");
   });
+  server.on("/api/google/on",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;
+    }
+    if(!busaGoogleSavedCredentials()){
+      server.send(409,"text/plain; charset=utf-8","Первичная настройка Google нужна один раз в приложении");return;
+    }
+    if(!busaGoogleUiToggle(true)){
+      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить включение");return;
+    }
+    server.send(200,"text/plain; charset=utf-8","Передача Google включена, настройки сохранены");
+  });
   server.on("/api/google/off",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){
-      server.send(403,"text/plain","Подтвердите локально");return;
+      server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;
     }
-    googleEnabled=false;
-    googleTestRequested=false;
-    prefs.remove("g-token");
-    googleRestart=true;googleRestartAt=millis();
-    server.send(200,"text/plain","Отправка отключена; БУСА перезапускается");
+    if(!busaGoogleUiToggle(false)){
+      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить отключение");return;
+    }
+    server.send(200,"text/plain; charset=utf-8","Передача Google отключена; URL и токен сохранены");
   });
 }
 void launchGoogleCloud(){
