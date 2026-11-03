@@ -51,6 +51,9 @@ function doPost(e) {
     }
     const data = JSON.parse(e.postData.contents);
     const cfg = PropertiesService.getScriptProperties();
+    if (data.kind === 'alarm_threshold_command') {
+      return busaQueueAlarmCommand_(data, cfg);
+    }
     const expected = cfg.getProperty('BUSA_TOKEN');
     if (!expected || typeof data.token !== 'string' ||
         data.token !== expected || data.device_id !== 'BUSA-1M-001' ||
@@ -99,6 +102,30 @@ function doPost(e) {
       const tab = sheet.getSheetByName(BUSA_TAB) || sheet.insertSheet(BUSA_TAB);
       if (tab.getLastRow() === 0) { tab.appendRow(BUSA_HEADERS); tab.setFrozenRows(1); }
       tab.appendRow(row);
+      // The device's next authenticated telemetry confirms an applied command.
+      const ack = payload.remote_alarm;
+      if (ack && typeof ack.id === 'string' && /^[a-f0-9]{24}$/.test(ack.id)) {
+        const raw = cfg.getProperty('BUSA_REMOTE_COMMAND');
+        if (raw) {
+          try {
+            const cmd = JSON.parse(raw);
+            if (cmd.id === ack.id && (ack.state === 'applied' || ack.state === 'failed')) {
+              let verified = ack.state === 'applied';
+              if (verified) {
+                const ref = Array.isArray(payload.display_references) ? payload.display_references : [];
+                verified = ref.length === 4 && cmd.on.every((n,i) =>
+                  typeof ref[i].target === 'number' && Math.abs(ref[i].target - n) < 0.051 &&
+                  typeof ref[i].notice === 'number' && Math.abs(ref[i].notice - cmd.off[i]) < 0.051);
+              }
+              cfg.setProperty('BUSA_REMOTE_STATUS', JSON.stringify({
+                id:cmd.id, state:verified?'applied':'failed',
+                updated:Date.now(), detail:verified?'Confirmed by ESP32 telemetry':'Device save not confirmed'
+              }));
+              cfg.deleteProperty('BUSA_REMOTE_COMMAND');
+            }
+          } catch (_) { /* Leave the pending command for expiry. */ }
+        }
+      }
     } finally {
       lock.releaseLock();
     }
@@ -116,6 +143,56 @@ function busaJson_(obj) {
 
 
 /**
+ * Remote configuration of SOUND NOTIFICATION thresholds only.
+ * The VIEW token authorizes configuration; the ESP32 TOKEN is used solely
+ * to retrieve a queued command. No remote relay, actuator or GPIO command.
+ */
+function busaCommandStatus_(cfg) {
+  const raw = cfg.getProperty('BUSA_REMOTE_STATUS');
+  if (!raw) return null;
+  try {
+    const state=JSON.parse(raw), queued=cfg.getProperty('BUSA_REMOTE_COMMAND');
+    if (state.state==='queued' && queued && Date.now()-state.updated>300000) {
+      state.state='expired'; state.detail='ESP32 has not confirmed within 5 minutes';
+      cfg.setProperty('BUSA_REMOTE_STATUS',JSON.stringify(state));
+      cfg.deleteProperty('BUSA_REMOTE_COMMAND');
+    }
+    return {id:state.id,state:state.state,updated:state.updated,detail:state.detail||''};
+  } catch (_) { return null; }
+}
+function busaQueueAlarmCommand_(data,cfg) {
+  const expected=cfg.getProperty('BUSA_VIEW_TOKEN');
+  if (!expected || data.token !== expected || data.device_id!=='BUSA-1M-001' ||
+      data.version!==1 || !/^[a-f0-9]{24}$/.test(String(data.id||''))) {
+    return busaJson_({ok:false,error:'Unauthorized configuration request'});
+  }
+  const on=data.on,off=data.off;
+  const valid=n=>typeof n==='number'&&Number.isFinite(n)&&n>=0&&n<=125&&
+                 Math.abs(n*10-Math.round(n*10))<0.0001;
+  if (!Array.isArray(on)||!Array.isArray(off)||on.length!==4||off.length!==4||
+      !on.every(valid)||!off.every(valid)||
+      !on.every((n,i)=>Math.abs(n-off[i])>=0.099)) {
+    return busaJson_({ok:false,error:'Invalid sound thresholds'});
+  }
+  const lock=LockService.getScriptLock();
+  if (!lock.tryLock(5000))return busaJson_({ok:false,error:'Busy'});
+  try {
+    const state=busaCommandStatus_(cfg);
+    if (state?.state==='queued' && state.id!==data.id) {
+      return busaJson_({ok:false,error:'Another configuration is pending'});
+    }
+    if (state?.id===data.id)return busaJson_({ok:true,state:state.state,id:data.id});
+    cfg.setProperty('BUSA_REMOTE_COMMAND',JSON.stringify({
+      id:data.id,on:on,off:off,created:Date.now()
+    }));
+    cfg.setProperty('BUSA_REMOTE_STATUS',JSON.stringify({
+      id:data.id,state:'queued',updated:Date.now(),detail:'Waiting for ESP32'
+    }));
+    return busaJson_({ok:true,id:data.id,state:'queued'});
+  } finally {lock.releaseLock();}
+}
+
+/**
  * Read-only live mobile dashboard feed. JSONP is used because an HTTPS GitHub
  * Pages website cannot directly contact the local HTTP ESP32, while Google
  * Apps Script ContentService cross-origin fetch does not reliably return CORS
@@ -129,7 +206,24 @@ function doGet(e) {
   const callback = 'busaViewReceive';
   try {
     const q = (e && e.parameter) || {};
-    const expected = PropertiesService.getScriptProperties().getProperty('BUSA_VIEW_TOKEN');
+    const cfg = PropertiesService.getScriptProperties();
+    if (q.mode === 'device_command') {
+      const deviceKey=cfg.getProperty('BUSA_TOKEN');
+      if (!deviceKey || q.deviceToken!==deviceKey || !/^[a-fA-F0-9]{64}$/.test(q.deviceToken||'')) {
+        return busaJson_({ok:false,error:'Unauthorized'});
+      }
+      const status=busaCommandStatus_(cfg);
+      const raw=cfg.getProperty('BUSA_REMOTE_COMMAND');
+      let pending=null;
+      if (raw && status?.state==='queued') {
+        try {
+          const c=JSON.parse(raw);
+          pending={id:c.id,on:c.on,off:c.off};
+        } catch (_) {}
+      }
+      return busaJson_({ok:true,command:pending});
+    }
+    const expected = cfg.getProperty('BUSA_VIEW_TOKEN');
     if (!expected || typeof q.readToken !== 'string' ||
         !/^[a-fA-F0-9]{64}$/.test(q.readToken) ||
         q.readToken !== expected || q.mode !== 'latest' ||
@@ -161,6 +255,7 @@ function doGet(e) {
     return busaScript_({
       ok:true,
       latest:sample.length?sample[sample.length-1]:null,
+      command_status:busaCommandStatus_(PropertiesService.getScriptProperties()),
       history:sample.map(v=>({
         at:v.at,
         temperatures:(Array.isArray(v.telemetry.temperatures)?
