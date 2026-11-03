@@ -224,7 +224,6 @@ jobs:
             assert len(z.read('app.bin'))==package['app.bin'].stat().st_size
           print('USB PACKAGE VERIFIED:',archive,archive.stat().st_size)
           PY
-          PY
       - uses: actions/upload-artifact@v4
         with:
           name: BUSA_15_0_WIFI_GOOGLE_NVS_SAFE_OTA
