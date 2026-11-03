@@ -1,7 +1,7 @@
-name: Build BUSA 14.9 Wi-Fi STA pause + passive scan AP-always-on N16R8 OTA
+name: Build BUSA 14.9 independent TFT and local UI + correct SSID switch and scan N16R8 OTA
 on:
   push:
-    branches: [fix/busa-v14-9-wifi-scan-sta-pause-passive-20261103]
+    branches: [fix/busa-v14-9-independent-ui-sta-switch-20261103]
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
@@ -51,7 +51,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          assert '14v9-N16R8-WIFI-STA-PAUSE-SCAN-NVS-20261103' in s
+          assert '14v9-N16R8-UI-WIFI-SWITCH-NVS-20261103' in s
           assert 'busaRemoteAlarmApply()' in s and 'busaRemoteAlarmJSON()' in s
           remote=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_RemoteAlarm.h').read_text()
           assert 'portENTER_CRITICAL' in remote
@@ -116,9 +116,9 @@ jobs:
           assert 'v14Tiny("назад"' not in landscape and 'v14Tiny("0,"' not in landscape
           portrait=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
           assert 'v13Text("G"' in portrait and 'v13Text("E"' in portrait
-          assert 'WiFi.scanNetworks(true,false,false,120)' in s
+          assert 'WiFi.scanNetworks(true,true,false,180)' in s and 'WiFi.scanNetworks(true,true,true,350)' in s
           assert 'manualSsid' not in s
-          assert 'get(\'net\').value,pass=get(\'pass\').value' in s
+          assert "get('ssidManual').value.trim()||get('net').value" in s
           assert 'AbortSignal.timeout(16000)' in s
           assert 'проверяю результат поиска' in s
           assert 'setInterval(update,3000)' in s
@@ -148,10 +148,28 @@ jobs:
           assert all('busaIconDetail'+str(i) in s for i in range(4))
           assert Path('assets/BUSA_approved_rig_276.webp').stat().st_size>10000
           assert 'validKeymap(newPairs)' in s and 'return r==5&&c==4;' in s
+          # Independent navigation and externally selected STA, no iPhone autofill
+          assert "fetch('/api/page?n=" not in s
+          assert "fetch('/api/settings-tab?n=" not in s
+          assert "fetch('/api/graph-view?view=" not in s
+          assert "page(physicalPage,false)" not in s
+          assert "settingsTab(s.ui_subtab,false)" not in s
+          assert 'scope\\":\\"browser_only' in s
+          assert 'actualSsid==stationSsid' in s
+          assert 'target_ssid' in s and 'last_error' in s
+          assert 'if(!select.value)select.value=s.station.ssid;' not in s
+          assert 'id="ssidManual"' in s
+          assert 'wifiUiAssociationDueAt' in ui
+          assert 'WiFi.SSID()==stationSsid' in ui
+          assert 'wifiUiLastConnectError' in ui
+          assert 'busaWebScanFinish()' in s
+          assert 'WiFi.disconnect(false,false); // STA only, BUSA softAP remains ON' in s
+          assert 'busaWebScanPassive' in s
+          assert 'elapsed(now,busaWifiScanStartedAt,27000)' in s
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
           ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert '#include "BUSA_KeypadTFT_UI.h"' in s
-          assert '14v9-N16R8-WIFI-STA-PAUSE-SCAN-NVS-20261103' in s
+          assert '14v9-N16R8-UI-WIFI-SWITCH-NVS-20261103' in s
           assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,true,false,180)' in ui
           assert 'WiFi.scanNetworks(true,true,true,350)' in ui
           assert 'wifiUiResumeStation' in ui and 'wifiUiRestoreStationAfterScan' in ui
@@ -240,18 +258,18 @@ jobs:
       - name: Produce APP-ONLY OTA and USB-at-0x10000 image
         run: |
           set -euo pipefail
-          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_WIFI_STA_PAUSE_SCAN_APP_OTA.bin
-          (cd out && sha256sum BUSA_14_9_WIFI_STA_PAUSE_SCAN_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_UI_WIFI_SWITCH_APP_OTA.bin
+          (cd out && sha256sum BUSA_14_9_UI_WIFI_SWITCH_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('out/BUSA_14_9_WIFI_STA_PAUSE_SCAN_APP_OTA.bin')
+          p=Path('out/BUSA_14_9_UI_WIFI_SWITCH_APP_OTA.bin')
           assert 60000 < p.stat().st_size < 3000000
           print('APP-ONLY',p.stat().st_size,'bytes; OTA or esptool write_flash at 0x10000')
           print('Do NOT use erase_flash, merged/full USB or erase NVS; preserve both keys20 namespaces')
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_14_9_WIFI_STA_PAUSE_SCAN_APP_OTA
+          name: BUSA_14_9_UI_WIFI_SWITCH_APP_OTA
           path: |
-            out/BUSA_14_9_WIFI_STA_PAUSE_SCAN_APP_OTA.bin
+            out/BUSA_14_9_UI_WIFI_SWITCH_APP_OTA.bin
             out/SHA256SUMS.txt
