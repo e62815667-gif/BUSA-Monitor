@@ -333,7 +333,30 @@ static void v13Settings(uint32_t now,bool layout){
    v13Text("T"+String(calSensor+1)+" "+String(calEditing?calDraft:tempOffset[calSensor],1)+" C",17,146,V13_CYAN);
    v13Text("UP/DN: 0.1 C",17,174,WHITE);
    v13Text("ENT: сохранить",17,195,WHITE);break;
-  case 1:v13Text(WiFi.status()==WL_CONNECTED?"Wi-Fi OK":"Нет Wi-Fi",17,145,WHITE);break;
+  case 1:
+   switch(wifiUiStage){
+    case WIFIUI_SCANNING:
+     v13Text("Поиск сетей...",17,144,V13_CYAN);break;
+    case WIFIUI_NETWORKS:
+     v13Text("Выбери сеть:",17,129,V13_CYAN);
+     if(wifiUiCount) {
+       String s=wifiUiNetworks[wifiUiIndex];
+       if(s.length()>22)s=s.substring(0,21)+"...";
+       v13Text(s,17,158,WHITE);
+     }
+     v13Text("UP/DN · ENT",17,190,V13_CYAN);break;
+    case WIFIUI_PASSWORD:
+     v13Text("Wi-Fi пароль",17,127,V13_CYAN);
+     v13Text(String("Режим: ")+wifiUiModeCaption(),17,150,WHITE);
+     v13Text(wifiUiPasswordMask(),17,174,WHITE);
+     v13Text("UP/DN · ENT",17,201,V13_CYAN);break;
+    case WIFIUI_CONNECTING:
+     v13Text("Подключаю...",17,145,V13_CYAN);break;
+    default:
+     v13Text(WiFi.status()==WL_CONNECTED?"Wi-Fi подключён":"Нет Wi-Fi",17,145,WHITE);
+     v13Text("ENT: поиск сети",17,188,V13_CYAN);break;
+   }
+   break;
   case 2:v13Text(themeDraft==0?"Светлая":themeDraft==1?"Тёмная":"Системная",17,145,WHITE);break;
   case 3:v13Text(googleEnabled?"Google OK":"Нет Google",17,145,WHITE);break;
   default:
