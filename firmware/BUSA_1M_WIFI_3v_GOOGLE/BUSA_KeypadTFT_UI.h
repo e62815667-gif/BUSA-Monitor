@@ -18,6 +18,9 @@ uint8_t wifiUiRetries=0;
 uint32_t wifiUiRetryAt=0;
 String wifiUiFeedback="";
 extern volatile bool busaWifiScanRunning,busaGoogleNetworkBusy;
+extern volatile bool busaStaSwitchPending,busaStaSwitching;
+extern volatile int8_t busaStaLastResult;
+extern String busaStaMessage;
 extern uint32_t busaWifiScanLastAt,busaWifiScanStartedAt,lastStationCheck;
 extern String stationSsid,stationPass;
 String quoteJson(const String &x); // implemented below this header in BUSA_Main.h
@@ -93,6 +96,9 @@ void wifiUiBackspace(){
 // Both the physical TFT and phone app request this SAME nonblocking scanner.
 // Google HTTPS or reconnect may delay a scan; neither causes an error screen.
 void wifiUiBeginScan(){
+  if(busaStaSwitchPending||busaStaSwitching){
+    wifiUiFeedback="Дождись окончания подключения";tftDirty=true;return;
+  }
   wifiUiCount=0;wifiUiIndex=0;wifiUiSelectedSsid="";
   wifiUiRetries=0;
   wifiUiScanPending=true;
@@ -108,6 +114,8 @@ void wifiUiFinishScan(){
   busaWifiScanRunning=false;
   wifiUiStage=WIFIUI_STATUS; // Remain on the Wi-Fi child page, not an automatic picker.
   wifiUiFeedback=wifiUiCount?("Найдено сетей: "+String(wifiUiCount)):"Сети не найдены";
+  if(WiFi.status()!=WL_CONNECTED && !busaStaSwitchPending && !busaStaSwitching)
+    busaStaRestoreLocal();
   tftDirty=true;
 }
 void wifiUiRetryOrFinish(){
@@ -134,10 +142,11 @@ String wifiUiScanJSON(){
 void wifiUiPoll(){
   const uint32_t now=millis();
   if(wifiUiScanPending && !wifiUiOwnsScan && (int32_t)(now-wifiUiRetryAt)>=0 &&
-     !busaGoogleNetworkBusy){
+     !busaGoogleNetworkBusy && !busaStaSwitchPending && !busaStaSwitching){
     wifiUiScanPending=false;
     wifiUiScanAt=now;
     WiFi.scanDelete();
+    if(WiFi.getMode()==WIFI_AP)WiFi.mode(WIFI_AP_STA);
     busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
     wifiUiRetries++; // count even immediate failures to prevent an endless scan loop
     const int scan=WiFi.scanNetworks(true,false,false,160);
@@ -175,21 +184,14 @@ void wifiUiPoll(){
       }else wifiUiFinishScan();
     }
   }
-  if(wifiUiConnectPending && !busaGoogleNetworkBusy && !busaWifiScanRunning){
-    wifiUiConnectPending=false;
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-    lastStationCheck=now;wifiUiConnectAt=now;
-    wifiUiFeedback="Подключение...";
-    tftDirty=true;
-  }
-  if(wifiUiStage==WIFIUI_CONNECTING && !wifiUiConnectPending){
-    if(WiFi.status()==WL_CONNECTED){
-      wifiUiFeedback="Wi-Fi подключён";tftDirty=true;
-      wifiUiStage=WIFIUI_STATUS;
-    }else if((uint32_t)(now-wifiUiConnectAt)>16000){
-      // AP, TFT and alarms stay responsive; manual network selection stays usable.
-      wifiUiFeedback="Нет связи. Выбери другую сеть";
-      tftDirty=true;wifiUiStage=WIFIUI_STATUS;
+  if(wifiUiStage==WIFIUI_CONNECTING){
+    if(busaStaLastResult==1 && !busaStaSwitching && !busaStaSwitchPending){
+      wifiUiConnectPending=false;
+      wifiUiFeedback="Wi-Fi подключён";wifiUiStage=WIFIUI_STATUS;tftDirty=true;
+    }else if(busaStaLastResult==-1 && !busaStaSwitching && !busaStaSwitchPending){
+      wifiUiConnectPending=false;
+      wifiUiFeedback="Нет связи. БУСА работает локально";
+      wifiUiStage=WIFIUI_STATUS;tftDirty=true;
     }
   }
 }
@@ -199,22 +201,15 @@ void wifiUiSavePassword(){
      wifiUiPassword.length()<8||wifiUiPassword.length()>63){
     wifiUiFeedback="Пароль: 8..63 символа";tftDirty=true;return;
   }
-  const String oldSsid=prefs.getString("ssid","");
-  const String oldPass=prefs.getString("pass","");
-  if(prefs.putString("pass",wifiUiPassword)!=wifiUiPassword.length() ||
-     prefs.putString("ssid",wifiUiSelectedSsid)!=wifiUiSelectedSsid.length() ||
-     prefs.getString("pass","")!=wifiUiPassword ||
-     prefs.getString("ssid","")!=wifiUiSelectedSsid){
-    prefs.putString("ssid",oldSsid);prefs.putString("pass",oldPass);
-    wifiUiFeedback="Ошибка сохранения Wi-Fi";tftDirty=true;return;
+  if(!busaStageStaCredentials(wifiUiSelectedSsid,wifiUiPassword)){
+    wifiUiFeedback="Wi-Fi занят. Повтори позже";tftDirty=true;return;
   }
-  stationSsid=wifiUiSelectedSsid;stationPass=wifiUiPassword;
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiStage=WIFIUI_CONNECTING;
   wifiUiFocus=0; // Stay on the Wi-Fi child page and show connection progress.
   wifiUiConnectPending=true;
   wifiUiConnectAt=millis();
-  wifiUiFeedback="Сеть сохранена. Подключаю...";
+  wifiUiFeedback="Проверяю сеть перед сохранением...";
   tftDirty=true;
 }
 bool wifiUiKey(int k){
