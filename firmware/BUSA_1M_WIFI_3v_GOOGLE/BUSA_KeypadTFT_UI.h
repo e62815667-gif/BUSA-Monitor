@@ -5,10 +5,9 @@
 enum BusaWifiUiStage : uint8_t { WIFIUI_STATUS=0, WIFIUI_SCANNING=1,
   WIFIUI_NETWORKS=2, WIFIUI_PASSWORD=3, WIFIUI_CONNECTING=4 };
 BusaWifiUiStage wifiUiStage=WIFIUI_STATUS;
-uint8_t wifiUiMenuIndex=0; // Search, select SSID, enter password, save, radio OFF
-bool wifiUiRadioOff=false; // persistent NVS "wifiOff", read during setup
-bool wifiUiTemporaryRadio=false; // radio temporarily re-enabled for user search
-bool wifiUiDisablePending=false; // defer radio power-down until HTTPS finishes
+uint8_t wifiUiMenuIndex=0; // Search, select SSID, password, save, disconnect from external STA
+bool wifiUiStaDisabled=false; // persistent NVS "staOff" flag; AP always stays ON
+bool wifiUiDisablePending=false; // defer STA disconnect while Google HTTPS is active
 String wifiUiNetworks[16],wifiUiSelectedSsid="",wifiUiPassword="";
 int wifiUiSignals[16]={0};
 uint8_t wifiUiCount=0,wifiUiIndex=0,wifiUiMode=0;
@@ -19,9 +18,9 @@ bool wifiUiOwnsScan=false,wifiUiConnectPending=false;
 String wifiUiFeedback="";
 extern volatile bool busaWifiScanRunning,busaGoogleNetworkBusy;
 extern uint32_t busaWifiScanLastAt,busaWifiScanStartedAt,lastStationCheck;
-extern String stationSsid,stationPass,apPassword;
-extern bool wifiRunning,otaActive;
-extern WebServer server;
+extern String stationSsid,stationPass;
+extern bool otaActive;
+extern volatile int googleInternet;
 const char* wifiUiModeCaption(){static const char* modes[]={"abc","ABC","123","SYM"};return modes[wifiUiMode%4];}
 String wifiUiPasswordMask(){
   String hidden="";
@@ -91,52 +90,32 @@ void wifiUiBackspace(){
   }
   tftDirty=true;
 }
-// Physically disable both STA and AP. No credentials/keymap are erased.
-// A pending Google HTTPS request is allowed to finish before the radio is powered down.
-void wifiUiApplyRadioOff(){
+// Disconnect ONLY the external station. The BUSA access point, local web app,
+// and OTA stay available at 192.168.4.1, even after reboot.
+void wifiUiApplyStationDisconnect(){
   wifiUiConnectPending=false;
   WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
   WiFi.setAutoReconnect(false);
-  WiFi.disconnect(true,false);
-  WiFi.mode(WIFI_OFF);
-  wifiRunning=false;
-  wifiUiTemporaryRadio=false;
+  WiFi.disconnect(false,false); // NEVER stop the radio or the BUSA softAP
   wifiUiDisablePending=false;
   googleInternet=0;
   wifiUiStage=WIFIUI_STATUS;
-  wifiUiFeedback="Wi-Fi отключён";
+  wifiUiFeedback="Внешняя сеть отключена; AP БУСА работает";
   tftDirty=true;
 }
-void wifiUiRequestRadioOff(){
-  if(!prefs.putBool("wifiOff",true) || !prefs.getBool("wifiOff",false)){
-    wifiUiFeedback="Не удалось сохранить отключение";tftDirty=true;return;
+void wifiUiRequestStationDisconnect(){
+  if(!prefs.putBool("staOff",true) || !prefs.getBool("staOff",false)){
+    wifiUiFeedback="Ошибка сохранения отключения";tftDirty=true;return;
   }
-  wifiUiRadioOff=true;
+  wifiUiStaDisabled=true;
   wifiUiDisablePending=true;
   wifiUiConnectPending=false;
-  wifiUiStage=WIFIUI_STATUS;
-  wifiUiMenuIndex=4;
+  wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=4;
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
-  wifiUiFeedback="Отключаю Wi-Fi...";
-  if(!busaGoogleNetworkBusy && !otaActive)wifiUiApplyRadioOff();
+  wifiUiFeedback="Отключаю внешнюю сеть...";
+  if(!busaGoogleNetworkBusy && !otaActive)wifiUiApplyStationDisconnect();
   tftDirty=true;
 }
-// When OFF is persisted, pressing physical "Search" temporarily starts AP+STA
-// but DOES NOT reconnect using the old saved STA credentials.
-bool wifiUiEnableRadioForScan(){
-  if(!wifiUiRadioOff || wifiUiTemporaryRadio)return true;
-  if(wifiUiDisablePending){wifiUiFeedback="Завершается отключение";return false;}
-  if(!WiFi.mode(WIFI_AP_STA)){wifiUiFeedback="Ошибка включения Wi-Fi";return false;}
-  WiFi.setSleep(false);
-  WiFi.setAutoReconnect(false);
-  wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
-  if(!wifiRunning){WiFi.mode(WIFI_OFF);wifiUiFeedback="Точка доступа не запустилась";return false;}
-  WiFi.setTxPower(WIFI_POWER_19_5dBm);
-  server.begin(); // local access is restored while user selects a new network
-  wifiUiTemporaryRadio=true;
-  return true;
-}
-// If user leaves Wi-Fi without saving a new connection, respect persistent OFF.
 void wifiUiLeave(){
   if(wifiUiOwnsScan){
     WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
@@ -144,7 +123,7 @@ void wifiUiLeave(){
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiStage=WIFIUI_STATUS;
   wifiUiMenuIndex=0;
-  if(wifiUiRadioOff && wifiUiTemporaryRadio)wifiUiDisablePending=true;
+  // Leaving the menu NEVER disconnects BUSA's own Wi-Fi hotspot.
   tftDirty=true;
 }
 void wifiUiBeginScan(){
@@ -152,7 +131,6 @@ void wifiUiBeginScan(){
   if(otaActive||busaWifiScanRunning||busaGoogleNetworkBusy){
     wifiUiFeedback="Сеть занята, повтори поиск";tftDirty=true;return;
   }
-  if(!wifiUiEnableRadioForScan()){tftDirty=true;return;}
   if(busaWifiScanLastAt&&(uint32_t)(now-busaWifiScanLastAt)<15000){
     wifiUiFeedback="Повтори поиск через 15 секунд";tftDirty=true;return;
   }
@@ -171,7 +149,7 @@ void wifiUiBeginScan(){
 void wifiUiPoll(){
   const uint32_t now=millis();
   if(wifiUiDisablePending && !busaGoogleNetworkBusy && !otaActive){
-    wifiUiApplyRadioOff();
+    wifiUiApplyStationDisconnect();
     return;
   }
   if(wifiUiStage==WIFIUI_SCANNING && wifiUiOwnsScan){
@@ -232,32 +210,31 @@ void wifiUiSaveConnection(){
     wifiUiFeedback="Сначала выбери сеть и пароль 8-63";
     tftDirty=true;return;
   }
-  if(!wifiUiEnableRadioForScan()){tftDirty=true;return;}
   const String oldSsid=prefs.getString("ssid","");
   const String oldPass=prefs.getString("pass","");
-  const bool oldOff=prefs.getBool("wifiOff",false);
+  const bool oldOff=prefs.getBool("staOff",false);
   const bool saved=
     prefs.putString("pass",wifiUiPassword)==wifiUiPassword.length() &&
     prefs.putString("ssid",wifiUiSelectedSsid)==wifiUiSelectedSsid.length() &&
-    prefs.putBool("wifiOff",false) &&
+    prefs.putBool("staOff",false) &&
     prefs.getString("pass","")==wifiUiPassword &&
     prefs.getString("ssid","")==wifiUiSelectedSsid &&
-    !prefs.getBool("wifiOff",true);
+    !prefs.getBool("staOff",true);
   if(!saved){
     prefs.putString("ssid",oldSsid);prefs.putString("pass",oldPass);
-    prefs.putBool("wifiOff",oldOff);
+    prefs.putBool("staOff",oldOff);
     wifiUiFeedback="Ошибка сохранения Wi-Fi";tftDirty=true;return;
   }
   stationSsid=wifiUiSelectedSsid;
   stationPass=wifiUiPassword;
-  wifiUiRadioOff=false;wifiUiTemporaryRadio=false;wifiUiDisablePending=false;
+  wifiUiStaDisabled=false;wifiUiDisablePending=false;
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiConnectPending=true;
   wifiUiConnectAt=millis();wifiUiStage=WIFIUI_CONNECTING;wifiUiMenuIndex=3;
   wifiUiFeedback="Сеть сохранена. Подключаю...";
   tftDirty=true;
 }
-// Five ordered Wi-Fi actions: Search / Select / Password / Save / Disconnect.
+// Five ordered Wi-Fi actions: Search / Select / Password / Save / STA Disconnect.
 // The two-stage selection follows the same UP/DOWN -> ENTER -> ESC pattern as Settings.
 bool wifiUiKey(int k){
   if(k==1)return false; // F2 still turns TFT display OFF
@@ -312,7 +289,7 @@ bool wifiUiKey(int k){
           }else wifiUiFeedback="Сначала выбери сеть";
           break;
         case 3:wifiUiSaveConnection();break;
-        case 4:wifiUiRequestRadioOff();break;
+        case 4:wifiUiRequestStationDisconnect();break;
       }
     }else if(k==15){
       wifiUiLeave();tftView=0;
