@@ -415,57 +415,46 @@ static void v14Settings(bool layout){
    }
    break;
   }
-  case 1: { // Search list and password belong to this same Wi-Fi child page.
+  case 1: { // One Wi-Fi child page; five rows with explicit focus and Save.
    v14Big("Wi-Fi",17,75,V14_TEXT);
    screen->drawFastHLine(17,82,280,V14_RULE);
-   switch(wifiUiStage){
-    case WIFIUI_SCANNING:
-     v14Print("Поиск сети",24,110,V14_TEXT);
-     v14Print("Поиск...",24,142,V14_TEXT);
-     break;
-    case WIFIUI_NETWORKS: {
-     v14Print("Поиск сети",24,101,V14_TEXT);
+   if(wifiUiStage==WIFIUI_NETWORKS){
+     v14Print("Выбор сети (ENT выбрать)",20,100,V14_TEXT);
      const int start=(wifiUiIndex/4)*4;
      for(int row=0;row<4;row++){
        const int idx=start+row;
        if(idx>=wifiUiCount)break;
        const int y=108+row*22;
-       if(idx==wifiUiIndex){
-         screen->fillRoundRect(18,y+1,4,16,2,V14_ORANGE);
-       }
+       hqPanel(15,y,290,21);
+       if(idx==wifiUiIndex)screen->fillRoundRect(19,y+3,4,15,2,V14_ORANGE);
        String ssid=wifiUiNetworks[idx];
-       if(ssid.length()>37)ssid=ssid.substring(0,34)+"...";
-       v14Print(ssid,27,y+15,V14_TEXT);
+       if(ssid.length()>29)ssid=ssid.substring(0,26)+"...";
+       v14Print(ssid,30,y+15,V14_TEXT);
      }
-     break;
-    }
-    case WIFIUI_PASSWORD: {
-     String ssid=wifiUiSelectedSsid;
-     if(ssid.length()>35)ssid=ssid.substring(0,32)+"...";
-     v14Print("Сеть: "+ssid,23,104,V14_TEXT);
-     v14Print("Регистр: "+String(wifiUiModeCaption()),23,128,V14_TEXT);
-     String masked=wifiUiPasswordMask();
-     if(masked.length()>32)masked="..."+masked.substring(masked.length()-29);
-     v14Print("Пароль: "+masked,23,151,V14_TEXT);
-     // ENT saves without another confirmation and returns to Settings.
-     screen->fillRoundRect(20,173,277,26,4,V14_CARD);
-     v14Print("Сохранить",109,191,V14_TEXT);
-     break;
-    }
-    case WIFIUI_CONNECTING:
-     v14Print("Подключение...",23,113,V14_TEXT);
-     v14Print("Сеть: "+wifiUiSelectedSsid,23,143,V14_TEXT);
-     break;
-    default:
-     screen->fillRoundRect(19,93,279,31,4,V14_CARD);
-     v14Print("Поиск сети",97,113,V14_TEXT);
-     if(WiFi.status()==WL_CONNECTED){
-       v14Print("Wi-Fi подключён",23,153,V14_TEXT);
-     }else{
-       v14Print("Нет подключения",23,153,V14_TEXT);
+   }else{
+     const bool connected=WiFi.status()==WL_CONNECTED;
+     String connectedName=connected?WiFi.SSID():String("");
+     if(connectedName.length()>23)connectedName=connectedName.substring(0,20)+"...";
+     String selected=wifiUiSelectedSsid;
+     if(selected.length()>22)selected=selected.substring(0,19)+"...";
+     String password=wifiUiStage==WIFIUI_PASSWORD?wifiUiPasswordPreview():wifiUiPasswordMask();
+     if(password.length()>17)password="..."+password.substring(password.length()-14);
+     String rows[5]={
+       wifiUiStage==WIFIUI_CONNECTING?"Wi-Fi: подключение...":
+         (connected?"Wi-Fi подключён: "+connectedName:"Wi-Fi отключён"),
+       wifiUiStage==WIFIUI_SCANNING?"Поиск сети: выполняется":
+         (wifiUiCount?"Поиск сети ("+String(wifiUiCount)+")":"Поиск сети"),
+       selected.isEmpty()?"Выбор сети":("Выбор сети: "+selected),
+       String(wifiUiStage==WIFIUI_PASSWORD?"Пароль [":"Пароль [")+
+         String(wifiUiModeCaption())+"]: "+password,
+       "Сохранить"
+     };
+     for(int i=0;i<5;i++){
+       const int y=88+i*22;
+       hqPanel(14,y,291,20);
+       if(i==wifiUiFocus)screen->fillRoundRect(18,y+3,4,14,2,V14_ORANGE);
+       v14Print(rows[i],28,y+15,V14_TEXT);
      }
-     // Search is started with ENT; no obsolete connection-error banner.
-     break;
    }
    break;
   }

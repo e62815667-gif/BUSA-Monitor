@@ -845,7 +845,12 @@ void keypadAction(int k){
         googleUiChoice=(googleUiChoice+1)%2;
       }
     }else if(currentPage==6){
-      diagModule=(diagModule+(k==7?6:1))%7;tftView=0;
+      // Match physical top-to-bottom order in the two-column diagnostic grid.
+      // DOWN: Screen -> Relays -> Wi-Fi -> Flow -> Keyboard -> Sensors -> ESP32.
+      static const uint8_t diagOrder[7]={0,2,4,6,1,3,5};
+      uint8_t slot=0;
+      for(uint8_t n=0;n<7;n++)if(diagOrder[n]==diagModule){slot=n;break;}
+      diagModule=diagOrder[(slot+(k==7?6:1))%7];tftView=0;
     }else if(currentPage==3){
       graphSubView=(graphSubView+1)%2;
     }else{
@@ -868,7 +873,7 @@ void keypadAction(int k){
         tftView=1;
         themeDraft=tftThemeMode;
         if(approvedSettingsItem==1){
-          wifiUiStage=WIFIUI_STATUS;wifiUiFeedback="";
+          wifiUiStage=WIFIUI_STATUS;wifiUiFeedback="";wifiUiFocus=0;
           // Search starts on deliberate ENT "Поиск сети", not automatically.
         }
         if(approvedSettingsItem==3)googleUiChoice=0;

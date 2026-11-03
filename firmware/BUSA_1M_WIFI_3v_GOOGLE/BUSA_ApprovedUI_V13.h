@@ -343,38 +343,48 @@ static void v13Settings(uint32_t now,bool layout){
     v13Text(String(v>=0?"+":"")+String(v,1)+" °C",103,y,WHITE);
    }
    break;
-  case 1:
-   switch(wifiUiStage){
-    case WIFIUI_SCANNING:
-     v13Text("Поиск сети",17,119,WHITE);
-     v13Text("Поиск...",17,150,WHITE);break;
-    case WIFIUI_NETWORKS:
-     v13Text("Поиск сети",17,109,WHITE);
-     for(int row=0;row<4;row++){
-       int idx=(wifiUiIndex/4)*4+row;
+  case 1: {
+   if(wifiUiStage==WIFIUI_NETWORKS){
+     v13Text("Выбор сети · ENT выбрать",17,108,WHITE);
+     const int start=(wifiUiIndex/5)*5;
+     for(int row=0;row<5;row++){
+       const int idx=start+row;
        if(idx>=wifiUiCount)break;
-       const int y=134+row*31;
-       if(idx==wifiUiIndex)screen->fillRect(14,y-13,3,22,V13_CYAN);
-       String name=wifiUiNetworks[idx];
-       if(name.length()>31)name=name.substring(0,28)+"...";
-       v13Text(name,21,y,WHITE);
+       const int y=136+row*29;
+       v13Panel(13,y-19,214,26);
+       if(idx==wifiUiIndex)screen->fillRect(16,y-15,3,18,V13_CYAN);
+       String ssid=wifiUiNetworks[idx];
+       if(ssid.length()>24)ssid=ssid.substring(0,21)+"...";
+       v13Text(ssid,27,y,WHITE);
      }
-     break;
-    case WIFIUI_PASSWORD:{
-     v13Text("Сеть: "+wifiUiSelectedSsid,17,119,WHITE);
-     v13Text(String("Регистр: ")+wifiUiModeCaption(),17,158,WHITE);
-     v13Text("Пароль: "+wifiUiPasswordMask(),17,189,WHITE);
-     v13Panel(19,215,200,36);
-     v13Text("Сохранить",64,240,WHITE);
-     break;
-    }
-    case WIFIUI_CONNECTING:
-     v13Text("Подключение...",17,137,WHITE);
-     break;
-    default:
-     v13Text("Поиск сети",17,128,WHITE);
-     v13Text(WiFi.status()==WL_CONNECTED?"Wi-Fi подключён":"Нет подключения",17,168,WHITE);
-     break;
+   }else{
+     const bool connected=WiFi.status()==WL_CONNECTED;
+     String connectedName=connected?WiFi.SSID():String("");
+     if(connectedName.length()>17)connectedName=connectedName.substring(0,14)+"...";
+     String selected=wifiUiSelectedSsid;
+     if(selected.length()>17)selected=selected.substring(0,14)+"...";
+     String password=wifiUiStage==WIFIUI_PASSWORD?wifiUiPasswordPreview():wifiUiPasswordMask();
+     if(password.length()>15)password="..."+password.substring(password.length()-12);
+     String rows[5]={
+       wifiUiStage==WIFIUI_CONNECTING?"Wi-Fi: подключение":
+         (connected?"Подключено: "+connectedName:"Wi-Fi отключён"),
+       wifiUiStage==WIFIUI_SCANNING?"Поиск: выполняется":
+         (wifiUiCount?"Поиск сети ("+String(wifiUiCount)+")":"Поиск сети"),
+       selected.isEmpty()?"Выбор сети":("Сеть: "+selected),
+       String("Пароль [")+wifiUiModeCaption()+"]: "+password,
+       "Сохранить"
+     };
+     for(int i=0;i<5;i++){
+       const int y=105+i*35;
+       v13Panel(13,y-20,214,31);
+       if(i==wifiUiFocus)screen->fillRect(16,y-16,4,24,V13_CYAN);
+       v13Text(rows[i],27,y+1,WHITE);
+     }
+     if(wifiUiFeedback.length()){
+       String msg=wifiUiFeedback;
+       if(msg.length()>27)msg=msg.substring(0,24)+"...";
+       v13Text(msg,17,285,WHITE);
+     }
    }
    break;
   case 2:{
@@ -416,10 +426,12 @@ static void v13Diagnostics(uint32_t now,bool layout){
  static const char* names[]={"Экран","Клавиатура","Реле","Датчики","Wi-Fi/Google","ESP32","Расходомер"};
  if(layout){
   v13Text("ДИАГНОСТИКА",8,43,WHITE);
+  static const uint8_t diagVisualOrder[7]={0,2,4,6,1,3,5};
   for(int i=0;i<7;i++){
+   const int module=diagVisualOrder[i];
    const int y=48+i*29;v13Panel(5,y,230,27);
-   if(i==diagModule)screen->fillRect(7,y+3,3,21,V13_CYAN);
-   v13Text(names[i],17,y+19,WHITE);
+   if(module==diagModule)screen->fillRect(7,y+3,3,21,V13_CYAN);
+   v13Text(names[module],17,y+19,WHITE);
   }
  }
  if(tftView){
