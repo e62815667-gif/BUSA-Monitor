@@ -1531,6 +1531,9 @@ String statusJSON(){
   s+=",\"network_indicators\":{\"internet\":"+(googleInternet==1?String("true"):String("false"));
   s+=",\"local_client\":"+(WiFi.softAPgetStationNum()>0?String("true"):String("false"));
   s+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"))+"}";
+  s+=",\"wifi_scan\":{\"phase\":"+String(wifiUiScanPhase)+
+    ",\"attempts\":"+String(wifiUiRetries)+",\"code\":"+String(wifiUiLastScanCode)+
+    ",\"scanning\":"+(wifiUiScanPending||wifiUiOwnsScan?String("true"):String("false"))+"}";
   s+=",\"sta_switch\":{\"pending\":"+(busaStaSwitchPending?String("true"):String("false"))+
     ",\"connecting\":"+(busaStaSwitching?String("true"):String("false"))+
     ",\"result\":"+String((int)busaStaLastResult)+
@@ -3016,7 +3019,7 @@ void setup(){
       server.send(403,"application/json","{\"error\":\"Only protected local AP\"}");return;
     }
     if(server.hasArg("start") && server.arg("start")=="1"){
-      if(!wifiUiScanPending && !wifiUiOwnsScan && !busaStaSwitchPending && !busaStaSwitching)wifiUiBeginScan();
+      if(!wifiUiScanPending && !wifiUiOwnsScan)wifiUiBeginScan();
     }
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",wifiUiScanJSON());
