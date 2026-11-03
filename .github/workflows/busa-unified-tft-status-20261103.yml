@@ -75,13 +75,13 @@ jobs:
           assert 'setInterval(update,3000)' in s
           assert 'statusFailures>=3' in s
           assert 'AbortSignal.timeout(6000)' in s
-          assert 'elapsed(now,lastStationCheck,120000)' in s
+          assert 'busaStaService();' in s and 'busaStaSwitchAt' in s
           assert 'busaGoogleNetworkBusy' in s
           google=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
           assert 'lastNetProbe' not in google and 'probe.connect(' not in google
           assert 'request.setConnectTimeout(8000)' in google
           assert 'request.setTimeout(10000)' in google
-          assert 'if(busaWifiScanRunning)continue;' in google
+          assert 'busaWifiScanRunning||busaStaSwitchPending||busaStaSwitching' in google
           assert 'googleInternet=1;googleDns=1;' in google
           assert 'WIFI_SCAN_FAILED' in Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert 'KPIN[4]={7,6,5,4}' in s
