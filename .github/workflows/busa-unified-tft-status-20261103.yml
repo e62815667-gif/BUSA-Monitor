@@ -1,7 +1,7 @@
-name: Build BUSA 14.9 minimalist TFT footer N16R8 OTA preserves 20 keys
+name: Build BUSA 14.9 expanded all-screen TFT N16R8 OTA preserves NVS
 on:
   push:
-    branches: [fix/busa-v14-9-home-expand-clean-20261103]
+    branches: [fix/busa-v14-9-layout-allpages-20261103]
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
@@ -51,7 +51,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          assert '14v9-N16R8-HOME-EXPAND-NVS-20261103' in s
+          assert '14v9-N16R8-LAYOUT2-NVS-20261103' in s
           assert 'busaRemoteAlarmApply()' in s and 'busaRemoteAlarmJSON()' in s
           remote=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_RemoteAlarm.h').read_text()
           assert 'portENTER_CRITICAL' in remote
@@ -69,7 +69,17 @@ jobs:
           assert 'K1-K4: ЗВУК 12В' not in landscape
           assert 'v14Tiny("назад"' not in landscape
           assert 'v14Tiny("ESC",288,229' in landscape
-          assert 'hqRig(120,27,125,179)' in landscape
+          assert 'hqRig(117,25,130,181,false)' in landscape
+          assert 'ГРАФИК ОТБОРА' not in landscape
+          assert 'ВОДА · YF-S401' not in landscape
+          assert 'Линия отсутствует' not in landscape
+          assert 'bandY=66,bandH=33' in landscape
+          assert 'y=25+(i/2)*92' in landscape
+          assert 'y=26+i*36' in landscape
+          assert 'y=26+(i/2)*45' in landscape
+          assert 'y=80+i*24' in landscape
+          graphics=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedGraphics_HQ_V14.h').read_text()
+          assert 'bool framed=true' in graphics and 'if(framed)hqPanel(x,y,w,h);' in graphics
           assert 'v14Metric(v13Temp(i,now),21,27+i*44+37' in landscape
           assert 'hqPanel(3,y,116,34)' not in landscape
           assert 'v14Tiny("ENTER"' in landscape and 'v14Tiny("ESC"' in landscape
@@ -111,7 +121,7 @@ jobs:
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
           ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert '#include "BUSA_KeypadTFT_UI.h"' in s
-          assert '14v9-N16R8-HOME-EXPAND-NVS-20261103' in s
+          assert '14v9-N16R8-LAYOUT2-NVS-20261103' in s
           assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,80)' in ui
           assert 'WIFIUI_PASSWORD' in ui and 'wifiUiTypeDigit' in ui
           assert 'wifiUiModeCaption()' in ui and '"abc","ABC","123","SYM"' in ui
@@ -127,7 +137,7 @@ jobs:
           assert 'v14SystemInfoRows()' in land and 'u' not in []
           assert 'Wi-Fi подключён: ' in land and 'ESP32 Wi-Fi: ' in land
           assert 'Прошивка: V14.9' in land and 'String(uptimeSeconds%60)' in land
-          assert 'v14Print("Прошивка: V14.9",17,163,V14_TEXT)' in land
+          assert 'v14Print("Прошивка: V14.9",17,157,V14_TEXT)' in land
           assert 'Пороги звука не меняются' not in land
           assert 'UP/DN выбор датчика' not in land
           assert 'v13Text("Прошивка: V14.9"' in portrait
@@ -162,18 +172,18 @@ jobs:
       - name: Produce APP-ONLY OTA and USB-at-0x10000 image
         run: |
           set -euo pipefail
-          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_HOME_EXPAND_APP_OTA.bin
-          (cd out && sha256sum BUSA_14_9_HOME_EXPAND_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_LAYOUT2_APP_OTA.bin
+          (cd out && sha256sum BUSA_14_9_LAYOUT2_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('out/BUSA_14_9_HOME_EXPAND_APP_OTA.bin')
+          p=Path('out/BUSA_14_9_LAYOUT2_APP_OTA.bin')
           assert 60000 < p.stat().st_size < 3000000
           print('APP-ONLY',p.stat().st_size,'bytes; OTA or esptool write_flash at 0x10000')
           print('Do NOT use erase_flash, merged/full USB or erase NVS; preserve both keys20 namespaces')
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_14_9_HOME_EXPAND_APP_OTA
+          name: BUSA_14_9_LAYOUT2_APP_OTA
           path: |
-            out/BUSA_14_9_HOME_EXPAND_APP_OTA.bin
+            out/BUSA_14_9_LAYOUT2_APP_OTA.bin
             out/SHA256SUMS.txt
