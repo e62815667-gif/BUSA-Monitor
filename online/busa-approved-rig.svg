@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 720" role="img" aria-labelledby="rigTitle rigDesc">
+<title id="rigTitle">Установка БУСА-1М — утверждённая компоновка</title>
+<desc id="rigDesc">Хромированный куб с уровнями, две колонны, соединительные трубки, правый холодильник со спиралью, синие капли и прозрачный мерный стакан. Векторная иллюстрация без потери чёткости.</desc>
+<defs>
+ <linearGradient id="dark" x1="0" y1="0" x2=".95" y2="1"><stop stop-color="#061726"/><stop offset=".55" stop-color="#020916"/><stop offset="1" stop-color="#041629"/></linearGradient>
+ <linearGradient id="steel" x1="0" x2="1"><stop stop-color="#43525c"/><stop offset=".14" stop-color="#a6b4bd"/><stop offset=".29" stop-color="#f4f8f9"/><stop offset=".4" stop-color="#687e8b"/><stop offset=".56" stop-color="#e6f3f7"/><stop offset=".74" stop-color="#647784"/><stop offset=".87" stop-color="#cddbe1"/><stop offset="1" stop-color="#34444f"/></linearGradient>
+ <linearGradient id="steelLight" x1="0" x2="1"><stop stop-color="#62747e"/><stop offset=".25" stop-color="#e0ecee"/><stop offset=".52" stop-color="#fbfeff"/><stop offset=".71" stop-color="#667b8b"/><stop offset="1" stop-color="#b9cbd4"/></linearGradient>
+ <linearGradient id="steelTall" x1="0" y1="0" x2="1" y2=".05"><stop stop-color="#36434b"/><stop offset=".18" stop-color="#c0d2d7"/><stop offset=".33" stop-color="#fcffff"/><stop offset=".48" stop-color="#a7b8bd"/><stop offset=".65" stop-color="#5d6f79"/><stop offset=".82" stop-color="#d7e5e9"/><stop offset="1" stop-color="#2c414a"/></linearGradient>
+ <linearGradient id="water" x1="0" y1="0" x2=".6" y2="1"><stop stop-color="#d8fcff"/><stop offset=".18" stop-color="#39e6ff"/><stop offset=".62" stop-color="#008fea"/><stop offset="1" stop-color="#003d94"/></linearGradient>
+ <linearGradient id="glass" x1="0" x2="1"><stop stop-color="#91d9ef" stop-opacity=".22"/><stop offset=".18" stop-color="#d7f6ff" stop-opacity=".62"/><stop offset=".4" stop-color="#164c70" stop-opacity=".18"/><stop offset=".75" stop-color="#68b1d2" stop-opacity=".22"/><stop offset="1" stop-color="#e7f9ff" stop-opacity=".66"/></linearGradient>
+ <radialGradient id="cyanGlow"><stop stop-color="#25f6ff" stop-opacity=".85"/><stop offset="1" stop-color="#07a9ed" stop-opacity="0"/></radialGradient>
+ <linearGradient id="gold" x1="0" x2="1"><stop stop-color="#915115"/><stop offset=".33" stop-color="#ffe273"/><stop offset=".7" stop-color="#f58b14"/><stop offset="1" stop-color="#7c320f"/></linearGradient>
+ <linearGradient id="red" x1="0" x2="1"><stop stop-color="#6f0920"/><stop offset=".45" stop-color="#ff5b64"/><stop offset="1" stop-color="#a70011"/></linearGradient>
+ <filter id="shadow" x="-35%" y="-35%" width="175%" height="180%"><feDropShadow dx="1.5" dy="4" stdDeviation="5" flood-color="#000" flood-opacity=".72"/></filter>
+ <filter id="waterGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="2.1"/></filter>
+ <pattern id="metalMark" width="12" height="7" patternUnits="userSpaceOnUse"><path d="M0 4h12" stroke="#c7e0e8" stroke-opacity=".07" stroke-width="1"/></pattern>
+</defs>
+<rect width="360" height="720" fill="url(#dark)"/>
+<ellipse cx="180" cy="650" rx="153" ry="20" fill="#00aafa" opacity=".07"/>
+<!-- Coolant return piping behind column -->
+<g fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#shadow)">
+ <path d="M235 317v33c0 19-9 29-24 29h-43c-17 0-23 8-23 20v40" stroke="#3c4a52" stroke-width="14"/>
+ <path d="M235 317v33c0 19-9 29-24 29h-43c-17 0-23 8-23 20v40" stroke="#e3f1f5" stroke-width="8"/>
+ <path d="M235 317v33c0 19-9 29-24 29h-43c-17 0-23 8-23 20v40" stroke="#7597a4" stroke-width="2"/>
+ <path d="M123 105V73c0-18 10-28 26-28h57c16 0 18 14 18 28" stroke="#42545c" stroke-width="14"/>
+ <path d="M123 105V73c0-18 10-28 26-28h57c16 0 18 14 18 28" stroke="#f5fcff" stroke-width="8"/>
+ <path d="M123 105V73c0-18 10-28 26-28h57c16 0 18 14 18 28" stroke="#718e9b" stroke-width="2"/>
+ <path d="M235 130h30c22 0 33 12 33 28v22" stroke="#405462" stroke-width="13"/>
+ <path d="M235 130h30c22 0 33 12 33 28v22" stroke="#d9ecf3" stroke-width="7"/>
+</g>
+<!-- Branch stainless side column, left -->
+<g filter="url(#shadow)">
+ <rect x="105" y="96" width="41" height="323" rx="12" fill="url(#steelTall)" stroke="#334650" stroke-width="3"/>
+ <path d="M109 109v288" stroke="#ffffff" stroke-opacity=".65" stroke-width="2"/>
+ <path d="M136 104v294" stroke="#122938" stroke-opacity=".4" stroke-width="2"/>
+ <rect x="101" y="105" width="49" height="10" rx="4" fill="url(#steel)" stroke="#91afbd"/>
+ <rect x="101" y="397" width="49" height="13" rx="4" fill="url(#steel)" stroke="#8ba4ac"/>
+ <rect x="110" y="133" width="31" height="9" rx="3" fill="url(#steelLight)" stroke="#506877"/>
+ <rect x="110" y="329" width="31" height="9" rx="3" fill="url(#steelLight)" stroke="#506877"/>
+ <path d="M104 192h48M104 274h48" stroke="#526978" stroke-width="9"/>
+ <path d="M104 191h48M104 273h48" stroke="#e2e9ef" stroke-width="5"/>
+ <circle cx="126" cy="181" r="11" fill="url(#steel)" stroke="#91adbc" stroke-width="2"/>
+ <circle cx="126" cy="181" r="6" fill="url(#water)"/>
+ <circle cx="126" cy="253" r="10" fill="url(#steel)" stroke="#91adbc" stroke-width="2"/>
+ <circle cx="126" cy="253" r="5" fill="url(#water)"/>
+ <circle cx="126" cy="346" r="11" fill="url(#red)" stroke="#edabb0" stroke-width="2"/>
+ <circle cx="126" cy="346" r="5" fill="#88000c"/>
+</g>
+<!-- Main rectification column right -->
+<g filter="url(#shadow)">
+ <rect x="204" y="60" width="43" height="297" rx="10" fill="url(#steelTall)" stroke="#394c56" stroke-width="3"/>
+ <rect x="201" y="58" width="49" height="14" rx="5" fill="url(#steelLight)" stroke="#55717e" stroke-width="2"/>
+ <rect x="201" y="345" width="49" height="13" rx="5" fill="url(#steelLight)" stroke="#55717e" stroke-width="2"/>
+ <path d="M212 82v252" stroke="#fff" stroke-width="2" stroke-opacity=".72"/>
+ <path d="M238 81v251" stroke="#344d59" stroke-width="3" opacity=".5"/>
+ <path d="M208 167h35M208 279h35" stroke="#b7cbd3" stroke-width="7"/>
+ <path d="M208 167h35M208 279h35" stroke="#42596a" stroke-width="2"/>
+ <circle cx="226" cy="162" r="12" fill="url(#steel)" stroke="#98adbb"/>
+ <circle cx="226" cy="162" r="6" fill="url(#water)"/>
+ <circle cx="226" cy="282" r="12" fill="url(#steel)" stroke="#98adbb"/>
+ <circle cx="226" cy="282" r="6" fill="url(#water)"/>
+ <rect x="216" y="88" width="7" height="40" rx="3" fill="#4fd8fb" opacity=".43"/>
+</g>
+<!-- Framed spiral refrigerator -->
+<g filter="url(#shadow)">
+ <path d="M285 169h52v261h-52z" fill="url(#glass)" stroke="#8eb6c7" stroke-width="5"/>
+ <rect x="283" y="164" width="56" height="15" rx="6" fill="url(#steelLight)" stroke="#516f7b" stroke-width="2"/>
+ <rect x="283" y="416" width="56" height="14" rx="6" fill="url(#steelLight)" stroke="#516f7b" stroke-width="2"/>
+ <rect x="291" y="187" width="40" height="223" fill="#043967" opacity=".58"/>
+ <path d="M291 185h40v92h-40z" fill="#007eea" opacity=".30"/>
+ <path d="M294 194 C330 194 330 206 310 206 S292 219 310 219 S332 231 310 231 S292 243 310 243 S332 255 310 255 S292 267 310 267 S332 279 310 279 S292 291 310 291 S332 303 310 303 S292 315 310 315 S332 327 310 327 S292 339 310 339 S332 351 310 351 S292 363 310 363 S332 375 310 375 S292 387 310 387 S332 399 310 399" stroke="#a7d8f0" stroke-width="5" fill="none" stroke-linecap="round"/>
+ <path d="M294 194 C330 194 330 206 310 206 S292 219 310 219 S332 231 310 231 S292 243 310 243 S332 255 310 255 S292 267 310 267 S332 279 310 279" stroke="#22b9ff" stroke-width="2.6" fill="none" stroke-linecap="round" opacity=".95"/>
+ <path d="M294 182v226" stroke="#d8f4ff" stroke-width="2" opacity=".58"/>
+ <path d="M335 184v226" stroke="#d8f4ff" stroke-width="2" opacity=".8"/>
+ <path d="M300 430v31" stroke="#a2bac4" stroke-width="8" fill="none"/>
+ <path d="M300 430v31" stroke="#f3fdff" stroke-width="3" fill="none"/>
+</g>
+<!-- Boiler pot silver lid, shell and bright polished sight gauge -->
+<g filter="url(#shadow)">
+ <path d="M66 481Q77 446 111 436h49q45 4 57 45v10H66z" fill="url(#steelLight)" stroke="#526571" stroke-width="4"/>
+ <ellipse cx="143" cy="483" rx="92" ry="17" fill="url(#steelLight)" stroke="#516b7a" stroke-width="4"/>
+ <path d="M53 489h183v128q-3 28-91 31-89-1-92-31z" fill="url(#steel)" stroke="#4a5d66" stroke-width="4"/>
+ <path d="M59 498v120q8 20 35 24" fill="none" stroke="#faffff" stroke-width="3" opacity=".78"/>
+ <path d="M221 497v123" fill="none" stroke="#293d4c" stroke-width="5" opacity=".6"/>
+ <path d="M57 501h176v108H57z" fill="url(#metalMark)" opacity=".5"/>
+ <ellipse cx="145" cy="618" rx="91" ry="23" fill="none" stroke="#a4becb" stroke-width="3" opacity=".45"/>
+ <path d="M72 643l-8 15h19l8-13m104-1 7 15h22l-12-19" fill="url(#steel)" stroke="#566974" stroke-width="3"/>
+ <rect x="133" y="522" width="23" height="101" rx="11" fill="#425764" stroke="#a6bfc8" stroke-width="3"/>
+ <rect x="138" y="527" width="13" height="89" rx="6" fill="#052b48" stroke="#d9eef5" stroke-width="2"/>
+ <path d="M144 536v70" stroke="#4bd5ff" stroke-width="3" opacity=".95"/>
+ <ellipse cx="144" cy="536" rx="4.5" ry="6.5" fill="url(#water)"/>
+ <rect x="120" y="452" width="47" height="15" rx="6" fill="url(#steelLight)" stroke="#435762"/>
+ <path d="M121 424h45v27h-45z" fill="url(#steel)" stroke="#435762" stroke-width="3"/>
+ <ellipse cx="143" cy="425" rx="24" ry="7" fill="url(#steelLight)" stroke="#516a74" stroke-width="3"/>
+</g>
+<!-- valves and taps -->
+<g filter="url(#shadow)">
+ <path d="M87 344h40" stroke="#b7c6cc" stroke-width="10" stroke-linecap="round"/>
+ <rect x="78" y="333" width="18" height="22" rx="4" fill="url(#steel)" stroke="#546d77"/>
+ <path d="M84 333v-22m-12 9h24" stroke="url(#red)" stroke-width="7" stroke-linecap="round"/>
+ <path d="M144 252h24" stroke="#c5d6dc" stroke-width="8"/>
+ <circle cx="169" cy="252" r="12" fill="url(#gold)" stroke="#fff1b3" stroke-width="2"/>
+ <path d="M167 240v24m-11-12h23" stroke="url(#gold)" stroke-width="4.5" stroke-linecap="round"/>
+ <circle cx="184" cy="45" r="15" fill="url(#gold)" stroke="#d8e9e9" stroke-width="3"/>
+ <circle cx="184" cy="45" r="7" fill="#f6900f"/>
+ <path d="M184 26v-10m-12 9h24" stroke="#d7e5e9" stroke-width="6" stroke-linecap="round"/>
+ <path d="M226 558h31" stroke="#b5c7d0" stroke-width="11"/>
+ <circle cx="263" cy="558" r="13" fill="url(#red)" stroke="#efc5c8" stroke-width="2"/>
+ <path d="M262 545v26m-12-13h25" stroke="#ff575b" stroke-width="5" stroke-linecap="round"/>
+ <path d="M259 526v-21" stroke="#cae6f3" stroke-width="7" stroke-linecap="round"/>
+ <circle cx="259" cy="506" r="6" fill="url(#water)"/>
+</g>
+<!-- Distillate drops and collecting cup -->
+<g>
+ <path d="M300 470c-5 12-11 21-11 30a11 11 0 0022 0c0-9-7-20-11-30Z" fill="url(#water)" stroke="#45cfff" stroke-width="2"/>
+ <path d="M301 522c-3 6-7 13-7 18a7 7 0 0014 0c0-5-4-12-7-18Z" fill="url(#water)" stroke="#54d7fc" stroke-width="1.4"/>
+ <path d="M290 578h63l-7 96q-29 17-49 0z" fill="url(#glass)" stroke="#adc9d4" stroke-width="3"/>
+ <path d="M295 615q27-5 53 0l-4 55q-25 12-44 0z" fill="url(#water)" opacity=".83"/>
+ <path d="M296 612q28-8 52 0" fill="none" stroke="#b9faff" stroke-width="3"/>
+ <ellipse cx="321" cy="580" rx="32" ry="9" fill="#09263b" fill-opacity=".5" stroke="#d2edf5" stroke-width="3"/>
+ <path d="M300 589v77" stroke="#fff" stroke-width="2" opacity=".8"/>
+ <path d="M343 590l-3 76" stroke="#c3f4ff" stroke-width="2" opacity=".6"/>
+ <ellipse cx="321" cy="673" rx="25" ry="5" fill="#24c5fb" opacity=".4"/>
+</g>
+</svg>
