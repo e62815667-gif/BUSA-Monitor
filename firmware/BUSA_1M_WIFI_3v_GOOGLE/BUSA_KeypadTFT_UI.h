@@ -15,6 +15,9 @@ uint8_t wifiUiLastTapKey=255,wifiUiLastTapIndex=0;
 uint32_t wifiUiLastTapAt=0,wifiUiScanAt=0,wifiUiConnectAt=0;
 uint8_t wifiUiCursor=0;
 bool wifiUiOwnsScan=false,wifiUiConnectPending=false;
+uint8_t wifiUiScanAttempts=0; // One automatic retry for failed or empty scans
+uint32_t wifiUiScanRetryAt=0;
+int wifiUiLastScanCode=-99; // -3=timeout, -2=failed, >=0=number found
 String wifiUiFeedback="";
 extern volatile bool busaWifiScanRunning,busaGoogleNetworkBusy;
 extern uint32_t busaWifiScanLastAt,busaWifiScanStartedAt,lastStationCheck;
@@ -122,29 +125,72 @@ void wifiUiLeave(){
   }
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiStage=WIFIUI_STATUS;
-  wifiUiMenuIndex=0;
+  wifiUiMenuIndex=0;wifiUiScanRetryAt=0;
   // Leaving the menu NEVER disconnects BUSA's own Wi-Fi hotspot.
+  tftDirty=true;
+}
+
+// Recover STA scan capability without stopping/restarting the BUSA softAP.
+// ESP32-S3 uses one radio for AP+STA; scanning still works when external
+// internet was explicitly disabled with WiFi.disconnect(false,false).
+void wifiUiStartScanAttempt(uint32_t now){
+  ++wifiUiScanAttempts;
+  wifiUiScanRetryAt=0;
+  wifiUiStage=WIFIUI_SCANNING;
+  if(WiFi.getMode()!=WIFI_AP_STA){
+    if(!WiFi.mode(WIFI_AP_STA)){
+      wifiUiLastScanCode=WIFI_SCAN_FAILED;
+      wifiUiFeedback="STA недоступна. AP БУСА работает";
+      wifiUiOwnsScan=false;busaWifiScanRunning=false;
+      if(wifiUiScanAttempts<2)wifiUiScanRetryAt=now+1200;
+      else wifiUiStage=WIFIUI_STATUS;
+      tftDirty=true;return;
+    }
+  }
+  WiFi.setSleep(false);
+  WiFi.scanDelete();
+  wifiUiScanAt=now;
+  busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
+  // Active 2.4-GHz scan, asynchronous, extended time per channel.
+  const int result=WiFi.scanNetworks(true,false,false,120);
+  wifiUiLastScanCode=result;
+  wifiUiOwnsScan=(result==WIFI_SCAN_RUNNING || result>=0);
+  busaWifiScanRunning=wifiUiOwnsScan;
+  if(!wifiUiOwnsScan){
+    wifiUiFeedback="Ошибка сканера. Повторяю...";
+    if(wifiUiScanAttempts<2)wifiUiScanRetryAt=now+1200;
+    else{
+      wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
+      wifiUiFeedback="Сканер Wi-Fi: ошибка "+String(result);
+    }
+  }else{
+    wifiUiFeedback=wifiUiScanAttempts>1?
+      "Повторный поиск сетей 2,4 ГГц...":
+      "Поиск сетей 2,4 ГГц...";
+  }
   tftDirty=true;
 }
 void wifiUiBeginScan(){
   const uint32_t now=millis();
-  if(otaActive||busaWifiScanRunning||busaGoogleNetworkBusy){
+  if(otaActive || busaGoogleNetworkBusy){
     wifiUiFeedback="Сеть занята, повтори поиск";tftDirty=true;return;
   }
-  if(busaWifiScanLastAt&&(uint32_t)(now-busaWifiScanLastAt)<15000){
-    wifiUiFeedback="Повтори поиск через 15 секунд";tftDirty=true;return;
+  // The local app's scan can remain flagged when its browser stopped polling.
+  // Recover only a stale request; never interrupt a valid in-flight scan.
+  if(busaWifiScanRunning && !wifiUiOwnsScan &&
+     (uint32_t)(now-busaWifiScanStartedAt)>=16000){
+    WiFi.scanDelete();busaWifiScanRunning=false;
+  }
+  if(busaWifiScanRunning){
+    wifiUiFeedback="Сканирование уже выполняется";tftDirty=true;return;
+  }
+  if(busaWifiScanLastAt && (uint32_t)(now-busaWifiScanLastAt)<3000){
+    wifiUiFeedback="Повтори поиск через 3 секунды";tftDirty=true;return;
   }
   wifiUiCount=0;wifiUiIndex=0;wifiUiSelectedSsid="";
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
-  wifiUiFeedback="Поиск доступных сетей...";
-  WiFi.scanDelete();
-  busaWifiScanLastAt=now;busaWifiScanStartedAt=now;wifiUiScanAt=now;
-  const int result=WiFi.scanNetworks(true,false,false,80);
-  wifiUiOwnsScan=(result==WIFI_SCAN_RUNNING||result>=0);
-  busaWifiScanRunning=wifiUiOwnsScan;
-  wifiUiStage=wifiUiOwnsScan?WIFIUI_SCANNING:WIFIUI_STATUS;
-  if(!wifiUiOwnsScan)wifiUiFeedback="Ошибка поиска Wi-Fi";
-  tftDirty=true;
+  wifiUiScanAttempts=0;wifiUiScanRetryAt=0;wifiUiLastScanCode=-99;
+  wifiUiStartScanAttempt(now);
 }
 void wifiUiPoll(){
   const uint32_t now=millis();
@@ -152,31 +198,49 @@ void wifiUiPoll(){
     wifiUiApplyStationDisconnect();
     return;
   }
-  if(wifiUiStage==WIFIUI_SCANNING && wifiUiOwnsScan){
-    const int count=WiFi.scanComplete();
-    if(count==WIFI_SCAN_RUNNING && (uint32_t)(now-wifiUiScanAt)<10000)return;
-    if(count<0 || (uint32_t)(now-wifiUiScanAt)>=10000){
-      WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
-      wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
-      wifiUiFeedback="Сети не найдены; повтори поиск";
-    }else{
-      for(int i=0;i<count && wifiUiCount<16;i++){
-        const String candidate=WiFi.SSID(i);
-        if(candidate.isEmpty()||candidate.length()>32)continue;
-        bool duplicate=false;
-        for(int j=0;j<wifiUiCount;j++)if(wifiUiNetworks[j]==candidate){duplicate=true;break;}
-        if(duplicate)continue;
-        wifiUiNetworks[wifiUiCount]=candidate;
-        wifiUiSignals[wifiUiCount]=WiFi.RSSI(i);
-        wifiUiCount++;
+  if(wifiUiStage==WIFIUI_SCANNING){
+    if(wifiUiScanRetryAt){
+      if((int32_t)(now-wifiUiScanRetryAt)>=0){
+        wifiUiStartScanAttempt(now);
       }
-      WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
-      wifiUiStage=WIFIUI_STATUS;
-      wifiUiMenuIndex=wifiUiCount?1:0;
-      wifiUiFeedback=wifiUiCount?
-        String("Найдено сетей: ")+wifiUiCount+". ENT: выбор":
-        String("Сети не найдены. ENT: повтор");
+      return; // Waiting for the automatic retry, not a failed search menu.
     }
+    if(!wifiUiOwnsScan)return;
+    const int count=WiFi.scanComplete();
+    if(count==WIFI_SCAN_RUNNING &&
+       (uint32_t)(now-wifiUiScanAt)<14000)return;
+    const bool timedOut=count==WIFI_SCAN_RUNNING;
+    wifiUiLastScanCode=timedOut?-3:count;
+    if(timedOut || count<=0){
+      WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
+      if(wifiUiScanAttempts<2){
+        wifiUiScanRetryAt=now+1000;
+        wifiUiFeedback="Поиск не завершён. Повторяю...";
+      }else{
+        wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
+        if(timedOut)wifiUiFeedback="Поиск Wi-Fi: превышено время";
+        else if(count<0)wifiUiFeedback="Ошибка сканера: "+String(count);
+        else wifiUiFeedback="Сети 2,4 ГГц не найдены";
+      }
+      tftDirty=true;return;
+    }
+    for(int i=0;i<count && wifiUiCount<16;i++){
+      const String candidate=WiFi.SSID(i);
+      if(candidate.isEmpty()||candidate.length()>32)continue;
+      bool duplicate=false;
+      for(int j=0;j<wifiUiCount;j++)
+        if(wifiUiNetworks[j]==candidate){duplicate=true;break;}
+      if(duplicate)continue;
+      wifiUiNetworks[wifiUiCount]=candidate;
+      wifiUiSignals[wifiUiCount]=WiFi.RSSI(i);
+      ++wifiUiCount;
+    }
+    WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
+    wifiUiStage=WIFIUI_STATUS;
+    wifiUiMenuIndex=wifiUiCount?1:0;
+    wifiUiFeedback=wifiUiCount?
+      "Найдено сетей: "+String(wifiUiCount)+". ENT: выбор":
+      "Сети не отображаются: повтори поиск";
     tftDirty=true;
   }
   if(wifiUiConnectPending && !wifiUiDisablePending &&
@@ -268,6 +332,7 @@ bool wifiUiKey(int k){
   if(wifiUiStage==WIFIUI_SCANNING){
     if(k==15){
       WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
+      wifiUiScanRetryAt=0;
       wifiUiStage=WIFIUI_STATUS;wifiUiFeedback="Поиск отменён";
     }else if(k==16||k==18)return false;
     tftDirty=true;return true;
