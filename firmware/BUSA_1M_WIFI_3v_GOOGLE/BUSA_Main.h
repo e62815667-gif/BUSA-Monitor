@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-MENU-STA-NVS-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-SCAN-RECOVERY-NVS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1490,6 +1490,12 @@ String statusJSON(){
   s+=",\"ap_clients\":"+String(WiFi.softAPgetStationNum());
   s+=",\"sta_connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
   s+=",\"sta_disabled_by_user\":"+(wifiUiStaDisabled?String("true"):String("false"));
+  // Scan diagnostics let Google telemetry distinguish zero visible SSIDs
+  // from a driver error, a timeout or an overlapping local-app scan.
+  s+=",\"scan_result_code\":"+String(wifiUiLastScanCode);
+  s+=",\"scan_attempts\":"+String(wifiUiScanAttempts);
+  s+=",\"scan_network_count\":"+String(wifiUiCount);
+  s+=",\"scan_in_progress\":"+(busaWifiScanRunning?String("true"):String("false"));
   s+=",\"sta_rssi_dbm\":"+(WiFi.status()==WL_CONNECTED?String(WiFi.RSSI()):String("null"));
   s+=",\"station_credentials_protected\":true}";
   s+="}";
@@ -2965,6 +2971,12 @@ void setup(){
       server.send(403,"application/json","{\"error\":\"Only protected local AP\"}");return;
     }
     const uint32_t now=millis();
+    // TFT and web UI share one radio / scan-result buffer. Never let a
+    // browser polling for scans consume+delete the result of the TFT scan.
+    if(wifiUiOwnsScan || (wifiUiStage==WIFIUI_SCANNING && wifiUiScanRetryAt)){
+      server.send(409,"application/json",
+        "{\"scanning\":true,\"error\":\"tft_scan_active\",\"networks\":[]}");return;
+    }
     if(server.hasArg("start") && server.arg("start")=="1"){
       // A STA scan shares one 2.4-GHz radio with the local AP.
       // One short passive scan per request, bounded to avoid lengthy AP stalls.
@@ -2974,14 +2986,18 @@ void setup(){
       if(busaGoogleNetworkBusy){
         server.send(503,"application/json","{\"scanning\":false,\"error\":\"google_upload_active\",\"networks\":[]}");return;
       }
-      if(busaWifiScanLastAt && !elapsed(now,busaWifiScanLastAt,15000)){
+      if(busaWifiScanLastAt && !elapsed(now,busaWifiScanLastAt,5000)){
         server.send(429,"application/json","{\"scanning\":false,\"error\":\"repeat_too_soon\",\"networks\":[]}");return;
+      }
+      // Restore AP+STA if the STA part was disabled by a previous station
+      // disconnect, without ever disabling the BUSA access point.
+      if(WiFi.getMode()!=WIFI_AP_STA && !WiFi.mode(WIFI_AP_STA)){
+        server.send(503,"application/json",
+          "{\"scanning\":false,\"error\":\"sta_unavailable\",\"networks\":[]}");return;
       }
       WiFi.scanDelete();
       busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
-      // Active probe is more reliable than the old 45-ms passive scan, which
-      // could miss 100-ms AP beacons and incorrectly report zero networks.
-      const int started=WiFi.scanNetworks(true,false,false,80);
+      const int started=WiFi.scanNetworks(true,false,false,120);
       busaWifiScanRunning=(started==WIFI_SCAN_RUNNING);
       if(started==WIFI_SCAN_FAILED){
         busaWifiScanRunning=false;
