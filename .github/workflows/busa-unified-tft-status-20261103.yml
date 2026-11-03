@@ -1,7 +1,7 @@
-name: Build BUSA 14.9 TFT SETTINGS N16R8 OTA preserves NVS
+name: Build BUSA 14.9 minimalist TFT footer N16R8 OTA preserves 20 keys
 on:
   push:
-    branches: [feature/busa-v14-9-tft-settings-20261103]
+    branches: [fix/busa-v14-9-tft-footer-nav-20261103]
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
@@ -51,7 +51,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          assert '14v9-N16R8-SETTINGS-KEYBOARD-NVS-20261103' in s
+          assert '14v9-N16R8-FOOTER-NVS-20261103' in s
           assert 'busaRemoteAlarmApply()' in s and 'busaRemoteAlarmJSON()' in s
           remote=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_RemoteAlarm.h').read_text()
           assert 'portENTER_CRITICAL' in remote
@@ -65,6 +65,9 @@ jobs:
           assert 'localOn' in s and 'googleOn' in s
           landscape=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Landscape_V14.h').read_text()
           assert 'v14GoogleLast' in landscape and 'v14Tiny("ESP32"' in landscape
+          assert 'v14FooterSectionNames' in landscape and 'v14Tabs[i]' not in landscape
+          assert 'v14Tiny("ENTER"' in landscape and 'v14Tiny("ESC"' in landscape
+          assert 'v14Tiny("назад"' in landscape and 'v14Tiny("0,"' not in landscape
           portrait=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
           assert 'v13Text("G"' in portrait and 'v13Text("E"' in portrait
           assert 'WiFi.scanNetworks(true,false,false,80)' in s
@@ -102,7 +105,7 @@ jobs:
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
           ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert '#include "BUSA_KeypadTFT_UI.h"' in s
-          assert '14v9-N16R8-SETTINGS-KEYBOARD-NVS-20261103' in s
+          assert '14v9-N16R8-FOOTER-NVS-20261103' in s
           assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,80)' in ui
           assert 'WIFIUI_PASSWORD' in ui and 'wifiUiTypeDigit' in ui
           assert 'wifiUiModeCaption()' in ui and '"abc","ABC","123","SYM"' in ui
@@ -153,18 +156,18 @@ jobs:
       - name: Produce APP-ONLY OTA and USB-at-0x10000 image
         run: |
           set -euo pipefail
-          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin
-          (cd out && sha256sum BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_FOOTER_NAV_APP_OTA.bin
+          (cd out && sha256sum BUSA_14_9_FOOTER_NAV_APP_OTA.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('out/BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin')
+          p=Path('out/BUSA_14_9_FOOTER_NAV_APP_OTA.bin')
           assert 60000 < p.stat().st_size < 3000000
           print('APP-ONLY',p.stat().st_size,'bytes; OTA or esptool write_flash at 0x10000')
           print('Do NOT use erase_flash, merged/full USB or erase NVS; preserve both keys20 namespaces')
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_14_9_SETTINGS_NVS_SAFE_OTA
+          name: BUSA_14_9_FOOTER_NAV_APP_OTA
           path: |
-            out/BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin
+            out/BUSA_14_9_FOOTER_NAV_APP_OTA.bin
             out/SHA256SUMS.txt
