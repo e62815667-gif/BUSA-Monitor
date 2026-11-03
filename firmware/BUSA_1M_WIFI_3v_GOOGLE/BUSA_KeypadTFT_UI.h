@@ -171,6 +171,7 @@ void wifiUiSavePassword(){
   tftDirty=true;
 }
 bool wifiUiKey(int k){
+  if(k==1)return false; // F2 remains display-off
   if(currentPage!=5||approvedSettingsItem!=1||!tftView)return false;
   if(wifiUiStage==WIFIUI_PASSWORD){
     if(k==15){wifiUiPassword="";wifiUiCursor=0;wifiUiStage=WIFIUI_NETWORKS;wifiUiResetTap();}
