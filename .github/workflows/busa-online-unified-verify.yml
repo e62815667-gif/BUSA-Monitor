@@ -6,6 +6,12 @@ on:
       - 'online/**'
       - 'google/BUSA_GoogleSheets_Receiver.gs'
       - '.github/workflows/busa-online-unified-verify.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'online/**'
+      - 'google/BUSA_GoogleSheets_Receiver.gs'
+      - '.github/workflows/busa-online-unified-verify.yml'
   workflow_dispatch:
 permissions:
   contents: read
@@ -33,3 +39,26 @@ jobs:
           assert(!/BUSA_VIEW_TOKEN\s*=\s*['"][a-fA-F0-9]{64}/.test(html),'hardcoded VIEW token');
           console.log('PASS: online JS, Apps Script JS, manifest, four alarm editors, status feedback and auth storage');
           JS
+      - name: Assemble iPhone PWA and Google Apps Script package
+        run: |
+          mkdir -p out
+          cp online/index.html out/BUSA_1M_iPhone_PWA.html
+          cp online/sw.js out/BUSA_1M_ServiceWorker.js
+          cp online/manifest.webmanifest out/BUSA_1M_Manifest.webmanifest
+          cp google/BUSA_GoogleSheets_Receiver.gs out/BUSA_GoogleSheets_Receiver.gs
+          cat > out/README.txt <<'TXT'
+          БУСА-1М №001 · Online/Local Monitor
+          One iPhone PWA: https://e62815667-gif.github.io/BUSA-Monitor/online/
+          Google Apps Script source: BUSA_GoogleSheets_Receiver.gs
+          Update the existing bound Apps Script project with the new source;
+          create a NEW version in Manage deployments and keep the SAME /exec URL.
+          The device upload secret BUSA_TOKEN and view/config secret BUSA_VIEW_TOKEN
+          must stay in Script Properties and must not be put in public code.
+          The app stores the /exec URL and VIEW token in the device's localStorage.
+          Remote sound thresholds are confirmed only by ESP32 telemetry ACK.
+          Offline local ESP32 UI: http://192.168.4.1 while on BUSA Wi-Fi.
+          TXT
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_UNIFIED_IPHONE_PWA_GOOGLE_SCRIPT
+          path: out/
