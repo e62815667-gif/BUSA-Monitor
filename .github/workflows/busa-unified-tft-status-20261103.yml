@@ -1,7 +1,7 @@
-name: Build BUSA 14.9 TFT SETTINGS N16R8 OTA preserves NVS
+name: Build BUSA 15.0 Wi-Fi Google TFT N16R8 OTA preserves NVS
 on:
   push:
-    branches: [feature/busa-v14-9-tft-settings-20261103]
+    branches: [feature/busa-v15-0-wifi-google-tft-20261103]
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
@@ -51,7 +51,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          assert '14v9-N16R8-SETTINGS-KEYBOARD-NVS-20261103' in s
+          assert '15v0-N16R8-WIFI-GOOGLE-TFT-NVS-20261103' in s
           assert 'busaRemoteAlarmApply()' in s and 'busaRemoteAlarmJSON()' in s
           remote=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_RemoteAlarm.h').read_text()
           assert 'portENTER_CRITICAL' in remote
@@ -67,7 +67,7 @@ jobs:
           assert 'v14GoogleLast' in landscape and 'v14Tiny("ESP32"' in landscape
           portrait=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_ApprovedUI_V13.h').read_text()
           assert 'v13Text("G"' in portrait and 'v13Text("E"' in portrait
-          assert 'WiFi.scanNetworks(true,false,false,80)' in s
+          assert 'wifiUiScanJSON()' in s and 'wifiUiBeginScan();' in s
           assert 'manualSsid' not in s
           assert 'get(\'net\').value,pass=get(\'pass\').value' in s
           assert 'AbortSignal.timeout(16000)' in s
@@ -83,7 +83,7 @@ jobs:
           assert 'request.setTimeout(10000)' in google
           assert 'if(busaWifiScanRunning)continue;' in google
           assert 'googleInternet=1;googleDns=1;' in google
-          assert 'WIFI_SCAN_FAILED' in s
+          assert 'WIFI_SCAN_FAILED' in ui
           assert 'KPIN[4]={7,6,5,4}' in s
           assert 'BUSA_TFT_LIVE_REFRESH_MS=200' in s
           assert 'keypadBackupOpen=keypadBackupPrefs.begin("busa-key20",false)' in s
@@ -102,8 +102,8 @@ jobs:
           assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
           ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           assert '#include "BUSA_KeypadTFT_UI.h"' in s
-          assert '14v9-N16R8-SETTINGS-KEYBOARD-NVS-20261103' in s
-          assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,80)' in ui
+          assert '15v0-N16R8-WIFI-GOOGLE-TFT-NVS-20261103' in s
+          assert 'wifiUiBeginScan' in ui and 'WiFi.scanNetworks(true,false,false,160)' in ui
           assert 'WIFIUI_PASSWORD' in ui and 'wifiUiTypeDigit' in ui
           assert 'wifiUiModeCaption()' in ui and '"abc","ABC","123","SYM"' in ui
           assert 'keypadDeferredZero' in s and 'wifiUiLongZero' in s
@@ -117,15 +117,30 @@ jobs:
           assert '"Рисунок БУСА"' in land and 'themeNames[tftThemeMode]' in land
           assert 'v14SystemInfoRows()' in land and 'u' not in []
           assert 'Wi-Fi подключён: ' in land and 'ESP32 Wi-Fi: ' in land
-          assert 'Прошивка: V14.9' in land and 'String(uptimeSeconds%60)' in land
-          assert 'v14Print("Прошивка: V14.9",17,163,V14_TEXT)' in land
+          assert 'Прошивка: V15.0' in land and 'String(uptimeSeconds%60)' in land
+          assert 'v14Print("Прошивка: V15.0",17,163,V14_TEXT)' in land
           assert 'Пороги звука не меняются' not in land
           assert 'UP/DN выбор датчика' not in land
-          assert 'v13Text("Прошивка: V14.9"' in portrait
+          assert 'v13Text("Прошивка: V15.0"' in portrait
           assert 'tftView=0; // One ENT saves and returns to Settings.' in s
           assert 'saveTempOffset(calSensor,0.0f)' in s
           assert 'KEY_CAPS[20]' in s and 'loadKeymap();' in s
-          print('PASS 14.9: nested menus, T1..T4, Wi-Fi search, saved themes, uniform About, NVS keys')
+          assert 'wifiUiScanJSON()' in s
+          assert 'wifiUiScanJSON()' in ui and 'wifiUiRetries<2' in ui
+          assert 'wifiUiScanPending=true' in ui
+          assert 'get(\'googleStart\').onclick' in s
+          assert 'googleUiChoice' in s and 'busaGoogleUiToggle(enable)' in s
+          assert 'busaGoogleUiToggle(bool enable)' in google
+          assert 'server.on("/api/google/on"' in google
+          assert 'server.on("/api/google/off"' in google
+          assert 'prefs.remove("g-token")' not in google
+          assert 'prefs.getBool("g-enabled",true)' in google
+          assert 'prefs.putBool("g-enabled",enable)' in google
+          assert '"enabled"' in google or 'enabled' in google
+          assert 'googleUiChoice' in land and 'googleUiChoice' in portrait
+          assert 'g-token' in google and 'g-url' in google
+          assert 'prefs.clear()' not in s and 'nvs_flash_erase' not in s
+          print('PASS 15.0: Wi-Fi shared scanner, Google toggle, local app, NVS/keys20 preserved')
           PY
       - name: Verify both embedded and online JavaScript
         run: |
@@ -153,18 +168,18 @@ jobs:
       - name: Produce APP-ONLY OTA and USB-at-0x10000 image
         run: |
           set -euo pipefail
-          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin
-          (cd out && sha256sum BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+          cp out/BUSA_1M_WIFI_3v_GOOGLE.ino.bin out/BUSA_15_0_WIFI_GOOGLE_N16R8_OTA_NVS_SAFE.bin
+          (cd out && sha256sum BUSA_15_0_WIFI_GOOGLE_N16R8_OTA_NVS_SAFE.bin > SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('out/BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin')
+          p=Path('out/BUSA_15_0_WIFI_GOOGLE_N16R8_OTA_NVS_SAFE.bin')
           assert 60000 < p.stat().st_size < 3000000
           print('APP-ONLY',p.stat().st_size,'bytes; OTA or esptool write_flash at 0x10000')
           print('Do NOT use erase_flash, merged/full USB or erase NVS; preserve both keys20 namespaces')
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_14_9_SETTINGS_NVS_SAFE_OTA
+          name: BUSA_15_0_WIFI_GOOGLE_NVS_SAFE_OTA
           path: |
-            out/BUSA_14_9_SETTINGS_N16R8_OTA_NVS_SAFE.bin
+            out/BUSA_15_0_WIFI_GOOGLE_N16R8_OTA_NVS_SAFE.bin
             out/SHA256SUMS.txt
