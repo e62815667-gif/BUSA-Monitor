@@ -138,13 +138,13 @@ void wifiUiPoll(){
     wifiUiScanAt=now;
     WiFi.scanDelete();
     busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
+    wifiUiRetries++; // count even immediate failures to prevent an endless scan loop
     const int scan=WiFi.scanNetworks(true,false,false,160);
     if(scan==WIFI_SCAN_FAILED){
       wifiUiRetryOrFinish();
     }else{
       wifiUiOwnsScan=true;
       busaWifiScanRunning=true;
-      wifiUiRetries++;
       wifiUiStage=WIFIUI_SCANNING;
     }
   }
