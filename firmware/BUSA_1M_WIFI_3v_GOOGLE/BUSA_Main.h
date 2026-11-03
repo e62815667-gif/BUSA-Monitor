@@ -708,6 +708,7 @@ void startKeyLearning(){
   currentPage=6;diagModule=1;tftView=1;tftDirty=true;
 }
 
+#include "BUSA_KeypadTFT_UI.h"
 void navigatePage(uint8_t target){
   if(target>=7||target==currentPage)return;
   if(currentPage==5 && target!=5 && wifiUiStage==WIFIUI_PASSWORD){
@@ -730,7 +731,6 @@ bool saveTempOffset(uint8_t sensor,float v){
  if(isfinite(temperature[sensor]))temperature[sensor]+=v-tempOffset[sensor];
  tempOffset[sensor]=v;tftDirty=true;return true;
 }
-#include "BUSA_KeypadTFT_UI.h"
 extern bool tftThemeDark; // state declared below in TFT globals
 bool saveThemeMode(uint8_t mode){
  if(mode>2||prefs.putUChar("themeMode",mode)!=sizeof(uint8_t))return false;
@@ -3097,7 +3097,7 @@ void loop(){
     Serial0.println("STA reconnect: no local clients, 120s backoff");
   }
   readConsole();
-  wifiUiPoll(); // nonblocking Wi-Fi scan and password-provisioning on physical TFT
+  if(!otaActive)wifiUiPoll(); // nonblocking Wi-Fi scan and password-provisioning on physical TFT
   if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
