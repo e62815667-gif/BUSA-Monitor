@@ -43,7 +43,7 @@ jobs:
           assert set(['home','temps','collection','graphs','events','settings','connection','diagnostics','cloudUpdates']).issubset(p.sections)
           required=['remoteT0','remoteT1','remoteT2','remoteT3','detailT0','detailT3','remoteGraphT','remoteGraphW','settingsMenu','settingsBack','googleSettings','viewUrl','viewToken','viewConnect','viewClear','viewState','statusText','cloudInternet','cloudLocal','cloudData','themeSwitch','remoteEvents','onlineInnerBack','onlineFreshness']
           assert set(required).issubset(p.ids),set(required)-set(p.ids)
-          assert '<svg viewBox="0 0 190 310"' in html
+          assert 'class="approvedRig"' in html and 'busa-approved-rig.svg' in html
           assert 'Т1–Т4 · отдельные линии' in html
           assert 'Вода и отбор' in html
           assert 'busaViewReceive' in js and 'mode=latest&callback=busaViewReceive' in js
