@@ -443,7 +443,8 @@ static void v14Settings(bool layout){
        wifiUiStage==WIFIUI_CONNECTING?"Wi-Fi: подключение...":
          (connected?"Wi-Fi подключён: "+connectedName:"Wi-Fi отключён"),
        wifiUiStage==WIFIUI_SCANNING?"Поиск сети: выполняется":
-         (wifiUiCount?"Поиск сети ("+String(wifiUiCount)+")":"Поиск сети"),
+         (wifiUiLastScanCode<0?"Поиск сети: ошибка "+String(wifiUiLastScanCode):
+         (wifiUiCount?"Поиск сети ("+String(wifiUiCount)+")":"Поиск сети")),
        selected.isEmpty()?"Выбор сети":("Выбор сети: "+selected),
        String(wifiUiStage==WIFIUI_PASSWORD?"Пароль [":"Пароль [")+
          String(wifiUiModeCaption())+"]: "+password,
