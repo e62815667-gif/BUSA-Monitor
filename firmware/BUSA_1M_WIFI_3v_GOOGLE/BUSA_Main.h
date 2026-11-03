@@ -3068,7 +3068,7 @@ void setup(){
     for(int i=0;i<n && nearbyCount<5;i++)
       if(WiFi.SSID(i).length())nearbyNames[nearbyCount++]=WiFi.SSID(i);
     String out="{\"scanning\":false,\"networks\":[";
-    for(int i=0;i<n && i<35;i++){
+    for(int i=0;i<n && i<48;i++){
       if(i)out+=",";
       out+="{\"ssid\":"+quoteJson(WiFi.SSID(i));
       out+=",\"rssi\":"+String(WiFi.RSSI(i))+"}";
