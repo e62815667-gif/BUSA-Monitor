@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0b1928"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>БУСА-1М №001 · Онлайн-монитор</title><link rel="manifest" href="./manifest.webmanifest">
+<title>БУСА-1М №001 · Монитор</title><link rel="manifest" href="./manifest.webmanifest">
 <style>
 :root{color-scheme:light;--ink:#273f50;--muted:#667e8b;--paper:#faf9f4;--border:#dce6e9;--orange:#dfa05a;--teal:#007fa9;--warn:#ae452f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}
 *{box-sizing:border-box}body{margin:0}header{position:sticky;top:0;z-index:3;background:#fff;border-bottom:2px solid var(--orange);padding:14px 16px 10px;box-shadow:0 3px 12px #283e4f0b}
@@ -404,34 +404,59 @@ main #googleSettings .actions button.secondary{background:#153c60!important}
 #googleSettings .busaGoogleDiag{border-color:#2688c8!important}
 .approvedTemp strong,.approvedSensorLive{font-variant-numeric:tabular-nums}
 @media(max-width:390px){.approvedRig .approvedRigPhoto{max-height:340px}}
+
+/* Same three network indicators as ESP32 TFT and the local application. */
+.onlineNetwork{display:flex!important;gap:5px!important;justify-content:space-between!important}
+.onlineNetwork>span{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;min-width:0;flex:1;font-size:11px}
+.onlineNetwork .led{width:10px;height:10px;min-width:10px;background:#d63838!important;border-radius:50%}
+.onlineNetwork .led.ok{background:#14bb61!important;box-shadow:0 0 6px #14bb6180}
+.onlineNetwork .led.bad,.onlineNetwork .led.unknown{background:#d63838!important}
+.onlineNetwork b{font-size:10px;font-weight:650}
+#googleCredentialForm[hidden],#savedGoogleInfo[hidden],#editGoogleAccess[hidden]{display:none!important}
+#savedGoogleInfo{padding:9px;border:1px solid #267a8d;border-radius:9px;color:#86eabb}
+.busaWifiMode{padding:12px 0;border-top:1px solid #2a536c}.busaWifiMode h3{margin:3px 0 5px}.busaWifiMode p{font-size:13px;color:var(--muted)}
 </style></head><body>
-<header class="appHeader"><div class="headerRow"><div><div class="eyebrow">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div><span class="onlineReadOnly">● САЙТ ОТКРЫТ</span></div><div class="headerTime" id="clockDisplay">Время: —</div><div class="onlineNetwork"><span><i class="led" id="cloudInternet"></i> ИНТ <b id="cloudInternetLabel">—</b></span><span><i class="led" id="cloudLocal"></i> ЛОК <b id="cloudLocalLabel">—</b></span><span><i class="led" id="cloudData"></i> ДАН <b id="cloudDataLabel">—</b></span></div></header>
+<header class="appHeader"><div class="headerRow"><div><div class="eyebrow">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div><span class="onlineReadOnly">● САЙТ ОТКРЫТ</span></div><div class="headerTime" id="clockDisplay">Время: —</div><div class="onlineNetwork"><span><i class="led" id="cloudInternet"></i> Wi-Fi <b id="cloudInternetLabel">ОТКЛ</b></span><span><i class="led" id="cloudData"></i> Google <b id="cloudDataLabel">ОТКЛ</b></span><span><i class="led" id="cloudLocal"></i> ESP32 <b id="cloudLocalLabel">ОТКЛ</b></span></div></header>
 <main>
 
 <section id="home"><div class="approvedHomeTitle"><strong>БУСА-1М №001</strong><span id="heroStatus">● Ожидание данных</span></div>
 <div id="onlineSetupBanner" class="onlineSetupBanner"><div><strong>Google: ожидание данных</strong><p id="onlineSetupMessage">Для показа температур подключи защищённый просмотр Google. БУСА уже отправляет данные в таблицу.</p></div><button id="onlineOpenGoogle" type="button">Подключить</button></div><div class="approvedDashboard"><div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon0" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><path d="M24 4C17 17 7 28 7 37a17 17 0 0034 0C41 28 31 17 24 4Z" fill="url(#busaIcon0)" stroke="#28cdff" stroke-width="2"/><path d="M15 35q0 12 12 13" fill="none" stroke="#dcfaff" stroke-width="2.5" stroke-linecap="round"/></svg></span><span>Вода</span></div><strong id="remoteT0">Н/Д</strong><small id="onlineSet0">Зад: —</small></div><div class="approvedTemp temp1"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon1" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon1)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></span><span>Колонна</span></div><strong id="remoteT1">Н/Д</strong><small id="onlineSet1">Зад: —</small></div><div class="approvedTemp temp2"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon2" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="5" y="17" width="38" height="35" rx="7" stroke="#10b9f7" stroke-width="2.5" fill="#083357"/><path d="M8 31q8-5 16 0t16 0v18H8Z" fill="url(#busaIcon2)" opacity=".92"/><path d="M14 17V9h20v8" fill="none" stroke="#55d6ff" stroke-width="3"/></svg></span><span>Куб</span></div><strong id="remoteT2">Н/Д</strong><small id="onlineSet2">Зад: —</small></div><div class="approvedTemp temp3"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon3" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon3)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></span><span>Верх колонны</span></div><strong id="remoteT3">Н/Д</strong><small id="onlineSet3">Зад: —</small></div></div><div class="approvedRig"><img class="approvedRigPhoto" src="./busa-approved-rig.svg" alt="Установка БУСА-1М: металлический куб, колонны, холодильник со змеевиком и стакан" width="360" height="720" decoding="async"></div></div><div class="approvedMetrics"><div class="approvedMetric"><span>◉</span><div><small>Расход отбора</small><strong>Н/Д</strong><small>мл/мин · нет датчика</small></div></div><div class="approvedMetric"><span>▤</span><div><small>Собрано</small><strong>Н/Д</strong><small>мл · нет датчика</small></div></div></div><div class="approvedStatus"><span id="onlineFreshness">● Нет данных Google</span><span>4 звуковых реле</span></div><details class="card approvedAdditional"><summary>Охлаждающая вода и звуковые выходы</summary><div class="row"><span>YF-S401 · импульсы</span><b id="waterLive">Нет показаний</b></div><div class="relayGrid"><span>K1 <b id="cloudRelay0">—</b></span><span>K2 <b id="cloudRelay1">—</b></span><span>K3 <b id="cloudRelay2">—</b></span><span>K4 <b id="cloudRelay3">—</b></span></div></details></section>
 <section id="temps" hidden><div class="approvedPageTitle"><span>♨</span><strong>ТЕМПЕРАТУРЫ</strong></div><div class="approvedSensorList"><div class="approvedSensor temp0"><div class="approvedSensorHead"><div class="approvedSensorIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon0" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><path d="M24 4C17 17 7 28 7 37a17 17 0 0034 0C41 28 31 17 24 4Z" fill="url(#busaIcon0)" stroke="#28cdff" stroke-width="2"/><path d="M15 35q0 12 12 13" fill="none" stroke="#dcfaff" stroke-width="2.5" stroke-linecap="round"/></svg></div><div class="approvedSensorText"><strong>Вода</strong><small id="onlineThreshold0">ВКЛ — · ВЫКЛ —</small><small id="errorT0">Нет данных</small></div><strong id="detailT0" class="approvedSensorLive">Н/Д</strong></div></div><div class="approvedSensor temp1"><div class="approvedSensorHead"><div class="approvedSensorIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon1" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon1)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></div><div class="approvedSensorText"><strong>Колонна</strong><small id="onlineThreshold1">ВКЛ — · ВЫКЛ —</small><small id="errorT1">Нет данных</small></div><strong id="detailT1" class="approvedSensorLive">Н/Д</strong></div></div><div class="approvedSensor temp2"><div class="approvedSensorHead"><div class="approvedSensorIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon2" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="5" y="17" width="38" height="35" rx="7" stroke="#10b9f7" stroke-width="2.5" fill="#083357"/><path d="M8 31q8-5 16 0t16 0v18H8Z" fill="url(#busaIcon2)" opacity=".92"/><path d="M14 17V9h20v8" fill="none" stroke="#55d6ff" stroke-width="3"/></svg></div><div class="approvedSensorText"><strong>Куб</strong><small id="onlineThreshold2">ВКЛ — · ВЫКЛ —</small><small id="errorT2">Нет данных</small></div><strong id="detailT2" class="approvedSensorLive">Н/Д</strong></div></div><div class="approvedSensor temp3"><div class="approvedSensorHead"><div class="approvedSensorIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon3" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><rect x="9" y="6" width="30" height="6" rx="3" stroke="#c0eeff" fill="#8eeaff"/><rect x="15" y="13" width="18" height="35" rx="2" fill="#082b51" stroke="#6acbff" stroke-width="2"/><path d="M17 29h14v17H17Z" fill="url(#busaIcon3)" opacity=".84"/><path d="M17 23h14M17 38h14" stroke="#9deeff" stroke-width="2"/><rect x="9" y="47" width="30" height="6" rx="3" stroke="#b7e7ff" fill="#6cc2f0"/></svg></div><div class="approvedSensorText"><strong>Верх колонны</strong><small id="onlineThreshold3">ВКЛ — · ВЫКЛ —</small><small id="errorT3">Нет данных</small></div><strong id="detailT3" class="approvedSensorLive">Н/Д</strong></div></div></div><div class="card"><p class="muted">Показания и пороги поступают из Google. Изменение порогов доступно через локальное приложение БУСА.</p><a class="btn secondary" href="http://192.168.4.1/">Открыть локальные настройки</a></div></section>
 <section id="collection" hidden><div class="approvedPageTitle"><span>♧</span><strong>ОТБОР ЖИДКОСТИ</strong></div><div class="approvedCollectionMetrics"><div class="approvedCollectionCell"><small>Текущий расход</small><strong>НЕТ ДАТЧИКА</strong><small>мл/мин</small></div><div class="approvedCollectionCell"><small>Собрано жидкости</small><strong>Н/Д</strong><small>мл</small></div></div><div class="card approvedGraphCard"><h2>График отбора</h2><div class="approvedGraphPlaceholder">Нет датчика отбора</div></div><details class="card approvedAdditional"><summary>Охлаждающая вода</summary><div class="row"><span>Импульсы YF-S401</span><b id="onlineWaterPulses">—</b></div></details></section>
-<section id="settings" hidden><div class="approvedPageTitle"><span>⚙</span><strong>НАСТРОЙКИ</strong></div><div class="card approvedSettingsMain" id="settingsMenu"><button type="button" class="approvedMenuItem" data-settings-target="settings-temps"><span class="approvedMenuIcon">♨</span><span>Температура</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="connection"><span class="approvedMenuIcon">⌁</span><span>Wi-Fi</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="settings-screen"><span class="approvedMenuIcon">▣</span><span>Экран</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="googleSettings"><span class="approvedMenuIcon">☁</span><span>Google</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="cloudUpdates"><span class="approvedMenuIcon">⇩</span><span>Обновление ПО</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="diagnostics"><span class="approvedMenuIcon">⊞</span><span>Диагностика</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="aboutSettings"><span class="approvedMenuIcon">ⓘ</span><span>О системе</span><span class="approvedArrow">›</span></button></div><button id="settingsBack" class="approvedBack" type="button" hidden>‹ Все настройки</button><div class="card settingCard" id="settings-temps" hidden><h2>Температура</h2><div id="onlineCalibration" class="diagList">Нет данных</div><p class="muted">Калибровка изменяется только в локальном приложении.</p></div><div class="card settingCard" id="settings-screen" hidden><h2>Экран</h2><div class="row"><span>TFT</span><b id="onlineTft">—</b></div><div class="row"><span>Тема контроллера</span><b id="onlineTftTheme">—</b></div><p class="muted">Тема интернет-приложения:</p><button type="button" id="themeSwitch" class="btn secondary">Сменить тему</button></div><div class="card" id="googleSettings"><h2>Удалённый мониторинг · Google</h2>
-<p class="muted">Введи адрес своего Google Apps Script и отдельный <b>ключ просмотра</b> BUSA_VIEW_TOKEN. Ключ отправки BUSA_TOKEN здесь не нужен.</p>
+<section id="settings" hidden><div class="approvedPageTitle"><span>⚙</span><strong>НАСТРОЙКИ</strong></div><div class="card approvedSettingsMain" id="settingsMenu"><button type="button" class="approvedMenuItem" data-settings-target="settings-temps"><span class="approvedMenuIcon">♨</span><span>Температура</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="connection"><span class="approvedMenuIcon">⌁</span><span>Wi-Fi · ESP32 и интернет</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="settings-screen"><span class="approvedMenuIcon">▣</span><span>Экран</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="googleSettings"><span class="approvedMenuIcon">☁</span><span>Google</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="cloudUpdates"><span class="approvedMenuIcon">⇩</span><span>Обновление ПО</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="diagnostics"><span class="approvedMenuIcon">⊞</span><span>Диагностика</span><span class="approvedArrow">›</span></button><button type="button" class="approvedMenuItem" data-settings-target="aboutSettings"><span class="approvedMenuIcon">ⓘ</span><span>О системе</span><span class="approvedArrow">›</span></button></div><button id="settingsBack" class="approvedBack" type="button" hidden>‹ Все настройки</button><div class="card settingCard" id="settings-temps" hidden><h2>Температуры · звуковые оповещения</h2>
+<div class="diagList" id="onlineThresholdSummary">Нет данных Т1–Т4</div>
+<p class="muted">Пороги ВКЛ и ОТКЛ и калибровка настраиваются на ESP32 с шагом 0,1 °C. Интернет-режим показывает реальные сохранённые значения.</p>
+<a class="btn secondary" href="http://192.168.4.1/">Открыть локальную настройку ВКЛ/ОТКЛ</a>
+<h3>Калибровка</h3><div id="onlineCalibration" class="diagList">Нет данных</div></div><div class="card settingCard" id="settings-screen" hidden><h2>Экран</h2><div class="row"><span>TFT</span><b id="onlineTft">—</b></div><div class="row"><span>Тема контроллера</span><b id="onlineTftTheme">—</b></div><p class="muted">Тема интернет-приложения:</p><button type="button" id="themeSwitch" class="btn secondary">Сменить тему</button></div><div class="card" id="googleSettings"><h2>Google · интернет</h2>
+<p class="muted">Один раз введи адрес Apps Script и BUSA_VIEW_TOKEN. При обновлениях приложения вводить их заново не потребуется.</p>
+<p id="savedGoogleInfo" hidden>Настройки Google сохранены на iPhone.</p>
+<button id="editGoogleAccess" class="btn secondary" type="button" hidden>Изменить подключение</button>
+<div id="googleCredentialForm">
 <label for="viewUrl">Ссылка веб-приложения Google /exec</label>
 <input type="url" id="viewUrl" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
 <label for="viewToken">Ключ просмотра · 64 символа</label>
 <input type="password" id="viewToken" placeholder="BUSA_VIEW_TOKEN (не BUSA_TOKEN)" autocomplete="off">
 <div class="actions"><button type="button" id="viewConnect" class="btn">Подключить данные</button>
 <button type="button" id="viewClear" class="btn secondary">Отключить</button></div>
-<div class="row"><span>Получение данных</span><b id="viewState" aria-live="polite">Не настроено</b></div>
+</div><div class="row"><span>Получение данных</span><b id="viewState" aria-live="polite">Не настроено</b></div>
 <div class="busaGoogleDiag" role="status">
 <strong>Проверка доступа Google</strong>
 <div id="busaGoogleDiagMessage">Проверяются ссылка Apps Script и отдельный ключ просмотра. Ключ отправки БУСА не требуется.</div>
 <button type="button" id="viewRetry">Повторить проверку Google</button>
 </div>
-<p class="muted">Данные обновляются примерно каждые 30 секунд, если БУСА отправляет их в Google. Ключ просмотра сохраняется только на этом iPhone. При утере телефона смени ключ в Apps Script.</p>
+<p class="muted">Телеметрия обновляется примерно каждые 30 секунд. Ключ хранится на этом iPhone, а не в коде сайта. После полной очистки данных Safari его придётся ввести повторно.</p>
 <div class="actions"><a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/blob/main/google/README_BUSA_Google_Drive.md" target="_blank" rel="noopener">Инструкция Google</a></div></div>
 <div class="card settingCard" id="aboutSettings" hidden><h2>О системе</h2><div class="row"><span>Wi-Fi</span><b id="onlineAboutWifi">—</b></div><div class="row"><span>Google</span><b id="onlineAboutGoogle">—</b></div><div class="row"><span>Прошивка</span><b id="onlineAboutFirmware">—</b></div><div class="row"><span>Время работы</span><b id="onlineAboutUptime">—</b></div></div><div id="statusText" hidden>Нет удалённых данных</div></section>
 <section id="graphs" hidden><div class="approvedPageTitle"><span>⌁</span><strong>ГРАФИКИ</strong></div><div class="card approvedBlackGraph"><div class="graphTabs approvedGraphTabs"><button class="on" data-chart="0">Температуры</button><button data-chart="1">Вода и отбор</button></div><div data-chart-panel="0"><h3>Т1–Т4 · отдельные линии</h3><canvas id="remoteGraphT" class="approvedLaneCanvas" width="600" height="420"></canvas></div><div data-chart-panel="1" hidden><h3>Вода и отбор · раздельно</h3><canvas id="remoteGraphW" class="approvedWaterCanvas" width="600" height="280"></canvas></div></div></section>
 <section id="events" hidden><div class="approvedPageTitle"><span>▤</span><strong>СОБЫТИЯ</strong></div><div class="card"><div class="graphTabs eventTabs"><button class="on" data-event-filter="all">Все</button><button data-event-filter="warn">Предупр.</button><button data-event-filter="alarm">Аварии</button><button data-event-filter="system">Система</button></div><div id="remoteEvents" class="approvedEvents">Ожидание Google…</div></div></section><button type="button" id="onlineInnerBack" class="approvedBack" hidden>‹ Все настройки</button>
 <section id="connection" hidden>
+<div class="card" id="networkModes"><h2>Настройки Wi-Fi</h2>
+<div class="busaWifiMode"><h3>ESP32 · локальная сеть</h3>
+<p>Локальная точка доступа ESP32. Настройка порогов ВКЛ/ОТКЛ, калибровки и других параметров доступна при подключении к сети БУСА.</p>
+<a class="btn secondary" href="http://192.168.4.1/">Открыть ESP32</a></div>
+<div class="busaWifiMode"><h3>Wi-Fi · сеть с интернетом</h3>
+<p>Внешний роутер, через который ESP32 отправляет телеметрию в Google. Выбор сети и ввод пароля находятся в локальных настройках.</p>
+<a class="btn secondary" href="http://192.168.4.1/">Настроить Wi-Fi роутера</a></div></div>
 <div class="card"><h2>Связь с БУСА</h2><p class="muted">Состояние с последнего отчёта, полученного через Google. Это не прямое соединение с ESP32.</p>
 <div class="row"><span>Последний пакет</span><b id="connectionLast">—</b></div>
 <div class="row"><span>Актуальность</span><b id="connectionFresh">Нет данных</b></div>
@@ -571,7 +596,7 @@ let configUrl='',configToken='';
 function indicator(id,label,on,unknown=false){
  const dot=byId(id),text=byId(label);if(!dot||!text)return;
  dot.className="led "+(unknown?"unknown":on?"ok":"bad");
- text.textContent=unknown?"—":on?"ДА":"НЕТ";
+ text.textContent=on?"ПОДКЛ":"ОТКЛ";
 }
 function remoteStatus(msg){
  byId('statusText').textContent=msg;
@@ -751,7 +776,7 @@ function invalidateStaleRemote(){
  byId('connectionFresh').textContent='УСТАРЕЛА';
  byId('heroStatus').textContent='● Нет новых данных: '+stampRussian(cloudCurrentAt);
  for(const id of ['cloudInternet','cloudLocal','cloudData']){
-   indicator(id,id+'Label',false,true);
+   indicator(id,id+'Label',false);
  }
  for(let i=0;i<4;i++){
    byId('remoteT'+i).textContent='Н/Д';
@@ -768,9 +793,9 @@ function renderRemote(d,history,receivedAt){
  renderDiagnostics(d,receivedAt,fresh);
  const diag=d.diagnostics||{},one=Array.isArray(diag.onewire)?diag.onewire:[];
  const nets=d.network_indicators||{};
- indicator("cloudInternet","cloudInternetLabel",nets.internet===true,!fresh||typeof nets.internet!=="boolean");
- indicator("cloudLocal","cloudLocalLabel",nets.local_client===true,!fresh||typeof nets.local_client!=="boolean");
- indicator("cloudData","cloudDataLabel",d.google?.configured===true,!fresh||typeof d.google?.configured!=="boolean");
+ indicator("cloudInternet","cloudInternetLabel",fresh&&d.station?.connected===true);
+ indicator("cloudData","cloudDataLabel",fresh); // Incoming Google data is actually fresh.
+ indicator("cloudLocal","cloudLocalLabel",fresh&&nets.local_client===true);
  const temperatures=Array.isArray(d.temperatures)?d.temperatures:[];
  for(let i=0;i<4;i++){
   const t=temperatures[i]||{},probe=one[i]||{};
@@ -789,6 +814,10 @@ function renderRemote(d,history,receivedAt){
   byId('cloudRelay'+i).textContent=typeof channel.sound_on==='boolean'?(channel.sound_on?'ЗВУК':'ОЖИДАНИЕ'):'—';
  }
  byId('onlineCalibration').textContent=[0,1,2,3].map(i=>'Т'+(i+1)+' · '+(typeof offsets[i]==='number'?offsets[i].toFixed(1)+' °C':'—')).join('\n');
+ byId('onlineThresholdSummary').textContent=[0,1,2,3].map(i=>{
+ const p=refs[i]||{},f=n=>Number.isFinite(n)?Number(n).toFixed(1)+' °C':'—';
+ return 'Т'+(i+1)+' · ВКЛ '+f(p.target)+' · ОТКЛ '+f(p.notice);
+ }).join('\n');
  byId('onlineFreshness').textContent=fresh?'● Обновлено '+new Date(receivedAt).toLocaleTimeString('ru-RU'):'● Данные устарели';
  byId('onlineTft').textContent=d.modules?.tft_boot_complete?'ST7789 · работает':'Нет подтверждения';
  byId('onlineTftTheme').textContent=['Светлая','Тёмная','Системная'][d.tft_theme_mode]||'—';
@@ -926,6 +955,13 @@ function stopRemote(){
  if(remoteRequest){remoteRequest.remove();remoteRequest=null}
  remoteTimer=null;
 }
+function showSavedGoogleCredentials(saved){
+ const form=byId('googleCredentialForm'),info=byId('savedGoogleInfo'),edit=byId('editGoogleAccess');
+ if(form)form.hidden=saved;
+ if(info)info.hidden=!saved;
+ if(edit)edit.hidden=!saved;
+}
+byId('editGoogleAccess').addEventListener('click',()=>showSavedGoogleCredentials(false));
 function connectRemote(url,token,persist=true){
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]{20,}\/exec$/.test(url)){
   remoteStatus('Нужен адрес Apps Script /exec');return false;
@@ -939,6 +975,7 @@ function connectRemote(url,token,persist=true){
   localStorage.setItem(remoteStorePrefix+'url',url);
   localStorage.setItem(remoteStorePrefix+'token',token);
  }catch(ignore){}
+ showSavedGoogleCredentials(true);
  remoteStatus('Подключение к Google…');
  loadGoogleLatest();
  remoteTimer=setInterval(loadGoogleLatest,30000);
@@ -961,6 +998,7 @@ byId('viewRetry').addEventListener('click',()=>{
 byId('viewClear').addEventListener('click',()=>{
  stopRemote();configUrl='';configToken='';remoteHistory=[];remoteLastSample=null;
  byId('viewUrl').value='';byId('viewToken').value='';
+ showSavedGoogleCredentials(false);
  try{localStorage.removeItem(remoteStorePrefix+'url');
  localStorage.removeItem(remoteStorePrefix+'token')}catch(ignore){}
  clearRemoteNumbers();remoteStatus('Подключение отключено');
