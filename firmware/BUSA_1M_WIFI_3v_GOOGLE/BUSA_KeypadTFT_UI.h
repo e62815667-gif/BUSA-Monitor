@@ -22,6 +22,8 @@ String wifiUiFeedback="";
 extern volatile bool busaWifiScanRunning,busaGoogleNetworkBusy;
 extern volatile bool busaStaSwitchPending,busaStaSwitching;
 extern bool busaStaCancelRequested,busaStaDisconnectRequested;
+extern bool otaActive;
+extern uint32_t busaStaDisconnectAt;
 extern volatile int8_t busaStaLastResult;
 extern String busaStaMessage;
 extern uint32_t busaWifiScanLastAt,busaWifiScanStartedAt,lastStationCheck;
