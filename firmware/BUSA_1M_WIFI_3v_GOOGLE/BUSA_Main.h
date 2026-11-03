@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-STA-PAUSE-SCAN-NVS-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-UI-WIFI-SWITCH-NVS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1507,9 +1507,15 @@ String statusJSON(){
   s+=",\"network_indicators\":{\"internet\":"+(googleInternet==1?String("true"):String("false"));
   s+=",\"local_client\":"+(WiFi.softAPgetStationNum()>0?String("true"):String("false"));
   s+=",\"ap_running\":"+(wifiRunning?String("true"):String("false"))+"}";
-  s+=",\"station\":{\"ssid\":"+quoteJson(stationSsid);
-  s+=",\"connected\":"+(WiFi.status()==WL_CONNECTED?String("true"):String("false"));
-  s+=",\"ip\":"+quoteJson(WiFi.status()==WL_CONNECTED?WiFi.localIP().toString():String(""))+"}";
+  const String actualSsid=WiFi.status()==WL_CONNECTED?WiFi.SSID():String("");
+  const bool exactStation=WiFi.status()==WL_CONNECTED && actualSsid==stationSsid;
+  s+=",\"station\":{\"ssid\":"+quoteJson(actualSsid);
+  s+=",\"target_ssid\":"+quoteJson(stationSsid);
+  s+=",\"connected\":"+(exactStation?String("true"):String("false"));
+  s+=",\"connecting\":"+(wifiUiConnectPending || wifiUiAssociationDueAt ||
+       (wifiUiStage==WIFIUI_CONNECTING && wifiUiConnectAt>0)?String("true"):String("false"));
+  s+=",\"last_error\":"+quoteJson(wifiUiLastConnectError);
+  s+=",\"ip\":"+quoteJson(exactStation?WiFi.localIP().toString():String(""))+"}";
   s+="}";
   return s;
 }
@@ -2232,7 +2238,7 @@ function page(n,send=true){
  document.querySelectorAll('.appTabs button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===visible));
  if(inDiag)settingsTab(6,false);
  else if(visible===5&&send)settingsTab(-1,false);
- if(send){lastLocalNav=Date.now();fetch('/api/page?n='+(n+1)).catch(()=>{});}
+ // Browser page selection never commands the physical TFT.
  if(visible===3){graphs();refreshGraphHistory(true);}
 }
 function settingsTab(n,send=true){
@@ -2241,19 +2247,10 @@ function settingsTab(n,send=true){
  get('settingsBack').hidden=n===-1;
  document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);
  document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));
- if(send){
-  lastLocalNav=Date.now();
-  if(n===6)fetch('/api/page?n=7').catch(()=>{});
-  else{
-   fetch('/api/page?n=6').then(()=>{
-     if(n>=0&&n<=4)return fetch('/api/settings-tab?n='+n);
-   }).catch(()=>{});
-  }
- }
+ // Local settings stay in browser; physical TFT navigation is independent.
 }
 get('settingsBack').onclick=()=>{
- settingsTab(-1,false);lastLocalNav=Date.now();
- fetch('/api/page?n=6').catch(()=>{});
+ settingsTab(-1,false);
 };
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
 function selectGraphView(n,send=true){
@@ -2261,7 +2258,7 @@ function selectGraphView(n,send=true){
  document.querySelectorAll('[data-graph-tft]').forEach(c=>c.classList.toggle('on',Number(c.dataset.graphTft)===n));
  document.querySelectorAll('[data-graph-panel]').forEach(p=>p.hidden=Number(p.dataset.graphPanel)!==n);
  graphs();
- if(send){lastLocalNav=Date.now();fetch('/api/graph-view?view='+n).catch(()=>{});}
+ // Browser graph selection does not control physical graph.
 }
 document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=()=>{
  selectGraphView(Number(b.dataset.graphTft));refreshGraphHistory(true);
@@ -2392,15 +2389,9 @@ async function refreshGraphHistory(force=false){
  }catch(e){}finally{busaGraphLoading=false;}
 }
 async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;statusFailures=0;
-networkLeds(s.network_indicators,s.station,s.google);if(Date.now()-lastLocalNav>1800){
- const physicalPage=(s.ui_page||1)-1;
- if(typeof s.ui_page==='number'&&(physicalPage===6?active!==5||settingsActive!==6:physicalPage!==active))page(physicalPage,false);
- if(physicalPage===5&&settingsActive>=0&&settingsActive<=4&&typeof s.ui_subtab==='number'&&s.ui_subtab!==settingsActive)settingsTab(s.ui_subtab,false);
- if(physicalPage===3&&typeof s.graph_view==='number'){
-   const currentGraph=Number(document.querySelector('[data-graph-tft].on')?.dataset.graphTft||0);
-   if(currentGraph!==s.graph_view)selectGraphView(s.graph_view,false);
- }
-}let names=['Вода','Колонна','Куб','Верх колонны'];
+networkLeds(s.network_indicators,s.station,s.google);
+ // Physical buttons and browser navigation are independent.
+ let names=['Вода','Колонна','Куб','Верх колонны'];
 s.temperatures.forEach((t,i)=>{
  get('t'+i).textContent=t.c===null?'Н/Д':Number(t.c).toFixed(1)+' °C';
  get('tempLive'+i).textContent=get('t'+i).textContent;
@@ -3063,8 +3054,8 @@ void setup(){
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
     if(n<1||n>7){server.send(400,"application/json","{\"error\":\"page 1..7\"}");return;}
-    navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;
-    server.send(200,"application/json","{\"ok\":true}");
+    // Legacy browser callers must not alter TFT navigation.
+    server.send(200,"application/json","{\"ok\":true,\"scope\":\"browser_only\"}");
   });
   server.on("/api/tft/profile",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){
@@ -3203,20 +3194,17 @@ void setup(){
   server.on("/api/graph-view",HTTP_GET,[]{
     int n=server.arg("view").toInt();
     if(n<0||n>1){server.send(400,"text/plain","Bad graph");return;}
-    graphSubView=(uint8_t)n;tftDirty=true;lastRender=0;
-    server.send(200,"application/json","{\"ok\":true}");
+    server.send(200,"application/json","{\"ok\":true,\"scope\":\"browser_only\"}");
   });
   server.on("/api/settings-tab",HTTP_GET,[]{
     int n=server.arg("n").toInt();
     if(n<0||n>4){server.send(400,"text/plain","bad subtab");return;}
-    settingsSubTab=(uint8_t)n;approvedSettingsItem=(uint8_t)n;tftDirty=true;lastRender=0;
-    server.send(200,"application/json","{\"ok\":true}");
+    server.send(200,"application/json","{\"ok\":true,\"scope\":\"browser_only\"}");
   });
   server.on("/api/tft/scroll",HTTP_GET,[]{
     String dir=server.arg("dir");
     if(dir!="up"&&dir!="down"){server.send(400,"text/plain","bad dir");return;}
-    tftView=(dir=="down")?1:0;tftDirty=true;lastRender=0;
-    server.send(200,"application/json","{\"ok\":true}");
+    server.send(200,"application/json","{\"ok\":true,\"scope\":\"browser_only\"}");
   });
   const char *headers[]={"X-Busa-Token"};
   server.collectHeaders(headers,1);
