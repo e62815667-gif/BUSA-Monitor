@@ -74,7 +74,7 @@ jobs:
           assert 'ВОДА · YF-S401' not in landscape
           assert 'Линия отсутствует' not in landscape
           assert 'bandY=66,bandH=33' in landscape
-          assert 'const int sensor=tempMenuOrder[pos]' in landscape
+          assert 'const int sensor=tempMenuOrder[pos]' not in landscape
           assert 'if(!tftView)' in landscape
           assert 'selectedField==field' in landscape
           assert 'String("T")+String(sensor+1)+(field?" ВЫКЛ":" ВКЛ")' in landscape
