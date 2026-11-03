@@ -450,7 +450,7 @@ static void v14Settings(bool layout){
   default:
    v14Tiny(String("Wi-Fi: ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),35,118,V14_TEXT);
    v14Tiny(String("Google: ")+(googleEnabled?"да":"нет"),35,138,V14_TEXT);
-   v14Tiny("Прошивка: V14.7 UISETDIAG",35,158,V14_BLUE);
+   v14Tiny("Прошивка: V14.8 KEYBOARD",35,158,V14_BLUE);
    v14Tiny(String("Работа: ")+(millis()/60000)+" мин",35,180,V14_TEXT);
  }
 }
