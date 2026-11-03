@@ -15,7 +15,7 @@ static uint16_t hqMix(uint16_t a,uint16_t b,uint8_t mix){
 static void hqBackground(){
   // Solid light cream, not an expensive striped gradient.
   screen->fillScreen(HQ_NAVY);
-  screen->drawFastHLine(0,49,320,HQ_STEEL);
+  // No obsolete separator beneath the status header.
   screen->drawFastHLine(0,210,320,HQ_STEEL);
 }
 static void hqPanel(int x,int y,int w,int h){
@@ -62,10 +62,10 @@ static void hqSymbol(uint8_t p,int cx,int cy,int k,uint16_t c=HQ_CYAN){
   screen->drawFastVLine(cx,cy-k,4,c);screen->drawFastVLine(cx,cy+k-4,4,c);
  }
 }
-static void hqRig(int x,int y,int w,int h){
+static void hqRig(int x,int y,int w,int h,bool framed=true){
  // Layered illustration inspired by approved MAIN reference art.
  // Decorative representation only; no schematic/electrical/process instructions.
- hqPanel(x,y,w,h);
+ if(framed)hqPanel(x,y,w,h);
  auto X=[&](int n){return x+3+n*(w-6)/100;};
  auto Y=[&](int n){return y+3+n*(h-6)/100;};
  // Equipment shadows and nickel-steel surfaces
