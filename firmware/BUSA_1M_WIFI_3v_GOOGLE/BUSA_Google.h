@@ -103,7 +103,7 @@ static bool busaRemoteParseCommand(const String &json,BusaRemoteAlarmCommand &ou
 }
 static void busaGooglePollRemoteAlarms(){
   if(!googleEnabled||WiFi.status()!=WL_CONNECTED||busaWifiScanRunning||
-     busaStaSwitchPending||busaStaSwitching)return;
+     wifiUiScanPending||wifiUiOwnsScan||busaStaSwitchPending||busaStaSwitching)return;
   // The Google device secret is already stored in ESP32 NVS; users never re-enter it.
   if(!googleTokenValid(googleSecret))return;
   const String url=googleEndpoint+"?mode=device_command&deviceToken="+googleSecret;
@@ -142,7 +142,8 @@ void googleWorker(void* unused){
     }
     // One radio serves both the local AP and Google uplink. Do not run HTTPS
     // while a user-requested Wi-Fi scan is switching 2.4 GHz channels.
-    if(busaWifiScanRunning||busaStaSwitchPending||busaStaSwitching)continue;
+    if(busaWifiScanRunning||wifiUiScanPending||wifiUiOwnsScan||
+       busaStaSwitchPending||busaStaSwitching)continue;
     if(!googleEnabled)continue;
     if(time(nullptr)<1700000000){googleState=2;continue;}
     const uint32_t now=millis();
