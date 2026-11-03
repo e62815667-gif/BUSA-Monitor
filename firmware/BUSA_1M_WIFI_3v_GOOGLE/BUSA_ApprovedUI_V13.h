@@ -316,54 +316,91 @@ static void v13EventsPage(bool layout){
 }
 static void v13Settings(uint32_t now,bool layout){
  static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе"};
- if(layout){
-  v13Text("НАСТРОЙКИ",8,44,WHITE);
-  for(int i=0;i<5;i++){
-   const int y=52+i*39;v13Panel(5,y,230,35);
-   if(i==approvedSettingsItem)screen->fillRect(7,y+3,3,29,V13_CYAN);
-   v13Text(names[i],17,y+22,WHITE);
+ if(!tftView){
+  if(layout){
+   v13Text("НАСТРОЙКИ",8,44,WHITE);
+   for(int i=0;i<5;i++){
+    const int y=52+i*39;
+    v13Panel(5,y,230,35);
+    if(i==approvedSettingsItem)screen->fillRect(7,y+3,4,29,V13_CYAN);
+    v13Text(names[i],17,y+22,WHITE);
+   }
   }
+  return;
  }
- if(!tftView)return;
- screen->fillRoundRect(7,90,226,135,5,PANEL);
- screen->drawRoundRect(7,90,226,135,5,V13_CYAN);
- v13Text(names[approvedSettingsItem],17,111,WHITE);
+ // Full child page rather than an overlay across the Settings list.
+ if(layout)v13Panel(5,52,230,247);
+ v13Text(names[approvedSettingsItem],17,77,WHITE);
  switch(approvedSettingsItem){
   case 0:
-   v13Text("T"+String(calSensor+1)+" "+String(calEditing?calDraft:tempOffset[calSensor],1)+" C",17,146,V13_CYAN);
-   v13Text("UP/DN: 0.1 C",17,174,WHITE);
-   v13Text("ENT: сохранить",17,195,WHITE);break;
+   // The full T1–T4 list is visible at all times.
+   for(int i=0;i<4;i++){
+    const int y=106+i*44;
+    if(i==calSensor)screen->fillRect(13,y-15,4,24,V13_CYAN);
+    float v=(calEditing && calSensor==i)?calDraft:tempOffset[i];
+    v13Text("T"+String(i+1),23,y,WHITE);
+    v13Text(String(v>=0?"+":"")+String(v,1)+" °C",103,y,WHITE);
+   }
+   break;
   case 1:
    switch(wifiUiStage){
     case WIFIUI_SCANNING:
-     v13Text("Поиск сетей...",17,144,V13_CYAN);break;
+     v13Text("Поиск сети",17,119,WHITE);
+     v13Text("Поиск...",17,150,WHITE);break;
     case WIFIUI_NETWORKS:
-     v13Text("Выбери сеть:",17,129,V13_CYAN);
-     if(wifiUiCount) {
-       String s=wifiUiNetworks[wifiUiIndex];
-       if(s.length()>22)s=s.substring(0,21)+"...";
-       v13Text(s,17,158,WHITE);
+     v13Text("Поиск сети",17,109,WHITE);
+     for(int row=0;row<4;row++){
+       int idx=(wifiUiIndex/4)*4+row;
+       if(idx>=wifiUiCount)break;
+       const int y=134+row*31;
+       if(idx==wifiUiIndex)screen->fillRect(14,y-13,3,22,V13_CYAN);
+       String name=wifiUiNetworks[idx];
+       if(name.length()>31)name=name.substring(0,28)+"...";
+       v13Text(name,21,y,WHITE);
      }
-     v13Text("UP/DN · ENT",17,190,V13_CYAN);break;
-    case WIFIUI_PASSWORD:
-     v13Text("Wi-Fi пароль",17,127,V13_CYAN);
-     v13Text(String("Режим: ")+wifiUiModeCaption(),17,150,WHITE);
-     v13Text(wifiUiPasswordMask(),17,174,WHITE);
-     v13Text("UP/DN · ENT",17,201,V13_CYAN);break;
+     break;
+    case WIFIUI_PASSWORD:{
+     v13Text("Сеть: "+wifiUiSelectedSsid,17,119,WHITE);
+     v13Text(String("Регистр: ")+wifiUiModeCaption(),17,158,WHITE);
+     v13Text("Пароль: "+wifiUiPasswordMask(),17,189,WHITE);
+     v13Panel(19,215,200,36);
+     v13Text("Сохранить",64,240,WHITE);
+     break;
+    }
     case WIFIUI_CONNECTING:
-     v13Text("Подключаю...",17,145,V13_CYAN);break;
+     v13Text("Подключение...",17,137,WHITE);
+     break;
     default:
-     v13Text(WiFi.status()==WL_CONNECTED?"Wi-Fi подключён":"Нет Wi-Fi",17,145,WHITE);
-     v13Text("ENT: поиск сети",17,188,V13_CYAN);break;
+     v13Text("Поиск сети",17,128,WHITE);
+     v13Text(WiFi.status()==WL_CONNECTED?"Wi-Fi подключён":"Нет подключения",17,168,WHITE);
+     break;
    }
    break;
-  case 2:v13Text(themeDraft==0?"Светлая":themeDraft==1?"Тёмная":"Системная",17,145,WHITE);break;
-  case 3:v13Text(googleEnabled?"Google OK":"Нет Google",17,145,WHITE);break;
-  default:
-   v13Text(String("Wi-Fi ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),17,133,WHITE);
-   v13Text(String("Google ")+(googleEnabled?"да":"нет"),17,155,WHITE);
-   v13Text("Прошивка V14.8",17,178,WHITE);
-   v13Text(String(millis()/60000)+" мин",17,200,WHITE);break;
+  case 2:{
+   static const char* themes[]={"Светлая","Тёмная","Рисунок БУСА"};
+   v13Text("Выбор темы",17,105,WHITE);
+   v13Text(String("Выбрана: ")+themes[tftThemeMode],17,134,WHITE);
+   for(int i=0;i<3;i++){
+     const int y=167+i*35;
+     if(i==themeDraft)screen->fillRect(14,y-14,4,24,V13_CYAN);
+     v13Text(themes[i],24,y,WHITE);
+   }
+   break;
+  }
+  case 3:
+   v13Text(googleEnabled?"Google: да":"Google: нет",17,127,WHITE);
+   v13Text(googleState==5?"Передача: да":"Передача: нет",17,166,WHITE);
+   break;
+  default:{
+   const bool googleOk=googleEnabled && googleInternet==1 &&
+     googleState==5 && (googleHttp==200 || googleHttp==302);
+   const uint32_t secs=millis()/1000;
+   v13Text(String("Wi-Fi подключён: ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),17,112,WHITE);
+   v13Text(String("Google: ")+(googleOk?"да":"нет"),17,143,WHITE);
+   v13Text(String("ESP32 Wi-Fi: ")+(wifiRunning?"да":"нет"),17,174,WHITE);
+   v13Text("Прошивка: V14.9",17,205,WHITE);
+   v13Text("Работа: "+String(secs/60)+" мин "+String(secs%60)+" сек",17,236,WHITE);
+  }
  }
 }
 static void v13Diagnostics(uint32_t now,bool layout){
