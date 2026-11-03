@@ -268,9 +268,32 @@ jobs:
           print('APP-ONLY',p.stat().st_size,'bytes; OTA or esptool write_flash at 0x10000')
           print('Do NOT use erase_flash, merged/full USB or erase NVS; preserve both keys20 namespaces')
           PY
+      - name: Bundle source code and recovery notes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          fw=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE')
+          dest=Path('out/BUSA_14_9_UI_WIFI_SWITCH_SOURCE.zip')
+          readme=('БУСА-1М №001 — V14.9 UI-WIFI-SWITCH 03.11.2026\n'
+                  'Source snapshot for ESP32-S3 N16R8.\n'
+                  'Web page navigation independent of physical TFT.\n'
+                  'Wi-Fi: actual SSID checked, manual SSID input, STA switching\n'
+                  'with 18-second feedback; local AP always stays at 192.168.4.1.\n'
+                  'OTA install: use BUSA_14_9_UI_WIFI_SWITCH_APP_OTA.bin ONLY.\n'
+                  'Do not erase NVS or reinstall USB merged firmware.\n')
+          with ZipFile(dest,'w',compression=ZIP_DEFLATED) as z:
+            for p in fw.rglob('*'):
+              if p.is_file() and '.git' not in p.parts: z.write(p,p.as_posix())
+            for p in [Path('index.html'),Path('.github/workflows/busa-unified-tft-status-20261103.yml')]:
+              if p.exists(): z.write(p,p.as_posix())
+            z.writestr('README_BUSA_14_9.txt',readme)
+          print(dest, dest.stat().st_size, 'bytes')
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: BUSA_14_9_UI_WIFI_SWITCH_APP_OTA
           path: |
             out/BUSA_14_9_UI_WIFI_SWITCH_APP_OTA.bin
+            out/BUSA_14_9_UI_WIFI_SWITCH_SOURCE.zip
             out/SHA256SUMS.txt
