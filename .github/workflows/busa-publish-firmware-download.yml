@@ -1,0 +1,40 @@
+name: Publish downloadable BUSA unified firmware
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/busa-publish-firmware-download.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download verified ESP32-S3 N16R8 USB/OTA artifact
+        run: |
+          set -euo pipefail
+          mkdir -p output
+          gh run download 41610310182 --repo ${{ github.repository }} --name BUSA_V14_7_UNIFIED_NETWORK_USB_OTA --dir output
+          cd output
+          sha256sum -c SHA256SUMS.txt
+          cp BUSA_V14_7_UNIFIED_NETWORK_N16R8_APP_OTA.bin BUSA_OTA.bin
+          zip -j -9 BUSA_OTA.zip BUSA_OTA.bin
+          sha256sum BUSA_OTA.bin BUSA_OTA.zip
+      - name: Publish GitHub Release for direct iPhone/PC download
+        run: |
+          set -euo pipefail
+          TAG=busa-v14.7-unified-remote-20261103
+          if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release upload "$TAG" output/BUSA_OTA.bin output/BUSA_OTA.zip --clobber --repo "${{ github.repository }}"
+          else
+            gh release create "$TAG" output/BUSA_OTA.bin output/BUSA_OTA.zip \
+              --repo "${{ github.repository }}" \
+              --target "${{ github.sha }}" \
+              --title "БУСА-1М №001 · V14.7 OTA · Wi-Fi/Google/ESP32" \
+              --notes "ESP32-S3 N16R8 only. BUSA_OTA.bin is APP/OTA firmware; update locally from the ESP32 web UI. USB full-flash binary is not included to protect existing NVS and learned keypad. Unified remote alarm thresholds require updated Google Apps Script deployment. CI-compiled and checksum-tested, not yet physically verified." \
+              --prerelease
+          fi
