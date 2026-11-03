@@ -8,8 +8,8 @@ BusaWifiUiStage wifiUiStage=WIFIUI_STATUS;
 uint8_t wifiUiMenuIndex=0; // Search, select SSID, password, save, disconnect from external STA
 bool wifiUiStaDisabled=false; // persistent NVS "staOff" flag; AP always stays ON
 bool wifiUiDisablePending=false; // defer STA disconnect while Google HTTPS is active
-String wifiUiNetworks[16],wifiUiSelectedSsid="",wifiUiPassword="";
-int wifiUiSignals[16]={0};
+String wifiUiNetworks[48],wifiUiSelectedSsid="",wifiUiPassword="";
+int wifiUiSignals[48]={0};
 uint8_t wifiUiCount=0,wifiUiIndex=0,wifiUiMode=0;
 uint8_t wifiUiLastTapKey=255,wifiUiLastTapIndex=0;
 uint32_t wifiUiLastTapAt=0,wifiUiScanAt=0,wifiUiConnectAt=0;
@@ -258,7 +258,7 @@ void wifiUiPoll(){
       }
       tftDirty=true;return;
     }
-    for(int i=0;i<count && wifiUiCount<16;i++){
+    for(int i=0;i<count && wifiUiCount<48;i++){
       const String candidate=WiFi.SSID(i);
       if(candidate.isEmpty()||candidate.length()>32)continue;
       bool duplicate=false;
