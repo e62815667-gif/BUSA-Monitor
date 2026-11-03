@@ -15,6 +15,8 @@ uint8_t wifiUiLastTapKey=255,wifiUiLastTapIndex=0;
 uint32_t wifiUiLastTapAt=0,wifiUiScanAt=0,wifiUiConnectAt=0;
 uint8_t wifiUiCursor=0;
 bool wifiUiOwnsScan=false,wifiUiConnectPending=false;
+uint32_t wifiUiAssociationDueAt=0;
+String wifiUiLastConnectError=""; // displayed on physical TFT + local app
 uint8_t wifiUiScanAttempts=0; // One automatic retry for failed or empty scans
 uint32_t wifiUiScanRetryAt=0;
 bool wifiUiResumeStation=false; // restore prior STA after search, never AP
@@ -99,7 +101,8 @@ void wifiUiBackspace(){
 // and OTA stay available at 192.168.4.1, even after reboot.
 void wifiUiApplyStationDisconnect(){
   wifiUiResumeStation=false; // explicit user STA disconnect wins
-  wifiUiConnectPending=false;
+  wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
+  wifiUiLastConnectError="";
   WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
   WiFi.setAutoReconnect(false);
   WiFi.disconnect(false,false); // NEVER stop the radio or the BUSA softAP
@@ -115,7 +118,7 @@ void wifiUiRequestStationDisconnect(){
   }
   wifiUiStaDisabled=true;
   wifiUiDisablePending=true;
-  wifiUiConnectPending=false;
+  wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
   wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=4;
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiFeedback="Отключаю внешнюю сеть...";
@@ -275,24 +278,42 @@ void wifiUiPoll(){
     wifiUiRestoreStationAfterScan();
     tftDirty=true;
   }
-  if(wifiUiConnectPending && !wifiUiDisablePending &&
+  if(wifiUiConnectPending && !wifiUiDisablePending && !otaActive &&
      !busaGoogleNetworkBusy && !busaWifiScanRunning){
     wifiUiConnectPending=false;
-    WiFi.setAutoReconnect(true);
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-    lastStationCheck=now;wifiUiConnectAt=now;
+    wifiUiResumeStation=false; // a new saved SSID wins over old iPhone
+    WiFi.setAutoReconnect(false);
+    WiFi.disconnect(false,false); // disconnect STA only; keep BUSA local AP
+    lastStationCheck=now;
+    wifiUiAssociationDueAt=now+550;
+    wifiUiConnectAt=0;wifiUiLastConnectError="";
     wifiUiStage=WIFIUI_CONNECTING;
-    wifiUiFeedback="Подключение к выбранной сети...";
+    wifiUiFeedback="Переключаю на "+stationSsid;
     tftDirty=true;
   }
-  if(wifiUiStage==WIFIUI_CONNECTING && !wifiUiConnectPending){
-    if(WiFi.status()==WL_CONNECTED){
-      wifiUiFeedback="Подключено: "+WiFi.SSID();
-      wifiUiStage=WIFIUI_STATUS;
+  if(wifiUiAssociationDueAt && (int32_t)(now-wifiUiAssociationDueAt)>=0 &&
+     !wifiUiDisablePending && !otaActive && !busaGoogleNetworkBusy){
+    wifiUiAssociationDueAt=0;
+    if(WiFi.getMode()!=WIFI_AP_STA)WiFi.mode(WIFI_AP_STA);
+    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    wifiUiConnectAt=now;lastStationCheck=now;
+    wifiUiFeedback="Подключаю: "+stationSsid;
+    tftDirty=true;
+  }
+  if(wifiUiStage==WIFIUI_CONNECTING && !wifiUiConnectPending &&
+     !wifiUiAssociationDueAt && wifiUiConnectAt){
+    if(WiFi.status()==WL_CONNECTED && WiFi.SSID()==stationSsid){
+      wifiUiLastConnectError="";
+      WiFi.setAutoReconnect(true);
+      wifiUiFeedback="Подключено: "+stationSsid;
+      wifiUiConnectAt=0;wifiUiStage=WIFIUI_STATUS;
       tftDirty=true;
-    }else if((uint32_t)(now-wifiUiConnectAt)>16000){
-      wifiUiFeedback="Нет соединения. Проверь пароль";
-      wifiUiStage=WIFIUI_STATUS;
+    }else if((uint32_t)(now-wifiUiConnectAt)>18000){
+      wifiUiLastConnectError="Не подключено: "+stationSsid+". Проверь пароль/2,4ГГц";
+      WiFi.setAutoReconnect(false);
+      WiFi.disconnect(false,false); // no silent fallback to the old hotspot
+      wifiUiFeedback=wifiUiLastConnectError;
+      wifiUiConnectAt=0;wifiUiStage=WIFIUI_STATUS;
       tftDirty=true;
     }
   }
@@ -324,6 +345,8 @@ void wifiUiSaveConnection(){
   stationSsid=wifiUiSelectedSsid;
   stationPass=wifiUiPassword;
   wifiUiStaDisabled=false;wifiUiDisablePending=false;
+  wifiUiResumeStation=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
+  wifiUiLastConnectError="";
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiConnectPending=true;
   wifiUiConnectAt=millis();wifiUiStage=WIFIUI_CONNECTING;wifiUiMenuIndex=3;
