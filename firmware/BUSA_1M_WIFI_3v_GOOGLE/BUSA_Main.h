@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-TEMP-TABS-NVS-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-NAV-ORDER-NVS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -555,6 +555,7 @@ bool pcfRead(uint16_t &value){
 }
 uint8_t currentPage=0; // 7 tabs including Diagnostics
 uint8_t graphSubView=0; // 0 four isolated temperature lanes; 1 water + collection lanes
+uint8_t graphMenuCursor=0; // Selected item in the Graphs submenu; ENTER opens it
 uint32_t busaGraphLastDrawnCapture=0;
 uint8_t approvedSettingsItem=0; // 5 approved settings
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
@@ -853,12 +854,13 @@ void keypadAction(int k){
         themeDraft=(themeDraft+(k==7?2:1))%3;
       }
     }else if(currentPage==6){
-      diagModule=(diagModule+(k==7?6:1))%7;tftView=0;
+      // Like Settings: move in the diagnostics menu, never close an opened child.
+      if(!tftView)diagModule=(diagModule+(k==7?6:1))%7;
     }else if(currentPage==3){
-      graphSubView=(graphSubView+1)%2;
-    }else{
-      tftView=k==7?0:1;
+      // Select Graphs entries in sequence. Do not switch a graph during preview.
+      if(!tftView)graphMenuCursor=(graphMenuCursor+(k==7?1:1))%2;
     }
+    // Home/Collection/Events are read-only panels; no invisible submenus.
   }else if(k==16 || k==18){ // LEFT/RIGHT: change sections everywhere
     moveApprovedTab(k==16?-1:+1);
   }else if(k==19){ // ENT: open selected element
@@ -890,12 +892,14 @@ void keypadAction(int k){
           tftView=0; // One ENT saves and returns to Settings.
         }else keyMessage="Ошибка сохранения темы";
       }
-    }else if(currentPage==6){tftView=!tftView;
+    }else if(currentPage==6){
+      // ENTER opens the selected diagnostic module; ESC is the only way back.
+      if(!tftView)tftView=1;
     }else if(currentPage==3){
-      graphSubView=(graphSubView+1)%2;
-    }else{
-      tftView=1;
+      // ENTER opens exactly the graph highlighted by UP/DOWN, not the next one.
+      if(!tftView){graphSubView=graphMenuCursor;tftView=1;}
     }
+    // Nothing else to open in read-only sections.
   }else if(k==1){ // F2: display OFF; monitoring continues
     darkenTftDisplay();
     keyMessage="TFT погашен (ручной режим)";
