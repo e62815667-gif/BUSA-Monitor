@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v8-N16R8-KEYBOARD-NVS-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-SETTINGS-KEYBOARD-NVS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -740,14 +740,20 @@ bool saveThemeMode(uint8_t mode){
 }
 void darkenTftDisplay(); // manual screen-off via F2 or local iPhone UI
 void keypadAction(int k){
-  // # stays unassigned; * enters the decimal comma only in a threshold editor.
+  // # and * always remain unassigned; hold 0 >2 seconds for decimal comma.
   if(k==2 || k==3)return; // # and * always unused
   if(wifiUiKey(k))return;
   if(calEditing){
-    if(k==7||k==11){calDraft=constrain(roundf((calDraft+(k==7?0.1f:-0.1f))*10.0f)/10.0f,-10.0f,10.0f);}
-    else if(k==19){if(saveTempOffset(calSensor,calDraft)){calEditing=false;keyMessage="Калибровка сохранена";}}
-    else if(k==15){calEditing=false;keyMessage="Калибровка отменена";}
-    else if(k==16||k==18){calEditing=false;moveApprovedTab(k==16?-1:1);}
+    // A single inline editor for each of the four visible sensor rows.
+    if(k==7||k==11){
+      calDraft=constrain(roundf((calDraft+(k==7?0.1f:-0.1f))*10.0f)/10.0f,-10.0f,10.0f);
+    }else if(k==0){calDraft=0.0f;keyMessage="Поправка: 0.0 C";}
+    else if(k==19){
+      if(saveTempOffset(calSensor,calDraft)){calEditing=false;keyMessage="Поправка T"+String(calSensor+1)+" сохранена";}
+      else keyMessage="Не удалось сохранить поправку";
+    }else if(k==15){calEditing=false;keyMessage="Изменение отменено";}
+    // Left/right never silently commit a value: return to navigation.
+    else if(k==16||k==18){calEditing=false;tftView=0;moveApprovedTab(k==16?-1:1);}
     tftDirty=true;return;
   }
   // Confirmation is the only path that removes an existing sound threshold.
@@ -806,8 +812,13 @@ void keypadAction(int k){
       uint8_t target=previousMainPage;
       previousMainPage=currentPage;currentPage=target;
     }else if(currentPage!=0){navigatePage(0);}
-  }else if(k==0){ // F1: request delete confirmation on Temperatures only
-    if(currentPage==1){
+  }else if(k==0){ // F1 deletes the selected setting only.
+    if(currentPage==5 && tftView && approvedSettingsItem==0){
+      // Calibration deletion = revert only this sensor's correction to zero.
+      if(saveTempOffset(calSensor,0.0f)){
+        keyMessage="Поправка T"+String(calSensor+1)+" удалена";
+      }else keyMessage="Ошибка сброса поправки";
+    }else if(currentPage==1){
       deleteConfirmPending=true;
       keyMessage=String("Удалить T")+String(selectedTemp+1)+
         (selectedField?" ВЫКЛ":" ВКЛ")+"? ENT/ESC";
@@ -819,9 +830,15 @@ void keypadAction(int k){
       item=(item+(k==7?7:1))%8;
       selectedTemp=item/2;selectedField=item%2;
     }else if(currentPage==5){
-      if(tftView && approvedSettingsItem==0)calSensor=(calSensor+(k==7?3:1))%4;
-      else if(tftView && approvedSettingsItem==2)themeDraft=(themeDraft+(k==7?2:1))%3;
-      else if(!tftView){approvedSettingsItem=(approvedSettingsItem+(k==7?4:1))%5;settingsSubTab=approvedSettingsItem;}
+      if(!tftView){
+        approvedSettingsItem=(approvedSettingsItem+(k==7?4:1))%5;
+        settingsSubTab=approvedSettingsItem;
+      }else if(approvedSettingsItem==0){
+        // Temperature subpage always shows T1..T4 simultaneously.
+        calSensor=(calSensor+(k==7?3:1))%4;
+      }else if(approvedSettingsItem==2){
+        themeDraft=(themeDraft+(k==7?2:1))%3;
+      }
     }else if(currentPage==6){
       diagModule=(diagModule+(k==7?6:1))%7;tftView=0;
     }else if(currentPage==3){
@@ -841,10 +858,19 @@ void keypadAction(int k){
     }else if(currentPage==0){
       navigatePage(1);
     }else if(currentPage==5){
-      if(!tftView){tftView=1;themeDraft=tftThemeMode;
-        if(approvedSettingsItem==1)wifiUiBeginScan();}
-      else if(approvedSettingsItem==0){calEditing=true;calDraft=tempOffset[calSensor];}
-      else if(approvedSettingsItem==2){if(saveThemeMode(themeDraft))keyMessage="Тема сохранена";}
+      if(!tftView){
+        // Settings is a real page; ENT opens the selected nested page.
+        tftView=1;
+        themeDraft=tftThemeMode;
+        if(approvedSettingsItem==1)wifiUiBeginScan();
+      }else if(approvedSettingsItem==0){
+        calEditing=true;calDraft=tempOffset[calSensor];
+      }else if(approvedSettingsItem==2){
+        if(saveThemeMode(themeDraft)){
+          keyMessage="Тема сохранена";
+          tftView=0; // One ENT saves and returns to Settings.
+        }else keyMessage="Ошибка сохранения темы";
+      }
     }else if(currentPage==6){tftView=!tftView;
     }else if(currentPage==3){
       graphSubView=(graphSubView+1)%2;
@@ -1054,7 +1080,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V14.7 N16R8";
+  const String version="FW V14.9 N16R8";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
