@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v7-N16R8-KEYRESTORE-APPROVED-UI-REMOTE-ALARMS-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v8-N16R8-KEYBOARD-NVS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -708,8 +708,12 @@ void startKeyLearning(){
   currentPage=6;diagModule=1;tftView=1;tftDirty=true;
 }
 
+#include "BUSA_KeypadTFT_UI.h"
 void navigatePage(uint8_t target){
   if(target>=7||target==currentPage)return;
+  if(currentPage==5 && target!=5 && wifiUiStage==WIFIUI_PASSWORD){
+    wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();wifiUiStage=WIFIUI_STATUS;
+  }
   previousMainPage=currentPage;
   currentPage=target;tftView=0;editingTemp=false;deleteConfirmPending=false;calEditing=false;tftDirty=true;
 }
@@ -737,7 +741,8 @@ bool saveThemeMode(uint8_t mode){
 void darkenTftDisplay(); // manual screen-off via F2 or local iPhone UI
 void keypadAction(int k){
   // # stays unassigned; * enters the decimal comma only in a threshold editor.
-  if(k==2 || (k==3 && !editingTemp))return;
+  if(k==2 || k==3)return; // # and * always unused
+  if(wifiUiKey(k))return;
   if(calEditing){
     if(k==7||k==11){calDraft=constrain(roundf((calDraft+(k==7?0.1f:-0.1f))*10.0f)/10.0f,-10.0f,10.0f);}
     else if(k==19){if(saveTempOffset(calSensor,calDraft)){calEditing=false;keyMessage="Калибровка сохранена";}}
@@ -786,7 +791,7 @@ void keypadAction(int k){
       const int digitKey[10]={17,4,5,6,8,9,10,12,13,14};
       String insert="";
       for(int d=0;d<10;d++)if(k==digitKey[d])insert=String(d);
-      if(k==3 && editTempBuffer.indexOf(',')<0 && editTempBuffer.indexOf('.')<0)insert=","; // * decimal comma; F2 remains display-off
+      // Decimal comma is entered by holding 0 for >2 seconds; * and # are unused.
       if(insert.length() && editTempBuffer.length()<7){
         editTempBuffer=editTempBuffer.substring(0,editCursor)+
           insert+editTempBuffer.substring(editCursor);
@@ -836,7 +841,8 @@ void keypadAction(int k){
     }else if(currentPage==0){
       navigatePage(1);
     }else if(currentPage==5){
-      if(!tftView){tftView=1;themeDraft=tftThemeMode;}
+      if(!tftView){tftView=1;themeDraft=tftThemeMode;
+        if(approvedSettingsItem==1)wifiUiBeginScan();}
       else if(approvedSettingsItem==0){calEditing=true;calDraft=tempOffset[calSensor];}
       else if(approvedSettingsItem==2){if(saveThemeMode(themeDraft))keyMessage="Тема сохранена";}
     }else if(currentPage==6){tftView=!tftView;
@@ -848,15 +854,10 @@ void keypadAction(int k){
   }else if(k==1){ // F2: display OFF; monitoring continues
     darkenTftDisplay();
     keyMessage="TFT погашен (ручной режим)";
-  }else if(k==17 || k==4){navigatePage(0);} // 0,1 Home
-  else if(k==5){navigatePage(1);selectedTemp=0;selectedField=0;} // 2 Temperatures
-  else if(k==6){navigatePage(2);} // 3 Collection
-  else if(k==8){navigatePage(3);} // 4 Graphs
-  else if(k==9){navigatePage(4);} // 5 Events
-  else if(k==10){navigatePage(5);} // 6 Settings
-  else if(k==12){navigatePage(5);approvedSettingsItem=1;settingsSubTab=1;tftView=1;} // 7 Wi-Fi
-  else if(k==13){navigatePage(5);approvedSettingsItem=3;settingsSubTab=3;tftView=1;} // 8 Google
-  else if(k==14){navigatePage(6);diagModule=0;} // 9 Diagnostics
+  }else if(wifiUiDigitFromKey(k)>=0){
+    // Numbers NEVER open sections. Digits are used only inside an editor.
+    keyMessage="Цифры работают только в полях ввода";
+  }
   tftDirty=true;
 }
 
@@ -898,6 +899,7 @@ bool learnCommitPair(int pair){
 void wakeTftDisplay(); // Wake works even when the 5x4 keymap is untrained.
 bool tftDisplayOff=false;
 uint32_t tftDisplayActivityMs=0;
+bool keypadDeferredZero=false;
 // No inactivity auto-off. Only F2 or explicit iPhone screen button blanks TFT.
 void pollKeys(uint32_t now){
   if(!pcfDetected||busaI2cSuspended(now)||!busaI2cLinesFree()){
@@ -929,25 +931,43 @@ void pollKeys(uint32_t now){
   }else{
     rawPair="НЕТ"; // V9 kept stale ambiguous pairs after release
   }
-  if(pair!=pendingPair){pendingPair=pair;pendingAt=now;keyHeld=false;}
-  if(pair<0||keyHeld||!elapsed(now,pendingAt,80))return;
+  if(pair!=pendingPair){
+    // Zero is classified only on release, so a long press never enters "0,".
+    if(pair<0 && keypadDeferredZero && keyHeld && !keypadLearning){
+      if((uint32_t)(now-pendingAt)>2000)wifiUiLongZero();
+      else keypadAction(17);
+    }
+    pendingPair=pair;pendingAt=now;keyHeld=false;keypadDeferredZero=false;
+  }
+  if(pair<0)return;
+  if(keyHeld){
+    if(keypadDeferredZero && (uint32_t)(now-pendingAt)>2000){
+      keypadDeferredZero=false;
+      wifiUiLongZero();
+    }
+    return;
+  }
+  if(!elapsed(now,pendingAt,80))return;
   keyHeld=true;
   keyCount++;
   if(tftDisplayOff){
-    // First recognized electrical key press only wakes the TFT.
-    // No menu action, setpoint edit, or output action on wake.
-    wakeTftDisplay();
-    keyMessage="Экран пробуждён";
-    return;
+    // Any key wakes TFT without performing the key's original function.
+    wakeTftDisplay();keyMessage="Экран пробуждён";return;
   }
   tftDisplayActivityMs=now;
-  if(keypadLearning){
-    learnCommitPair(pair);
-  }else{
+  if(keypadLearning){learnCommitPair(pair);}
+  else{
     int k=-1;
     if(keypadReady)for(int i=0;i<20;i++)if(keyPairs[i]==pair){k=i;break;}
     if(k<0)keyMessage="Не назначено: "+rawPair;
-    else{keyMessage=String(KEY_CAPS[k])+" ("+rawPair+")";keypadAction(k);}
+    else{
+      keyMessage=String(KEY_CAPS[k])+" ("+rawPair+")";
+      if(k==17 && (editingTemp ||
+          (currentPage==5 && approvedSettingsItem==1 &&
+           tftView && wifiUiStage==WIFIUI_PASSWORD))){
+        keypadDeferredZero=true;
+      }else keypadAction(k);
+    }
   }
   tftDirty=true;
 }
@@ -3077,6 +3097,7 @@ void loop(){
     Serial0.println("STA reconnect: no local clients, 120s backoff");
   }
   readConsole();
+  if(!otaActive)wifiUiPoll(); // nonblocking Wi-Fi scan and password-provisioning on physical TFT
   if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.

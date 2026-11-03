@@ -397,10 +397,48 @@ static void v14Settings(bool layout){
     v14Tiny("UP/DN выбор датчика · ENT поправка",35,149,V14_BLUE);
     v14Tiny("Пороги звука не меняются",35,173,V14_MUTED);
    }break;
-  case 1:
-   v14Print(WiFi.status()==WL_CONNECTED?"Wi-Fi: подключён":"Wi-Fi: нет связи",35,121,V14_TEXT);
-   v14Tiny("AP: "+WiFi.softAPIP().toString(),35,144,V14_BLUE);
-   v14Tiny("Параметры подключения: iPhone",35,170,V14_MUTED);break;
+  case 1: { // Physical TFT uses discovery; SSID is NEVER typed manually.
+   switch(wifiUiStage){
+    case WIFIUI_SCANNING:
+     v14Print("Ищу сети Wi-Fi...",35,127,V14_BLUE);
+     v14Tiny("Поиск без блокировки датчиков",35,150,V14_MUTED);
+     break;
+    case WIFIUI_NETWORKS:
+     v14Tiny("Доступные сети: "+String(wifiUiCount),35,116,V14_BLUE);
+     for(int j=0;j<3;j++){
+       int n=(int)wifiUiIndex+j-1;
+       if(n<0||n>=wifiUiCount)continue;
+       String name=wifiUiNetworks[n];
+       if(name.length()>23)name=name.substring(0,22)+"...";
+       v14Tiny(String(n==wifiUiIndex?"> ":"  ")+name,35,139+j*19,
+               n==wifiUiIndex?V14_ORANGE:V14_TEXT);
+     }
+     v14Tiny("UP/DN выбор · ENT пароль",35,195,V14_MUTED);
+     break;
+    case WIFIUI_PASSWORD:{
+     String ssid=wifiUiSelectedSsid;
+     if(ssid.length()>22)ssid=ssid.substring(0,21)+"...";
+     v14Tiny("Сеть: "+ssid,35,115,V14_TEXT);
+     v14Print(String("Режим ")+wifiUiModeCaption(),35,137,V14_ORANGE);
+     String masked=wifiUiPasswordMask();
+     if(masked.length()>28)masked="..."+masked.substring(masked.length()-25);
+     v14Tiny("Пароль: "+masked,35,156,V14_BLUE);
+     v14Tiny("UP/DN режим · F1 удалить",35,176,V14_MUTED);
+     v14Tiny("0 долго: запятая · ENT ОК",35,195,V14_MUTED);
+     break;
+    }
+    case WIFIUI_CONNECTING:
+     v14Print("Подключаю Wi-Fi...",35,125,V14_BLUE);
+     v14Tiny("Сеть: "+wifiUiSelectedSsid,35,147,V14_TEXT);
+     v14Tiny(wifiUiFeedback,35,172,V14_MUTED);
+     break;
+    default:
+     v14Print(WiFi.status()==WL_CONNECTED?"Wi-Fi подключён":"Wi-Fi нет связи",35,122,V14_TEXT);
+     v14Tiny("ENT: искать доступные сети",35,147,V14_BLUE);
+     v14Tiny(wifiUiFeedback,35,172,V14_MUTED);
+   }
+   break;
+  }
   case 2:
    v14Print(themeDraft==0?"Светлая":themeDraft==1?"Тёмная":"Системная",35,126,V14_TEXT);
    v14Tiny("UP/DN выбор · ENT сохранить",35,152,V14_BLUE);
@@ -412,7 +450,7 @@ static void v14Settings(bool layout){
   default:
    v14Tiny(String("Wi-Fi: ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),35,118,V14_TEXT);
    v14Tiny(String("Google: ")+(googleEnabled?"да":"нет"),35,138,V14_TEXT);
-   v14Tiny("Прошивка: V14.7 UISETDIAG",35,158,V14_BLUE);
+   v14Tiny("Прошивка: V14.8 KEYBOARD",35,158,V14_BLUE);
    v14Tiny(String("Работа: ")+(millis()/60000)+" мин",35,180,V14_TEXT);
  }
 }
