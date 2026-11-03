@@ -17,6 +17,8 @@ uint8_t wifiUiCursor=0;
 bool wifiUiOwnsScan=false,wifiUiConnectPending=false;
 uint8_t wifiUiScanAttempts=0; // One automatic retry for failed or empty scans
 uint32_t wifiUiScanRetryAt=0;
+bool wifiUiResumeStation=false; // restore prior STA after search, never AP
+bool wifiUiPassiveFallback=false; // second scan listens for 2.4GHz beacons
 int wifiUiLastScanCode=-99; // -3=timeout, -2=failed, >=0=number found
 String wifiUiFeedback="";
 extern volatile bool busaWifiScanRunning,busaGoogleNetworkBusy;
@@ -96,6 +98,7 @@ void wifiUiBackspace(){
 // Disconnect ONLY the external station. The BUSA access point, local web app,
 // and OTA stay available at 192.168.4.1, even after reboot.
 void wifiUiApplyStationDisconnect(){
+  wifiUiResumeStation=false; // explicit user STA disconnect wins
   wifiUiConnectPending=false;
   WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
   WiFi.setAutoReconnect(false);
@@ -119,6 +122,15 @@ void wifiUiRequestStationDisconnect(){
   if(!busaGoogleNetworkBusy && !otaActive)wifiUiApplyStationDisconnect();
   tftDirty=true;
 }
+void wifiUiRestoreStationAfterScan(){
+  if(!wifiUiResumeStation)return;
+  wifiUiResumeStation=false;
+  if(wifiUiStaDisabled || wifiUiDisablePending || wifiUiConnectPending ||
+     stationSsid.isEmpty() || stationPass.length()<8)return;
+  WiFi.setAutoReconnect(true);
+  WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+  lastStationCheck=millis();
+}
 void wifiUiLeave(){
   if(wifiUiOwnsScan){
     WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
@@ -126,6 +138,7 @@ void wifiUiLeave(){
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiStage=WIFIUI_STATUS;
   wifiUiMenuIndex=0;wifiUiScanRetryAt=0;
+  wifiUiRestoreStationAfterScan();
   // Leaving the menu NEVER disconnects BUSA's own Wi-Fi hotspot.
   tftDirty=true;
 }
@@ -151,8 +164,11 @@ void wifiUiStartScanAttempt(uint32_t now){
   WiFi.scanDelete();
   wifiUiScanAt=now;
   busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
-  // Active 2.4-GHz scan, asynchronous, extended time per channel.
-  const int result=WiFi.scanNetworks(true,false,false,120);
+  // Passive all-channel fallback differs from first active scan.
+  wifiUiPassiveFallback=(wifiUiScanAttempts>1);
+  const int result=wifiUiPassiveFallback?
+    WiFi.scanNetworks(true,true,true,350):
+    WiFi.scanNetworks(true,true,false,180);
   wifiUiLastScanCode=result;
   wifiUiOwnsScan=(result==WIFI_SCAN_RUNNING || result>=0);
   busaWifiScanRunning=wifiUiOwnsScan;
@@ -190,6 +206,20 @@ void wifiUiBeginScan(){
   wifiUiCount=0;wifiUiIndex=0;wifiUiSelectedSsid="";
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiScanAttempts=0;wifiUiScanRetryAt=0;wifiUiLastScanCode=-99;
+  wifiUiPassiveFallback=false;
+  // A connected STA can make ESP32-S3 Wi-Fi scans report zero networks.
+  // Pause only STA; keep WIFI_AP_STA, BUSA AP, HTTP and OTA active.
+  wifiUiResumeStation=!wifiUiStaDisabled && WiFi.status()==WL_CONNECTED &&
+    !stationSsid.isEmpty() && stationPass.length()>=8;
+  if(WiFi.status()==WL_CONNECTED){
+    WiFi.setAutoReconnect(false);
+    WiFi.disconnect(false,false); // STA only, never disable BUSA softAP
+    lastStationCheck=now;
+    wifiUiStage=WIFIUI_SCANNING;
+    wifiUiFeedback="Освобождаю STA для поиска...";
+    wifiUiScanRetryAt=now+650; // wait for driver to process disassociation
+    tftDirty=true;return;
+  }
   wifiUiStartScanAttempt(now);
 }
 void wifiUiPoll(){
@@ -221,6 +251,7 @@ void wifiUiPoll(){
         if(timedOut)wifiUiFeedback="Поиск Wi-Fi: превышено время";
         else if(count<0)wifiUiFeedback="Ошибка сканера: "+String(count);
         else wifiUiFeedback="Сети 2,4 ГГц не найдены";
+        wifiUiRestoreStationAfterScan();
       }
       tftDirty=true;return;
     }
@@ -241,6 +272,7 @@ void wifiUiPoll(){
     wifiUiFeedback=wifiUiCount?
       "Найдено сетей: "+String(wifiUiCount)+". ENT: выбор":
       "Сети не отображаются: повтори поиск";
+    wifiUiRestoreStationAfterScan();
     tftDirty=true;
   }
   if(wifiUiConnectPending && !wifiUiDisablePending &&
@@ -334,6 +366,7 @@ bool wifiUiKey(int k){
       WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
       wifiUiScanRetryAt=0;
       wifiUiStage=WIFIUI_STATUS;wifiUiFeedback="Поиск отменён";
+      wifiUiRestoreStationAfterScan();
     }else if(k==16||k==18)return false;
     tftDirty=true;return true;
   }
