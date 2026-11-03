@@ -1265,6 +1265,7 @@ void busaStaService(){
       tftDirty=true;
     }
   }else if(!busaStaSwitchPending && !otaActive &&
+      !wifiUiScanPending && !wifiUiOwnsScan && !busaWifiScanRunning &&
       WiFi.getMode()==WIFI_AP_STA && WiFi.status()!=WL_CONNECTED){
     // Never keep chasing a missing phone hotspot.
     if((uint32_t)(now-lastStationCheck)>1800)busaStaRestoreLocal();
@@ -2957,7 +2958,9 @@ void setup(){
     server.send(200,"application/json",otaJSON());
   });
   server.on("/api/ota/prepare",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"||otaActive){
+    if(!apClient()||server.arg("confirm")!="YES"||otaActive||
+       busaStaSwitchPending||busaStaSwitching||busaWifiScanRunning||
+       wifiUiScanPending||wifiUiOwnsScan){
       server.send(403,"text/plain","Требуется локальная сеть БУСА и согласие");return;
     }
     char token[17];
