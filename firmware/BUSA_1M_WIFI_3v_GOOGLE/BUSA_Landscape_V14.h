@@ -375,7 +375,7 @@ static void v14SystemInfoRows(){
   const bool staOk=(WiFi.status()==WL_CONNECTED);
   const bool googleOk=googleEnabled && googleInternet==1 &&
     googleState==5 && (googleHttp==200 || googleHttp==302);
-  const bool espApOk=wifiRunning; // ESP32's local Wi-Fi AP is running.
+  const bool espApOk=(WiFi.getMode()==WIFI_AP || WiFi.getMode()==WIFI_AP_STA); // ESP32 local Wi-Fi AP
   const uint32_t uptimeSeconds=millis()/1000;
   v14Print(String("Wi-Fi подключён: ")+(staOk?"да":"нет"),17,103,V14_TEXT);
   v14Print(String("Google: ")+(googleOk?"да":"нет"),17,123,V14_TEXT);
