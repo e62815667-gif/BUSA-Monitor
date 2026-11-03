@@ -888,6 +888,7 @@ window.busaViewReceive=function(data){
  if(!remoteEnabled)return;
  clearTimeout(remoteTimeout);
  if(!data||data.ok!==true){
+  clearRemoteNumbers();remoteHistory=[];drawRemoteCharts();
   remoteStatus('Ошибка Google: '+String(data&&data.error||'нет ответа'));return;
  }
  if(!data.latest||!data.latest.telemetry){
@@ -909,10 +910,16 @@ function loadGoogleLatest(){
  const join=configUrl.includes('?')?'&':'?';
  script.src=configUrl+join+'mode=latest&callback=busaViewReceive&readToken='+
   encodeURIComponent(configToken)+'&t='+Date.now();
- script.onerror=()=>{if(remoteEnabled){clearTimeout(remoteTimeout);remoteStatus('Ошибка загрузки из Google')}};
+ script.onerror=()=>{if(remoteEnabled){
+  clearTimeout(remoteTimeout);clearRemoteNumbers();remoteHistory=[];drawRemoteCharts();
+  remoteStatus('Ошибка загрузки из Google');
+ }};
  remoteRequest=script;document.head.appendChild(script);
  clearTimeout(remoteTimeout);
- remoteTimeout=setTimeout(()=>{if(remoteEnabled)remoteStatus('Нет ответа Google (проверь развёртывание)')},18000);
+ remoteTimeout=setTimeout(()=>{if(remoteEnabled){
+  clearRemoteNumbers();remoteHistory=[];drawRemoteCharts();
+  remoteStatus('Нет ответа Google (проверь развёртывание)');
+ }},18000);
 }
 function stopRemote(){
  remoteEnabled=false;clearInterval(remoteTimer);clearTimeout(remoteTimeout);
