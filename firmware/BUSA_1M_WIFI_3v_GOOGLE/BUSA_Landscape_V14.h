@@ -215,15 +215,20 @@ static void v14Temperature(uint32_t now,bool layout){
   // Sensor positions only; keep original T1/T2/T3/T4 pins and saved alarm values.
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
   if(!tftView){
-    // Main sensor selection: Water -> Cube -> Column -> Top of column.
-    for(int pos=0;pos<4;pos++){
-      const int sensor=tempMenuOrder[pos];
-      const int x=4+(pos%2)*158,y=25+(pos/2)*92;
+    // Read down each column: Water -> Column -> Cube -> Top of column.
+    // The display position matches UP/DOWN's sequential selection (0,1,2,3).
+    for(int sensor=0;sensor<4;sensor++){
+      const int x=4+(sensor/2)*158,y=25+(sensor%2)*92;
       hqPanel(x,y,153,87);
       if(sensor==selectedTemp)screen->fillRoundRect(x+3,y+3,4,81,2,V14_ORANGE);
-      screen->fillCircle(x+16,y+18,4,v14SeriesColors[sensor]);
-      v14Print(names[sensor],x+26,y+24,V14_TEXT);
-      v14Metric(v13Temp(sensor,now),x+12,y+64,131,hasTemp(sensor,now));
+      screen->fillCircle(x+16,y+15,4,v14SeriesColors[sensor]);
+      v14Print(names[sensor],x+26,y+19,V14_TEXT);
+      v14Metric(v13Temp(sensor,now),x+12,y+43,131,hasTemp(sensor,now));
+      // Display actual saved sound thresholds, never substitute made-up numbers.
+      v14Tiny(String("ВКЛ: ")+v13Ref(refTemp[sensor])+
+        (isfinite(refTemp[sensor])?String(" °C"):String("")),x+12,y+64,V14_MUTED);
+      v14Tiny(String("ВЫКЛ: ")+v13Ref(noticeTemp[sensor])+
+        (isfinite(noticeTemp[sensor])?String(" °C"):String("")),x+12,y+79,V14_MUTED);
     }
     return;
   }
@@ -575,10 +580,9 @@ void v14RefreshLive(uint32_t now){
       v14Metric(v13Temp(i,now),21,27+i*44+37,94,hasTemp(i,now),HQ_NAVY);
   } else if(currentPage==1 && !editingTemp && !deleteConfirmPending){
     if(!tftView){
-      for(int pos=0;pos<4;pos++){
-        const int sensor=tempMenuOrder[pos];
-        const int x=4+(pos%2)*158,y=25+(pos/2)*92;
-        v14Metric(v13Temp(sensor,now),x+12,y+64,131,hasTemp(sensor,now));
+      for(int sensor=0;sensor<4;sensor++){
+        const int x=4+(sensor/2)*158,y=25+(sensor%2)*92;
+        v14Metric(v13Temp(sensor,now),x+12,y+43,131,hasTemp(sensor,now));
       }
     }else{
       v14Metric(v13Temp(selectedTemp,now),230,46,69,hasTemp(selectedTemp,now));
