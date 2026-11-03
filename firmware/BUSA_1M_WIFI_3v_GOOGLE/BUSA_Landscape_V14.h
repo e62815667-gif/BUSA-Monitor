@@ -212,33 +212,45 @@ static void v14Home(uint32_t now,bool layout){
   // Removed redundant K1-K4/flow pulse strip below the enlarged figure.
 }
 static void v14Temperature(uint32_t now,bool layout){
+  // Sensor positions only; keep original T1/T2/T3/T4 pins and saved alarm values.
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
-  // Four larger cards fill the former 25..50px blank navigation strip.
-  for(int i=0;i<4;i++){
-    const int x=4+(i%2)*158,y=25+(i/2)*92;
-    hqPanel(x,y,153,87);
-    if(i==selectedTemp)screen->fillRoundRect(x+3,y+3,4,81,2,V14_ORANGE);
-    screen->fillCircle(x+14,y+15,4,v14SeriesColors[i]);
-    v14Print(names[i],x+25,y+19,V14_TEXT);
-    v14Metric(v13Temp(i,now),x+11,y+45,133,hasTemp(i,now));
-    v14Tiny(String(i==selectedTemp && selectedField==0?">ВКЛ: ":"ВКЛ: ")+v13Ref(refTemp[i]),
-      x+12,y+65,(i==selectedTemp && selectedField==0)?V14_ORANGE:V14_MUTED);
-    v14Tiny(String(i==selectedTemp && selectedField==1?">ВЫКЛ: ":"ВЫКЛ: ")+v13Ref(noticeTemp[i]),
-      x+12,y+80,(i==selectedTemp && selectedField==1)?V14_ORANGE:V14_MUTED);
+  if(!tftView){
+    // Main sensor selection: Water -> Cube -> Column -> Top of column.
+    for(int pos=0;pos<4;pos++){
+      const int sensor=tempMenuOrder[pos];
+      const int x=4+(pos%2)*158,y=25+(pos/2)*92;
+      hqPanel(x,y,153,87);
+      if(sensor==selectedTemp)screen->fillRoundRect(x+3,y+3,4,81,2,V14_ORANGE);
+      screen->fillCircle(x+16,y+18,4,v14SeriesColors[sensor]);
+      v14Print(names[sensor],x+26,y+24,V14_TEXT);
+      v14Metric(v13Temp(sensor,now),x+12,y+64,131,hasTemp(sensor,now));
+    }
+    return;
+  }
+  // Full-page settings replace the previous floating temperature edit popup.
+  hqPanel(6,25,308,181);
+  const int sensor=selectedTemp;
+  v14Big(String("T")+String(sensor+1)+" "+String(names[sensor]),17,47,V14_TEXT);
+  v14Metric(v13Temp(sensor,now),230,46,69,hasTemp(sensor,now));
+  screen->drawFastHLine(16,55,288,V14_RULE);
+  for(int field=0;field<2;field++){
+    const int x=15,y=66+field*58;
+    const bool chosen=selectedField==field;
+    hqPanel(x,y,290,53);
+    if(chosen)screen->fillRoundRect(x+4,y+4,5,45,2,V14_ORANGE);
+    const String label=String("T")+String(sensor+1)+(field?" ВЫКЛ":" ВКЛ");
+    v14Print(label,x+18,y+19,chosen?V14_ORANGE:V14_TEXT);
+    const float stored=field?noticeTemp[sensor]:refTemp[sensor];
+    String value=v13Ref(stored);
+    if(editingTemp && chosen)value=editTempBuffer.isEmpty()?"--":editTempBuffer;
+    v14Big(value,x+19,y+43,editingTemp&&chosen?V14_GREEN:V14_TEXT);
   }
   if(deleteConfirmPending){
-    hqPanel(35,46,250,152);
-    v14Big("УДАЛИТЬ ПОРОГ?",43,74,V14_WARN);
-    v14Print(String("T")+String(selectedTemp+1)+
-      (selectedField?" ВЫКЛ":" ВКЛ"),43,110,V14_TEXT);
-    v14Print("ENT: удалить",43,149,V14_WARN);
-    v14Print("ESC: отмена",43,178,V14_GREEN);
+    v14Tiny("ENT удалить / ESC отмена",18,197,V14_WARN);
   }else if(editingTemp){
-    hqPanel(43,46,234,152);
-    v14Big(String("T")+String(selectedTemp+1)+(selectedField?" ВЫКЛ":" ВКЛ"),53,72,V14_TEXT);
-    v14Metric(editTempBuffer.isEmpty()?"--":editTempBuffer,55,113,209,true);
-    v14Print("ENT сохранить",53,151,V14_GREEN);
-    v14Print("ESC отменить",53,180,V14_MUTED);
+    v14Tiny("ENT сохранить / ESC отмена",18,197,V14_GREEN);
+  }else{
+    v14Tiny("ENT изменить / ESC назад",18,197,V14_MUTED);
   }
 }
 static void v14Collection(bool layout){
@@ -554,9 +566,14 @@ void v14RefreshLive(uint32_t now){
     for(int i=0;i<4;i++)
       v14Metric(v13Temp(i,now),21,27+i*44+37,94,hasTemp(i,now),HQ_NAVY);
   } else if(currentPage==1 && !editingTemp && !deleteConfirmPending){
-    for(int i=0;i<4;i++){
-      int x=4+(i%2)*158,y=25+(i/2)*92;
-      v14Metric(v13Temp(i,now),x+11,y+45,133,hasTemp(i,now));
+    if(!tftView){
+      for(int pos=0;pos<4;pos++){
+        const int sensor=tempMenuOrder[pos];
+        const int x=4+(pos%2)*158,y=25+(pos/2)*92;
+        v14Metric(v13Temp(sensor,now),x+12,y+64,131,hasTemp(sensor,now));
+      }
+    }else{
+      v14Metric(v13Temp(selectedTemp,now),230,46,69,hasTemp(selectedTemp,now));
     }
   }
   String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
