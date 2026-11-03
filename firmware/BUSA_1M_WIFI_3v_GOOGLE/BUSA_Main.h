@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-SETTINGS-KEYBOARD-NVS-20261103";
+const char VERSION[]="БУСА 1М WiFi 15v0-N16R8-WIFI-GOOGLE-TFT-NVS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -559,6 +559,9 @@ uint32_t busaGraphLastDrawnCapture=0;
 uint8_t approvedSettingsItem=0; // 5 approved settings
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 uint8_t diagModule=0,calSensor=0,themeDraft=2,tftThemeMode=2;
+uint8_t googleUiChoice=0; // Physical Google page: 0 Connect, 1 Disconnect
+bool busaGoogleUiToggle(bool enable); // implemented in BUSA_Google.h
+bool busaGoogleSavedCredentials(); // never expose credentials to the TFT
 bool calEditing=false;float calDraft=0;
 bool tftDirty=true;
 float refTemp[4]={NAN,NAN,NAN,NAN},noticeTemp[4]={NAN,NAN,NAN,NAN};
@@ -838,6 +841,8 @@ void keypadAction(int k){
         calSensor=(calSensor+(k==7?3:1))%4;
       }else if(approvedSettingsItem==2){
         themeDraft=(themeDraft+(k==7?2:1))%3;
+      }else if(approvedSettingsItem==3){
+        googleUiChoice=(googleUiChoice+1)%2;
       }
     }else if(currentPage==6){
       diagModule=(diagModule+(k==7?6:1))%7;tftView=0;
@@ -862,7 +867,11 @@ void keypadAction(int k){
         // Settings is a real page; ENT opens the selected nested page.
         tftView=1;
         themeDraft=tftThemeMode;
-        if(approvedSettingsItem==1)wifiUiBeginScan();
+        if(approvedSettingsItem==1){
+          wifiUiStage=WIFIUI_STATUS;wifiUiFeedback="";
+          // Search starts on deliberate ENT "Поиск сети", not automatically.
+        }
+        if(approvedSettingsItem==3)googleUiChoice=0;
       }else if(approvedSettingsItem==0){
         calEditing=true;calDraft=tempOffset[calSensor];
       }else if(approvedSettingsItem==2){
@@ -870,6 +879,12 @@ void keypadAction(int k){
           keyMessage="Тема сохранена";
           tftView=0; // One ENT saves and returns to Settings.
         }else keyMessage="Ошибка сохранения темы";
+      }else if(approvedSettingsItem==3){
+        const bool enable=(googleUiChoice==0);
+        if(busaGoogleUiToggle(enable)){
+          keyMessage=enable?"Google подключён":"Google отключён (настройки сохранены)";
+          tftView=0;
+        }else keyMessage=enable?"Сначала настрой Google в приложении":"Ошибка сохранения Google";
       }
     }else if(currentPage==6){tftView=!tftView;
     }else if(currentPage==3){
@@ -1080,7 +1095,7 @@ void updateBootStage(uint8_t stage){
   String status=String("BOOT: ")+steps[bootStage];
   screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
   screen->print(status);
-  const String version="FW V14.9 N16R8";
+  const String version="FW V15.0 N16R8";
   screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
   screen->print(version);
   const int16_t width=w-46;
@@ -1988,6 +2003,7 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <label for="googleToken">Секрет устройства (64 символа)</label>
 <input id="googleToken" type="password" autocomplete="off" placeholder="Не пересылайте секрет в чат">
 <button id="googleSave" type="button" class="full">Сохранить подключение Google</button>
+<button id="googleStart" type="button" class="full">Подключить Google (сохранённые настройки)</button>
 <button id="googleTest" type="button" class="full">Проверить отправку диагностики</button>
 <button id="googleStop" type="button" class="full">Отключить передачу в Google</button>
 <p id="googleResult" role="status" class="hint">—</p></div>
@@ -2321,7 +2337,7 @@ if(Number.isFinite(currentPulse)){
  lastWaterPulse=currentPulse;waterPulseLog.push(delta);
  if(waterPulseLog.length>80)waterPulseLog.shift();
 }
-let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:(s.station.ssid?'Ожидание подключения: '+s.station.ssid:'Wi-Fi не настроен. Выберите сеть ниже.');
+let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:'Нет подключения. Нажмите «Найти сети Wi-Fi» и выберите сеть.';
 get('wstatus').textContent=ss;
 get('espAPStatus').textContent=s.ap?.enabled?'ESP32: ПОДКЛ · '+(s.ap.ip||'192.168.4.1'):'ESP32: ОТКЛ';
 get('mainwifi').textContent='Wi-Fi '+(s.station.connected?'ПОДКЛ':'ОТКЛ')+' · Google '+(s.google?.configured&&s.network_indicators?.internet?'ПОДКЛ':'ОТКЛ')+' · ESP32 '+(s.network_indicators?.local_client?'ПОДКЛ':'ОТКЛ');
@@ -2342,11 +2358,11 @@ if(!calInitialized&&Array.isArray(s.calibration_offsets)){
   calInitialized=true;
 }
 get('aboutWifi').textContent=s.station.connected?'Подключён':'Нет связи';
-get('aboutGoogle').textContent=!s.google.configured?'Не настроена':s.google.state===6?'Ошибка':'Настроена';
+get('aboutGoogle').textContent=!s.google.configured?'Не настроена':!s.google.enabled?'Отключена':s.google.state===6?'Ошибка':'Подключена';
 get('aboutFirmware').textContent=s.firmware;
 get('otaFirmware').textContent=s.firmware;
 get('aboutUptime').textContent=Math.floor(s.uptime_ms/3600000)+' ч '+Math.floor((s.uptime_ms%3600000)/60000)+' мин';
-get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
+get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':!cs.enabled?'ОТКЛЮЧЕНО (ДАННЫЕ СОХРАНЕНЫ)':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent+' · DNS '+(cs.dns??'?')+' · TLS '+(cs.tls_error??'?')+' · этап '+(cs.error_stage??'?');
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
 if(s.keypad){
@@ -2436,6 +2452,12 @@ if(!url.startsWith('https://script.google.com/macros/s/')||!url.endsWith('/exec'
 if(!confirm('Включить отправку показаний в свой Google Диск? Только мониторинг.'))return;
 let resp=await fetch('/api/google/config',{method:'POST',body:new URLSearchParams({url,token})});
 get('googleResult').textContent=await resp.text();if(resp.ok)get('googleToken').value='';
+};
+get('googleStart').onclick=async()=>{
+  try{
+    const r=await fetch('/api/google/on',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+    get('googleResult').textContent=await r.text();
+  }catch(e){get('googleResult').textContent='Ошибка подключения: '+e.message}
 };
 get('googleTest').onclick=async()=>{
   try{
@@ -2854,59 +2876,17 @@ void setup(){
     server.sendHeader("Cache-Control","no-store");
     server.send(otaSuccess?200:400,"application/json",otaJSON());
   },uploadOTA);
+  // Same asynchronous scan queue for TFT and local phone application.
+  // Neither caller consumes/deletes the other's results; no blocking wait.
   server.on("/api/wifi/scan",HTTP_GET,[]{
-    if(server.client().localIP()!=WiFi.softAPIP()){
+    if(!apClient()){
       server.send(403,"application/json","{\"error\":\"Only protected local AP\"}");return;
     }
-    const uint32_t now=millis();
     if(server.hasArg("start") && server.arg("start")=="1"){
-      // A STA scan shares one 2.4-GHz radio with the local AP.
-      // One short passive scan per request, bounded to avoid lengthy AP stalls.
-      if(busaWifiScanRunning){
-        server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
-      }
-      if(busaGoogleNetworkBusy){
-        server.send(503,"application/json","{\"scanning\":false,\"error\":\"google_upload_active\",\"networks\":[]}");return;
-      }
-      if(busaWifiScanLastAt && !elapsed(now,busaWifiScanLastAt,15000)){
-        server.send(429,"application/json","{\"scanning\":false,\"error\":\"repeat_too_soon\",\"networks\":[]}");return;
-      }
-      WiFi.scanDelete();
-      busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
-      // Active probe is more reliable than the old 45-ms passive scan, which
-      // could miss 100-ms AP beacons and incorrectly report zero networks.
-      const int started=WiFi.scanNetworks(true,false,false,80);
-      busaWifiScanRunning=(started==WIFI_SCAN_RUNNING);
-      if(started==WIFI_SCAN_FAILED){
-        busaWifiScanRunning=false;
-        server.send(503,"application/json","{\"scanning\":false,\"error\":\"scan_failed\",\"networks\":[]}");return;
-      }
+      if(!wifiUiScanPending && !wifiUiOwnsScan)wifiUiBeginScan();
     }
-    int n=WiFi.scanComplete();
-    if(n==WIFI_SCAN_RUNNING){
-      if(busaWifiScanRunning && elapsed(now,busaWifiScanStartedAt,9000)){
-        WiFi.scanDelete();busaWifiScanRunning=false;
-        server.send(504,"application/json","{\"scanning\":false,\"error\":\"scan_timeout\",\"networks\":[]}");return;
-      }
-      server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
-    }
-    if(n==WIFI_SCAN_FAILED){
-      busaWifiScanRunning=false;
-      server.send(503,"application/json","{\"scanning\":false,\"error\":\"scan_failed\",\"networks\":[]}");return;
-    }
-    busaWifiScanRunning=false;
-    nearbyCount=0;
-    for(int i=0;i<n && nearbyCount<5;i++){
-      if(WiFi.SSID(i).length()>0)nearbyNames[nearbyCount++]=WiFi.SSID(i);
-    }
-    String out="{\"scanning\":false,\"networks\":[";
-    for(int i=0;i<n&&i<28;i++){
-      if(i)out+=",";
-      out+="{\"ssid\":"+quoteJson(WiFi.SSID(i));
-      out+=",\"rssi\":"+String(WiFi.RSSI(i))+"}";
-    }
-    out+="]}";WiFi.scanDelete();
-    server.send(200,"application/json; charset=utf-8",out);
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json; charset=utf-8",wifiUiScanJSON());
   });
   server.on("/api/wifi",HTTP_POST,[]{
     // Credentials may only be provisioned while connected to the protected local AP.
