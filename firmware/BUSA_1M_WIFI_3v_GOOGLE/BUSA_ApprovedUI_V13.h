@@ -389,8 +389,16 @@ static void v13Settings(uint32_t now,bool layout){
    break;
   }
   case 3:
-   v13Text(googleEnabled?"Google: да":"Google: нет",17,127,WHITE);
-   v13Text(googleState==5?"Передача: да":"Передача: нет",17,166,WHITE);
+   v13Text(!busaGoogleSavedCredentials()?"Не настроено":
+      (googleEnabled?"Подключено":"Отключено"),17,114,WHITE);
+   for(int i=0;i<2;i++){
+     const int y=153+i*41;
+     v13Panel(15,y-21,214,35);
+     if(i==googleUiChoice)screen->fillRect(19,y-18,4,26,V13_CYAN);
+     v13Text(i==0?"Подключить":"Отключить",29,y+1,WHITE);
+   }
+   if(!busaGoogleSavedCredentials())
+     v13Text("Настройка: приложение",17,253,WHITE);
    break;
   default:{
    const bool googleOk=googleEnabled && googleInternet==1 &&
@@ -399,7 +407,7 @@ static void v13Settings(uint32_t now,bool layout){
    v13Text(String("Wi-Fi подключён: ")+(WiFi.status()==WL_CONNECTED?"да":"нет"),17,112,WHITE);
    v13Text(String("Google: ")+(googleOk?"да":"нет"),17,143,WHITE);
    v13Text(String("ESP32 Wi-Fi: ")+((WiFi.getMode()==WIFI_AP || WiFi.getMode()==WIFI_AP_STA)?"да":"нет"),17,174,WHITE);
-   v13Text("Прошивка: V14.9",17,205,WHITE);
+   v13Text("Прошивка: V15.0",17,205,WHITE);
    v13Text("Работа: "+String(secs/60)+" мин "+String(secs%60)+" сек",17,236,WHITE);
   }
  }
