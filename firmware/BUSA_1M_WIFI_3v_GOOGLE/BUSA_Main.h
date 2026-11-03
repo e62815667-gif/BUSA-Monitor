@@ -2519,7 +2519,7 @@ get('scan').onclick=async function(){
    if(e.name!=='TimeoutError'&&e.name!=='AbortError')throw e;
    get('response').textContent='Ответ задерживается, проверяю результат поиска...';
   }
-  for(let i=0;i<16 && (!j||j.scanning);i++){
+  for(let i=0;i<36 && (!j||j.scanning);i++){
    await new Promise(r=>setTimeout(r,800));
    try{
     const r=await fetch('/api/wifi/scan',{cache:'no-store',signal:AbortSignal.timeout(10000)});
@@ -2527,7 +2527,7 @@ get('scan').onclick=async function(){
     if(!r.ok)throw Error(result.error||'HTTP '+r.status);
     j=result;
    }catch(e){
-    if(i===15)throw e;
+    if(i===35)throw e;
    }
   }
   if(!j||j.scanning)throw Error('Нет ответа от ESP32 при сканировании');
@@ -3096,6 +3096,7 @@ void loop(){
   // Google HTTPS transfer, or a channel scan.
   if(stationSsid.length() && stationPass.length()>=8 &&
       WiFi.status()!=WL_CONNECTED && !busaWifiScanRunning &&
+      !wifiUiScanPending && !wifiUiConnectPending &&
       !busaGoogleNetworkBusy && WiFi.softAPgetStationNum()==0 &&
       elapsed(now,lastStationCheck,120000)){
     lastStationCheck=now;
