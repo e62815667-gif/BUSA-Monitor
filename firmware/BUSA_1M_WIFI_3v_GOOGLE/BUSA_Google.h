@@ -1,5 +1,5 @@
 #pragma once
-// Diagnostic-only Google Sheets uploader; no control channel or relay access.
+// Google Sheets uploader and authenticated SOUND-threshold configuration polling; no direct relay/GPIO control.
 // TLS certificate verification mandatory. Credentials never compiled into public image.
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -18,7 +18,7 @@ volatile int googleErrorStage=0; // 0 OK/idle, 1 DNS, 2 HTTPS, 3 HTTP
 
 String googleEndpoint,googleSecret;
 volatile bool busaGoogleNetworkBusy=false; // Distinguishes HTTPS transactions from AP scans
-// Sending is one-way HTTPS. No remote command endpoint is ever accepted.
+// Device-initiated HTTPS command polling accepts only verified T1–T4 sound thresholds.
 bool googleURLValid(const String &s){
   const String prefix="https://script.google.com/macros/s/";
   if(!s.startsWith(prefix)||!s.endsWith("/exec")||s.length()>255)return false;
@@ -50,10 +50,72 @@ void setupGoogleCloud(){
   googleEnabled=googleURLValid(googleEndpoint)&&googleTokenValid(googleSecret);
   googleState=googleEnabled?1:0;
 }
+// Parse ONLY the fixed Apps Script notification-threshold payload.
+// Avoid an additional JSON library and ignore malformed or oversized responses.
+static bool busaRemoteParseFour(const String &json,const char *key,float out[4]) {
+  const String needle=String("\"")+key+"\":[";
+  const int at=json.indexOf(needle);
+  if(at<0)return false;
+  const char *begin=json.c_str();
+  const char *p=begin+at+needle.length();
+  for(int i=0;i<4;i++){
+    while(*p==' '||*p=='\t')p++;
+    char *end=nullptr;
+    out[i]=strtof(p,&end);
+    if(!end||end==p||!isfinite(out[i]))return false;
+    p=end;
+    while(*p==' '||*p=='\t')p++;
+    if(*p!=(i==3?']':','))return false;
+    p++;
+  }
+  return true;
+}
+static bool busaRemoteParseCommand(const String &json,BusaRemoteAlarmCommand &out){
+  if(json.length()>1200 || json.indexOf("\"ok\":true")<0 ||
+     json.indexOf("\"command\":{")<0)return false;
+  const int at=json.indexOf("\"id\":\"");
+  if(at<0)return false;
+  const int p=at+6,finish=json.indexOf('"',p);
+  if(finish-p!=24)return false;
+  const String id=json.substring(p,finish);
+  if(!busaRemoteValidId(id.c_str()))return false;
+  memcpy(out.id,id.c_str(),25);
+  if(!busaRemoteParseFour(json,"on",out.on)||
+     !busaRemoteParseFour(json,"off",out.off))return false;
+  for(int i=0;i<4;i++)if(!busaRemoteValidPair(out.on[i],out.off[i]))return false;
+  return true;
+}
+static void busaGooglePollRemoteAlarms(){
+  if(!googleEnabled||WiFi.status()!=WL_CONNECTED||busaWifiScanRunning)return;
+  // The Google device secret is already stored in ESP32 NVS; users never re-enter it.
+  if(!googleTokenValid(googleSecret))return;
+  const String url=googleEndpoint+"?mode=device_command&deviceToken="+googleSecret;
+  if(url.length()>360)return;
+  busaGoogleNetworkBusy=true;
+  WiFiClientSecure secure;
+  secure.setCACert(GOOGLE_TRUST_ANCHOR);
+  secure.setTimeout(7500);
+  HTTPClient request;
+  request.setConnectTimeout(6500);
+  request.setTimeout(7500);
+  request.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  if(request.begin(secure,url)){
+    const int code=request.GET();
+    if(code==200){
+      const String reply=request.getString();
+      BusaRemoteAlarmCommand command;
+      if(busaRemoteParseCommand(reply,command))busaRemoteEnqueue(command);
+    }
+    request.end();
+  }
+  busaGoogleNetworkBusy=false;
+}
+
 void googleWorker(void* unused){
   (void)unused;
   // NTP is configured once in setup(); this worker never launches network probes.
   uint32_t last=millis()-30000;
+  uint32_t lastRemoteCheck=millis();
   while(true){
     vTaskDelay(pdMS_TO_TICKS(1250));
     if(WiFi.status()!=WL_CONNECTED){
@@ -67,6 +129,13 @@ void googleWorker(void* unused){
     if(!googleEnabled)continue;
     if(time(nullptr)<1700000000){googleState=2;continue;}
     const uint32_t now=millis();
+    // Poll the protected Google command inbox on a separate bounded interval.
+    // A separate HTTPS request never overlaps the telemetry POST or AP scan.
+    if((uint32_t)(now-lastRemoteCheck)>=45000 && !googleTestRequested){
+      lastRemoteCheck=now;
+      busaGooglePollRemoteAlarms();
+      continue;
+    }
     if(!googleTestRequested && (uint32_t)(now-last)<30000)continue;
     googleTestRequested=false;
     last=now;
