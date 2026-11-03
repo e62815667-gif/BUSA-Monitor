@@ -103,23 +103,23 @@ static void v14Big(const String& txt,int x,int y,uint16_t col=V14_TEXT){
   ruText(txt,x,y,col);
   ru.setFont(u8g2_font_6x13_t_cyrillic);
 }
-static void v14Metric(const String& txt,int x,int y,int width,bool valid){
+static void v14Metric(const String& txt,int x,int y,int width,bool valid,uint16_t bg=V14_CARD){
   // Update only CHANGED glyphs. Never erase entire frame for live telemetry.
   uint16_t color=valid?V14_GREEN:V14_WARN;
   for(uint8_t i=0;i<v14MetricCount;i++){
     V14MetricCache& m=v14Metrics[i];
     if(m.x==x && m.y==y && m.width==width){
-      if(m.value==txt && m.fg==color && m.bg==V14_CARD)return;
-      m.value=txt;m.fg=color;m.bg=V14_CARD;
-      screen->fillRect(x,y-13,width,16,V14_CARD);
+      if(m.value==txt && m.fg==color && m.bg==bg)return;
+      m.value=txt;m.fg=color;m.bg=bg;
+      screen->fillRect(x,y-13,width,16,bg);
       v14Big(txt,x,y,color);return;
     }
   }
   if(v14MetricCount<10){
     V14MetricCache& m=v14Metrics[v14MetricCount++];
-    m.x=x;m.y=y;m.width=width;m.value=txt;m.fg=color;m.bg=V14_CARD;
+    m.x=x;m.y=y;m.width=width;m.value=txt;m.fg=color;m.bg=bg;
   }
-  screen->fillRect(x,y-13,width,16,V14_CARD);
+  screen->fillRect(x,y-13,width,16,bg);
   v14Big(txt,x,y,color);
 }
 static void v14FootArrow(int x,int direction,uint16_t color){
@@ -183,43 +183,34 @@ static void v14Frame(uint32_t now){
   v14Tiny("ENTER",241,229,V14_GREEN);
   screen->fillRoundRect(276,215,41,22,4,V14_CARD);
   screen->drawRoundRect(276,215,41,22,4,V14_RULE);
-  v14Tiny("ESC",289,223,V14_BLUE);
-  v14Tiny("назад",283,233,V14_TEXT);
+  v14Tiny("ESC",288,229,V14_BLUE);
 }
 static void v14MiniRig(){
-  // Approved stylized installation; YF-S401 is on the cooling-water line.
-  hqRig(123,52,113,142);
-  v14Tiny("ВОДА YF",176,188,V14_BLUE);
-}
-
-static void v14DrawFlowBar(){
-  const uint32_t pulses=flowPulses();
-  if(v14FlowLast==pulses)return;
-  v14FlowLast=pulses;
-  screen->fillRoundRect(4,198,313,11,3,V14_INFO);
-  v14Tiny(String("YF-S401: ")+String(pulses)+
-     " имп. (не калибр.)    K1-K4: ЗВУК 12В",8,206,V14_TEXT);
+  // Enlarged approved illustration; only drawing coordinates have changed.
+  hqRig(120,27,125,179);
 }
 static void v14Home(uint32_t now,bool layout){
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
+  // Clear the now-redundant top-tabs separator only on the home screen.
+  screen->fillRect(0,22,320,29,HQ_NAVY);
   v14MiniRig();
+  // Larger frameless T1-T4 readings, retaining all four sensor names and data.
   for(int i=0;i<4;i++){
-    int y=52+i*36;
-    hqPanel(3,y,116,34);
-    screen->fillCircle(12,y+12,4,v14SeriesColors[i]);
-    v14Print(names[i],22,y+16,V14_TEXT);
-    v14Metric(v13Temp(i,now),21,y+30,94,hasTemp(i,now));
+    const int y=27+i*44;
+    screen->fillCircle(11,y+11,4,v14SeriesColors[i]);
+    v14Print(names[i],21,y+16,V14_TEXT);
+    v14Metric(v13Temp(i,now),21,y+37,94,hasTemp(i,now),HQ_NAVY);
+    if(i<3)screen->drawFastHLine(5,y+42,111,V14_RULE);
   }
-  hqPanel(240,52,77,65);
-  v14Tiny("ОТБОР",247,65,V14_TEXT);
-  v14Tiny("мл/мин",247,106,V14_MUTED);
-  v14Metric("Н/Д",247,91,65,false);
-  hqPanel(240,123,77,71);
-  v14Tiny("СОБРАНО",247,136,V14_TEXT);
-  v14Tiny("мл",247,182,V14_MUTED);
-  v14Metric("Н/Д",247,163,64,false);
-  v14FlowLast=UINT32_MAX; // always draw once when page is rebuilt
-  v14DrawFlowBar();
+  hqPanel(248,27,69,84);
+  v14Tiny("ОТБОР",253,41,V14_TEXT);
+  v14Metric("Н/Д",253,73,59,false);
+  v14Tiny("мл/мин",253,95,V14_MUTED);
+  hqPanel(248,119,69,87);
+  v14Tiny("СОБРАНО",252,134,V14_TEXT);
+  v14Metric("Н/Д",253,166,59,false);
+  v14Tiny("мл",253,192,V14_MUTED);
+  // Removed redundant K1-K4/flow pulse strip below the enlarged figure.
 }
 static void v14Temperature(uint32_t now,bool layout){
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -580,8 +571,7 @@ void v14RefreshLive(uint32_t now){
   }
   if(currentPage==0){
     for(int i=0;i<4;i++)
-      v14Metric(v13Temp(i,now),21,52+i*36+30,94,hasTemp(i,now));
-    v14DrawFlowBar();
+      v14Metric(v13Temp(i,now),21,27+i*44+37,94,hasTemp(i,now),HQ_NAVY);
   } else if(currentPage==1 && !editingTemp && !deleteConfirmPending){
     for(int i=0;i<4;i++){
       int x=4+(i%2)*158,y=52+(i/2)*77;
