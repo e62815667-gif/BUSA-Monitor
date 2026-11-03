@@ -1259,6 +1259,9 @@ String otaToken="",otaMessage="Ожидание",nearbyNames[5];
 uint8_t nearbyCount=0;
 volatile bool busaWifiScanRunning=false;
 uint32_t busaWifiScanStartedAt=0,busaWifiScanLastAt=0;
+bool busaWebScanPending=false,busaWebScanResumeSTA=false,busaWebScanPassive=false;
+uint8_t busaWebScanAttempts=0;
+uint32_t busaWebScanStartDueAt=0;
 bool screenAttempted=false;
 bool apClient(){return server.client().localIP()==WiFi.softAPIP();}
 
@@ -1266,6 +1269,20 @@ String apPassword="";
 bool wifiRunning=false;
 uint32_t lastRender=0,lastUart=0,lastStationCheck=0;
 String consoleLine="",stationSsid="",stationPass="";
+// The physical TFT and local browser share the Wi-Fi radio, but NOT navigation.
+// This web-only scan runner leaves BUSA's AP and OTA accessible throughout.
+void busaWebScanFinish(){
+  WiFi.scanDelete();busaWifiScanRunning=false;busaWebScanPending=false;
+  busaWebScanStartDueAt=0;
+  if(busaWebScanResumeSTA && !wifiUiStaDisabled && !wifiUiDisablePending &&
+     !wifiUiConnectPending && !wifiUiAssociationDueAt &&
+     stationSsid.length() && stationPass.length()>=8){
+    WiFi.setAutoReconnect(true);
+    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    lastStationCheck=millis();
+  }
+  busaWebScanResumeSTA=false;
+}
 String quoteJson(const String &x){
   String out="\"";
   for(unsigned i=0;i<x.length();i++){
@@ -3040,6 +3057,10 @@ void setup(){
     if(server.client().localIP()!=WiFi.softAPIP()){
       server.send(403,"text/plain; charset=utf-8","Настройка Wi-Fi доступна только через сеть БУСА.");return;
     }
+    if(busaWifiScanRunning || wifiUiOwnsScan || otaActive){
+      server.send(409,"text/plain; charset=utf-8",
+        "Поиск сети или обновление выполняется. Повтори после завершения.");return;
+    }
     String ssid=server.arg("ssid"),pass=server.arg("pass");
     ssid.trim();
     if(ssid.isEmpty()||ssid.length()>32||pass.length()<8||pass.length()>63){
@@ -3060,10 +3081,11 @@ void setup(){
       server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;
     }
     stationSsid=ssid;stationPass=pass;wifiUiStaDisabled=false;wifiUiDisablePending=false;
-    wifiUiConnectPending=true; // in loop, after current local response and HTTPS transaction
-    wifiUiConnectAt=millis();
-    lastStationCheck=millis();
-    server.send(200,"text/plain; charset=utf-8","Wi-Fi сохранён. Подключение к сети запущено.");
+    wifiUiLastConnectError="";wifiUiResumeStation=false;
+    wifiUiStage=WIFIUI_CONNECTING; // shared network state, NOT navigation state
+    wifiUiConnectPending=true;wifiUiAssociationDueAt=0;
+    wifiUiConnectAt=0;lastStationCheck=millis();
+    server.send(200,"text/plain; charset=utf-8","Выбрана сеть: "+ssid+". Подключение запускается.");
   });
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
@@ -3245,6 +3267,9 @@ void loop(){
   const uint32_t tickStart=now;
   soundPoll(now);
   {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
+  // An abandoned browser scan must never hold Google telemetry disconnected.
+  if(busaWifiScanRunning && !wifiUiOwnsScan && busaWifiScanStartedAt &&
+     elapsed(now,busaWifiScanStartedAt,27000))busaWebScanFinish();
   // ESP-IDF auto-reconnect already runs in the Wi-Fi driver. Manual retries
   // use a 2-min backoff and never interrupt a local AP client, an active
   // Google HTTPS transfer, or a channel scan.
