@@ -46,7 +46,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 15v0-N16R8-WIFI-GOOGLE-TFT-NVS-20261103-APFIX-R1";
+const char VERSION[]="БУСА 1М WiFi 15v0-N16R8-WIFI-GOOGLE-TFT-NVS-20261103-APFIX-R2";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -713,6 +713,8 @@ void startKeyLearning(){
 
 bool busaStageStaCredentials(const String& ssid,const String& pass,bool fromBoot=false);
 void busaStaRestoreLocal();
+void busaDisconnectExternal();
+extern bool busaStaCancelRequested;
 #include "BUSA_KeypadTFT_UI.h"
 void navigatePage(uint8_t target){
   if(target>=7||target==currentPage)return;
@@ -1184,7 +1186,8 @@ volatile bool busaWifiScanRunning=false;
 volatile bool busaStaSwitchPending=false,busaStaSwitching=false;
 volatile int8_t busaStaLastResult=0; // 1 successful; -1 local fallback
 String busaStaNextSsid="",busaStaNextPass="",busaStaMessage="Готово";
-uint32_t busaStaSwitchAt=0,busaStaPendingAt=0;
+uint32_t busaStaSwitchAt=0,busaStaPendingAt=0,busaStaDisconnectAt=0;
+bool busaStaCancelRequested=false,busaStaDisconnectRequested=false;
 bool busaStaBootAttempt=false;
 uint32_t busaWifiScanStartedAt=0,busaWifiScanLastAt=0;
 bool screenAttempted=false;
@@ -1203,6 +1206,16 @@ void busaStaRestoreLocal(){
   if(!wifiRunning)wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
   lastStationCheck=millis();
 }
+void busaDisconnectExternal(){
+  // User-requested disconnect: remove only the chosen STA credentials.
+  // Never touch keypad NVS, Google credentials, or any unrelated preferences.
+  prefs.remove("ssid");prefs.remove("pass");
+  stationSsid="";stationPass="";
+  busaStaNextSsid="";busaStaNextPass="";
+  busaStaSwitchPending=false;busaStaSwitching=false;
+  busaStaLastResult=0;busaStaMessage="Внешний Wi-Fi отключён. Локальная БУСА доступна";
+  busaStaRestoreLocal();tftDirty=true;
+}
 bool busaStageStaCredentials(const String& ssid,const String& pass,bool fromBoot){
   if(otaActive||busaStaSwitchPending||busaStaSwitching||
      ssid.isEmpty()||ssid.length()>32||pass.length()<8||pass.length()>63)return false;
@@ -1217,6 +1230,18 @@ bool busaStageStaCredentials(const String& ssid,const String& pass,bool fromBoot
 }
 void busaStaService(){
   const uint32_t now=millis();
+  if(busaStaDisconnectRequested && (uint32_t)(now-busaStaDisconnectAt)>1000 &&
+     !otaActive && !busaGoogleNetworkBusy && !busaWifiScanRunning){
+    busaStaDisconnectRequested=false;
+    busaDisconnectExternal();
+  }
+  if(busaStaCancelRequested && !otaActive && !busaGoogleNetworkBusy){
+    busaStaCancelRequested=false;
+    busaStaSwitchPending=false;busaStaSwitching=false;
+    busaStaNextSsid="";busaStaNextPass="";
+    busaStaLastResult=-1;busaStaMessage="Подключение отменено для поиска";
+    busaStaRestoreLocal();
+  }
   if(busaStaSwitchPending && (uint32_t)(now-busaStaPendingAt)>=1500 &&
      !otaActive && !busaGoogleNetworkBusy &&
      !busaWifiScanRunning && !wifiUiScanPending && !wifiUiOwnsScan){
@@ -2073,7 +2098,7 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <div id="espAPStatus">Проверка сети ESP32…</div>
 <p class="hint">Точка доступа БУСА для локального просмотра и настройки порогов звуковых оповещений.</p></div>
 <div class="busaWifiMode"><h3>Wi-Fi · роутер с интернетом</h3>
-<div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button>
+<div id="wstatus">Проверка подключения...</div><button type="button" class="full" id="scan">Найти сети Wi-Fi 2,4 ГГц</button><button type="button" class="full" id="disconnectWifi">Отключиться от внешней сети</button>
 <label for="net">Доступные сети Wi-Fi</label><select id="net" required><option value="">Выберите сеть из списка</option></select>
 <p class="hint">Выбери найденную сеть из списка, введи пароль и нажми «Сохранить и подключить».</p>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль самостоятельно">
@@ -2626,6 +2651,7 @@ get('scan').onclick=async function(){
    }
   }
   if(!j||j.scanning)throw Error('Нет ответа от ESP32 при сканировании');
+  if(j.error)throw Error(j.error+' (код '+j.code+')');
   const sel=get('net');sel.innerHTML='<option value="">Выберите сеть</option>';
   const seen=new Set();(j.networks||[]).forEach(w=>{
    if(!w.ssid||seen.has(w.ssid))return;
@@ -2637,6 +2663,15 @@ get('scan').onclick=async function(){
  }catch(e){
   get('response').textContent='Ошибка поиска Wi-Fi: '+e.message+'. Подключение БУСА не изменено.';
  }
+ this.disabled=false;
+};
+get('disconnectWifi').onclick=async function(){
+ this.disabled=true;get('response').textContent='Отключаю внешний Wi-Fi...';
+ try{
+  const r=await fetch('/api/wifi/disconnect',{method:'POST',signal:AbortSignal.timeout(6000)});
+  get('response').textContent=await r.text();
+  if(r.ok){get('pass').value='';get('net').value='';}
+ }catch(e){get('response').textContent='Ошибка отключения: '+e.message;}
  this.disabled=false;
 };
 get('save').onclick=async function(){let ssid=get('net').value,pass=get('pass').value;if(!ssid||ssid.length>32||pass.length<8||pass.length>63){get('response').textContent='Выбери найденную сеть и введи пароль (8–63 символа)';return}this.disabled=true;get('response').textContent='Сохраняю Wi-Fi...';
@@ -2998,6 +3033,16 @@ void setup(){
     server.sendHeader("Cache-Control","no-store");
     server.send(202,"text/plain; charset=utf-8",
       "Проверяю сеть. Если недоступна, БУСА останется в локальной сети.");
+  });
+  server.on("/api/wifi/disconnect",HTTP_POST,[]{
+    if(!apClient()){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;
+    }
+    if(otaActive||busaStaDisconnectRequested){
+      server.send(409,"text/plain; charset=utf-8","Wi-Fi занят");return;
+    }
+    busaStaDisconnectRequested=true;busaStaDisconnectAt=millis();
+    server.send(202,"text/plain; charset=utf-8","Внешняя сеть отключается, локальная БУСА остаётся");
   });
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
