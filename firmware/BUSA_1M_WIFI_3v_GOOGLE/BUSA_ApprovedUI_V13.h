@@ -369,7 +369,8 @@ static void v13Settings(uint32_t now,bool layout){
        wifiUiStage==WIFIUI_CONNECTING?"Wi-Fi: подключение":
          (connected?"Подключено: "+connectedName:"Wi-Fi отключён"),
        wifiUiStage==WIFIUI_SCANNING?"Поиск: выполняется":
-         (wifiUiCount?"Поиск сети ("+String(wifiUiCount)+")":"Поиск сети"),
+         (wifiUiLastScanCode<0?"Поиск: ошибка "+String(wifiUiLastScanCode):
+         (wifiUiCount?"Поиск сети ("+String(wifiUiCount)+")":"Поиск сети")),
        selected.isEmpty()?"Выбор сети":("Сеть: "+selected),
        String("Пароль [")+wifiUiModeCaption()+"]: "+password,
        "Сохранить"
