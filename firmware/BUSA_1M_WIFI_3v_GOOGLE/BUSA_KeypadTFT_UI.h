@@ -165,6 +165,7 @@ void wifiUiSavePassword(){
   stationSsid=wifiUiSelectedSsid;stationPass=wifiUiPassword;
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiStage=WIFIUI_CONNECTING;
+  tftView=0; // ENT means Save and Back: no extra confirmation or popup.
   wifiUiConnectPending=true;
   wifiUiConnectAt=millis();
   wifiUiFeedback="Сеть сохранена. Подключаю...";
