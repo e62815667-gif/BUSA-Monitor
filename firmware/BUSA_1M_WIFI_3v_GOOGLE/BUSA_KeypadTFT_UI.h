@@ -1,5 +1,5 @@
 #pragma once
-// BUSA 14.8. Physical 20-key navigation + TFT Wi-Fi scan/password.
+// BUSA 15.0. Shared Wi-Fi scan queue for the physical TFT and the phone UI.
 // Key-to-PCF8575 pairs remain in original NVS "busa-r04"/"keys20"
 // with backup "busa-key20"/"keys20"; no retraining at OTA.
 enum BusaWifiUiStage : uint8_t { WIFIUI_STATUS=0, WIFIUI_SCANNING=1,
@@ -12,10 +12,14 @@ uint8_t wifiUiLastTapKey=255,wifiUiLastTapIndex=0;
 uint32_t wifiUiLastTapAt=0,wifiUiScanAt=0,wifiUiConnectAt=0;
 uint8_t wifiUiCursor=0;
 bool wifiUiOwnsScan=false,wifiUiConnectPending=false;
+bool wifiUiScanPending=false;
+uint8_t wifiUiRetries=0;
+uint32_t wifiUiRetryAt=0;
 String wifiUiFeedback="";
 extern volatile bool busaWifiScanRunning,busaGoogleNetworkBusy;
 extern uint32_t busaWifiScanLastAt,busaWifiScanStartedAt,lastStationCheck;
 extern String stationSsid,stationPass;
+String quoteJson(const String &x); // implemented below this header in BUSA_Main.h
 const char* wifiUiModeCaption(){static const char* modes[]={"abc","ABC","123","SYM"};return modes[wifiUiMode%4];}
 String wifiUiPasswordMask(){
   String hidden="";
@@ -85,34 +89,73 @@ void wifiUiBackspace(){
   }
   tftDirty=true;
 }
+// Both the physical TFT and phone app request this SAME nonblocking scanner.
+// Google HTTPS or reconnect may delay a scan; neither causes an error screen.
 void wifiUiBeginScan(){
-  const uint32_t now=millis();
-  if(busaWifiScanRunning||busaGoogleNetworkBusy){
-    wifiUiFeedback="Сеть занята. Повтори поиск";tftDirty=true;return;
-  }
-  if(busaWifiScanLastAt&&(uint32_t)(now-busaWifiScanLastAt)<15000){
-    wifiUiFeedback="Поиск повторить через 15 секунд";tftDirty=true;return;
-  }
   wifiUiCount=0;wifiUiIndex=0;wifiUiSelectedSsid="";
-  wifiUiFeedback="Поиск Wi-Fi...";
-  WiFi.scanDelete();
-  busaWifiScanLastAt=now;busaWifiScanStartedAt=now;wifiUiScanAt=now;
-  const int result=WiFi.scanNetworks(true,false,false,80);
-  wifiUiOwnsScan=result==WIFI_SCAN_RUNNING||result>=0;
-  busaWifiScanRunning=wifiUiOwnsScan;
-  wifiUiStage=wifiUiOwnsScan?WIFIUI_SCANNING:WIFIUI_STATUS;
-  if(!wifiUiOwnsScan)wifiUiFeedback="Ошибка поиска Wi-Fi";
+  wifiUiRetries=0;
+  wifiUiScanPending=true;
+  wifiUiOwnsScan=false;
+  wifiUiStage=WIFIUI_SCANNING;
+  wifiUiRetryAt=millis();
+  wifiUiFeedback="";
   tftDirty=true;
+}
+void wifiUiFinishScan(){
+  wifiUiScanPending=false;
+  wifiUiOwnsScan=false;
+  busaWifiScanRunning=false;
+  wifiUiStage=wifiUiCount?WIFIUI_NETWORKS:WIFIUI_STATUS;
+  wifiUiFeedback=wifiUiCount?"":"Сети не найдены";
+  tftDirty=true;
+}
+void wifiUiRetryOrFinish(){
+  WiFi.scanDelete();
+  busaWifiScanRunning=false;wifiUiOwnsScan=false;
+  if(wifiUiRetries<2){
+    wifiUiScanPending=true;
+    wifiUiRetryAt=millis()+1500;
+    wifiUiStage=WIFIUI_SCANNING;
+  }else wifiUiFinishScan();
+}
+String wifiUiScanJSON(){
+  if(wifiUiScanPending || wifiUiOwnsScan || wifiUiStage==WIFIUI_SCANNING)
+    return "{\"scanning\":true,\"networks\":[]}";
+  String out="{\"scanning\":false,\"networks\":[";
+  for(int i=0;i<wifiUiCount;i++){
+    if(i)out+=",";
+    out+="{\"ssid\":"+quoteJson(wifiUiNetworks[i])+
+      ",\"rssi\":"+String(wifiUiSignals[i])+"}";
+  }
+  out+="]}";
+  return out;
 }
 void wifiUiPoll(){
   const uint32_t now=millis();
+  if(wifiUiScanPending && !wifiUiOwnsScan && (int32_t)(now-wifiUiRetryAt)>=0 &&
+     !busaGoogleNetworkBusy){
+    wifiUiScanPending=false;
+    wifiUiScanAt=now;
+    WiFi.scanDelete();
+    busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
+    const int scan=WiFi.scanNetworks(true,false,false,160);
+    if(scan==WIFI_SCAN_FAILED){
+      wifiUiRetryOrFinish();
+    }else{
+      wifiUiOwnsScan=true;
+      busaWifiScanRunning=true;
+      wifiUiRetries++;
+      wifiUiStage=WIFIUI_SCANNING;
+    }
+  }
   if(wifiUiStage==WIFIUI_SCANNING && wifiUiOwnsScan){
     const int count=WiFi.scanComplete();
-    if(count==WIFI_SCAN_RUNNING && (uint32_t)(now-wifiUiScanAt)<10000)return;
-    if(count<0 || (uint32_t)(now-wifiUiScanAt)>=10000){
-      WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
-      wifiUiStage=WIFIUI_STATUS;wifiUiFeedback="Не удалось найти сети. ENT повторить";
+    if(count==WIFI_SCAN_RUNNING && (uint32_t)(now-wifiUiScanAt)<13000){
+      // Do not block HTTP, TFT, relay alerts or DS18B20 temperature sampling.
+    }else if(count<0 || (uint32_t)(now-wifiUiScanAt)>=13000){
+      wifiUiRetryOrFinish();
     }else{
+      wifiUiCount=0;
       for(int i=0;i<count && wifiUiCount<16;i++){
         const String candidate=WiFi.SSID(i);
         if(candidate.isEmpty()||candidate.length()>32)continue;
@@ -124,17 +167,18 @@ void wifiUiPoll(){
         wifiUiSignals[wifiUiCount]=WiFi.RSSI(i);
         wifiUiCount++;
       }
-      WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
-      wifiUiStage=wifiUiCount?WIFIUI_NETWORKS:WIFIUI_STATUS;
-      wifiUiFeedback=wifiUiCount?"Выбери сеть стрелками":"Сети не найдены. ENT повторить";
+      WiFi.scanDelete();
+      if(wifiUiCount==0 && wifiUiRetries<2){
+        busaWifiScanRunning=false;wifiUiOwnsScan=false;
+        wifiUiScanPending=true;wifiUiRetryAt=now+1500;
+      }else wifiUiFinishScan();
     }
-    tftDirty=true;
   }
   if(wifiUiConnectPending && !busaGoogleNetworkBusy && !busaWifiScanRunning){
     wifiUiConnectPending=false;
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
     lastStationCheck=now;wifiUiConnectAt=now;
-    wifiUiFeedback="Подключение к выбранной сети...";
+    wifiUiFeedback="Подключение...";
     tftDirty=true;
   }
   if(wifiUiStage==WIFIUI_CONNECTING && !wifiUiConnectPending){
@@ -142,8 +186,9 @@ void wifiUiPoll(){
       wifiUiFeedback="Wi-Fi подключён";tftDirty=true;
       wifiUiStage=WIFIUI_STATUS;
     }else if((uint32_t)(now-wifiUiConnectAt)>16000){
-      wifiUiFeedback="Нет соединения. Проверь пароль";tftDirty=true;
-      wifiUiStage=WIFIUI_STATUS;
+      // AP, TFT and alarms stay responsive; manual network selection stays usable.
+      wifiUiFeedback="Нет связи. Выбери другую сеть";
+      tftDirty=true;wifiUiStage=WIFIUI_STATUS;
     }
   }
 }
