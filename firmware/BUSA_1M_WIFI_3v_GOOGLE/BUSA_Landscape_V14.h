@@ -17,11 +17,11 @@ static uint16_t v14SeriesColors[4]={0x037b,0xd980,0xb500,0x3685};
 static uint16_t V14_INFO=0xff16,V14_GRID=0xe71c,V14_BADGE=0xe7f8;
 static uint32_t v14FlowLast=UINT32_MAX;
 static String v14ClockLast="";
-static int8_t v14NetLast=-1,v14LocalLast=-1;
+static int8_t v14NetLast=-1,v14GoogleLast=-1,v14LocalLast=-1;
 struct V14MetricCache{int16_t x=-1,y=-1,width=-1;String value;uint16_t fg=0,bg=0;};
 static V14MetricCache v14Metrics[10];
 static uint8_t v14MetricCount=0;
-static void v14InvalidateLive(){v14MetricCount=0;v14FlowLast=UINT32_MAX;v14ClockLast="";v14NetLast=-1;v14LocalLast=-1;}
+static void v14InvalidateLive(){v14MetricCount=0;v14FlowLast=UINT32_MAX;v14ClockLast="";v14NetLast=-1;v14GoogleLast=-1;v14LocalLast=-1;}
 static void v14ApplyPalette(bool dark){
  HQ_MONO_DARK=dark;
  if(dark){
@@ -129,24 +129,26 @@ static void v14FootArrow(int x,int direction,uint16_t color){
   if(direction==2){screen->fillTriangle(cx,cy+r,cx-r,cy-3,cx+r,cy-3,color);}
   if(direction==3){screen->fillTriangle(cx+r,cy,cx-3,cy-r,cx-3,cy+r,color);}
 }
-// Independent status dots: Internet external TCP/443 probe, local blue AP client.
-// Red means not confirmed. TFT settings show STA name and AP address in detail.
+// Three independent Wi-Fi/Google/ESP32 indicators in the 320px display header.
 static void v14NetIndicators(){
-  const int8_t net=(WiFi.status()==WL_CONNECTED && googleInternet==1)?1:0;
+  const int8_t net=(WiFi.status()==WL_CONNECTED)?1:0;
+  const int8_t google=(googleEnabled && googleInternet==1 && (googleHttp==200 || googleHttp==302))?1:0;
   const int8_t local=(WiFi.softAPgetStationNum()>0)?1:0;
-  if(v14NetLast==net && v14LocalLast==local)return;
-  v14NetLast=net;v14LocalLast=local;
-  screen->fillRect(121,2,98,17,V14_CARD);
-  screen->fillCircle(130,11,4,net?0x07e0:0xf800);
-  v14Tiny("ИНТ",137,14,V14_TEXT);
-  screen->fillCircle(179,11,4,local?0x001f:0xf800);
-  v14Tiny("ЛОК",186,14,V14_TEXT);
+  if(v14NetLast==net && v14GoogleLast==google && v14LocalLast==local)return;
+  v14NetLast=net;v14GoogleLast=google;v14LocalLast=local;
+  screen->fillRect(78,2,146,17,V14_CARD);
+  screen->fillCircle(85,11,3,net?0x07e0:0xf800);
+  v14Tiny("WiFi",91,14,V14_TEXT);
+  screen->fillCircle(131,11,3,google?0x07e0:0xf800);
+  v14Tiny("Google",137,14,V14_TEXT);
+  screen->fillCircle(183,11,3,local?0x07e0:0xf800);
+  v14Tiny("ESP32",189,14,V14_TEXT);
 }
 static void v14Frame(uint32_t now){
   hqBackground();
   screen->fillRect(0,0,320,21,V14_CARD);
   screen->drawFastHLine(0,21,320,V14_ORANGE);
-  v14Big("БУСА-1М №001",5,15,V14_TEXT);
+  v14Big("БУСА-1М",5,15,V14_TEXT);
   v14NetIndicators();
   // DD.MM.YY HH:MM. Exact pixel width is measured; date cannot clip at 320.
   String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
