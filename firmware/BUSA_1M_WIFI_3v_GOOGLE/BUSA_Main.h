@@ -20,6 +20,7 @@
 #include <time.h>
 #include <sys/time.h>
 #include <esp_system.h>
+#include <esp_heap_caps.h>
 #include <Wire.h>
 #include <driver/gpio.h>
 #include <Preferences.h>
@@ -46,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-NAV-ORDER-NVS-20261103";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-TEMP-VERTICAL-PSRAM-NVS-20261103";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -838,9 +839,11 @@ void keypadAction(int k){
         // Sensor subpage: navigate between ON and OFF, without another popup.
         selectedField=(selectedField+1)%2;
       }else{
-        // Sensor index order: Water -> Cube -> Column -> Top.
-        const int pos=selectedTempOrderIndex();
-        selectedTemp=tempMenuOrder[(pos+(k==7?3:1))%4];
+        // Follow the card grid TOP TO BOTTOM within each column:
+        // Water (left/top) -> Column (left/bottom) ->
+        // Cube (right/top) -> Top (right/bottom).
+        // Physical sensor numbering T1..T4 is unchanged.
+        selectedTemp=(selectedTemp+(k==7?3:1))%4;
         selectedField=0;
       }
     }else if(currentPage==5){
@@ -1025,6 +1028,46 @@ Adafruit_ST7789 screenSt(TFT_CS,TFT_DC,TFT_RST);
 Adafruit_ILI9341 screenIli(TFT_CS,TFT_DC,TFT_RST);
 Adafruit_GFX* screen=nullptr;
 U8G2_FOR_ADAFRUIT_GFX ru;
+// A full-color PSRAM-backed TFT frame eliminates the blank flash on keypress.
+// Render a whole landscape screen offscreen and transfer one complete frame
+// over SPI only AFTER all cards, fonts and highlights are finished.
+// Falls back to the existing immediate renderer if no PSRAM is available.
+class BusaTftPsramFrame : public Adafruit_GFX {
+ public:
+  uint16_t* data=nullptr;
+  BusaTftPsramFrame():Adafruit_GFX(320,240){}
+  bool ensure(){
+    if(!data && ESP.getPsramSize()>0){
+      data=(uint16_t*)heap_caps_malloc(320u*240u*sizeof(uint16_t),
+         MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+    }
+    return data!=nullptr;
+  }
+  void drawPixel(int16_t x,int16_t y,uint16_t color) override {
+    if(data && x>=0 && y>=0 && x<320 && y<240)
+      data[(uint32_t)y*320u+(uint16_t)x]=color;
+  }
+  void fillRect(int16_t x,int16_t y,int16_t w,int16_t h,uint16_t color) override {
+    if(!data||w<=0||h<=0)return;
+    const int16_t x1=max((int16_t)0,x),y1=max((int16_t)0,y);
+    const int16_t x2=min((int16_t)320,(int16_t)(x+w));
+    const int16_t y2=min((int16_t)240,(int16_t)(y+h));
+    if(x2<=x1||y2<=y1)return;
+    for(int16_t yy=y1;yy<y2;yy++){
+      uint16_t* row=data+(uint32_t)yy*320u+x1;
+      for(int16_t xx=x1;xx<x2;xx++)*row++=color;
+    }
+  }
+  void drawFastHLine(int16_t x,int16_t y,int16_t w,uint16_t color) override {
+    fillRect(x,y,w,1,color);
+  }
+  void drawFastVLine(int16_t x,int16_t y,int16_t h,uint16_t color) override {
+    fillRect(x,y,1,h,color);
+  }
+  void fillScreen(uint16_t color) override {fillRect(0,0,320,240,color);}
+};
+static BusaTftPsramFrame busaTftFrame;
+
 uint8_t tftProfile=1;
 bool tftStarted=false;
 bool tftInverted=false; // Hardware inversion remains DISABLED
@@ -1172,7 +1215,34 @@ extern volatile int googleInternet,googleHttp; // TFT indicators; definitions in
 void renderScreen(uint32_t now){
   if(!tftStarted||!screen)return;
   if(!bootSplashComplete || !elapsed(now,splashStartedAt,splashHoldMs))return;
-  if(screen->width()>=300){renderLandscape(now);return;}
+  if(screen->width()>=300){
+    if(busaTftFrame.ensure()){
+      Adafruit_GFX* physical=screen;
+      screen=&busaTftFrame;
+      ru.begin(*screen);
+      ru.setFont(u8g2_font_6x13_t_cyrillic);
+      ru.setFontMode(1);
+      renderLandscape(now); // No drawing reaches the TFT until frame is complete.
+      screen=physical;
+      ru.begin(*screen);
+      ru.setFont(u8g2_font_6x13_t_cyrillic);
+      ru.setFontMode(1);
+      if(tftProfile==2){
+        screenIli.startWrite();
+        screenIli.setAddrWindow(0,0,320,240);
+        screenIli.writePixels(busaTftFrame.data,320u*240u);
+        screenIli.endWrite();
+      }else{
+        screenSt.startWrite();
+        screenSt.setAddrWindow(0,0,320,240);
+        screenSt.writePixels(busaTftFrame.data,320u*240u);
+        screenSt.endWrite();
+      }
+    }else{
+      renderLandscape(now); // Graceful fallback if PSRAM allocation fails.
+    }
+    return;
+  }
   renderPortrait(now);
 }
 
