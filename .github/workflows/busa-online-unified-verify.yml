@@ -1,0 +1,35 @@
+name: Verify BUSA unified iPhone PWA and Google command gateway
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'online/**'
+      - 'google/BUSA_GoogleSheets_Receiver.gs'
+      - '.github/workflows/busa-online-unified-verify.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: JavaScript syntax and interface contract
+        run: |
+          node <<'JS'
+          const fs=require('fs'),vm=require('vm'),assert=require('assert');
+          const html=fs.readFileSync('online/index.html','utf8');
+          const script=html.match(/<script>([\s\S]*?)<\/script>/);
+          assert(script,'online inline script missing');
+          new vm.Script(script[1],{filename:'BUSA-online.js'});
+          const gs=fs.readFileSync('google/BUSA_GoogleSheets_Receiver.gs','utf8');
+          new vm.Script(gs,{filename:'BUSA-AppsScript.gs'});
+          const manifest=JSON.parse(fs.readFileSync('online/manifest.webmanifest','utf8'));
+          assert(manifest.display==='standalone');
+          assert(html.match(/<section(?:\s|>)/g).length===html.match(/<\/section>/g).length);
+          for(let i=0;i<4;i++)for(const key of ['On','Off'])assert(html.includes('id="remoteAlarm'+key+i+'"'));
+          for(const key of ['id="cloudInternet"','id="cloudData"','id="cloudLocal"','id="remoteAlarmSave"','remoteAlarmShowCommandStatus(data)','mode:\'no-cors\'','id="googleCredentialForm"','remoteStorePrefix'])assert(html.includes(key),key);
+          for(const key of ['function busaQueueAlarmCommand_','command_status:','mode === \'device_command\'','BUSA_REMOTE_COMMAND','BUSA_REMOTE_STATUS'])assert(gs.includes(key),key);
+          assert(!/BUSA_VIEW_TOKEN\s*=\s*['"][a-fA-F0-9]{64}/.test(html),'hardcoded VIEW token');
+          console.log('PASS: online JS, Apps Script JS, manifest, four alarm editors, status feedback and auth storage');
+          JS
