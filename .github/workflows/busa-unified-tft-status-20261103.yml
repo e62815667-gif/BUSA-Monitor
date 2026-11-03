@@ -56,7 +56,14 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
-          assert 'KEYRESTORE-APPROVED-UI-UNIFIED-STATUS-20261103' in s
+          assert 'KEYRESTORE-APPROVED-UI-REMOTE-ALARMS-20261103' in s
+          assert 'busaRemoteAlarmApply()' in s and 'busaRemoteAlarmJSON()' in s
+          remote=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_RemoteAlarm.h').read_text()
+          assert 'portENTER_CRITICAL' in remote
+          assert 'remoteAlarmId' in remote and 'busaRemoteValidPair' in remote
+          google=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h').read_text()
+          assert 'busaGooglePollRemoteAlarms()' in google
+          assert 'HTTPC_STRICT_FOLLOW_REDIRECTS' in google
           assert 'id="googleLed"' in s
           assert 'id="espAPStatus"' in s
           assert 'networkLeds(s.network_indicators,s.station,s.google)' in s
