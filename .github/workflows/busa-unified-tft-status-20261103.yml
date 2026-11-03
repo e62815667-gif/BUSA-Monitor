@@ -5,6 +5,11 @@ on:
     paths:
       - '.github/workflows/busa-unified-tft-status-20261103.yml'
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+  pull_request:
+    branches: [fix/busa-local-ui-crisp-temp-icons-20261103]
+    paths:
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+      - '.github/workflows/busa-unified-tft-status-20261103.yml'
   workflow_dispatch:
 permissions:
   contents: write
