@@ -148,6 +148,7 @@ jobs:
           assert all('busaIconDetail'+str(i) in s for i in range(4))
           assert Path('assets/BUSA_approved_rig_276.webp').stat().st_size>10000
           assert 'validKeymap(newPairs)' in s and 'return r==5&&c==4;' in s
+          ui=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_KeypadTFT_UI.h').read_text()
           # Independent navigation and externally selected STA, no iPhone autofill
           assert "fetch('/api/page?n=" not in s
           assert "fetch('/api/settings-tab?n=" not in s
