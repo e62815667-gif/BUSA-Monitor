@@ -118,6 +118,13 @@ void googleWorker(void* unused){
   uint32_t lastRemoteCheck=millis();
   while(true){
     vTaskDelay(pdMS_TO_TICKS(1250));
+    // A user's disconnect request blocks NEW Google HTTPS transactions;
+    // the current bounded request is allowed to finish before STA goes down.
+    if(wifiUiStaDisabled || wifiUiDisablePending){
+      googleInternet=0;googleDns=0;
+      if(googleEnabled)googleState=1;
+      continue;
+    }
     if(WiFi.status()!=WL_CONNECTED){
       googleInternet=0;googleDns=0;
       if(googleEnabled)googleState=1;
