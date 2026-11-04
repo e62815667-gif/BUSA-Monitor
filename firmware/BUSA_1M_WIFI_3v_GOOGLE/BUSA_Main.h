@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-SCANFIX-20261105";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-APP-DISCONNECT-20261105";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -2251,6 +2251,7 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <label for="net">Выберите сеть</label><select id="net"><option value="">Поиск сетей...</option></select>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
+<button type="button" class="full" id="disconnectWifi">Отключить Wi-Fi</button>
 <p id="response" role="status"></p></div></div>
 
 <div class="card settingCard" data-stab="2" hidden><h2>Экран</h2>
@@ -2752,7 +2753,7 @@ get('manualUpdate').onclick=async function(){
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
   this.disabled=false;
 };
-let wifiListBusy=false;
+let wifiListBusy=false,wifiRescanAfterDisconnect=false;
 // Single bounded radio scan per opening of the Wi-Fi page.
 async function wifiRefreshNetworks(){
   if(wifiListBusy||settingsActive!==1)return;
@@ -2794,9 +2795,37 @@ async function wifiRefreshNetworks(){
       sel.replaceChildren(new Option('Сети не найдены',''));
       get('response').textContent='Ошибка поиска Wi-Fi';
     }
-  }finally{wifiListBusy=false;}
+  }finally{
+    wifiListBusy=false;
+    if(wifiRescanAfterDisconnect&&settingsActive===1){
+      wifiRescanAfterDisconnect=false;
+      await new Promise(resolve=>setTimeout(resolve,650));
+      if(settingsActive===1)wifiRefreshNetworks();
+    }
+  }
 }
 get('net').onchange=()=>{get('response').textContent='';};
+get('disconnectWifi').onclick=async function(){
+  this.disabled=true;
+  get('response').textContent='Отключаю Wi-Fi...';
+  try{
+    const r=await fetch('/api/wifi/disconnect',{method:'POST',
+      cache:'no-store',signal:AbortSignal.timeout(9000)});
+    const reply=await r.text();
+    if(!r.ok)throw Error(reply||'HTTP '+r.status);
+    get('response').textContent=reply;
+    get('wstatus').textContent='НЕТ СОЕДИНЕНИЯ';
+    get('pass').value='';
+    get('net').replaceChildren(new Option('Выберите сеть',''));
+    // An in-flight scan finishes first; then one fresh scan runs on disconnected STA.
+    if(wifiListBusy)wifiRescanAfterDisconnect=true;
+    else{
+      await new Promise(resolve=>setTimeout(resolve,750));
+      if(settingsActive===1)wifiRefreshNetworks();
+    }
+  }catch(e){get('response').textContent='Ошибка отключения: '+e.message;}
+  this.disabled=false;
+};
 get('save').onclick=async function(){
  let ssid=get('net').value.trim(),pass=get('pass').value;
  if(!ssid||ssid.length>32||pass.length<8||pass.length>63){
@@ -3163,6 +3192,31 @@ void setup(){
     }
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",busaWifiScanJSON());
+  });
+  // Phone-local Wi-Fi disconnect: never disable the BUSA access point.
+  // The same saved 'staOff' flag is used by the existing physical disconnect.
+  server.on("/api/wifi/disconnect",HTTP_POST,[]{
+    if(!apClient()){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА.");return;
+    }
+    if(otaActive){
+      server.send(409,"text/plain; charset=utf-8","Дождитесь завершения обновления.");return;
+    }
+    if(!prefs.putBool("staOff",true) || !prefs.getBool("staOff",false)){
+      server.send(500,"text/plain; charset=utf-8","Ошибка сохранения отключения Wi-Fi.");return;
+    }
+    wifiUiStaDisabled=true;wifiUiDisablePending=true;
+    wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
+    wifiUiResumeStation=false;wifiUiLastConnectError="";
+    WiFi.setAutoReconnect(false);
+    // Don't reuse a cached scan that ran on the previous router's channel.
+    if(busaSharedScanState==BUSA_SCAN_READY ||
+       busaSharedScanState==BUSA_SCAN_EMPTY ||
+       busaSharedScanState==BUSA_SCAN_ERROR)
+      busaSharedScanState=BUSA_SCAN_IDLE;
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"text/plain; charset=utf-8",
+      "Внешний Wi-Fi отключён. Локальная сеть БУСА работает.");
   });
   server.on("/api/wifi",HTTP_POST,[]{
     // Credentials may only be provisioned while connected to the protected local AP.
