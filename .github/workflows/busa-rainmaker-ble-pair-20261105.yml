@@ -1,7 +1,7 @@
-name: BUSA 1M RainMaker BLE Pair UI USB and OTA
+name: BUSA 1M RainMaker BLE Once Pair USB OTA
 on:
   push:
-    branches: [feat/busa-rainmaker-bluetooth-pair-ui-20261105]
+    branches: [feat/busa-ble-rainmaker-once-pair-20261105]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-rainmaker-ble-pair-20261105.yml'
@@ -112,7 +112,7 @@ jobs:
           assert 'wifiUiStaDisabled=true;wifiUiDisablePending=true;' in main
           assert "get('net').replaceChildren(new Option('Выберите сеть',''))" in main
           assert 'WiFi.disconnect(false,false)' in keys
-          assert '14v9-N16R8-RM-BLE-PAIR-20261105' in main
+          assert '14v9-N16R8-RM-BLE-ONCE-20261105' in main
           assert 'data-stab-btn="7"' in main
           assert 'id="rmStart"' in main
           assert "get('rmStart').onclick" in main
@@ -137,10 +137,10 @@ jobs:
           ESPTOOL="$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
           test -f "$ESPTOOL"
           SOURCE=out/BUSA_1M_WIFI_3v_GOOGLE.ino
-          cp ${SOURCE}.bin out/BUSA_1M_14V9_RM_BLE_PAIR_CHEREZ_WIFI_OTA.bin
+          cp ${SOURCE}.bin out/BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_WIFI_OTA.bin
           CORE="$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
           python3 "$ESPTOOL" --chip esp32s3 merge_bin \
-            -o out/BUSA_1M_14V9_RM_BLE_PAIR_CHEREZ_USB_MERGED.bin \
+            -o out/BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_USB_MERGED.bin \
             --flash_mode qio --flash_freq 80m --flash_size 16MB \
             0x0 ${SOURCE}.bootloader.bin \
             0x8000 ${SOURCE}.partitions.bin \
@@ -150,8 +150,8 @@ jobs:
           from pathlib import Path
           import hashlib
           p=Path('out')
-          a=p/'BUSA_1M_14V9_RM_BLE_PAIR_CHEREZ_WIFI_OTA.bin'
-          u=p/'BUSA_1M_14V9_RM_BLE_PAIR_CHEREZ_USB_MERGED.bin'
+          a=p/'BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_WIFI_OTA.bin'
+          u=p/'BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_USB_MERGED.bin'
           assert 50000<a.stat().st_size<0x300000
           assert u.stat().st_size > a.stat().st_size
           assert u.stat().st_size < 0x310000
@@ -161,9 +161,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_1M_14V9_RM_BLE_PAIR_USB_WIFI_20261105
+          name: BUSA_1M_14V9_RM_BLE_ONCE_USB_WIFI_20261105
           retention-days: 30
           path: |
-            out/BUSA_1M_14V9_RM_BLE_PAIR_CHEREZ_WIFI_OTA.bin
-            out/BUSA_1M_14V9_RM_BLE_PAIR_CHEREZ_USB_MERGED.bin
+            out/BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_WIFI_OTA.bin
+            out/BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_USB_MERGED.bin
             out/SHA256SUMS.txt
