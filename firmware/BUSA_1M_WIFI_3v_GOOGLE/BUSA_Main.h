@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-DRIVER-20261105";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-SCANFIX-20261105";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1268,6 +1268,8 @@ BusaSharedScanState busaSharedScanState=BUSA_SCAN_IDLE;
 uint8_t busaSharedScanAttempt=0;
 uint32_t busaSharedScanAttemptAt=0,busaSharedScanFinishedAt=0,busaSharedScanRetryDueAt=0;
 bool busaSharedScanForTft=false;
+bool busaSharedScanReleasedSTA=false;
+int busaSharedScanStartResult=0,busaSharedScanLastResult=0;
 String busaSharedScanError="";
 
 bool screenAttempted=false;
@@ -1301,36 +1303,38 @@ String quoteJson(const String &x){
 bool busaWifiRequestSharedScan(bool physical){
   const uint32_t now=millis();
   if(otaActive)return false;
-  // Selecting Wi-Fi must work even when an earlier association is still pending.
-  // Cancel the old attempt; never turn off BUSA's separate local access point.
-  const bool pendingAssociation=wifiUiConnectPending || wifiUiAssociationDueAt ||
-                                wifiUiConnectAt;
-  if(pendingAssociation){
-    wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
-    WiFi.setAutoReconnect(false);
-    if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
-  }
   if(physical)busaSharedScanForTft=true;
-  if(busaSharedScanState==BUSA_SCAN_REQUESTED || busaSharedScanState==BUSA_SCAN_RUNNING)
-    return true;
-  // A shared result can be reused for a few seconds by both UIs.
+  // TFT and browser join the same in-flight scan.
+  if(busaSharedScanState==BUSA_SCAN_REQUESTED ||
+     busaSharedScanState==BUSA_SCAN_RUNNING)return true;
+  // A fresh successful scan may be reused without another RF scan.
   if(busaSharedScanState==BUSA_SCAN_READY &&
      (uint32_t)(now-busaSharedScanFinishedAt)<5000){
     if(physical && wifiUiCount>0){
-      wifiUiStage=WIFIUI_NETWORKS;
-      wifiUiFeedback="";
-      wifiUiMenuIndex=0;wifiUiIndex=0;
-      busaSharedScanForTft=false;tftDirty=true;
+      wifiUiStage=WIFIUI_NETWORKS;wifiUiMenuIndex=0;wifiUiIndex=0;
+      wifiUiFeedback="";busaSharedScanForTft=false;tftDirty=true;
     }
     return true;
   }
+  // CRITICAL: esp_wifi_scan_start fails during an STA association.
+  // Cancel the old connection attempt before searching another router.
+  // Only the STA interface is disconnected; BUSA's AP stays running.
+  const bool pendingAssociation=wifiUiConnectPending || wifiUiAssociationDueAt ||
+                                wifiUiConnectAt;
+  wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
+  WiFi.setAutoReconnect(false);
+  const bool staNotConnected=WiFi.status()!=WL_CONNECTED;
+  busaSharedScanReleasedSTA=staNotConnected;
+  if(staNotConnected)WiFi.disconnect(false,false);
   busaSharedScanAttempt=0;
-  busaSharedScanRetryDueAt=pendingAssociation?now+350:0;
+  busaSharedScanRetryDueAt=(staNotConnected||pendingAssociation)?now+900:0;
   busaSharedScanError="";
+  busaSharedScanStartResult=0;busaSharedScanLastResult=0;
   busaSharedScanState=BUSA_SCAN_REQUESTED;
-  busaWifiScanRunning=true;
-  busaWifiScanStartedAt=now;
+  busaWifiScanRunning=true;busaWifiScanStartedAt=now;
   wifiUiCount=0;
+  Serial0.printf("BUSA WIFI SCAN requested mode=%d connected=%d pending=%d\n",
+     (int)WiFi.getMode(),(int)!staNotConnected,(int)pendingAssociation);
   return true;
 }
 void busaWifiScanFinish(uint8_t state,uint32_t now){
@@ -1368,6 +1372,9 @@ void busaWifiScanPoll(uint32_t now){
     busaSharedScanRetryDueAt=0;
     const bool passive=busaSharedScanAttempt>1;
     const int result=WiFi.scanNetworks(true,true,passive,passive?280:140);
+    busaSharedScanStartResult=result;
+    Serial0.printf("BUSA WIFI SCAN start attempt=%d result=%d mode=%d STA=%d\n",
+       (int)busaSharedScanAttempt,result,(int)WiFi.getMode(),(int)WiFi.status());
     if(result==WIFI_SCAN_RUNNING || result>=0){
       busaSharedScanState=BUSA_SCAN_RUNNING;return;
     }
@@ -1379,6 +1386,7 @@ void busaWifiScanPoll(uint32_t now){
   }
   if(busaSharedScanState!=BUSA_SCAN_RUNNING)return;
   const int count=WiFi.scanComplete();
+  busaSharedScanLastResult=count;
   if(count==WIFI_SCAN_RUNNING && (uint32_t)(now-busaSharedScanAttemptAt)<9000)
     return;
   if(count==WIFI_SCAN_RUNNING){
@@ -1388,10 +1396,19 @@ void busaWifiScanPoll(uint32_t now){
   }
   if(count<=0){
     busaSharedScanError=count==0?"no_networks":"scan_failed";
+    Serial0.printf("BUSA WIFI SCAN finished attempt=%d count=%d STA=%d\n",
+       (int)busaSharedScanAttempt,count,(int)WiFi.status());
     if(busaSharedScanAttempt<2){
+      // An already-connected STA may suppress the all-channel scan.
+      // Release only the external STA once before the passive retry.
+      if(!busaSharedScanReleasedSTA){
+        WiFi.setAutoReconnect(false);
+        WiFi.disconnect(false,false);
+        busaSharedScanReleasedSTA=true;
+        busaSharedScanRetryDueAt=now+900;
+      }else busaSharedScanRetryDueAt=now+700;
       WiFi.scanDelete();
-      busaSharedScanState=BUSA_SCAN_REQUESTED;
-      busaSharedScanRetryDueAt=now+700;return;
+      busaSharedScanState=BUSA_SCAN_REQUESTED;return;
     }
     busaWifiScanFinish(count==0?BUSA_SCAN_EMPTY:BUSA_SCAN_ERROR,now);
     return;
@@ -1407,6 +1424,7 @@ void busaWifiScanPoll(uint32_t now){
     wifiUiSignals[wifiUiCount]=WiFi.RSSI(i);
     ++wifiUiCount;
   }
+  Serial0.printf("BUSA WIFI SCAN discovered=%d\n",(int)wifiUiCount);
   busaSharedScanError=wifiUiCount?"":"no_networks";
   busaWifiScanFinish(wifiUiCount?BUSA_SCAN_READY:BUSA_SCAN_EMPTY,now);
 }
@@ -1422,7 +1440,13 @@ String busaWifiScanJSON(){
            ",\"rssi\":"+String(wifiUiSignals[i])+"}";
     }
   }
-  out+="],\"error\":"+quoteJson(scanning?"":busaSharedScanError)+"}";
+  out+="],\"error\":"+quoteJson(scanning?"":busaSharedScanError);
+  out+=",\"diagnostic\":{\"attempt\":"+String(busaSharedScanAttempt);
+  out+=",\"start_result\":"+String(busaSharedScanStartResult);
+  out+=",\"scan_result\":"+String(busaSharedScanLastResult);
+  out+=",\"wifi_mode\":"+String((int)WiFi.getMode());
+  out+=",\"station_status\":"+String((int)WiFi.status());
+  out+="}}";
   return out;
 }
 
