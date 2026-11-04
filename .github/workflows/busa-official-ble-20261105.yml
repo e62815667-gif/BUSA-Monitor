@@ -1,0 +1,101 @@
+name: BUSA Official Espressif BLE OTA USB
+on:
+  push:
+    branches: [fix/busa-official-rainmaker-ble-20261105]
+    paths:
+      - 'ci/ble_official_provisioning.py'
+      - '.github/workflows/busa-official-ble-20261105.yml'
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install ESP32 and libraries
+        run: |
+          set -euo pipefail
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+          arduino-cli lib install "Adafruit BusIO@1.17.4"
+          arduino-cli lib install "OneWire@2.3.8"
+          arduino-cli lib install "DallasTemperature@4.0.6"
+          arduino-cli lib install "Adafruit GFX Library@1.13.0"
+          arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
+          arduino-cli lib install "Adafruit ILI9341@1.7.0"
+          arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+      - name: Google verified CA bundle
+        run: |
+          python3 - <<'PY'
+          import hashlib,ssl,urllib.request
+          from pathlib import Path
+          fingerprints={
+            'gtsr1':'d947432abde7b7fa90fc2e6b59101b1280e0e1c7e4e40fa3c6887fff57a7f4cf',
+            'gtsr2':'8d25cd97229dbf70356bda4eb3cc734031e24cf00fafcfd32dc76eb5841c7ea8',
+            'gtsr3':'34d8a73ee208d9bcdb0d956520934b4e40e69482596e8b6f73c8426b010a6f48',
+            'gtsr4':'349dfa4058c5e263123b398ae795573c4e1313c83fe68f93556cd5e8031b3c7d'}
+          bundle=[]
+          for name,expected in fingerprints.items():
+            pem=urllib.request.urlopen('https://pki.goog/repo/certs/'+name+'.pem',timeout=20).read().decode()
+            assert hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()==expected,name
+            bundle.append(pem)
+          dest=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h')
+          dest.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+'\n'.join(bundle)+')GOOGLECERT";\n')
+          PY
+      - name: Prepare boot BLE then official Espressif event sequence
+        run: |
+          python3 ci/ble_cold_start_patch.py
+          python3 ci/ble_official_provisioning.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h')
+          s=p.read_text()
+          assert s.count('14v9-N16R8-RM-BLE-BOOT-20261105')==1
+          s=s.replace('14v9-N16R8-RM-BLE-BOOT-20261105','14v9-N16R8-RM-BLE-ESPOFFICIAL-20261105')
+          p.write_text(s)
+          r=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_RainMaker.h').read_text()
+          assert 'ARDUINO_EVENT_PROV_INIT' in r
+          assert 'wifi_prov_mgr_disable_auto_stop(10000)' in r
+          assert 'wifi_prov_mgr_stop_provisioning()' in r
+          assert 'BUSA_RM_FIXED_POP="123456789"' in r
+          assert 'WiFiProv.beginProvision' in r
+          assert 'WiFi.softAP(' in s and 'busaGoogleNetworkBusy' in s
+          print('BLE and existing BUSA services confirmed')
+          PY
+      - name: Compile ESP32-S3 N16R8
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
+      - name: Package OTA BIN and USB BIN
+        run: |
+          set -euo pipefail
+          BASE=out/BUSA_1M_WIFI_3v_GOOGLE.ino
+          cp "${BASE}.bin" out/BUSA_1M_14V9_RM_BLE_ESPOFFICIAL_WIFI_OTA.bin
+          CORE="$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
+          ESPTOOL="$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          python3 "$ESPTOOL" --chip esp32s3 merge_bin \
+            -o out/BUSA_1M_14V9_RM_BLE_ESPOFFICIAL_USB_MERGED.bin \
+            --flash_mode qio --flash_freq 80m --flash_size 16MB \
+            0x0 "${BASE}.bootloader.bin" \
+            0x8000 "${BASE}.partitions.bin" \
+            0xe000 "$CORE/tools/partitions/boot_app0.bin" \
+            0x10000 "${BASE}.bin"
+          (cd out && sha256sum BUSA_1M_14V9_RM_BLE_ESPOFFICIAL_*.bin > SHA256SUMS.txt)
+          ls -lh out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_1M_14V9_RM_BLE_ESPOFFICIAL_USB_WIFI_20261105
+          retention-days: 30
+          path: |
+            out/BUSA_1M_14V9_RM_BLE_ESPOFFICIAL_WIFI_OTA.bin
+            out/BUSA_1M_14V9_RM_BLE_ESPOFFICIAL_USB_MERGED.bin
+            out/SHA256SUMS.txt
