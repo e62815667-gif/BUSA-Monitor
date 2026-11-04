@@ -36,7 +36,22 @@ static QueueHandle_t busaRmQueue=nullptr;
 static TemperatureSensor* busaRmTemps[4]={nullptr,nullptr,nullptr,nullptr};
 static Device *busaRmHealth=nullptr,*busaRmWater=nullptr,*busaRmScreen=nullptr,*busaRmKeys=nullptr;
 static bool busaRmStarted=false;
-static bool busaRmStartRequested=false; // Explicit local diagnostic start only; never start on boot.
+static bool busaRmStartRequested=false; // Start only from local app, never on boot.
+// Bluetooth pairing is a temporary, explicitly requested provisioning session.
+// IMPORTANT: WiFiProv's IDF BLE provisioning temporarily switches AP+STA to STA.
+// The pre-existing BUSA Wi-Fi preferences remain intact for automatic restoration.
+static volatile bool busaRmBleAdvertising=false;
+static volatile bool busaRmBleEnded=false;
+static volatile bool busaRmBleCredentialsAccepted=false;
+static volatile bool busaRmBleCredentialsRejected=false;
+static bool busaRmBleSessionRequested=false;
+static bool busaRmBleSessionStarted=false;
+static bool busaRmBleRestorePending=false;
+static bool busaRmBleEverCompleted=false;
+static bool busaRmBleTimeoutPending=false;
+static uint32_t busaRmBleSessionAt=0;
+static const uint32_t BUSA_BLE_PAIR_TIMEOUT_MS=180000;
+static String busaRmBleFeedback="Bluetooth выключен";
 static uint32_t busaRmLastSent=0,busaRmLastSettingsSent=0;
 static uint8_t busaRmSettingsCursor=0;
 static char busaRmService[24]={};
@@ -44,8 +59,20 @@ static char busaRmPoP[16]={};
 
 static void busaRmProvisionEvent(arduino_event_t *event){
   if(event->event_id==ARDUINO_EVENT_PROV_START){
-    Serial0.printf("BUSA RainMaker pairing name=%s PoP=%s\n",busaRmService,busaRmPoP);
+    busaRmBleAdvertising=true;
+    busaRmBleFeedback="Bluetooth включен: ожидаю ESP RainMaker";
+    Serial0.printf("BUSA RainMaker BLE provisioning: %s\n",busaRmService);
     printQR(busaRmService,busaRmPoP,"ble");
+  }else if(event->event_id==ARDUINO_EVENT_PROV_CRED_SUCCESS){
+    busaRmBleCredentialsAccepted=true;
+    busaRmBleFeedback="Учётные данные приняты: завершаю сопряжение";
+  }else if(event->event_id==ARDUINO_EVENT_PROV_CRED_FAIL){
+    busaRmBleCredentialsRejected=true;
+    busaRmBleFeedback="Ошибка при сопряжении; проверь пароль сети";
+  }else if(event->event_id==ARDUINO_EVENT_PROV_END){
+    busaRmBleAdvertising=false;
+    busaRmBleEnded=true;
+    busaRmBleFeedback="BLE-сеанс завершён; восстанавливаю локальную сеть";
   }
 }
 static bool busaRmFindSensor(const char*name,int&out){
@@ -183,8 +210,23 @@ static void busaRainMakerStart(){
 }
 static void busaRainMakerProvision(){
   if(!busaRmStarted)return;
+  // A previously connected BUSA has already been Wi-Fi provisioned.
+  // Explicitly reset ONLY Espressif's provisioning state for this one-time
+  // BLE pairing. BUSA's Wi-Fi credentials live in a SEPARATE Preferences
+  // namespace and are NOT erased. WiFiProv temporarily drops the local AP;
+  // it is restored when the BLE session ends or times out.
+  busaRmBleSessionAt=millis();
+  busaRmBleSessionStarted=true;
+  busaRmBleSessionRequested=false;
+  busaRmBleEnded=false;
+  busaRmBleAdvertising=false;
+  busaRmBleCredentialsAccepted=false;
+  busaRmBleCredentialsRejected=false;
+  busaRmBleTimeoutPending=false;
+  busaRmBleFeedback="Запуск BLE-сопряжения (до 3 минут)";
   WiFiProv.beginProvision(WIFI_PROV_SCHEME_BLE,WIFI_PROV_SCHEME_HANDLER_FREE_BTDM,
-                          WIFI_PROV_SECURITY_1,busaRmPoP,busaRmService);
+                          WIFI_PROV_SECURITY_1,busaRmPoP,busaRmService,
+                          nullptr,nullptr,true);
 }
 // Apply only writes accepted by the signed-in RainMaker device owner.
 // Never touch main TFT, NVS or GPIO from the RainMaker callback's task.
