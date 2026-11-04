@@ -1,0 +1,130 @@
+name: BUSA 1M Core Stability with Optional RainMaker N16R8
+on:
+  push:
+    branches: [fix/busa-rainmaker-core-stability-20261104]
+    paths:
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+      - '.github/workflows/busa-core-stability-20261104.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install ESP32-S3 toolchain and firmware libraries
+        run: |
+          set -euo pipefail
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+          arduino-cli lib install "Adafruit BusIO@1.17.4"
+          arduino-cli lib install "OneWire@2.3.8"
+          arduino-cli lib install "DallasTemperature@4.0.6"
+          arduino-cli lib install "Adafruit GFX Library@1.13.0"
+          arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
+          arduino-cli lib install "Adafruit ILI9341@1.7.0"
+          arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+      - name: Generate verified Google trust anchors
+        run: |
+          python3 - <<'PY'
+          import hashlib,ssl,urllib.request
+          from pathlib import Path
+          fingerprints={
+            'gtsr1':'d947432abde7b7fa90fc2e6b59101b1280e0e1c7e4e40fa3c6887fff57a7f4cf',
+            'gtsr2':'8d25cd97229dbf70356bda4eb3cc734031e24cf00fafcfd32dc76eb5841c7ea8',
+            'gtsr3':'34d8a73ee208d9bcdb0d956520934b4e40e69482596e8b6f73c8426b010a6f48',
+            'gtsr4':'349dfa4058c5e263123b398ae795573c4e1313c83fe68f93556cd5e8031b3c7d'}
+          bundle=[]
+          for name,expected in fingerprints.items():
+            pem=urllib.request.urlopen('https://pki.goog/repo/certs/'+name+'.pem',timeout=20).read().decode()
+            assert hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()==expected,name
+            bundle.append(pem)
+          dest=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h')
+          dest.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+'\n'.join(bundle)+')GOOGLECERT";\n')
+          PY
+      - name: Check RainMaker and partition layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE')
+          main=(p/'BUSA_Main.h').read_text()
+          cloud=(p/'BUSA_RainMaker.h').read_text()
+          partition=(p/'partitions.csv').read_text()
+          assert 'busaRainMakerStart()' in main
+          assert 'busaRainMakerProvision()' in main
+          assert 'busaRainMakerPoll(now)' in main
+          assert 'busaRainMakerApply()' in main
+          assert 'storeTempReference(' in cloud
+          assert 'saveTempOffset(' in cloud
+          assert 'PROP_FLAG_READ|PROP_FLAG_WRITE' in cloud
+          assert 'RM_THEME' in cloud and 'RM_KEYLEARN' in cloud
+          assert 'WiFiProv.beginProvision' in cloud
+          assert 'BUSA_RM_FIXED_POP="123456789"' in cloud
+          assert 'rainmakerBootAttempted=false' in main
+          assert 'if(!rainmakerBootAttempted && busaRmStartRequested &&' in main
+          assert 'static bool busaRmStartRequested=false;' in cloud
+          assert '/api/rainmaker/status' in main and '/api/rainmaker/enable' in main
+          assert 'busaRainMakerStart();' not in main.split('void setup(){',1)[1].split('void loop(){',1)[0]
+          assert 'RMaker.initNode(' in cloud
+          assert 'esp.device.sensor' in cloud
+          assert '0x310000, 0x300000' in partition
+          assert 'fctry, ' in partition
+          assert 'KPIN[4]={7,6,5,4}' in main
+          assert 'busaRemoteAlarmApply()' in main
+          assert 'setupGoogleCloud()' in main
+          assert 'sampleFlow(now)' in main
+          assert 'startScreen()' in main
+          assert 'WiFi.softAP(' in main
+          print('BUSA full feature and RainMaker bridge static checks: OK')
+          PY
+      - name: Build full ESP32-S3 N16R8 firmware
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
+          ls -lah out
+      - name: Produce APP OTA BIN and full USB BIN
+        run: |
+          set -euo pipefail
+          ESPTOOL="$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          test -f "$ESPTOOL"
+          SOURCE=out/BUSA_1M_WIFI_3v_GOOGLE.ino
+          cp ${SOURCE}.bin out/BUSA_1M_CORE_STABLE_APP_OTA.bin
+          CORE="$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
+          python3 "$ESPTOOL" --chip esp32s3 merge_bin \
+            -o out/BUSA_1M_CORE_STABLE_USB_MERGED.bin \
+            --flash_mode qio --flash_freq 80m --flash_size 16MB \
+            0x0 ${SOURCE}.bootloader.bin \
+            0x8000 ${SOURCE}.partitions.bin \
+            0xe000 "$CORE/tools/partitions/boot_app0.bin" \
+            0x10000 ${SOURCE}.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          p=Path('out')
+          a=p/'BUSA_1M_CORE_STABLE_APP_OTA.bin'
+          u=p/'BUSA_1M_CORE_STABLE_USB_MERGED.bin'
+          assert 50000<a.stat().st_size<0x300000
+          assert u.stat().st_size > a.stat().st_size
+          assert u.stat().st_size < 0x310000
+          text='\n'.join(f"{hashlib.sha256(f.read_bytes()).hexdigest()}  {f.name}" for f in [a,u])+'\n'
+          (p/'SHA256SUMS.txt').write_text(text)
+          print(text)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_1M_CORE_STABLE_USB_OTA_20261104
+          retention-days: 30
+          path: |
+            out/BUSA_1M_CORE_STABLE_APP_OTA.bin
+            out/BUSA_1M_CORE_STABLE_USB_MERGED.bin
+            out/SHA256SUMS.txt
