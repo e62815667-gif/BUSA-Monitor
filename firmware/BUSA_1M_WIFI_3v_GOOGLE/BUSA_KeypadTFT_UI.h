@@ -19,6 +19,8 @@ uint32_t wifiUiAssociationDueAt=0;
 String wifiUiLastConnectError=""; // displayed on physical TFT + local app
 uint8_t wifiUiScanAttempts=0; // One automatic retry for failed or empty scans
 uint32_t wifiUiScanRetryAt=0;
+bool wifiUiAutoScanPending=false;
+uint32_t wifiUiAutoScanAt=0;
 bool wifiUiResumeStation=false; // restore prior STA after search, never AP
 bool wifiUiPassiveFallback=false; // second scan listens for 2.4GHz beacons
 int wifiUiLastScanCode=-99; // -3=timeout, -2=failed, >=0=number found
@@ -126,13 +128,9 @@ void wifiUiRequestStationDisconnect(){
   tftDirty=true;
 }
 void wifiUiRestoreStationAfterScan(){
-  if(!wifiUiResumeStation)return;
+  // Search is read-only. Do NOT reconnect the router the user left.
+  // A fresh explicit Save is required for any external Wi-Fi association.
   wifiUiResumeStation=false;
-  if(wifiUiStaDisabled || wifiUiDisablePending || wifiUiConnectPending ||
-     stationSsid.isEmpty() || stationPass.length()<8)return;
-  WiFi.setAutoReconnect(false); // no indefinite reconnection to former router
-  WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-  lastStationCheck=millis();
 }
 void wifiUiLeave(){
   if(wifiUiOwnsScan){
@@ -141,6 +139,7 @@ void wifiUiLeave(){
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiStage=WIFIUI_STATUS;
   wifiUiMenuIndex=0;wifiUiScanRetryAt=0;
+  wifiUiAutoScanPending=false;
   wifiUiRestoreStationAfterScan();
   // Leaving the menu NEVER disconnects BUSA's own Wi-Fi hotspot.
   tftDirty=true;
@@ -159,7 +158,7 @@ void wifiUiStartScanAttempt(uint32_t now){
       wifiUiFeedback="STA недоступна. AP БУСА работает";
       wifiUiOwnsScan=false;busaWifiScanRunning=false;
       if(wifiUiScanAttempts<2)wifiUiScanRetryAt=now+1200;
-      else wifiUiStage=WIFIUI_STATUS;
+      else {wifiUiStage=WIFIUI_STATUS;wifiUiAutoScanPending=true;wifiUiAutoScanAt=now;}
       tftDirty=true;return;
     }
   }
@@ -227,6 +226,14 @@ void wifiUiBeginScan(){
 }
 void wifiUiPoll(){
   const uint32_t now=millis();
+  // If the Wi-Fi radio was occupied when this page opened, retry silently.
+  if(wifiUiAutoScanPending && wifiUiStage==WIFIUI_STATUS &&
+     currentPage==5 && approvedSettingsItem==1 && tftView &&
+     (!wifiUiAutoScanAt || (uint32_t)(now-wifiUiAutoScanAt)>=3500)){
+    wifiUiAutoScanAt=now;
+    wifiUiBeginScan();
+    if(wifiUiStage==WIFIUI_SCANNING)wifiUiAutoScanPending=false;
+  }
   if(wifiUiDisablePending && !busaGoogleNetworkBusy && !otaActive){
     wifiUiApplyStationDisconnect();
     return;
@@ -254,6 +261,7 @@ void wifiUiPoll(){
         if(timedOut)wifiUiFeedback="Поиск Wi-Fi: превышено время";
         else if(count<0)wifiUiFeedback="Ошибка сканера: "+String(count);
         else wifiUiFeedback="Сети не найдены";
+        wifiUiAutoScanPending=true;wifiUiAutoScanAt=now;
         wifiUiRestoreStationAfterScan();
       }
       tftDirty=true;return;
@@ -271,6 +279,7 @@ void wifiUiPoll(){
     }
     WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
     wifiUiStage=wifiUiCount?WIFIUI_NETWORKS:WIFIUI_STATUS;
+    if(!wifiUiCount){wifiUiAutoScanPending=true;wifiUiAutoScanAt=now;}
     wifiUiMenuIndex=0; // Network list is open immediately, not behind another menu.
     wifiUiFeedback=wifiUiCount?"Выберите сеть":"Сети не найдены";
     wifiUiRestoreStationAfterScan();
