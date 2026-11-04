@@ -183,8 +183,8 @@ void wifiUiStartScanAttempt(uint32_t now){
     }
   }else{
     wifiUiFeedback=wifiUiScanAttempts>1?
-      "Повторный поиск сетей 2,4 ГГц...":
-      "Поиск сетей 2,4 ГГц...";
+      "Поиск сетей...":
+      "Поиск сетей...";
   }
   tftDirty=true;
 }
