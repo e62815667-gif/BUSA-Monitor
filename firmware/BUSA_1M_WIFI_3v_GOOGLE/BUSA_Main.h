@@ -2999,8 +2999,21 @@ void setup(){
       server.send(403,"application/json","{\"error\":\"Only protected local AP\"}");return;
     }
     const uint32_t now=millis();
+    // Share one physical radio scan between the TFT and the browser.
+    // An already-running TFT search is not an error for the phone.
     if(wifiUiOwnsScan || (wifiUiStage==WIFIUI_SCANNING && wifiUiScanRetryAt)){
-      server.send(409,"application/json","{\"error\":\"tft_scan_active\"}");return;
+      server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
+    }
+    if(!busaWifiScanRunning && wifiUiCount>0 &&
+       (uint32_t)(now-wifiUiScanAt)<12000){
+      String out="{\"scanning\":false,\"networks\":[";
+      for(int i=0;i<wifiUiCount;i++){
+        if(i)out+=",";
+        out+="{\"ssid\":"+quoteJson(wifiUiNetworks[i]);
+        out+=",\"rssi\":"+String(wifiUiSignals[i])+"}";
+      }
+      out+="]}";
+      server.send(200,"application/json; charset=utf-8",out);return;
     }
     if(server.hasArg("start") && server.arg("start")=="1"){
       if(!busaWifiScanRunning){
