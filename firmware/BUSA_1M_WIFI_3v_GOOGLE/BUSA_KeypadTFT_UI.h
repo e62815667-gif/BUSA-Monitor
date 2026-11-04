@@ -5,7 +5,7 @@
 enum BusaWifiUiStage : uint8_t { WIFIUI_STATUS=0, WIFIUI_SCANNING=1,
   WIFIUI_NETWORKS=2, WIFIUI_PASSWORD=3, WIFIUI_CONNECTING=4 };
 BusaWifiUiStage wifiUiStage=WIFIUI_STATUS;
-uint8_t wifiUiMenuIndex=0; // Search, select SSID, password, save, disconnect from external STA
+uint8_t wifiUiMenuIndex=0; // Select network, password, connect (minimal physical UI)
 bool wifiUiStaDisabled=false; // persistent NVS "staOff" flag; AP always stays ON
 bool wifiUiDisablePending=false; // defer STA disconnect while Google HTTPS is active
 String wifiUiNetworks[48],wifiUiSelectedSsid="",wifiUiPassword="";
@@ -119,7 +119,7 @@ void wifiUiRequestStationDisconnect(){
   wifiUiStaDisabled=true;
   wifiUiDisablePending=true;
   wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
-  wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=4;
+  wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiFeedback="Отключаю внешнюю сеть...";
   if(!busaGoogleNetworkBusy && !otaActive)wifiUiApplyStationDisconnect();
@@ -130,7 +130,7 @@ void wifiUiRestoreStationAfterScan(){
   wifiUiResumeStation=false;
   if(wifiUiStaDisabled || wifiUiDisablePending || wifiUiConnectPending ||
      stationSsid.isEmpty() || stationPass.length()<8)return;
-  WiFi.setAutoReconnect(true);
+  WiFi.setAutoReconnect(false); // no indefinite reconnection to former router
   WiFi.begin(stationSsid.c_str(),stationPass.c_str());
   lastStationCheck=millis();
 }
@@ -253,7 +253,7 @@ void wifiUiPoll(){
         wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
         if(timedOut)wifiUiFeedback="Поиск Wi-Fi: превышено время";
         else if(count<0)wifiUiFeedback="Ошибка сканера: "+String(count);
-        else wifiUiFeedback="Сети 2,4 ГГц не найдены";
+        else wifiUiFeedback="Сети не найдены";
         wifiUiRestoreStationAfterScan();
       }
       tftDirty=true;return;
@@ -270,11 +270,9 @@ void wifiUiPoll(){
       ++wifiUiCount;
     }
     WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
-    wifiUiStage=WIFIUI_STATUS;
-    wifiUiMenuIndex=wifiUiCount?1:0;
-    wifiUiFeedback=wifiUiCount?
-      "Найдено сетей: "+String(wifiUiCount)+". ENT: выбор":
-      "Сети не отображаются: повтори поиск";
+    wifiUiStage=wifiUiCount?WIFIUI_NETWORKS:WIFIUI_STATUS;
+    wifiUiMenuIndex=0; // Network list is open immediately, not behind another menu.
+    wifiUiFeedback=wifiUiCount?"Выберите сеть":"Сети не найдены";
     wifiUiRestoreStationAfterScan();
     tftDirty=true;
   }
@@ -304,12 +302,12 @@ void wifiUiPoll(){
      !wifiUiAssociationDueAt && wifiUiConnectAt){
     if(WiFi.status()==WL_CONNECTED && WiFi.SSID()==stationSsid){
       wifiUiLastConnectError="";
-      WiFi.setAutoReconnect(true);
+      WiFi.setAutoReconnect(false);
       wifiUiFeedback="Подключено: "+stationSsid;
       wifiUiConnectAt=0;wifiUiStage=WIFIUI_STATUS;
       tftDirty=true;
     }else if((uint32_t)(now-wifiUiConnectAt)>18000){
-      wifiUiLastConnectError="Не подключено: "+stationSsid+". Проверь пароль/2,4ГГц";
+      wifiUiLastConnectError="Не подключено. Проверь пароль";
       WiFi.setAutoReconnect(false);
       WiFi.disconnect(false,false); // no silent fallback to the old hotspot
       wifiUiFeedback=wifiUiLastConnectError;
@@ -349,24 +347,24 @@ void wifiUiSaveConnection(){
   wifiUiLastConnectError="";
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiConnectPending=true;
-  wifiUiConnectAt=millis();wifiUiStage=WIFIUI_CONNECTING;wifiUiMenuIndex=3;
+  wifiUiConnectAt=millis();wifiUiStage=WIFIUI_CONNECTING;wifiUiMenuIndex=2;
   wifiUiFeedback="Сеть сохранена. Подключаю...";
   tftDirty=true;
 }
-// Five ordered Wi-Fi actions: Search / Select / Password / Save / STA Disconnect.
-// The two-stage selection follows the same UP/DOWN -> ENTER -> ESC pattern as Settings.
+// Three ordinary actions only: choose a network, enter password, connect.
+// A scan begins when Settings -> Wi-Fi opens; no separate Search menu.
 bool wifiUiKey(int k){
   if(k==1)return false; // F2 still turns TFT display OFF
   if(currentPage!=5 || approvedSettingsItem!=1 || !tftView)return false;
   if(wifiUiStage==WIFIUI_PASSWORD){
-    if(k==15){wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=2;wifiUiResetTap();}
+    if(k==15){wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=1;wifiUiResetTap();}
     else if(k==0)wifiUiBackspace();
     else if(k==7||k==11){wifiUiMode=(wifiUiMode+(k==7?3:1))%4;wifiUiResetTap();}
     else if(k==16){if(wifiUiCursor)wifiUiCursor--;wifiUiResetTap();}
     else if(k==18){if(wifiUiCursor<wifiUiPassword.length())wifiUiCursor++;wifiUiResetTap();}
     else if(k==19){
-      wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=3;
-      wifiUiFeedback="Пароль введён. Выбери Сохранить";
+      wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=2;
+      wifiUiFeedback="Пароль введён. Выбери Подключить";
       wifiUiResetTap();
     }
     else if(wifiUiDigitFromKey(k)>=0)wifiUiTypeDigit(k);
@@ -378,9 +376,9 @@ bool wifiUiKey(int k){
     }else if(k==19 && wifiUiCount){
       wifiUiSelectedSsid=wifiUiNetworks[wifiUiIndex];
       wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
-      wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=2;
-      wifiUiFeedback="Сеть выбрана. ENTER: пароль";
-    }else if(k==15){wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=1;}
+      wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=1;
+      wifiUiFeedback="Сеть выбрана";
+    }else if(k==15){wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;}
     else if(k==16||k==18)return false;
     tftDirty=true;return true;
   }
@@ -393,28 +391,25 @@ bool wifiUiKey(int k){
     }else if(k==16||k==18)return false;
     tftDirty=true;return true;
   }
-  // The menu is always stable on entry: no unsolicited scan or password popup.
+  // While idle, show just the three actions. No old-router waiting screen.
   if(wifiUiStage==WIFIUI_STATUS||wifiUiStage==WIFIUI_CONNECTING){
     if(k==7||k==11){
-      wifiUiMenuIndex=(wifiUiMenuIndex+(k==7?4:1))%5;
+      wifiUiMenuIndex=(wifiUiMenuIndex+(k==7?2:1))%3;
     }else if(k==19){
       switch(wifiUiMenuIndex){
-        case 0:wifiUiBeginScan();break;
-        case 1:
+        case 0:
           if(wifiUiCount){wifiUiIndex=0;wifiUiStage=WIFIUI_NETWORKS;}
-          else{wifiUiFeedback="Сначала запусти поиск сетей";}
+          else wifiUiBeginScan(); // automatic retry when no networks are listed
           break;
-        case 2:
+        case 1:
           if(wifiUiSelectedSsid.length()){
             wifiUiMode=0;wifiUiResetTap();wifiUiStage=WIFIUI_PASSWORD;
-          }else wifiUiFeedback="Сначала выбери сеть";
+          }else wifiUiFeedback="Выберите сеть";
           break;
-        case 3:wifiUiSaveConnection();break;
-        case 4:wifiUiRequestStationDisconnect();break;
+        case 2:wifiUiSaveConnection();break;
       }
-    }else if(k==15){
-      wifiUiLeave();tftView=0;
-    }else if(k==16||k==18)return false; // normal main section switching
+    }else if(k==15){wifiUiLeave();tftView=0;}
+    else if(k==16||k==18)return false;
     tftDirty=true;return true;
   }
   return false;
