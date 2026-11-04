@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-AUTOSCAN-STA-20261104";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-DRIVER-20261105";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1262,6 +1262,16 @@ uint32_t busaWifiScanStartedAt=0,busaWifiScanLastAt=0;
 bool busaWebScanPending=false,busaWebScanResumeSTA=false,busaWebScanPassive=false;
 uint8_t busaWebScanAttempts=0;
 uint32_t busaWebScanStartDueAt=0;
+enum BusaSharedScanState : uint8_t {
+  BUSA_SCAN_IDLE=0,BUSA_SCAN_REQUESTED=1,BUSA_SCAN_RUNNING=2,
+  BUSA_SCAN_READY=3,BUSA_SCAN_EMPTY=4,BUSA_SCAN_ERROR=5
+};
+BusaSharedScanState busaSharedScanState=BUSA_SCAN_IDLE;
+uint8_t busaSharedScanAttempt=0;
+uint32_t busaSharedScanAttemptAt=0,busaSharedScanFinishedAt=0,busaSharedScanRetryDueAt=0;
+bool busaSharedScanForTft=false;
+String busaSharedScanError="";
+
 bool screenAttempted=false;
 bool apClient(){return server.client().localIP()==WiFi.softAPIP();}
 
@@ -1987,9 +1997,10 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
 <span class="readOnlyLabel">● МОНИТОРИНГ</span></div>
 <div id="clockDisplay" class="clockBar" aria-live="off">Время синхронизируется…</div>
-<div class="netIndicators" role="status" aria-label="Статусы Wi-Fi и Google">
+<div class="netIndicators" role="status" aria-label="Статусы Wi-Fi, Google и ESP32">
 <span class="netPill"><span id="internetLed" class="netDot"></span>Wi-Fi <span id="internetLabel" class="netText">ОТКЛ</span></span>
 <span class="netPill"><span id="googleLed" class="netDot"></span>Google <span id="googleLabel" class="netText">ОТКЛ</span></span>
+<span class="netPill"><span id="localLed" class="netDot"></span>ESP32 <span id="localLabel" class="netText">ОТКЛ</span></span>
 
 </div>
 <nav class="appTabs" aria-label="Шесть разделов БУСА"><button data-page="0" class="on"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-7h6v7"/></svg><span>Главная</span></button>
@@ -2187,13 +2198,15 @@ let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=
 let active=0,connected=false,pollBusy=false,statusFailures=0,settingsActive=-1,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
 function networkLeds(info,station,google){
- const wifi=station?.connected===true;
+ const wifi=station?.connected===true,local=info?.local_client===true;
  // 302 means Apps Script accepted the POST redirect; do not treat "configured" as proof.
  const cloud=google?.configured===true&&info?.internet===true&&[200,302].includes(google?.http);
  get('internetLed').classList.toggle('internetOn',wifi);
  get('googleLed').classList.toggle('googleOn',cloud);
+ get('localLed').classList.toggle('localOn',local);
  get('internetLabel').textContent=wifi?'ПОДКЛ':'ОТКЛ';
  get('googleLabel').textContent=cloud?'ПОДКЛ':'ОТКЛ';
+ get('localLabel').textContent=local?'ПОДКЛ':'ОТКЛ';
 }
 
 let lastDiagnosticReport='';
@@ -2433,7 +2446,7 @@ let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.stat
  'НЕТ СОЕДИНЕНИЯ'+(s.station.target_ssid?' · выбрана '+s.station.target_ssid:'');
 get('wstatus').textContent=ss;
 
-get('mainwifi').textContent='Wi-Fi '+(s.station.connected?'ПОДКЛ':'ОТКЛ')+' · Google '+(s.google?.configured&&s.network_indicators?.internet?'ПОДКЛ':'ОТКЛ');
+get('mainwifi').textContent='Wi-Fi '+(s.station.connected?'ПОДКЛ':'ОТКЛ')+' · Google '+(s.google?.configured&&s.network_indicators?.internet?'ПОДКЛ':'ОТКЛ')+' · ESP32 '+(s.network_indicators?.local_client?'ПОДКЛ':'ОТКЛ');
 // The browser's SSID picker is never automatically populated with old iPhone.
 const cs=s.google;
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
