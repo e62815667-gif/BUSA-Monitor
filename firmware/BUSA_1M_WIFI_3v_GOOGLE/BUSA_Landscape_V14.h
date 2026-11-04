@@ -420,11 +420,10 @@ static void v14Settings(bool layout){
     case 1:{
       // Ordered Wi-Fi settings only. Never disconnect the always-on BUSA AP.
       v14Big("Wi-Fi",17,48,V14_TEXT);
-      v14Tiny("AP БУСА: ВКЛ",215,45,V14_GREEN);
       screen->drawFastHLine(17,55,280,V14_RULE);
       if(wifiUiStage==WIFIUI_SCANNING){
         v14Print("Поиск сетей...",24,103,V14_TEXT);
-        v14Tiny("ESC: отменить поиск",24,149,V14_MUTED);
+        v14Tiny("Поиск выполняется автоматически",24,149,V14_MUTED);
       }else if(wifiUiStage==WIFIUI_NETWORKS){
         v14Tiny("Выбери сеть: UP/DOWN, ENTER",21,67,V14_MUTED);
         const int first=(wifiUiIndex/5)*5;
@@ -450,25 +449,20 @@ static void v14Settings(bool layout){
         v14Tiny("F1: стереть. ENT: к сохранению",23,187,V14_GREEN);
       }else{
         static const char* menu[]={
-          "Поиск сети Wi-Fi","Выбор сети Wi-Fi","Ввести пароль",
-          "Сохранить подключение","Отключить внешнюю сеть"
+          "Выбрать сеть","Ввести пароль","Подключиться"
         };
-        // Five fully selectable menu rows, like Settings: UP/DOWN selects,
-        // ENTER performs the action, ESC returns. No automatic search popup.
-        for(int i=0;i<5;i++){
-          const int x=16,y=61+i*27;
-          hqPanel(x,y,288,25);
+        for(int i=0;i<3;i++){
+          const int x=16,y=65+i*38;
+          hqPanel(x,y,288,34);
           const bool selected=(wifiUiMenuIndex==i);
-          if(selected)screen->fillRoundRect(x+3,y+3,5,19,2,V14_ORANGE);
-          v14Print(menu[i],x+15,y+18,selected?V14_ORANGE:V14_TEXT);
+          if(selected)screen->fillRoundRect(x+3,y+5,5,24,2,V14_ORANGE);
+          v14Print(menu[i],x+15,y+23,selected?V14_ORANGE:V14_TEXT);
         }
         String message=wifiUiFeedback;
-        if(message.isEmpty()){
-          message=wifiUiStaDisabled?"Внешняя сеть отключена":
-            (WiFi.status()==WL_CONNECTED?"Подключено: "+WiFi.SSID():"Внешняя сеть не подключена");
-        }
-        if(message.length()>51)message=message.substring(0,48)+"...";
-        v14Tiny(message,19,204,wifiUiStaDisabled?V14_MUTED:V14_TEXT);
+        if(message.isEmpty())
+          message=WiFi.status()==WL_CONNECTED?"Подключено: "+WiFi.SSID():"Нет подключения";
+        if(message.length()>42)message=message.substring(0,39)+"...";
+        v14Tiny(message,19,200,V14_TEXT);
       }
       break;
     }
