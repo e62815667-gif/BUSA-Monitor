@@ -106,6 +106,12 @@ jobs:
           assert 'WiFi.setAutoReconnect(true)' not in keys
           assert '"Выбрать сеть","Ввести пароль","Подключиться"' in screen
           assert 'function page(n,send=true)' in main and 'browser' in main
+          assert 'id="disconnectWifi"' in main
+          assert "get('disconnectWifi').onclick" in main
+          assert 'server.on("/api/wifi/disconnect",HTTP_POST' in main
+          assert 'wifiUiStaDisabled=true;wifiUiDisablePending=true;' in main
+          assert "get('net').replaceChildren(new Option('Выберите сеть',''))" in main
+          assert 'WiFi.disconnect(false,false)' in keys
           print('BUSA full feature and RainMaker bridge static checks: OK')
           PY
       - name: Build full ESP32-S3 N16R8 firmware
