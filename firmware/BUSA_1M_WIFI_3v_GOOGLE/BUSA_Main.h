@@ -1299,6 +1299,127 @@ String quoteJson(const String &x){
   }
   return out+"\"";
 }
+
+bool busaWifiRequestSharedScan(bool physical){
+  const uint32_t now=millis();
+  if(otaActive || wifiUiConnectPending || wifiUiAssociationDueAt || wifiUiConnectAt)
+    return false;
+  if(physical)busaSharedScanForTft=true;
+  if(busaSharedScanState==BUSA_SCAN_REQUESTED || busaSharedScanState==BUSA_SCAN_RUNNING)
+    return true;
+  // A shared result can be reused for a few seconds by both UIs.
+  if(busaSharedScanState==BUSA_SCAN_READY &&
+     (uint32_t)(now-busaSharedScanFinishedAt)<5000){
+    if(physical && wifiUiCount>0){
+      wifiUiStage=WIFIUI_NETWORKS;
+      wifiUiFeedback="";
+      wifiUiMenuIndex=0;wifiUiIndex=0;
+      busaSharedScanForTft=false;tftDirty=true;
+    }
+    return true;
+  }
+  busaSharedScanAttempt=0;
+  busaSharedScanRetryDueAt=0;
+  busaSharedScanError="";
+  busaSharedScanState=BUSA_SCAN_REQUESTED;
+  busaWifiScanRunning=true;
+  busaWifiScanStartedAt=now;
+  wifiUiCount=0;
+  return true;
+}
+void busaWifiScanFinish(uint8_t state,uint32_t now){
+  // Driver buffers released in exactly one place, after completion.
+  WiFi.scanDelete();
+  busaWifiScanRunning=false;
+  busaSharedScanState=(BusaSharedScanState)state;
+  busaSharedScanFinishedAt=now;
+  busaWifiScanLastAt=now;
+  wifiUiScanAt=now;
+  if(busaSharedScanForTft && wifiUiStage==WIFIUI_SCANNING &&
+     currentPage==5 && approvedSettingsItem==1 && tftView){
+    wifiUiStage=wifiUiCount>0?WIFIUI_NETWORKS:WIFIUI_STATUS;
+    wifiUiIndex=0;wifiUiMenuIndex=0;
+    wifiUiFeedback=wifiUiCount>0?String(""):
+      (state==BUSA_SCAN_EMPTY?"Сети не найдены":"Ошибка поиска Wi-Fi");
+    tftDirty=true;
+  }
+  busaSharedScanForTft=false;
+}
+void busaWifiScanPoll(uint32_t now){
+  if(busaSharedScanState==BUSA_SCAN_REQUESTED){
+    if(otaActive)return;
+    if(busaSharedScanRetryDueAt && (int32_t)(now-busaSharedScanRetryDueAt)<0)return;
+    if(WiFi.getMode()!=WIFI_AP_STA && !WiFi.mode(WIFI_AP_STA)){
+      busaSharedScanError="sta_unavailable";
+      busaWifiScanFinish(BUSA_SCAN_ERROR,now);return;
+    }
+    // Never disconnect current Wi-Fi, never restart the AP for a scan.
+    // Both UIs request scanning, only this loop drives the actual radio.
+    WiFi.setSleep(false);
+    WiFi.scanDelete();
+    ++busaSharedScanAttempt;
+    busaSharedScanAttemptAt=now;
+    busaSharedScanRetryDueAt=0;
+    const bool passive=busaSharedScanAttempt>1;
+    const int result=WiFi.scanNetworks(true,true,passive,passive?280:140);
+    if(result==WIFI_SCAN_RUNNING || result>=0){
+      busaSharedScanState=BUSA_SCAN_RUNNING;return;
+    }
+    busaSharedScanError="scan_start_failed";
+    if(busaSharedScanAttempt<2){
+      busaSharedScanRetryDueAt=now+800;return;
+    }
+    busaWifiScanFinish(BUSA_SCAN_ERROR,now);return;
+  }
+  if(busaSharedScanState!=BUSA_SCAN_RUNNING)return;
+  const int count=WiFi.scanComplete();
+  if(count==WIFI_SCAN_RUNNING && (uint32_t)(now-busaSharedScanAttemptAt)<9000)
+    return;
+  if(count==WIFI_SCAN_RUNNING){
+    // An unresponsive driver must never leave the application "Searching".
+    busaSharedScanError="scan_timeout";
+    busaWifiScanFinish(BUSA_SCAN_ERROR,now);return;
+  }
+  if(count<=0){
+    busaSharedScanError=count==0?"no_networks":"scan_failed";
+    if(busaSharedScanAttempt<2){
+      WiFi.scanDelete();
+      busaSharedScanState=BUSA_SCAN_REQUESTED;
+      busaSharedScanRetryDueAt=now+700;return;
+    }
+    busaWifiScanFinish(count==0?BUSA_SCAN_EMPTY:BUSA_SCAN_ERROR,now);
+    return;
+  }
+  wifiUiCount=0;
+  for(int i=0;i<count && wifiUiCount<48;i++){
+    const String name=WiFi.SSID(i);
+    if(name.isEmpty() || name.length()>32)continue;
+    bool duplicate=false;
+    for(int j=0;j<wifiUiCount;j++)if(wifiUiNetworks[j]==name){duplicate=true;break;}
+    if(duplicate)continue;
+    wifiUiNetworks[wifiUiCount]=name;
+    wifiUiSignals[wifiUiCount]=WiFi.RSSI(i);
+    ++wifiUiCount;
+  }
+  busaSharedScanError=wifiUiCount?"":"no_networks";
+  busaWifiScanFinish(wifiUiCount?BUSA_SCAN_READY:BUSA_SCAN_EMPTY,now);
+}
+String busaWifiScanJSON(){
+  const bool scanning=busaSharedScanState==BUSA_SCAN_REQUESTED ||
+                      busaSharedScanState==BUSA_SCAN_RUNNING;
+  String out=String("{\"scanning\":")+(scanning?"true":"false")+
+    ",\"networks\":[";
+  if(!scanning && busaSharedScanState==BUSA_SCAN_READY){
+    for(int i=0;i<wifiUiCount;i++){
+      if(i)out+=",";
+      out+="{\"ssid\":"+quoteJson(wifiUiNetworks[i])+
+           ",\"rssi\":"+String(wifiUiSignals[i])+"}";
+    }
+  }
+  out+="],\"error\":"+quoteJson(scanning?"":busaSharedScanError)+"}";
+  return out;
+}
+
 String otaJSON(); // forward declaration
 #include "BUSA_SoundAlarms.h"
 #include "BUSA_RemoteAlarm.h"
