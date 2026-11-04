@@ -36,6 +36,7 @@ static QueueHandle_t busaRmQueue=nullptr;
 static TemperatureSensor* busaRmTemps[4]={nullptr,nullptr,nullptr,nullptr};
 static Device *busaRmHealth=nullptr,*busaRmWater=nullptr,*busaRmScreen=nullptr,*busaRmKeys=nullptr;
 static bool busaRmStarted=false;
+static bool busaRmStartRequested=false; // Explicit local diagnostic start only; never start on boot.
 static uint32_t busaRmLastSent=0,busaRmLastSettingsSent=0;
 static uint8_t busaRmSettingsCursor=0;
 static char busaRmService[24]={};
