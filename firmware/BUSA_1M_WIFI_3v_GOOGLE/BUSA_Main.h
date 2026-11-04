@@ -3585,8 +3585,7 @@ void loop(){
   // The existing Wi-Fi scan, connect, NVS, and SoftAP routines are unchanged.
   static bool rainmakerBootAttempted=false;
   if(busaRmStartRequested && !rainmakerBootAttempted &&
-     bootSplashComplete && busaTftFullRenderCount>0 &&
-     elapsed(now,busaBootAt,15000) && !otaActive){
+     bootSplashComplete && elapsed(now,busaBootAt,15000) && !otaActive){
     busaRmStartRequested=false;
     rainmakerBootAttempted=true;
     busaReportStage("RAINMAKER_BLE_MANUAL_BEGIN");
