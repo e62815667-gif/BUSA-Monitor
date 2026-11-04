@@ -2386,7 +2386,7 @@ function settingsTab(n,send=true){
  get('settingsBack').hidden=n===-1;
  document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);
  document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));
- if(n===1&&previous!==1){wifiListHasNetworks=false;wifiRefreshNetworks();}
+ if(n===1&&previous!==1)wifiRefreshNetworks();
  // Local settings stay in browser; physical TFT navigation is independent.
 }
 get('settingsBack').onclick=()=>{
@@ -2720,54 +2720,49 @@ get('manualUpdate').onclick=async function(){
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
   this.disabled=false;
 };
-let wifiListBusy=false,wifiListRetryAt=0,wifiListHasNetworks=false;
-// Opening Wi-Fi settings starts a fresh scan; no extra buttons are needed.
+let wifiListBusy=false;
+// Single bounded radio scan per opening of the Wi-Fi page.
 async function wifiRefreshNetworks(){
- if(wifiListBusy||settingsActive!==1)return;
- wifiListBusy=true;
- const sel=get('net'),previous=sel.value;
- sel.replaceChildren(new Option('Поиск сетей...',''));
- get('response').textContent='Ищу доступные сети...';
- try{
-   let j=null;
-   for(let attempt=0;attempt<3;attempt++){
-     try{
-       const r=await fetch('/api/wifi/scan?start=1',{cache:'no-store',signal:AbortSignal.timeout(8000)});
-       j=await r.json();
-       if(!r.ok)throw Error(j.error||'HTTP '+r.status);
-     }catch(e){
-       if(attempt===2)throw e;
-       await new Promise(resolve=>setTimeout(resolve,1600));
-       continue;
-     }
-     for(let i=0;i<38 && j.scanning;i++){
-       if(settingsActive!==1)return;
-       await new Promise(resolve=>setTimeout(resolve,750));
-       const r=await fetch('/api/wifi/scan',{cache:'no-store',signal:AbortSignal.timeout(8000)});
-       j=await r.json();
-       if(!r.ok)throw Error(j.error||'HTTP '+r.status);
-     }
-     if(j&&j.scanning)throw Error('Поиск не завершился');
-     break;
-   }
-   if(settingsActive!==1)return;
-   sel.replaceChildren(new Option('Выберите сеть',''));
-   const seen=new Set();
-   (j?.networks||[]).forEach(w=>{
-     if(!w.ssid||seen.has(w.ssid))return;
-     seen.add(w.ssid);
-     sel.add(new Option(w.ssid,w.ssid));
-   });
-   if(previous&&seen.has(previous))sel.value=previous;
-   wifiListHasNetworks=seen.size>0;
-   get('response').textContent=seen.size?'':'Поиск сетей...';
- }catch(e){
-   if(settingsActive===1){
-     sel.replaceChildren(new Option('Поиск сетей...',''));
-     wifiListHasNetworks=false;
-     get('response').textContent='Поиск сетей...';
-   }
- }finally{wifiListBusy=false;wifiListRetryAt=Date.now()+15000;}
+  if(wifiListBusy||settingsActive!==1)return;
+  wifiListBusy=true;
+  const sel=get('net');
+  sel.replaceChildren(new Option('Поиск сетей...',''));
+  get('response').textContent='Поиск сетей...';
+  try{
+    const start=await fetch('/api/wifi/scan?start=1',{
+      cache:'no-store',signal:AbortSignal.timeout(7000)});
+    let j=await start.json();
+    if(!start.ok)throw Error(j.error||'scan_unavailable');
+    for(let i=0;i<30&&j.scanning;i++){
+      if(settingsActive!==1)return;
+      await new Promise(resolve=>setTimeout(resolve,650));
+      try{
+        const resp=await fetch('/api/wifi/scan',{
+          cache:'no-store',signal:AbortSignal.timeout(6500)});
+        if(resp.ok)j=await resp.json();
+      }catch(e){
+        // Radio channel changes can briefly pause the local AP.
+        // Keep polling the same scan, rather than starting a competing scan.
+      }
+    }
+    if(settingsActive!==1)return;
+    if(j.scanning)throw Error('scan_timeout');
+    const unique=new Set();
+    sel.replaceChildren(new Option('Выберите сеть',''));
+    (j.networks||[]).forEach(item=>{
+      if(!item.ssid||unique.has(item.ssid))return;
+      unique.add(item.ssid);
+      sel.add(new Option(item.ssid,item.ssid));
+    });
+    // Never leave a permanent "Searching..." banner after the scan ends.
+    get('response').textContent=unique.size?'':(
+      j.error&&j.error!=='no_networks'?'Ошибка поиска Wi-Fi':'Сети не найдены');
+  }catch(e){
+    if(settingsActive===1){
+      sel.replaceChildren(new Option('Сети не найдены',''));
+      get('response').textContent='Ошибка поиска Wi-Fi';
+    }
+  }finally{wifiListBusy=false;}
 }
 get('net').onchange=()=>{get('response').textContent='';};
 get('save').onclick=async function(){
@@ -2789,9 +2784,7 @@ document.documentElement.dataset.theme='system';
 settingsTab(-1,false);
 message('Веб-приложение запущено');
 showPhoneClock();setInterval(showPhoneClock,1000);
- // Re-scan automatically when no network is selected, without a Search button.
- setInterval(()=>{if(settingsActive===1&&!wifiListBusy&&!wifiListHasNetworks&&
-   Date.now()>wifiListRetryAt)wifiRefreshNetworks();},5000);
+ // No endless scan timer. Reopening Wi-Fi requests a new finite search.
 syncClock();setInterval(syncClock,300000);
 update();setInterval(update,3000);
 </script></body></html>
