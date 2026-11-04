@@ -15,6 +15,7 @@ uint8_t wifiUiLastTapKey=255,wifiUiLastTapIndex=0;
 uint32_t wifiUiLastTapAt=0,wifiUiScanAt=0,wifiUiConnectAt=0;
 uint8_t wifiUiCursor=0;
 bool wifiUiOwnsScan=false,wifiUiConnectPending=false;
+bool busaWifiRequestSharedScan(bool physical); // implemented in BUSA_Main.h
 uint32_t wifiUiAssociationDueAt=0;
 String wifiUiLastConnectError=""; // displayed on physical TFT + local app
 uint8_t wifiUiScanAttempts=0; // One automatic retry for failed or empty scans
@@ -105,7 +106,7 @@ void wifiUiApplyStationDisconnect(){
   wifiUiResumeStation=false; // explicit user STA disconnect wins
   wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
   wifiUiLastConnectError="";
-  WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
+  wifiUiOwnsScan=false;
   WiFi.setAutoReconnect(false);
   WiFi.disconnect(false,false); // NEVER stop the radio or the BUSA softAP
   wifiUiDisablePending=false;
@@ -133,9 +134,8 @@ void wifiUiRestoreStationAfterScan(){
   wifiUiResumeStation=false;
 }
 void wifiUiLeave(){
-  if(wifiUiOwnsScan){
-    WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
-  }
+  // Scan is owned by the shared radio service, not this UI page.
+  wifiUiOwnsScan=false;
   wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiStage=WIFIUI_STATUS;
   wifiUiMenuIndex=0;wifiUiScanRetryAt=0;
@@ -145,148 +145,30 @@ void wifiUiLeave(){
   tftDirty=true;
 }
 
-// Recover STA scan capability without stopping/restarting the BUSA softAP.
-// ESP32-S3 uses one radio for AP+STA; scanning still works when external
-// internet was explicitly disabled with WiFi.disconnect(false,false).
-void wifiUiStartScanAttempt(uint32_t now){
-  ++wifiUiScanAttempts;
-  wifiUiScanRetryAt=0;
-  wifiUiStage=WIFIUI_SCANNING;
-  if(WiFi.getMode()!=WIFI_AP_STA){
-    if(!WiFi.mode(WIFI_AP_STA)){
-      wifiUiLastScanCode=WIFI_SCAN_FAILED;
-      wifiUiFeedback="STA недоступна. AP БУСА работает";
-      wifiUiOwnsScan=false;busaWifiScanRunning=false;
-      if(wifiUiScanAttempts<2)wifiUiScanRetryAt=now+1200;
-      else {wifiUiStage=WIFIUI_STATUS;wifiUiAutoScanPending=true;wifiUiAutoScanAt=now;}
-      tftDirty=true;return;
-    }
-  }
-  WiFi.setSleep(false);
-  WiFi.scanDelete();
-  wifiUiScanAt=now;
-  busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
-  // Passive all-channel fallback differs from first active scan.
-  wifiUiPassiveFallback=(wifiUiScanAttempts>1);
-  const int result=wifiUiPassiveFallback?
-    WiFi.scanNetworks(true,true,true,350):
-    WiFi.scanNetworks(true,true,false,180);
-  wifiUiLastScanCode=result;
-  wifiUiOwnsScan=(result==WIFI_SCAN_RUNNING || result>=0);
-  busaWifiScanRunning=wifiUiOwnsScan;
-  if(!wifiUiOwnsScan){
-    wifiUiFeedback="Ошибка сканера. Повторяю...";
-    if(wifiUiScanAttempts<2)wifiUiScanRetryAt=now+1200;
-    else{
-      wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
-      wifiUiFeedback="Сканер Wi-Fi: ошибка "+String(result);
-    }
+// TFT and browser use ONE async scanner, serviced by BUSA_Main.loop().
+void wifiUiBeginScan(){
+  wifiUiCount=0;wifiUiIndex=0;
+  wifiUiSelectedSsid="";wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
+  wifiUiAutoScanPending=false;wifiUiScanRetryAt=0;
+  wifiUiMenuIndex=0;
+  if(busaWifiRequestSharedScan(true)){
+    wifiUiStage=WIFIUI_SCANNING;
+    wifiUiFeedback="Поиск сетей...";
   }else{
-    wifiUiFeedback=wifiUiScanAttempts>1?
-      "Поиск сетей...":
-      "Поиск сетей...";
+    wifiUiStage=WIFIUI_STATUS;
+    wifiUiFeedback="Поиск недоступен";
   }
   tftDirty=true;
 }
-void wifiUiBeginScan(){
-  const uint32_t now=millis();
-  if(otaActive || busaGoogleNetworkBusy){
-    wifiUiFeedback="Сеть занята, повтори поиск";tftDirty=true;return;
-  }
-  // The local app's scan can remain flagged when its browser stopped polling.
-  // Recover only a stale request; never interrupt a valid in-flight scan.
-  if(busaWifiScanRunning && !wifiUiOwnsScan &&
-     (uint32_t)(now-busaWifiScanStartedAt)>=16000){
-    WiFi.scanDelete();busaWifiScanRunning=false;
-  }
-  if(busaWifiScanRunning){
-    wifiUiFeedback="Сканирование уже выполняется";tftDirty=true;return;
-  }
-  if(busaWifiScanLastAt && (uint32_t)(now-busaWifiScanLastAt)<3000){
-    wifiUiFeedback="Повтори поиск через 3 секунды";tftDirty=true;return;
-  }
-  wifiUiCount=0;wifiUiIndex=0;wifiUiSelectedSsid="";
-  wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
-  wifiUiScanAttempts=0;wifiUiScanRetryAt=0;wifiUiLastScanCode=-99;
-  wifiUiPassiveFallback=false;
-  // A connected STA can make ESP32-S3 Wi-Fi scans report zero networks.
-  // Pause only STA; keep WIFI_AP_STA, BUSA AP, HTTP and OTA active.
-  wifiUiResumeStation=!wifiUiStaDisabled && WiFi.status()==WL_CONNECTED &&
-    !stationSsid.isEmpty() && stationPass.length()>=8;
-  if(WiFi.status()==WL_CONNECTED){
-    WiFi.setAutoReconnect(false);
-    WiFi.disconnect(false,false); // STA only, never disable BUSA softAP
-    lastStationCheck=now;
-    wifiUiStage=WIFIUI_SCANNING;
-    wifiUiFeedback="Освобождаю STA для поиска...";
-    wifiUiScanRetryAt=now+650; // wait for driver to process disassociation
-    tftDirty=true;return;
-  }
-  wifiUiStartScanAttempt(now);
-}
 void wifiUiPoll(){
   const uint32_t now=millis();
-  // If the Wi-Fi radio was occupied when this page opened, retry silently.
-  if(wifiUiAutoScanPending && wifiUiStage==WIFIUI_STATUS &&
-     currentPage==5 && approvedSettingsItem==1 && tftView &&
-     (!wifiUiAutoScanAt || (uint32_t)(now-wifiUiAutoScanAt)>=3500)){
-    wifiUiAutoScanAt=now;
-    wifiUiBeginScan();
-    if(wifiUiStage==WIFIUI_SCANNING)wifiUiAutoScanPending=false;
-  }
-  if(wifiUiDisablePending && !busaGoogleNetworkBusy && !otaActive){
+  // One finite scan run; no automatic retry loop in the physical menu.
+  if(wifiUiDisablePending && !otaActive){
     wifiUiApplyStationDisconnect();
     return;
   }
-  if(wifiUiStage==WIFIUI_SCANNING){
-    if(wifiUiScanRetryAt){
-      if((int32_t)(now-wifiUiScanRetryAt)>=0){
-        wifiUiStartScanAttempt(now);
-      }
-      return; // Waiting for the automatic retry, not a failed search menu.
-    }
-    if(!wifiUiOwnsScan)return;
-    const int count=WiFi.scanComplete();
-    if(count==WIFI_SCAN_RUNNING &&
-       (uint32_t)(now-wifiUiScanAt)<14000)return;
-    const bool timedOut=count==WIFI_SCAN_RUNNING;
-    wifiUiLastScanCode=timedOut?-3:count;
-    if(timedOut || count<=0){
-      WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
-      if(wifiUiScanAttempts<2){
-        wifiUiScanRetryAt=now+1000;
-        wifiUiFeedback="Поиск не завершён. Повторяю...";
-      }else{
-        wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
-        if(timedOut)wifiUiFeedback="Поиск Wi-Fi: превышено время";
-        else if(count<0)wifiUiFeedback="Ошибка сканера: "+String(count);
-        else wifiUiFeedback="Сети не найдены";
-        wifiUiAutoScanPending=true;wifiUiAutoScanAt=now;
-        wifiUiRestoreStationAfterScan();
-      }
-      tftDirty=true;return;
-    }
-    for(int i=0;i<count && wifiUiCount<48;i++){
-      const String candidate=WiFi.SSID(i);
-      if(candidate.isEmpty()||candidate.length()>32)continue;
-      bool duplicate=false;
-      for(int j=0;j<wifiUiCount;j++)
-        if(wifiUiNetworks[j]==candidate){duplicate=true;break;}
-      if(duplicate)continue;
-      wifiUiNetworks[wifiUiCount]=candidate;
-      wifiUiSignals[wifiUiCount]=WiFi.RSSI(i);
-      ++wifiUiCount;
-    }
-    WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
-    wifiUiStage=wifiUiCount?WIFIUI_NETWORKS:WIFIUI_STATUS;
-    if(!wifiUiCount){wifiUiAutoScanPending=true;wifiUiAutoScanAt=now;}
-    wifiUiMenuIndex=0; // Network list is open immediately, not behind another menu.
-    wifiUiFeedback=wifiUiCount?"Выберите сеть":"Сети не найдены";
-    wifiUiRestoreStationAfterScan();
-    tftDirty=true;
-  }
   if(wifiUiConnectPending && !wifiUiDisablePending && !otaActive &&
-     !busaGoogleNetworkBusy && !busaWifiScanRunning){
+     !busaWifiScanRunning){
     wifiUiConnectPending=false;
     wifiUiResumeStation=false; // a new saved SSID wins over old iPhone
     WiFi.setAutoReconnect(false);
@@ -299,7 +181,7 @@ void wifiUiPoll(){
     tftDirty=true;
   }
   if(wifiUiAssociationDueAt && (int32_t)(now-wifiUiAssociationDueAt)>=0 &&
-     !wifiUiDisablePending && !otaActive && !busaGoogleNetworkBusy){
+     !wifiUiDisablePending && !otaActive){
     wifiUiAssociationDueAt=0;
     if(WiFi.getMode()!=WIFI_AP_STA)WiFi.mode(WIFI_AP_STA);
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
@@ -392,12 +274,8 @@ bool wifiUiKey(int k){
     tftDirty=true;return true;
   }
   if(wifiUiStage==WIFIUI_SCANNING){
-    if(k==15){
-      WiFi.scanDelete();wifiUiOwnsScan=false;busaWifiScanRunning=false;
-      wifiUiScanRetryAt=0;
-      wifiUiStage=WIFIUI_STATUS;wifiUiFeedback="Поиск отменён";
-      wifiUiRestoreStationAfterScan();
-    }else if(k==16||k==18)return false;
+    if(k==15){wifiUiStage=WIFIUI_STATUS;wifiUiFeedback="";wifiUiAutoScanPending=false;}
+    else if(k==16||k==18)return false;
     tftDirty=true;return true;
   }
   // While idle, show just the three actions. No old-router waiting screen.
