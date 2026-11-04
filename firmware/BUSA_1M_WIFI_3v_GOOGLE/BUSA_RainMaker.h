@@ -109,14 +109,11 @@ static void busaRainMakerStart(){
   if(!busaRmQueue)busaRmQueue=xQueueCreate(20,sizeof(BusaRmRequest));
   if(!busaRmQueue){Serial0.println("BUSA RainMaker: no memory for settings queue");return;}
   snprintf(busaRmService,sizeof(busaRmService),"BUSA_%04X",(unsigned)(ESP.getEfuseMac()&0xFFFF));
-  String pop=prefs.getString("rm-pop","");
-  if(pop.length()!=8){
-    char generated[12];
-    snprintf(generated,sizeof(generated),"%08lu",(unsigned long)(esp_random()%100000000UL));
-    pop=generated;
-    prefs.putString("rm-pop",pop);
-  }
-  strncpy(busaRmPoP,pop.c_str(),sizeof(busaRmPoP)-1);
+  // Approved fixed RainMaker BLE proof-of-possession (nine ASCII digits).
+  // Do not read previously generated eight-digit PoP from NVS.
+  constexpr const char *BUSA_RM_FIXED_POP="123456789";
+  strncpy(busaRmPoP,BUSA_RM_FIXED_POP,sizeof(busaRmPoP)-1);
+  busaRmPoP[sizeof(busaRmPoP)-1]='\0';
   Node node=RMaker.initNode("БУСА-1М Монитор");
   if(!node.getNodeHandle()){Serial0.println("BUSA RainMaker: initNode failed");return;}
   for(int i=0;i<4;i++){
