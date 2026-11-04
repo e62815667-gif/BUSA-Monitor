@@ -887,11 +887,11 @@ void keypadAction(int k){
         tftView=1;
         themeDraft=tftThemeMode;
         if(approvedSettingsItem==1){
-          // Enter the five-action Wi-Fi menu without starting a scan.
+          // Physical Wi-Fi opens the network search automatically.
           wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
-          wifiUiFeedback=wifiUiStaDisabled?
-            "Внешняя сеть отключена; AP БУСА работает":
-            (WiFi.status()==WL_CONNECTED?"Подключено: "+WiFi.SSID():"Внешняя сеть не подключена");
+          wifiUiAutoScanPending=true;wifiUiAutoScanAt=0;
+          wifiUiBeginScan();
+          if(wifiUiStage==WIFIUI_SCANNING)wifiUiAutoScanPending=false;
         }
       }else if(approvedSettingsItem==0){
         calEditing=true;calDraft=tempOffset[calSensor];
@@ -1274,13 +1274,8 @@ String consoleLine="",stationSsid="",stationPass="";
 void busaWebScanFinish(){
   WiFi.scanDelete();busaWifiScanRunning=false;busaWebScanPending=false;
   busaWebScanStartDueAt=0;
-  if(busaWebScanResumeSTA && !wifiUiStaDisabled && !wifiUiDisablePending &&
-     !wifiUiConnectPending && !wifiUiAssociationDueAt &&
-     stationSsid.length() && stationPass.length()>=8){
-    WiFi.setAutoReconnect(false); // no endless reconnect to a vanished network
-    WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-    lastStationCheck=millis();
-  }
+  // Do not silently reconnect to the previous network after searching.
+  // The local BUSA access point remains available for selecting another SSID.
   busaWebScanResumeSTA=false;
 }
 String quoteJson(const String &x){
@@ -2259,7 +2254,7 @@ function settingsTab(n,send=true){
  get('settingsBack').hidden=n===-1;
  document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);
  document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));
- if(n===1&&previous!==1)wifiRefreshNetworks();
+ if(n===1&&previous!==1){wifiListHasNetworks=false;wifiRefreshNetworks();}
  // Local settings stay in browser; physical TFT navigation is independent.
 }
 get('settingsBack').onclick=()=>{
@@ -2593,7 +2588,7 @@ get('manualUpdate').onclick=async function(){
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
   this.disabled=false;
 };
-let wifiListBusy=false,wifiListRetryAt=0;
+let wifiListBusy=false,wifiListRetryAt=0,wifiListHasNetworks=false;
 // Opening Wi-Fi settings starts a fresh scan; no extra buttons are needed.
 async function wifiRefreshNetworks(){
  if(wifiListBusy||settingsActive!==1)return;
@@ -2632,11 +2627,13 @@ async function wifiRefreshNetworks(){
      sel.add(new Option(w.ssid,w.ssid));
    });
    if(previous&&seen.has(previous))sel.value=previous;
-   get('response').textContent=seen.size?'':'Сети не найдены. Откройте Wi-Fi ещё раз.';
+   wifiListHasNetworks=seen.size>0;
+   get('response').textContent=seen.size?'':'Поиск сетей...';
  }catch(e){
    if(settingsActive===1){
-     sel.replaceChildren(new Option('Сети не найдены',''));
-     get('response').textContent='Не удалось получить список сетей. Откройте Wi-Fi ещё раз.';
+     sel.replaceChildren(new Option('Поиск сетей...',''));
+     wifiListHasNetworks=false;
+     get('response').textContent='Поиск сетей...';
    }
  }finally{wifiListBusy=false;wifiListRetryAt=Date.now()+15000;}
 }
@@ -2661,8 +2658,8 @@ settingsTab(-1,false);
 message('Веб-приложение запущено');
 showPhoneClock();setInterval(showPhoneClock,1000);
  // Re-scan automatically when no network is selected, without a Search button.
- setInterval(()=>{if(settingsActive===1&&!wifiListBusy&&
-   !get('net').value&&Date.now()>wifiListRetryAt)wifiRefreshNetworks();},5000);
+ setInterval(()=>{if(settingsActive===1&&!wifiListBusy&&!wifiListHasNetworks&&
+   Date.now()>wifiListRetryAt)wifiRefreshNetworks();},5000);
 syncClock();setInterval(syncClock,300000);
 update();setInterval(update,3000);
 </script></body></html>
