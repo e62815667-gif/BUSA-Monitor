@@ -95,7 +95,7 @@ jobs:
           assert 'wifiUiAutoScanPending' in keys
           assert 'WiFi.setAutoReconnect(true)' not in keys
           assert '"Выбрать сеть","Ввести пароль","Подключиться"' in screen
-          assert 'void page(n,send=true)' in main and 'browser' in main
+          assert 'function page(n,send=true)' in main and 'browser' in main
           print('BUSA full feature and RainMaker bridge static checks: OK')
           PY
       - name: Build full ESP32-S3 N16R8 firmware
