@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-AUTOSCAN-20261104";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-AUTOSCAN-STA-20261104";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1277,7 +1277,7 @@ void busaWebScanFinish(){
   if(busaWebScanResumeSTA && !wifiUiStaDisabled && !wifiUiDisablePending &&
      !wifiUiConnectPending && !wifiUiAssociationDueAt &&
      stationSsid.length() && stationPass.length()>=8){
-    WiFi.setAutoReconnect(true);
+    WiFi.setAutoReconnect(false); // no endless reconnect to a vanished network
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
     lastStationCheck=millis();
   }
@@ -1992,10 +1992,10 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
 <span class="readOnlyLabel">● МОНИТОРИНГ</span></div>
 <div id="clockDisplay" class="clockBar" aria-live="off">Время синхронизируется…</div>
-<div class="netIndicators" role="status" aria-label="Три подключения БУСА">
+<div class="netIndicators" role="status" aria-label="Статусы Wi-Fi и Google">
 <span class="netPill"><span id="internetLed" class="netDot"></span>Wi-Fi <span id="internetLabel" class="netText">ОТКЛ</span></span>
 <span class="netPill"><span id="googleLed" class="netDot"></span>Google <span id="googleLabel" class="netText">ОТКЛ</span></span>
-<span class="netPill"><span id="localLed" class="netDot"></span>ESP32 <span id="localLabel" class="netText">ОТКЛ</span></span>
+
 </div>
 <nav class="appTabs" aria-label="Шесть разделов БУСА"><button data-page="0" class="on"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-7h6v7"/></svg><span>Главная</span></button>
 <button data-page="1"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg><span>Температуры</span></button>
@@ -2192,15 +2192,13 @@ let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=
 let active=0,connected=false,pollBusy=false,statusFailures=0,settingsActive=-1,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
 let eventCategory="all",eventRecords=[];
 function networkLeds(info,station,google){
- const wifi=station?.connected===true,local=info?.local_client===true;
+ const wifi=station?.connected===true;
  // 302 means Apps Script accepted the POST redirect; do not treat "configured" as proof.
  const cloud=google?.configured===true&&info?.internet===true&&[200,302].includes(google?.http);
  get('internetLed').classList.toggle('internetOn',wifi);
  get('googleLed').classList.toggle('googleOn',cloud);
- get('localLed').classList.toggle('localOn',local);
  get('internetLabel').textContent=wifi?'ПОДКЛ':'ОТКЛ';
  get('googleLabel').textContent=cloud?'ПОДКЛ':'ОТКЛ';
- get('localLabel').textContent=local?'ПОДКЛ':'ОТКЛ';
 }
 
 let lastDiagnosticReport='';
@@ -2440,7 +2438,7 @@ let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.stat
  'НЕТ СОЕДИНЕНИЯ'+(s.station.target_ssid?' · выбрана '+s.station.target_ssid:'');
 get('wstatus').textContent=ss;
 
-get('mainwifi').textContent='Wi-Fi '+(s.station.connected?'ПОДКЛ':'ОТКЛ')+' · Google '+(s.google?.configured&&s.network_indicators?.internet?'ПОДКЛ':'ОТКЛ')+' · ESP32 '+(s.network_indicators?.local_client?'ПОДКЛ':'ОТКЛ');
+get('mainwifi').textContent='Wi-Fi '+(s.station.connected?'ПОДКЛ':'ОТКЛ')+' · Google '+(s.google?.configured&&s.network_indicators?.internet?'ПОДКЛ':'ОТКЛ');
 // The browser's SSID picker is never automatically populated with old iPhone.
 const cs=s.google;
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
@@ -2595,7 +2593,7 @@ get('manualUpdate').onclick=async function(){
   }catch(e){get('updateResult').textContent='Ошибка: '+e.message}
   this.disabled=false;
 };
-let wifiListBusy=false;
+let wifiListBusy=false,wifiListRetryAt=0;
 // Opening Wi-Fi settings starts a fresh scan; no extra buttons are needed.
 async function wifiRefreshNetworks(){
  if(wifiListBusy||settingsActive!==1)return;
@@ -2640,7 +2638,7 @@ async function wifiRefreshNetworks(){
      sel.replaceChildren(new Option('Сети не найдены',''));
      get('response').textContent='Не удалось получить список сетей. Откройте Wi-Fi ещё раз.';
    }
- }finally{wifiListBusy=false;}
+ }finally{wifiListBusy=false;wifiListRetryAt=Date.now()+15000;}
 }
 get('net').onchange=()=>{get('response').textContent='';};
 get('save').onclick=async function(){
@@ -2662,6 +2660,9 @@ document.documentElement.dataset.theme='system';
 settingsTab(-1,false);
 message('Веб-приложение запущено');
 showPhoneClock();setInterval(showPhoneClock,1000);
+ // Re-scan automatically when no network is selected, without a Search button.
+ setInterval(()=>{if(settingsActive===1&&!wifiListBusy&&
+   !get('net').value&&Date.now()>wifiListRetryAt)wifiRefreshNetworks();},5000);
 syncClock();setInterval(syncClock,300000);
 update();setInterval(update,3000);
 </script></body></html>
@@ -2771,7 +2772,7 @@ void setup(){
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str(),apPassword.c_str());
   if(!wifiUiStaDisabled && stationSsid.length() && stationPass.length()>=8){
-    WiFi.setAutoReconnect(true);
+    WiFi.setAutoReconnect(false); // no endless reconnect to a vanished network
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
     Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
   }else{
@@ -3317,17 +3318,8 @@ void loop(){
   // An abandoned browser scan must never hold Google telemetry disconnected.
   if(busaWifiScanRunning && !wifiUiOwnsScan && busaWifiScanStartedAt &&
      elapsed(now,busaWifiScanStartedAt,27000))busaWebScanFinish();
-  // ESP-IDF auto-reconnect already runs in the Wi-Fi driver. Manual retries
-  // use a 2-min backoff and never interrupt a local AP client, an active
-  // Google HTTPS transfer, or a channel scan.
-  if(!wifiUiStaDisabled && stationSsid.length() && stationPass.length()>=8 &&
-      WiFi.status()!=WL_CONNECTED && !busaWifiScanRunning &&
-      !busaGoogleNetworkBusy && WiFi.softAPgetStationNum()==0 &&
-      elapsed(now,lastStationCheck,120000)){
-    lastStationCheck=now;
-    WiFi.reconnect();
-    Serial0.println("STA reconnect: no local clients, 120s backoff");
-  }
+  // No automatic retry to an old router after a disconnect.
+  // BUSA AP and network selection always remain responsive.
   readConsole();
   busaRainMakerApply(); // Apply queued iPhone settings on the same thread as TFT, NVS and sound
   if(!otaActive)wifiUiPoll(); // nonblocking Wi-Fi scan and password-provisioning on physical TFT
