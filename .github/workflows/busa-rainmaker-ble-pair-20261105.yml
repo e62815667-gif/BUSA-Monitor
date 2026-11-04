@@ -1,10 +1,11 @@
-name: BUSA 1M RainMaker BLE Once Pair USB OTA
+name: BUSA 1M RainMaker BLE Boot Mode USB OTA
 on:
   push:
-    branches: [feat/busa-ble-rainmaker-once-pair-20261105]
+    branches: [fix/busa-rainmaker-ble-staged-start-20261105]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-rainmaker-ble-pair-20261105.yml'
+      - 'ci/ble_cold_start_patch.py'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -51,6 +52,8 @@ jobs:
           dest=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h')
           dest.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+'\n'.join(bundle)+')GOOGLECERT";\n')
           PY
+      - name: Apply isolated Bluetooth initialization
+        run: python3 ci/ble_cold_start_patch.py
       - name: Check RainMaker and partition layout
         run: |
           python3 - <<'PY'
@@ -69,11 +72,11 @@ jobs:
           assert 'RM_THEME' in cloud and 'RM_KEYLEARN' in cloud
           assert 'WiFiProv.beginProvision' in cloud
           assert 'BUSA_RM_FIXED_POP="123456789"' in cloud
-          assert 'rainmakerBootAttempted=false' in main
-          assert 'if(busaRmStartRequested && !rainmakerBootAttempted &&' in main
+          assert 'busaRmBleBootMode=true' in main
+          assert 'if(busaRmStartRequested)' in main
           assert 'static bool busaRmStartRequested=false;' in cloud
           assert '/api/rainmaker/status' in main and '/api/rainmaker/enable' in main
-          assert 'busaRainMakerStart();' not in main.split('void setup(){',1)[1].split('void loop(){',1)[0]
+          assert 'prefs.getBool("rmPairNext",false)' in main
           assert 'RMaker.initNode(' in cloud
           assert 'esp.device.sensor' in cloud
           assert '0x310000, 0x300000' in partition
@@ -112,14 +115,14 @@ jobs:
           assert 'wifiUiStaDisabled=true;wifiUiDisablePending=true;' in main
           assert "get('net').replaceChildren(new Option('Выберите сеть',''))" in main
           assert 'WiFi.disconnect(false,false)' in keys
-          assert '14v9-N16R8-RM-BLE-ONCE-20261105' in main
+          assert '14v9-N16R8-RM-BLE-BOOT-20261105' in main
           assert 'data-stab-btn="7"' in main
           assert 'id="rmStart"' in main
           assert "get('rmStart').onclick" in main
           assert '123456789' in main and 'BUSA_RM_FIXED_POP="123456789"' in cloud
           assert 'server.on("/api/rainmaker/enable",HTTP_POST' in main
           assert 'server.on("/api/rainmaker/status",HTTP_GET' in main
-          assert 'busaRmStartRequested &&' in main
+          assert 'busaRmBleBootMode' in main
           assert 'busaRainMakerProvision();' in main
           assert 'id="disconnectWifi"' in main
           assert 'server.on("/api/wifi/disconnect",HTTP_POST' in main
@@ -137,10 +140,10 @@ jobs:
           ESPTOOL="$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
           test -f "$ESPTOOL"
           SOURCE=out/BUSA_1M_WIFI_3v_GOOGLE.ino
-          cp ${SOURCE}.bin out/BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_WIFI_OTA.bin
+          cp ${SOURCE}.bin out/BUSA_1M_14V9_RM_BLE_BOOT_CHEREZ_WIFI_OTA.bin
           CORE="$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
           python3 "$ESPTOOL" --chip esp32s3 merge_bin \
-            -o out/BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_USB_MERGED.bin \
+            -o out/BUSA_1M_14V9_RM_BLE_BOOT_CHEREZ_USB_MERGED.bin \
             --flash_mode qio --flash_freq 80m --flash_size 16MB \
             0x0 ${SOURCE}.bootloader.bin \
             0x8000 ${SOURCE}.partitions.bin \
@@ -150,8 +153,8 @@ jobs:
           from pathlib import Path
           import hashlib
           p=Path('out')
-          a=p/'BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_WIFI_OTA.bin'
-          u=p/'BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_USB_MERGED.bin'
+          a=p/'BUSA_1M_14V9_RM_BLE_BOOT_CHEREZ_WIFI_OTA.bin'
+          u=p/'BUSA_1M_14V9_RM_BLE_BOOT_CHEREZ_USB_MERGED.bin'
           assert 50000<a.stat().st_size<0x300000
           assert u.stat().st_size > a.stat().st_size
           assert u.stat().st_size < 0x310000
@@ -161,9 +164,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_1M_14V9_RM_BLE_ONCE_USB_WIFI_20261105
+          name: BUSA_1M_14V9_RM_BLE_BOOT_USB_WIFI_20261105
           retention-days: 30
           path: |
-            out/BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_WIFI_OTA.bin
-            out/BUSA_1M_14V9_RM_BLE_ONCE_CHEREZ_USB_MERGED.bin
+            out/BUSA_1M_14V9_RM_BLE_BOOT_CHEREZ_WIFI_OTA.bin
+            out/BUSA_1M_14V9_RM_BLE_BOOT_CHEREZ_USB_MERGED.bin
             out/SHA256SUMS.txt
