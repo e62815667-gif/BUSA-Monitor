@@ -4,6 +4,7 @@
 // No remote process outputs; K1-K4 remain low-voltage audible notification channels only.
 #include <RMaker.h>
 #include <WiFiProv.h>
+#include <wifi_provisioning/manager.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 
