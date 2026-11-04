@@ -1,0 +1,1 @@
+ESP32-S3 BLE commissioning check. Keep the existing network configuration unchanged.
