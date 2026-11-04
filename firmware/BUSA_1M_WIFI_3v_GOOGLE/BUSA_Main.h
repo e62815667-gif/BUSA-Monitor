@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-POP9-DEFER-20261104";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CORE-STABLE-20261104";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -3259,6 +3259,19 @@ void setup(){
     if(n<0||n>1){server.send(400,"text/plain","Bad graph");return;}
     server.send(200,"application/json","{\"ok\":true,\"scope\":\"browser_only\"}");
   });
+  server.on("/api/rainmaker/enable",HTTP_POST,[]{
+    if(!apClient() || server.arg("confirm")!="YES"){
+      server.send(403,"application/json","{\"error\":\"local AP confirmation required\"}");return;
+    }
+    if(busaRmStarted){server.send(200,"application/json","{\"rainmaker\":\"running\"}");return;}
+    busaRmStartRequested=true;
+    server.send(202,"application/json","{\"rainmaker\":\"starting_on_main_loop\",\"warning\":\"experimental\"}");
+  });
+  server.on("/api/rainmaker/status",HTTP_GET,[]{
+    String state=busaRmStarted?"running":(busaRmStartRequested?"requested":"stopped");
+    server.send(200,"application/json",String("{\"rainmaker\":")+quoteJson(state)+
+       ",\"automatic_start\":false,\"pop\":\"123456789\"}");
+  });
   server.on("/api/settings-tab",HTTP_GET,[]{
     int n=server.arg("n").toInt();
     if(n<0||n>4){server.send(400,"text/plain","bad subtab");return;}
@@ -3350,17 +3363,20 @@ void loop(){
     busaLastTftRenderMs=millis()-started;
     busaObserve("TFT",started,busaTftWorstMs);
   }
-  // Keep TFT and local monitoring usable even when BLE provisioning takes time.
-  // Run optional RainMaker once, after a full local frame and 15-second boot grace.
+  // STABILITY BUILD: BUSA must remain a working local monitor even if
+  // RainMaker or BLE provisioning is incompatible with the installed Wi-Fi NVS.
+  // Previously the automatic RainMaker start could trigger ESP_RST_PANIC.
+  // RainMaker is still compiled in, but only starts on an explicit local request.
   static bool rainmakerBootAttempted=false;
-  if(!rainmakerBootAttempted && bootSplashComplete &&
-     (busaTftFullRenderCount>0 || !tftStarted) &&
+  if(!rainmakerBootAttempted && busaRmStartRequested &&
+     bootSplashComplete && busaTftFullRenderCount>0 &&
      elapsed(now,busaBootAt,15000) && !otaActive){
     rainmakerBootAttempted=true;
-    busaReportStage("RAINMAKER_DEFERRED_BEGIN");
+    busaRmStartRequested=false;
+    busaReportStage("RAINMAKER_MANUAL_BEGIN");
     busaRainMakerStart();
     if(busaRmStarted)busaRainMakerProvision();
-    busaReportStage(busaRmStarted?"RAINMAKER_DEFERRED_READY":"RAINMAKER_DEFERRED_FAILED");
+    busaReportStage(busaRmStarted?"RAINMAKER_MANUAL_READY":"RAINMAKER_MANUAL_FAILED");
   }
   // Display updates take priority over peripheral diagnostics.
   if(i2cOnline){
