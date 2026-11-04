@@ -887,11 +887,9 @@ void keypadAction(int k){
         tftView=1;
         themeDraft=tftThemeMode;
         if(approvedSettingsItem==1){
-          // Physical Wi-Fi opens the network search automatically.
+          // Open exactly one finite scan, with no extra search menu.
           wifiUiStage=WIFIUI_STATUS;wifiUiMenuIndex=0;
-          wifiUiAutoScanPending=true;wifiUiAutoScanAt=0;
           wifiUiBeginScan();
-          if(wifiUiStage==WIFIUI_SCANNING)wifiUiAutoScanPending=false;
         }
       }else if(approvedSettingsItem==0){
         calEditing=true;calDraft=tempOffset[calSensor];
@@ -3130,105 +3128,16 @@ void setup(){
   },uploadOTA);
   server.on("/api/wifi/scan",HTTP_GET,[]{
     if(!apClient()){
-      server.send(403,"application/json","{\"error\":\"Only protected local AP\"}");return;
+      server.send(403,"application/json","{\"error\":\"local_only\"}");return;
     }
-    const uint32_t now=millis();
-    // Share one physical radio scan between the TFT and the browser.
-    // An already-running TFT search is not an error for the phone.
-    if(wifiUiOwnsScan || (wifiUiStage==WIFIUI_SCANNING && wifiUiScanRetryAt)){
-      server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
+    // HTTP is read-only except for requesting a single async scan.
+    // Never manipulate the radio inside the browser request.
+    if(server.arg("start")=="1" && !busaWifiRequestSharedScan(false)){
+      server.send(409,"application/json",
+        "{\"scanning\":false,\"networks\":[],\"error\":\"busy\"}");return;
     }
-    if(!busaWifiScanRunning && wifiUiCount>0 &&
-       (uint32_t)(now-wifiUiScanAt)<12000){
-      String out="{\"scanning\":false,\"networks\":[";
-      for(int i=0;i<wifiUiCount;i++){
-        if(i)out+=",";
-        out+="{\"ssid\":"+quoteJson(wifiUiNetworks[i]);
-        out+=",\"rssi\":"+String(wifiUiSignals[i])+"}";
-      }
-      out+="]}";
-      server.send(200,"application/json; charset=utf-8",out);return;
-    }
-    if(server.hasArg("start") && server.arg("start")=="1"){
-      if(!busaWifiScanRunning){
-        if(otaActive || busaGoogleNetworkBusy){
-          server.send(503,"application/json","{\"error\":\"network_busy\"}");return;
-        }
-        if(busaWifiScanLastAt && !elapsed(now,busaWifiScanLastAt,4000)){
-          server.send(429,"application/json","{\"error\":\"repeat_too_soon\"}");return;
-        }
-        if(WiFi.getMode()!=WIFI_AP_STA && !WiFi.mode(WIFI_AP_STA)){
-          server.send(503,"application/json","{\"error\":\"sta_unavailable\"}");return;
-        }
-        WiFi.scanDelete();
-        busaWebScanResumeSTA=!wifiUiStaDisabled && WiFi.status()==WL_CONNECTED &&
-          stationSsid.length() && stationPass.length()>=8;
-        if(WiFi.status()==WL_CONNECTED){
-          WiFi.setAutoReconnect(false);
-          WiFi.disconnect(false,false); // STA only, BUSA softAP remains ON
-        }
-        busaWifiScanLastAt=now;busaWifiScanStartedAt=now;
-        busaWebScanAttempts=0;busaWebScanPassive=false;
-        busaWebScanStartDueAt=now+650;busaWebScanPending=true;
-        busaWifiScanRunning=true;
-      }
-      server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
-    }
-    // A scan is conducted asynchronously by the radio, NOT in the HTTP request.
-    // The browser polls until complete; a disappeared browser is recovered by
-    // loop() timeout after 27 sec to keep Google transmission alive.
-    if(!busaWifiScanRunning){
-      server.send(200,"application/json","{\"scanning\":false,\"networks\":[],\"error\":\"scan_not_started\"}");return;
-    }
-    if(busaWebScanPending){
-      if((int32_t)(now-busaWebScanStartDueAt)<0){
-        server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
-      }
-      busaWebScanPending=false;busaWebScanStartDueAt=0;
-      ++busaWebScanAttempts;
-      WiFi.scanDelete();
-      WiFi.setSleep(false);
-      int started=busaWebScanPassive?
-        WiFi.scanNetworks(true,true,true,350):
-        WiFi.scanNetworks(true,true,false,180);
-      if(started==WIFI_SCAN_FAILED){
-        if(busaWebScanAttempts<2){
-          busaWebScanPassive=true;busaWebScanPending=true;
-          busaWebScanStartDueAt=now+900;
-          server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
-        }
-        busaWebScanFinish();
-        server.send(503,"application/json","{\"error\":\"scan_failed\"}");return;
-      }
-    }
-    const int n=WiFi.scanComplete();
-    if(n==WIFI_SCAN_RUNNING){
-      server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
-    }
-    if(n<=0){
-      WiFi.scanDelete();
-      if(busaWebScanAttempts<2){
-        busaWebScanPassive=true;busaWebScanPending=true;
-        busaWebScanStartDueAt=now+900;
-        server.send(200,"application/json","{\"scanning\":true,\"networks\":[]}");return;
-      }
-      busaWebScanFinish();
-      if(n==0)server.send(200,"application/json","{\"scanning\":false,\"networks\":[]}");
-      else server.send(503,"application/json","{\"error\":\"scan_failed\"}");
-      return;
-    }
-    nearbyCount=0;
-    for(int i=0;i<n && nearbyCount<5;i++)
-      if(WiFi.SSID(i).length())nearbyNames[nearbyCount++]=WiFi.SSID(i);
-    String out="{\"scanning\":false,\"networks\":[";
-    for(int i=0;i<n && i<48;i++){
-      if(i)out+=",";
-      out+="{\"ssid\":"+quoteJson(WiFi.SSID(i));
-      out+=",\"rssi\":"+String(WiFi.RSSI(i))+"}";
-    }
-    out+="]}";
-    busaWebScanFinish(); // restore only previous STA, never change the AP
-    server.send(200,"application/json; charset=utf-8",out);
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json; charset=utf-8",busaWifiScanJSON());
   });
   server.on("/api/wifi",HTTP_POST,[]{
     // Credentials may only be provisioned while connected to the protected local AP.
@@ -3459,9 +3368,8 @@ void loop(){
   const uint32_t tickStart=now;
   soundPoll(now);
   {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
-  // An abandoned browser scan must never hold Google telemetry disconnected.
-  if(busaWifiScanRunning && !wifiUiOwnsScan && busaWifiScanStartedAt &&
-     elapsed(now,busaWifiScanStartedAt,27000))busaWebScanFinish();
+  // One nonblocking driver scan serves both TFT and web UI. Every scan ends.
+  busaWifiScanPoll(now);
   // No automatic retry to an old router after a disconnect.
   // BUSA AP and network selection always remain responsive.
   readConsole();
