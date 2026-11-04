@@ -33,6 +33,24 @@ jobs:
           arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
           arduino-cli lib install "Adafruit ILI9341@1.7.0"
           arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+      - name: Generate verified Google trust anchors
+        run: |
+          python3 - <<'PY'
+          import hashlib,ssl,urllib.request
+          from pathlib import Path
+          fingerprints={
+            'gtsr1':'d947432abde7b7fa90fc2e6b59101b1280e0e1c7e4e40fa3c6887fff57a7f4cf',
+            'gtsr2':'8d25cd97229dbf70356bda4eb3cc734031e24cf00fafcfd32dc76eb5841c7ea8',
+            'gtsr3':'34d8a73ee208d9bcdb0d956520934b4e40e69482596e8b6f73c8426b010a6f48',
+            'gtsr4':'349dfa4058c5e263123b398ae795573c4e1313c83fe68f93556cd5e8031b3c7d'}
+          bundle=[]
+          for name,expected in fingerprints.items():
+            pem=urllib.request.urlopen('https://pki.goog/repo/certs/'+name+'.pem',timeout=20).read().decode()
+            assert hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()==expected,name
+            bundle.append(pem)
+          dest=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h')
+          dest.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\\n'+'\\n'.join(bundle)+')GOOGLECERT";\\n')
+          PY
       - name: Check RainMaker and partition layout
         run: |
           python3 - <<'PY'
