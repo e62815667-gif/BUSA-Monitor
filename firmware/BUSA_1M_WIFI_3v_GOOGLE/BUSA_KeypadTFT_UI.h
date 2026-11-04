@@ -147,13 +147,16 @@ void wifiUiLeave(){
 
 // TFT and browser use ONE async scanner, serviced by BUSA_Main.loop().
 void wifiUiBeginScan(){
-  wifiUiCount=0;wifiUiIndex=0;
+  wifiUiIndex=0;
   wifiUiSelectedSsid="";wifiUiPassword="";wifiUiCursor=0;wifiUiResetTap();
   wifiUiAutoScanPending=false;wifiUiScanRetryAt=0;
   wifiUiMenuIndex=0;
+  // The shared service can reuse a recent completed result.
   if(busaWifiRequestSharedScan(true)){
-    wifiUiStage=WIFIUI_SCANNING;
-    wifiUiFeedback="Поиск сетей...";
+    if(wifiUiStage!=WIFIUI_NETWORKS){
+      wifiUiStage=WIFIUI_SCANNING;
+      wifiUiFeedback="Поиск сетей...";
+    }
   }else{
     wifiUiStage=WIFIUI_STATUS;
     wifiUiFeedback="Поиск недоступен";
