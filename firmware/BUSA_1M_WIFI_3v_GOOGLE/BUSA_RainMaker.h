@@ -92,6 +92,6 @@ static void busaRainMakerPoll(uint32_t now) {
   }
   if(busaRmHealth) {
     busaRmHealth->updateAndReportParam("Uptime Seconds",(int)(now/1000u));
-    busaRmHealth->updateAndReportParam("Keypad Online",pcfOnline);
+    busaRmHealth->updateAndReportParam("Keypad Online",pcfDetected);
   }
 }
