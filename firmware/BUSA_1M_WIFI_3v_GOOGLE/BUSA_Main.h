@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-WIFI-APP-DISCONNECT-20261105";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-BLE-PAIR-20261105";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -2232,6 +2232,7 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <button type="button" data-stab-btn="1" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M2 8c6-5 14-5 20 0M5 12c4-4 10-4 14 0M8 16c2-2 6-2 8 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg></span><span>Wi-Fi</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="2" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg></span><span>Экран</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="3" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M7 19h11a4 4 0 0 0 .5-8A6.5 6.5 0 0 0 6 11a4 4 0 0 0 1 8z"/></svg></span><span>Google</span><span class="approvedArrow">›</span></button>
+<button type="button" data-stab-btn="7" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m7 7 10 10-5 4V3l5 4L7 17"/></svg></span><span>Bluetooth · RainMaker</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="5" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 18v3h16v-3"/></svg></span><span>Обновление ПО</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="6" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 18h4l3-8 4 6 3-4h4"/><circle cx="12" cy="12" r="10"/></svg></span><span>Диагностика</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="4" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/></svg></span><span>О системе</span><span class="approvedArrow">›</span></button></div>
@@ -2274,6 +2275,14 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <button id="googleTest" type="button" class="full">Проверить отправку диагностики</button>
 <button id="googleStop" type="button" class="full">Отключить передачу в Google</button>
 <p id="googleResult" role="status" class="hint">—</p></div>
+
+<div class="card settingCard" data-stab="7" hidden><h2>Bluetooth · ESP RainMaker</h2>
+<p class="hint">Сопряжение БУСА-1М с приложением ESP RainMaker на iPhone. Рабочие настройки Wi-Fi не изменяются.</p>
+<div class="row">Bluetooth / RainMaker <b id="rmState">ПРОВЕРКА</b></div>
+<div class="row">Имя устройства <b id="rmService">—</b></div>
+<div class="row">Код сопряжения (PoP) <b>123456789</b></div>
+<button type="button" class="full" id="rmStart">Включить Bluetooth для подключения</button>
+<p id="rmMessage" class="hint" role="status">Запуск только по нажатию. После запуска открой ESP RainMaker и добавь устройство.</p></div>
 
 <div class="card settingCard" data-stab="4" hidden><h2>О системе</h2>
 <div class="row">Подключение к Wi-Fi <b id="aboutWifi">—</b></div>
@@ -2420,6 +2429,7 @@ function settingsTab(n,send=true){
  document.querySelectorAll('.settingCard').forEach(e=>e.hidden=Number(e.dataset.stab)!==n);
  document.querySelectorAll('[data-stab-btn]').forEach(e=>e.classList.toggle('on',Number(e.dataset.stabBtn)===n));
  if(n===1&&previous!==1)wifiRefreshNetworks();
+ if(n===7&&previous!==7)rainmakerRefreshStatus();
  // Local settings stay in browser; physical TFT navigation is independent.
 }
 get('settingsBack').onclick=()=>{
@@ -2487,6 +2497,39 @@ get('tftTheme').onclick=async()=>{
   get('tftThemeStatus').textContent=await r.text();
   if(r.ok){document.documentElement.dataset.theme=mode==='1'?'dark':mode==='2'?'system':'light';if(active===3)graphs();}
  }catch(e){get('tftThemeStatus').textContent='Ошибка: '+e.message}
+};
+async function rainmakerRefreshStatus(){
+  try{
+    const resp=await fetch('/api/rainmaker/status',{cache:'no-store',signal:AbortSignal.timeout(7000)});
+    if(!resp.ok)throw Error('HTTP '+resp.status);
+    const d=await resp.json();
+    const running=d.rainmaker==='running';
+    get('rmState').textContent=running?'СЛУЖБА ЗАПУЩЕНА':d.rainmaker==='requested'?'ЗАПУСКАЕТСЯ':'ВЫКЛЮЧЕН';
+    get('rmService').textContent=d.service||'BUSA_XXXX';
+    get('rmStart').disabled=running||d.rainmaker==='requested';
+    if(running)get('rmMessage').textContent='RainMaker запущен. В приложении ESP RainMaker добавь устройство через Bluetooth и введи код 123456789. Обнаружение BLE проверяется на iPhone.';
+  }catch(e){
+    get('rmState').textContent='НЕТ ДАННЫХ';
+    get('rmMessage').textContent='Ошибка чтения состояния: '+e.message;
+  }
+}
+get('rmStart').onclick=async function(){
+  this.disabled=true;get('rmState').textContent='ЗАПРОШЕН ЗАПУСК';
+  get('rmMessage').textContent='Запрашиваю запуск Bluetooth / RainMaker...';
+  try{
+    const resp=await fetch('/api/rainmaker/enable',{
+      method:'POST',body:new URLSearchParams({confirm:'YES'}),
+      cache:'no-store',signal:AbortSignal.timeout(8000)});
+    const result=await resp.json();
+    if(!resp.ok)throw Error(result.error||'HTTP '+resp.status);
+    get('rmMessage').textContent='Команда принята. Проверяю запуск.';
+    for(let i=0;i<9&&settingsActive===7;i++){
+      await new Promise(resolve=>setTimeout(resolve,2200));
+      await rainmakerRefreshStatus();
+      if(get('rmState').textContent==='СЛУЖБА ЗАПУЩЕНА')break;
+    }
+  }catch(e){get('rmMessage').textContent='Ошибка запуска: '+e.message}
+  if(get('rmState').textContent!=='СЛУЖБА ЗАПУЩЕНА')this.disabled=false;
 };
 get('tempCalSave').onclick=async()=>{
  const button=get('tempCalSave'),data=new URLSearchParams({confirm:'YES'});
@@ -3408,8 +3451,10 @@ void setup(){
   });
   server.on("/api/rainmaker/status",HTTP_GET,[]{
     String state=busaRmStarted?"running":(busaRmStartRequested?"requested":"stopped");
+    server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json",String("{\"rainmaker\":")+quoteJson(state)+
-       ",\"automatic_start\":false,\"pop\":\"123456789\"}");
+       ",\"automatic_start\":false,\"service\":"+quoteJson(busaRmService)+
+       ",\"pop\":\"123456789\"}");
   });
   server.on("/api/settings-tab",HTTP_GET,[]{
     int n=server.arg("n").toInt();
