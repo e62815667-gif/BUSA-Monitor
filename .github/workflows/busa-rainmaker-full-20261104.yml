@@ -49,7 +49,7 @@ jobs:
             assert hashlib.sha256(ssl.PEM_cert_to_DER_cert(pem)).hexdigest()==expected,name
             bundle.append(pem)
           dest=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h')
-          dest.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\\n'+'\\n'.join(bundle)+')GOOGLECERT";\\n')
+          dest.write_text('const char GOOGLE_TRUST_ANCHOR[] PROGMEM=R"GOOGLECERT(\n'+'\n'.join(bundle)+')GOOGLECERT";\n')
           PY
       - name: Check RainMaker and partition layout
         run: |
