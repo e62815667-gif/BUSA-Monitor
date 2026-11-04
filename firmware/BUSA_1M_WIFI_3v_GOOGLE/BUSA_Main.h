@@ -3301,6 +3301,7 @@ void setup(){
   busaSetupDoneMs=millis()-busaBootAt;
   busaReportStage("SETUP_DONE");
   Serial.printf("BUSA SETUP DONE ms=%lu K1-K4 sound-only\n",(unsigned long)busaSetupDoneMs);
+  Serial0.println("BUSA CORE STABLE: local TFT + AP first; RainMaker manual-only; PoP 123456789");
 }
 void loop(){
   uint32_t now=millis();
