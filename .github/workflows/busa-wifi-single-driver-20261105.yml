@@ -1,7 +1,7 @@
-name: BUSA 1M WiFi Driver Stable ESP32-S3 USB OTA
+name: BUSA 1M WiFi Scan Fix ESP32-S3 USB OTA
 on:
   push:
-    branches: [fix/busa-wifi-single-scanner-driver-20261105]
+    branches: [fix/busa-wifi-abort-pending-sta-20261105]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-wifi-single-driver-20261105.yml'
@@ -87,6 +87,8 @@ jobs:
           assert 'busaWifiRequestSharedScan' in main
           assert 'busaWifiScanPoll(now)' in main
           assert 'busaWifiScanJSON()' in main
+          assert 'busaSharedScanReleasedSTA' in main
+          assert 'busaSharedScanStartResult' in main
           assert 'WIFI_SCAN_RUNNING' in main
           assert 'busaWifiScanPoll(now)' in main.split('void loop(){',1)[1]
           assert 'WiFi.scanNetworks' in main
@@ -118,10 +120,10 @@ jobs:
           ESPTOOL="$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
           test -f "$ESPTOOL"
           SOURCE=out/BUSA_1M_WIFI_3v_GOOGLE.ino
-          cp ${SOURCE}.bin out/BUSA_1M_14V9_WIFI_DRIVER_CHEREZ_WIFI_OTA.bin
+          cp ${SOURCE}.bin out/BUSA_1M_14V9_WIFI_SCANFIX_CHEREZ_WIFI_OTA.bin
           CORE="$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
           python3 "$ESPTOOL" --chip esp32s3 merge_bin \
-            -o out/BUSA_1M_14V9_WIFI_DRIVER_CHEREZ_USB_MERGED.bin \
+            -o out/BUSA_1M_14V9_WIFI_SCANFIX_CHEREZ_USB_MERGED.bin \
             --flash_mode qio --flash_freq 80m --flash_size 16MB \
             0x0 ${SOURCE}.bootloader.bin \
             0x8000 ${SOURCE}.partitions.bin \
@@ -131,8 +133,8 @@ jobs:
           from pathlib import Path
           import hashlib
           p=Path('out')
-          a=p/'BUSA_1M_14V9_WIFI_DRIVER_CHEREZ_WIFI_OTA.bin'
-          u=p/'BUSA_1M_14V9_WIFI_DRIVER_CHEREZ_USB_MERGED.bin'
+          a=p/'BUSA_1M_14V9_WIFI_SCANFIX_CHEREZ_WIFI_OTA.bin'
+          u=p/'BUSA_1M_14V9_WIFI_SCANFIX_CHEREZ_USB_MERGED.bin'
           assert 50000<a.stat().st_size<0x300000
           assert u.stat().st_size > a.stat().st_size
           assert u.stat().st_size < 0x310000
@@ -142,9 +144,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_1M_14V9_WIFI_DRIVER_USB_WIFI_20261105
+          name: BUSA_1M_14V9_WIFI_SCANFIX_USB_WIFI_20261105
           retention-days: 30
           path: |
-            out/BUSA_1M_14V9_WIFI_DRIVER_CHEREZ_WIFI_OTA.bin
-            out/BUSA_1M_14V9_WIFI_DRIVER_CHEREZ_USB_MERGED.bin
+            out/BUSA_1M_14V9_WIFI_SCANFIX_CHEREZ_WIFI_OTA.bin
+            out/BUSA_1M_14V9_WIFI_SCANFIX_CHEREZ_USB_MERGED.bin
             out/SHA256SUMS.txt
