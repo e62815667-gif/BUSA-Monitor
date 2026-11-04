@@ -92,11 +92,12 @@ jobs:
       - name: Produce APP OTA BIN and full USB BIN
         run: |
           set -euo pipefail
-          python3 -m pip install 'esptool==4.8.1'
+          ESPTOOL="$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          test -f "$ESPTOOL"
           SOURCE=out/BUSA_1M_WIFI_3v_GOOGLE.ino
           cp ${SOURCE}.bin out/BUSA_1M_RAINMAKER_POP9_BOOTFIX_APP_OTA.bin
           CORE="$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
-          python3 -m esptool --chip esp32s3 merge_bin \
+          python3 "$ESPTOOL" --chip esp32s3 merge_bin \
             -o out/BUSA_1M_RAINMAKER_POP9_BOOTFIX_USB_MERGED.bin \
             --flash_mode qio --flash_freq 80m --flash_size 16MB \
             0x0 ${SOURCE}.bootloader.bin \
