@@ -1,7 +1,7 @@
-name: BUSA 1M RainMaker POP9 Deferred Boot Fix N16R8
+name: BUSA 1M STABLE CORE no RainMaker Autostart N16R8
 on:
   push:
-    branches: [fix/busa-rainmaker-pop123456789-safe-boot-20261104]
+    branches: [fix/busa-rainmaker-core-stability-20261104]
     paths:
       - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
       - '.github/workflows/busa-rainmaker-pop9-bootfix-20261104.yml'
@@ -70,6 +70,9 @@ jobs:
           assert 'WiFiProv.beginProvision' in cloud
           assert 'BUSA_RM_FIXED_POP="123456789"' in cloud
           assert 'rainmakerBootAttempted=false' in main
+          assert 'if(!rainmakerBootAttempted && busaRmStartRequested &&' in main
+          assert 'static bool busaRmStartRequested=false;' in cloud
+          assert '/api/rainmaker/status' in main
           assert 'busaRainMakerStart();' not in main.split('void setup(){',1)[1].split('void loop(){',1)[0]
           assert 'RMaker.initNode(' in cloud
           assert 'esp.device.sensor' in cloud
@@ -95,10 +98,10 @@ jobs:
           ESPTOOL="$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
           test -f "$ESPTOOL"
           SOURCE=out/BUSA_1M_WIFI_3v_GOOGLE.ino
-          cp ${SOURCE}.bin out/BUSA_1M_RAINMAKER_POP9_BOOTFIX_APP_OTA.bin
+          cp ${SOURCE}.bin out/BUSA_1M_CORE_STABLE_APP_OTA.bin
           CORE="$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
           python3 "$ESPTOOL" --chip esp32s3 merge_bin \
-            -o out/BUSA_1M_RAINMAKER_POP9_BOOTFIX_USB_MERGED.bin \
+            -o out/BUSA_1M_CORE_STABLE_USB_MERGED.bin \
             --flash_mode qio --flash_freq 80m --flash_size 16MB \
             0x0 ${SOURCE}.bootloader.bin \
             0x8000 ${SOURCE}.partitions.bin \
@@ -108,8 +111,8 @@ jobs:
           from pathlib import Path
           import hashlib
           p=Path('out')
-          a=p/'BUSA_1M_RAINMAKER_POP9_BOOTFIX_APP_OTA.bin'
-          u=p/'BUSA_1M_RAINMAKER_POP9_BOOTFIX_USB_MERGED.bin'
+          a=p/'BUSA_1M_CORE_STABLE_APP_OTA.bin'
+          u=p/'BUSA_1M_CORE_STABLE_USB_MERGED.bin'
           assert 50000<a.stat().st_size<0x300000
           assert u.stat().st_size > a.stat().st_size
           assert u.stat().st_size < 0x310000
@@ -119,9 +122,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_1M_RAINMAKER_POP9_BOOTFIX_USB_OTA_20261104
+          name: BUSA_1M_CORE_STABLE_USB_OTA_20261104
           retention-days: 30
           path: |
-            out/BUSA_1M_RAINMAKER_POP9_BOOTFIX_APP_OTA.bin
-            out/BUSA_1M_RAINMAKER_POP9_BOOTFIX_USB_MERGED.bin
+            out/BUSA_1M_CORE_STABLE_APP_OTA.bin
+            out/BUSA_1M_CORE_STABLE_USB_MERGED.bin
             out/SHA256SUMS.txt
