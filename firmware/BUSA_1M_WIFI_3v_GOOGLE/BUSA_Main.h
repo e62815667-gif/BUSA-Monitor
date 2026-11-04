@@ -47,7 +47,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-BLE-PAIR-20261105";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-BLE-ONCE-20261105";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -2277,12 +2277,14 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <p id="googleResult" role="status" class="hint">—</p></div>
 
 <div class="card settingCard" data-stab="7" hidden><h2>Bluetooth · ESP RainMaker</h2>
-<p class="hint">Сопряжение БУСА-1М с приложением ESP RainMaker на iPhone. Рабочие настройки Wi-Fi не изменяются.</p>
-<div class="row">Bluetooth / RainMaker <b id="rmState">ПРОВЕРКА</b></div>
-<div class="row">Имя устройства <b id="rmService">—</b></div>
-<div class="row">Код сопряжения (PoP) <b>123456789</b></div>
-<button type="button" class="full" id="rmStart">Включить Bluetooth для подключения</button>
-<p id="rmMessage" class="hint" role="status">Запуск только по нажатию. После запуска открой ESP RainMaker и добавь устройство.</p></div>
+<div class="row">Состояние Bluetooth <b id="rmState">ПРОВЕРКА</b></div>
+<div class="row">Имя устройства БУСА <b id="rmService">—</b></div>
+<div class="row">Пароль сопряжения (PoP) <b>123456789</b></div>
+<p class="hint">БУСА передаёт сигнал BLE, а iPhone находит её в ESP RainMaker. Сопряжение необходимо один раз.</p>
+<button type="button" class="full" id="rmStart">Включить Bluetooth · Сопряжение</button>
+<button type="button" class="full" id="rmStop">Отключить Bluetooth</button>
+<button type="button" class="full" id="rmCheck">Обновить состояние Bluetooth</button>
+<p id="rmMessage" class="hint" role="status">Рабочий Wi-Fi сохранён. На время первого BLE-сопряжения локальная сеть БУСА может временно исчезнуть; после завершения или через 3 минуты она восстановится.</p></div>
 
 <div class="card settingCard" data-stab="4" hidden><h2>О системе</h2>
 <div class="row">Подключение к Wi-Fi <b id="aboutWifi">—</b></div>
@@ -2499,38 +2501,48 @@ get('tftTheme').onclick=async()=>{
  }catch(e){get('tftThemeStatus').textContent='Ошибка: '+e.message}
 };
 async function rainmakerRefreshStatus(){
-  try{
-    const resp=await fetch('/api/rainmaker/status',{cache:'no-store',signal:AbortSignal.timeout(7000)});
-    if(!resp.ok)throw Error('HTTP '+resp.status);
-    const d=await resp.json();
-    const running=d.rainmaker==='running';
-    get('rmState').textContent=running?'СЛУЖБА ЗАПУЩЕНА':d.rainmaker==='requested'?'ЗАПУСКАЕТСЯ':'ВЫКЛЮЧЕН';
-    get('rmService').textContent=d.service||'BUSA_XXXX';
-    get('rmStart').disabled=running||d.rainmaker==='requested';
-    if(running)get('rmMessage').textContent='RainMaker запущен. В приложении ESP RainMaker добавь устройство через Bluetooth и введи код 123456789. Обнаружение BLE проверяется на iPhone.';
-  }catch(e){
-    get('rmState').textContent='НЕТ ДАННЫХ';
-    get('rmMessage').textContent='Ошибка чтения состояния: '+e.message;
-  }
+ try{
+  const resp=await fetch('/api/rainmaker/status',{cache:'no-store',signal:AbortSignal.timeout(6500)});
+  if(!resp.ok)throw Error('HTTP '+resp.status);
+  const d=await resp.json();
+  const active=d.ble==='advertising'||d.ble==='starting'||d.ble==='stopping';
+  get('rmState').textContent=d.ble==='advertising'?'ВКЛ · ОЖИДАЕТ iPHONE':
+    d.ble==='starting'?'ЗАПУСКАЕТСЯ':d.ble==='stopping'?'ВЫКЛЮЧАЕТСЯ':
+    d.ble==='done'?'СОПРЯЖЕНИЕ ЗАВЕРШЕНО':d.ble==='error'?'ОШИБКА':'ВЫКЛ';
+  get('rmService').textContent=d.service||'BUSA_XXXX';
+  get('rmStart').disabled=active||d.ble==='done';
+  get('rmStop').disabled=!active;
+  if(d.feedback)get('rmMessage').textContent=d.feedback;
+ }catch(e){
+  get('rmState').textContent='НЕТ СВЯЗИ С БУСА';
+  get('rmMessage').textContent='Во время BLE-сопряжения локальная Wi-Fi сеть временно недоступна. Открой ESP RainMaker и добавь устройство; после сопряжения сеть восстановится.';
+ }
 }
 get('rmStart').onclick=async function(){
-  this.disabled=true;get('rmState').textContent='ЗАПРОШЕН ЗАПУСК';
-  get('rmMessage').textContent='Запрашиваю запуск Bluetooth / RainMaker...';
-  try{
-    const resp=await fetch('/api/rainmaker/enable',{
-      method:'POST',body:new URLSearchParams({confirm:'YES'}),
-      cache:'no-store',signal:AbortSignal.timeout(8000)});
-    const result=await resp.json();
-    if(!resp.ok)throw Error(result.error||'HTTP '+resp.status);
-    get('rmMessage').textContent='Команда принята. Проверяю запуск.';
-    for(let i=0;i<9&&settingsActive===7;i++){
-      await new Promise(resolve=>setTimeout(resolve,2200));
-      await rainmakerRefreshStatus();
-      if(get('rmState').textContent==='СЛУЖБА ЗАПУЩЕНА')break;
-    }
-  }catch(e){get('rmMessage').textContent='Ошибка запуска: '+e.message}
-  if(get('rmState').textContent!=='СЛУЖБА ЗАПУЩЕНА')this.disabled=false;
+ this.disabled=true;get('rmState').textContent='ЗАПУСКАЕТСЯ';
+ get('rmMessage').textContent='Включаю Bluetooth. Дальше открой ESP RainMaker → Добавить устройство → Bluetooth, выбери BUSA_XXXX и введи 123456789.';
+ try{
+  const resp=await fetch('/api/rainmaker/enable',{method:'POST',
+    body:new URLSearchParams({confirm:'YES'}),cache:'no-store',signal:AbortSignal.timeout(7000)});
+  const d=await resp.json();
+  if(!resp.ok)throw Error(d.error||'HTTP '+resp.status);
+  get('rmMessage').textContent='Запуск принят. Перейди в ESP RainMaker на iPhone. Пароль BLE: 123456789. Временный разрыв локального Wi-Fi возможен.';
+ }catch(e){
+  get('rmMessage').textContent='Ошибка запуска: '+e.message;this.disabled=false;
+ }
 };
+get('rmStop').onclick=async function(){
+ this.disabled=true;
+ try{
+  const resp=await fetch('/api/rainmaker/disable',{method:'POST',
+    body:new URLSearchParams({confirm:'YES'}),cache:'no-store',signal:AbortSignal.timeout(7000)});
+  const d=await resp.json();
+  if(!resp.ok)throw Error(d.error||'HTTP '+resp.status);
+  get('rmMessage').textContent='Команда отключения BLE принята. Локальная сеть БУСА останется/станет доступной.';
+ }catch(e){get('rmMessage').textContent='Ошибка отключения: '+e.message}
+ await rainmakerRefreshStatus();
+};
+get('rmCheck').onclick=()=>rainmakerRefreshStatus();
 get('tempCalSave').onclick=async()=>{
  const button=get('tempCalSave'),data=new URLSearchParams({confirm:'YES'});
  for(let i=0;i<4;i++){
@@ -3445,14 +3457,45 @@ void setup(){
     if(!apClient() || server.arg("confirm")!="YES"){
       server.send(403,"application/json","{\"error\":\"local AP confirmation required\"}");return;
     }
-    if(busaRmStarted){server.send(200,"application/json","{\"rainmaker\":\"running\"}");return;}
+    if(otaActive||busaWifiScanRunning){
+      server.send(409,"application/json","{\"error\":\"OTA or Wi-Fi scan busy\"}");return;
+    }
+    if(busaRmBleSessionStarted||busaRmStartRequested){
+      server.send(200,"application/json","{\"bluetooth\":\"already_requested\"}");return;
+    }
+    if(busaRmBleEverCompleted){
+      server.send(409,"application/json","{\"error\":\"already paired; reboot device for a new BLE session\"}");return;
+    }
     busaRmStartRequested=true;
-    server.send(202,"application/json","{\"rainmaker\":\"starting_on_main_loop\",\"warning\":\"experimental\"}");
+    busaRmBleSessionRequested=true;
+    busaRmBleFeedback="Запуск BLE по запросу из локального приложения";
+    server.sendHeader("Cache-Control","no-store");
+    server.send(202,"application/json","{\"bluetooth\":\"starting\",\"pop\":\"123456789\",\"duration_sec\":180}");
+  });
+  server.on("/api/rainmaker/disable",HTTP_POST,[]{
+    if(!apClient() || server.arg("confirm")!="YES"){
+      server.send(403,"application/json","{\"error\":\"local AP confirmation required\"}");return;
+    }
+    // The AP can be temporarily absent during BLE pairing, so the timeout
+    // also stops BLE when a stop request cannot be submitted over Wi-Fi.
+    if(!busaRmBleSessionStarted){
+      busaRmStartRequested=false;busaRmBleSessionRequested=false;
+      busaRmBleFeedback="Bluetooth выключен";
+      server.send(200,"application/json","{\"bluetooth\":\"off\"}");return;
+    }
+    busaRmBleTimeoutPending=true;
+    server.send(202,"application/json","{\"bluetooth\":\"stopping\"}");
   });
   server.on("/api/rainmaker/status",HTTP_GET,[]{
-    String state=busaRmStarted?"running":(busaRmStartRequested?"requested":"stopped");
+    const String ble=busaRmBleSessionStarted?
+      (busaRmBleEnded||busaRmBleTimeoutPending?"stopping":
+       (busaRmBleAdvertising?"advertising":"starting")):
+      (busaRmBleEverCompleted?"done":"off");
+    const String state=busaRmStarted?"running":(busaRmStartRequested?"requested":"stopped");
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json",String("{\"rainmaker\":")+quoteJson(state)+
+       ",\"ble\":"+quoteJson(ble)+
+       ",\"feedback\":"+quoteJson(busaRmBleFeedback)+
        ",\"automatic_start\":false,\"service\":"+quoteJson(busaRmService)+
        ",\"pop\":\"123456789\"}");
   });
@@ -3538,20 +3581,63 @@ void loop(){
     busaLastTftRenderMs=millis()-started;
     busaObserve("TFT",started,busaTftWorstMs);
   }
-  // STABILITY BUILD: BUSA must remain a working local monitor even if
-  // RainMaker or BLE provisioning is incompatible with the installed Wi-Fi NVS.
-  // Previously the automatic RainMaker start could trigger ESP_RST_PANIC.
-  // RainMaker is still compiled in, but only starts on an explicit local request.
+  // RainMaker BLE is started ONLY after explicit local app authorization.
+  // The existing Wi-Fi scan, connect, NVS, and SoftAP routines are unchanged.
   static bool rainmakerBootAttempted=false;
-  if(!rainmakerBootAttempted && busaRmStartRequested &&
+  if(busaRmStartRequested && !rainmakerBootAttempted &&
      bootSplashComplete && busaTftFullRenderCount>0 &&
      elapsed(now,busaBootAt,15000) && !otaActive){
-    rainmakerBootAttempted=true;
     busaRmStartRequested=false;
-    busaReportStage("RAINMAKER_MANUAL_BEGIN");
+    rainmakerBootAttempted=true;
+    busaReportStage("RAINMAKER_BLE_MANUAL_BEGIN");
     busaRainMakerStart();
     if(busaRmStarted)busaRainMakerProvision();
-    busaReportStage(busaRmStarted?"RAINMAKER_MANUAL_READY":"RAINMAKER_MANUAL_FAILED");
+    else{
+      busaRmBleSessionRequested=false;
+      busaRmBleFeedback="Не удалось запустить RainMaker. Сохранённая версия Wi-Fi не затронута";
+    }
+    busaReportStage(busaRmStarted?"RAINMAKER_BLE_MANUAL_READY":"RAINMAKER_BLE_MANUAL_FAILED");
+  }
+  // When pairing finishes or times out, end provisioning then restore
+  // the BUSA AP+STA network from separately saved preferences.
+  static bool bleStopIssued=false;
+  static uint32_t bleRestoreAfter=0;
+  if(busaRmBleSessionStarted){
+    const uint32_t duration=millis()-busaRmBleSessionAt;
+    if(duration>BUSA_BLE_PAIR_TIMEOUT_MS && !busaRmBleTimeoutPending){
+      busaRmBleTimeoutPending=true;
+      busaRmBleFeedback="Время сопряжения истекло; восстанавливаю Wi-Fi";
+    }
+    if(busaRmBleTimeoutPending && !bleStopIssued){
+      bleStopIssued=true;
+      wifi_prov_mgr_stop_provisioning();
+      bleRestoreAfter=millis()+2500;
+    }
+    if(busaRmBleEnded && bleRestoreAfter==0)bleRestoreAfter=millis()+2200;
+    if(bleRestoreAfter && (int32_t)(millis()-bleRestoreAfter)>=0){
+      busaRmBleEverCompleted=busaRmBleCredentialsAccepted;
+      busaRmBleSessionStarted=false;
+      busaRmBleSessionRequested=false;
+      busaRmBleAdvertising=false;
+      busaRmBleEnded=false;
+      busaRmBleTimeoutPending=false;
+      bleStopIssued=false;bleRestoreAfter=0;
+      // WiFiProv only affects ESP-IDF Wi-Fi provisioning; BUSA Preferences
+      // still hold the proven local SSID/password and manual STA-off flag.
+      // Restore the original AP at 192.168.4.1 as before the one-time session.
+      WiFi.mode(WIFI_AP_STA);
+      WiFi.setSleep(false);
+      wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
+      WiFi.setAutoReconnect(false);
+      if(!wifiUiStaDisabled && stationSsid.length() && stationPass.length()>=8){
+        WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+      }
+      busaRmBleFeedback=busaRmBleEverCompleted?
+         "Bluetooth-сопряжение закончено. Wi-Fi БУСА восстановлен. Проверь устройство в ESP RainMaker":
+         "Bluetooth выключен. Локальный Wi-Fi БУСА восстановлен";
+      Serial0.printf("BUSA BLE pairing done=%d AP restored=%d\n",
+        (int)busaRmBleEverCompleted,(int)wifiRunning);
+    }
   }
   // Display updates take priority over peripheral diagnostics.
   if(i2cOnline){
