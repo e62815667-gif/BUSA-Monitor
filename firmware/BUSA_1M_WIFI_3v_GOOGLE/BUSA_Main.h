@@ -1300,8 +1300,16 @@ String quoteJson(const String &x){
 
 bool busaWifiRequestSharedScan(bool physical){
   const uint32_t now=millis();
-  if(otaActive || wifiUiConnectPending || wifiUiAssociationDueAt || wifiUiConnectAt)
-    return false;
+  if(otaActive)return false;
+  // Selecting Wi-Fi must work even when an earlier association is still pending.
+  // Cancel the old attempt; never turn off BUSA's separate local access point.
+  const bool pendingAssociation=wifiUiConnectPending || wifiUiAssociationDueAt ||
+                                wifiUiConnectAt;
+  if(pendingAssociation){
+    wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
+    WiFi.setAutoReconnect(false);
+    if(WiFi.status()!=WL_CONNECTED)WiFi.disconnect(false,false);
+  }
   if(physical)busaSharedScanForTft=true;
   if(busaSharedScanState==BUSA_SCAN_REQUESTED || busaSharedScanState==BUSA_SCAN_RUNNING)
     return true;
@@ -1317,7 +1325,7 @@ bool busaWifiRequestSharedScan(bool physical){
     return true;
   }
   busaSharedScanAttempt=0;
-  busaSharedScanRetryDueAt=0;
+  busaSharedScanRetryDueAt=pendingAssociation?now+350:0;
   busaSharedScanError="";
   busaSharedScanState=BUSA_SCAN_REQUESTED;
   busaWifiScanRunning=true;
