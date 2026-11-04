@@ -37,6 +37,7 @@ static TemperatureSensor* busaRmTemps[4]={nullptr,nullptr,nullptr,nullptr};
 static Device *busaRmHealth=nullptr,*busaRmWater=nullptr,*busaRmScreen=nullptr,*busaRmKeys=nullptr;
 static bool busaRmStarted=false;
 static uint32_t busaRmLastSent=0,busaRmLastSettingsSent=0;
+static uint8_t busaRmSettingsCursor=0;
 static char busaRmService[24]={};
 static char busaRmPoP[16]={};
 
@@ -230,12 +231,14 @@ static void busaRainMakerApply(){
       if(q.action==8&&q.b){
         if(pcfDetected){startKeyLearning();ok=true;}
       }else if(q.action==9&&q.b){
-        keypadLearning=false;keypadReady=keypadBackupOpen||keypadReady;
+        keypadLearning=false;learnStep=0;candidatePair=-1;candidateStep=255;
+        keypadMessage=keypadReady?"Сохранённая раскладка сохранена":"Обучение отменено";
         tftDirty=true;ok=true;
       }
     }
     if(!ok)Serial0.printf("BUSA RainMaker: rejected target=%u action=%u\n",(unsigned)q.target,(unsigned)q.action);
     // Publish the actual local values after each attempted write, not the untrusted requested value.
+    busaRmSettingsCursor=(uint8_t)q.target;
     busaRmLastSettingsSent=0;
   }
 }
@@ -243,9 +246,13 @@ static void busaRainMakerPoll(uint32_t now){
   if(!busaRmStarted||WiFi.status()!=WL_CONNECTED||otaActive||
      busaGoogleNetworkBusy||busaWifiScanRunning)return;
   // Settings sync also reflects changes made via keyboard or original local web UI.
-  if(!busaRmLastSettingsSent||elapsed(now,busaRmLastSettingsSent,12000)){
+  // One device per interval avoids flooding MQTT and stalling local TFT/I2C.
+  if(!busaRmLastSettingsSent||elapsed(now,busaRmLastSettingsSent,2500)){
     busaRmLastSettingsSent=now;
-    for(int i=0;i<4;i++)if(busaRmTemps[i]){
+    const uint8_t slot=busaRmSettingsCursor;
+    busaRmSettingsCursor=(busaRmSettingsCursor+1)%6;
+    if(slot<4&&busaRmTemps[slot]){
+      const int i=slot;
       const float on=refTemp[i],off=noticeTemp[i];
       busaRmTemps[i]->updateAndReportParam(RM_ON,isfinite(on)?on:0.0f);
       busaRmTemps[i]->updateAndReportParam(RM_OFF,isfinite(off)?off:0.0f);
@@ -260,12 +267,12 @@ static void busaRainMakerPoll(uint32_t now){
       }
       if(i==3)busaRmTemps[i]->updateAndReportParam(RM_K4,soundEnabled[3]);
     }
-    if(busaRmScreen){
+    if(slot==4&&busaRmScreen){
       busaRmScreen->updateAndReportParam(RM_THEME,(int)tftThemeMode);
       busaRmScreen->updateAndReportParam(RM_SCREEN,!tftDisplayOff);
       busaRmScreen->updateAndReportParam(RM_PAGE,(int)currentPage);
     }
-    if(busaRmKeys){
+    if(slot==5&&busaRmKeys){
       busaRmKeys->updateAndReportParam("Раскладка сохранена",keypadReady);
       busaRmKeys->updateAndReportParam("Обучение идет",keypadLearning);
       busaRmKeys->updateAndReportParam("Следующая клавиша",keypadLearning?(int)learnStep+1:0);
