@@ -79,7 +79,7 @@ header h1,header small{color:#f1f9ff}
 nav,:root[data-theme="dark"] nav{background:#041528;border-color:#177bcd}
 nav button,:root[data-theme="dark"] nav button{background:#06182b;color:#d0eaff;border-color:#17466e}
 nav button.active,:root[data-theme="dark"] nav button.active{background:linear-gradient(140deg,#1678f9,#0954cd);color:#fff;border-color:#0bc7ff}
-</style></head><body>
+</style><link rel="stylesheet" href="./calculator.css?v=CALC1"></head><body>
 <header><h1>БУСА-1М №001</h1><small>Монитор · iPhone · две цветные темы</small>
 <div id="connectStatus" role="status"><span class="netChip"><span id="netInternet" class="netBulb"></span>ИНТЕРНЕТ <span id="netInternetText">проверка</span></span>
 <span class="netChip"><span id="netLocal" class="netBulb"></span>БУСА Wi-Fi <span id="netLocalText">нет прямой связи</span></span></div>
@@ -169,8 +169,8 @@ nav button.active,:root[data-theme="dark"] nav button.active{background:linear-g
 <div data-chart-panel="2" hidden><p class="warn">Датчик отбора отсутствует. График не формируется.</p></div>
 </div></section>
 <section id="events" hidden><div class="card"><h2>Журнал событий</h2><p class="muted">Для просмотра текущих событий и ошибок PCF8575, DS18B20, YF-S401 открой локальную панель БУСА.</p></div></section>
-</main>
-<nav aria-label="Разделы"><button data-tab="home" class="active">Главная</button><button data-tab="temps">T1–T4</button><button data-tab="collection">Отбор</button><button data-tab="settings">Настройки</button><button data-tab="graphs">Графики</button><button data-tab="events">События</button></nav>
+<section id="calculator" hidden><div id="busaCalculator"></div></section></main>
+<nav aria-label="Разделы"><button data-tab="home" class="active">Главная</button><button data-tab="temps">T1–T4</button><button data-tab="collection">Отбор</button><button data-tab="settings">Настройки</button><button data-tab="graphs">Графики</button><button data-tab="events">События</button><button data-tab="calculator">Калькулятор</button></nav>
 <script>
 (function(){function clock(){const c=document.getElementById("refClock");if(c)c.textContent=new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});}clock();setInterval(clock,30000);})();
 // Change the standalone iPhone page's palette only; the TFT palette is
@@ -219,5 +219,7 @@ async function networkCheck(){
   }
 }
 networkCheck();setInterval(networkCheck,15000);
-if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
-</script></body></html>
+if('serviceWorker' in navigator){const hadController=Boolean(navigator.serviceWorker.controller);let calcReloading=false;
+ if(hadController)navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!calcReloading){calcReloading=true;location.reload();}});
+ navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+</script><script src="./calculator.js?v=CALC1"></script></body></html>

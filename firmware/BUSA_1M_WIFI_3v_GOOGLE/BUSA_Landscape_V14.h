@@ -6,8 +6,8 @@
 extern volatile bool googleEnabled;
 extern volatile int googleState;
 extern volatile int googleInternet;
-static const char* const v14FooterSectionNames[7]={
- "Главная","Температуры","Отбор","Графики","События","Настройки","Диагностика"
+static const char* const v14FooterSectionNames[8]={
+ "Главная","Температуры","Отбор","Графики","События","Настройки","Диагностика","Калькулятор"
 };
 // V14 palette is software-defined. DO NOT use ST7789 invertDisplay(): it
 // inverts every accent and destroys the colored illustration.
@@ -173,7 +173,7 @@ static void v14Frame(uint32_t now){
   const int sectionX=139,sectionW=92;
   screen->fillRoundRect(sectionX,215,sectionW,22,4,V14_BADGE);
   screen->drawRoundRect(sectionX,215,sectionW,22,4,V14_ORANGE);
-  const char* section=v14FooterSectionNames[currentPage<7?currentPage:0];
+  const char* section=v14FooterSectionNames[currentPage<8?currentPage:0];
   ru.setFont(u8g2_font_5x7_t_cyrillic);
   const int sectionTextW=ru.getUTF8Width(section);
   v14Tiny(section,sectionX+max(2,(sectionW-sectionTextW)/2),229,V14_TEXT);
@@ -555,6 +555,7 @@ void renderLandscape(uint32_t now){
     case 4:v14Events(true);break;
     case 5:v14Settings(true);break;
     case 6:v14Diagnostics(true);break;
+    case 7:busaCalcDraw();break;
   }
   tftDirty=false;
 }

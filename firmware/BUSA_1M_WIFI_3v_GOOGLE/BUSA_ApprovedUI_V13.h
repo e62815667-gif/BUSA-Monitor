@@ -83,17 +83,17 @@ static void v13Frame(uint32_t now){
   v13Text("E",130,18,WHITE);
   // Local STA status and clock; never infer that the AP is connected to the Internet.
   v13Text(deviceClockValid()?clockStamp(true):"--:--",165,18,GRAY);
-  const char* tab[]={"Глав","Темп","Отбор","Граф","Событ","Настр","Диаг"};
+  const char* tab[]={"Глав","Темп","Отбор","Граф","Событ","Настр","Диаг","Кал"};
   screen->fillRect(0,276,240,44,PANEL);
   v13Line(0,276,240);
-  for(int i=0;i<7;i++){
-    const int x=i*34;
+  for(int i=0;i<8;i++){
+    const int x=i*30;
     if(i==currentPage){
-      screen->fillRoundRect(x+2,279,31,39,4,BLUE);
-      v13Line(x+3,279,28,V13_CYAN);
+      screen->fillRoundRect(x+2,279,27,39,4,BLUE);
+      v13Line(x+3,279,24,V13_CYAN);
     }
     // Compact pictograms are rendered as vector primitives, not Unicode emoji.
-    const int cx=x+17,cy=288;
+    const int cx=x+15,cy=288;
     switch(i){
       case 0: screen->drawTriangle(cx-7,cy,cx,cy-6,cx+7,cy,WHITE);screen->drawRect(cx-5,cy,10,9,WHITE);break;
       case 1: screen->drawRoundRect(cx-3,cy-7,6,16,3,V13_CYAN);screen->fillCircle(cx,cy+6,3,V13_CYAN);break;
@@ -449,6 +449,7 @@ void renderPortrait(uint32_t now){
     case 4:v13EventsPage(layout);break;
     case 5:v13Settings(now,layout);break;
     case 6:v13Diagnostics(now,layout);break;
+    case 7:if(layout)busaCalcDraw();break;
     default:break;
   }
   // Refresh status dots with no full-screen redraw, preserving W/G/E labels.

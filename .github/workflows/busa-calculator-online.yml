@@ -1,0 +1,51 @@
+name: Publish BUSA Calculator online
+on:
+  push:
+    branches: [feat/busa-calculator-20261105]
+    paths: ['index.html','calculator.js','calculator.css','sw.js','manifest.webmanifest','.github/workflows/busa-calculator-online.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and prepare read-only online application
+        run: |
+          node --check calculator.js
+          node --check sw.js
+          python3 -B ci/generate_calculator.py --check
+          python3 -B tests/test_calculator.py
+          mkdir -p online/third_party/alcoholometry-core
+          cp index.html calculator.js calculator.css sw.js manifest.webmanifest online/
+          cp third_party/alcoholometry-core/LICENSE online/third_party/alcoholometry-core/
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: online
+      - uses: actions/deploy-pages@v4
+        id: deployment
+      - name: Check published calculator and record URL
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          curl --fail --retry 5 --retry-delay 5 "$PAGE_URL" -o /tmp/busa-online.html
+          python3 - <<'PY'
+          from pathlib import Path
+          assert 'busaCalculator' in Path('/tmp/busa-online.html').read_text()
+          PY
+          curl --fail --retry 3 "${PAGE_URL}calculator.js?v=CALC1" -o /tmp/busa-calculator.js
+          cmp /tmp/busa-calculator.js calculator.js
+          printf 'Published calculator: %s\n' "$PAGE_URL" >> "$GITHUB_STEP_SUMMARY"

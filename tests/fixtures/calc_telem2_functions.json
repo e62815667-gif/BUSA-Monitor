@@ -1,0 +1,14 @@
+{
+  "void sampleTemperatures(uint32_t now)": "2b6adb858bab1402c1ac91f7e08137aa8597e7ad938369f9b1b3d37e455d5bf6",
+  "void probeOneWire(uint32_t now)": "3616b4fd432e5c00679edf575387c3e29ee5fafcbc2da822dd1e3368c05c135b",
+  "bool hasTemp(int n,uint32_t now){": "4b2c4a9c2d3efaaa860e2067efe6e9f187d1031c8a93da67d4e3efd8dcb6c8fc",
+  "void IRAM_ATTR flowISR()": "1bd526f55f07e88cc93669e17e9ceabcd5ded0b3b342df68c3a7ef2360bfe735",
+  "void sampleFlow(uint32_t now)": "639f70bb14916dc09c6d9e68d0ae83bf065d0661ddfcd2e03182aa99701186bf",
+  "bool busaI2cExchange(": "b75c76c83f0f365aa680e97c590c11cd36c1fca6913c8e9d9c4460d4c58e1a9a",
+  "bool pcfWrite(": "368d377e4f8ca4837d69aa23f367bb39ba307104cd38899442fc1923d903de86",
+  "bool pcfRead(": "d92d118a0ac7b1fbff0e031465a05a1eef77c79aea24289e31da23713f560521",
+  "bool saveTempOffset(": "f982e48a132cc86aa9f899456547f4ced61d76070e1c6982a2321f1160e6e290",
+  "bool saveThemeMode(": "365ba5ebfb0e80b3c5ab272472b6812ccc24f51ffbf1bfcd857e23df179627f2",
+  "void uploadOTA()": "01301f1c787c6564fdc0f4f566e1b5c939d5de707d6a27cdc90f3c6413b5e1c4",
+  "bool storeTempReference(int sensor,int field,float value){": "26eca912fb7ecbbef8934188ecc3869a0721564b1b65268a790df127f8ae35b7"
+}

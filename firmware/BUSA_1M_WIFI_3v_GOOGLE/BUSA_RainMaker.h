@@ -188,7 +188,7 @@ static void busaRainMakerStart(){
   busaRmScreen=new Device("Экран БУСА","esp.device.sensor");
   if(busaRmScreen){
     busaRmAddInt(busaRmScreen,RM_THEME,(int)tftThemeMode,0,2);
-    busaRmAddInt(busaRmScreen,RM_PAGE,(int)currentPage,0,6);
+    busaRmAddInt(busaRmScreen,RM_PAGE,(int)currentPage,0,7);
     busaRmAddSwitch(busaRmScreen,RM_SCREEN,!tftDisplayOff);
     busaRmScreen->addCb(busaRmWrite);
     node.addDevice(*busaRmScreen);
@@ -282,7 +282,7 @@ static void busaRainMakerApply(){
       else if(q.action==6){
         if(q.b){wakeTftDisplay();ok=true;}
         else {darkenTftDisplay();ok=true;}
-      }else if(q.action==7&&q.i>=0&&q.i<7){navigatePage((uint8_t)q.i);ok=true;}
+      }else if(q.action==7&&q.i>=0&&q.i<8){navigatePage((uint8_t)q.i);ok=true;}
     }else if(q.target==5){
       if(q.action==8&&q.b){
         if(pcfDetected){startKeyLearning();ok=true;}

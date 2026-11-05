@@ -1,0 +1,108 @@
+name: BUSA N16R8 offline Calculator CALC1 verified build
+on:
+  push:
+    branches: [feat/busa-calculator-20261105]
+    paths:
+      - 'ci/ble_official_provisioning.py'
+      - 'ci/busa_ble_ota_stability.py'
+      - '.github/workflows/busa-calculator.yml'
+      - 'ci/**'
+      - 'tests/**'
+      - 'calculator/**'
+      - 'calculator.js'
+      - 'calculator.css'
+      - 'index.html'
+      - 'sw.js'
+      - '.github/workflows/busa-official-ble-20261105.yml'
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: 1.3.1
+      - name: Install ESP32 and libraries
+        run: |
+          set -euo pipefail
+          retry() {
+            local attempt
+            for attempt in 1 2 3; do
+              if "$@"; then return 0; fi
+              echo "Retry $attempt: $*"
+            done
+            return 1
+          }
+          exec > >(tee -a /tmp/busa-dependencies.log) 2>&1
+          trap 'code=$?; if [ "$code" -ne 0 ]; then { echo "### Dependency installation failure"; echo ~~~text; tail -100 /tmp/busa-dependencies.log; echo ~~~; } >> "$GITHUB_STEP_SUMMARY"; fi' EXIT
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          retry arduino-cli core update-index
+          retry arduino-cli core install esp32:esp32@2.0.17
+          retry arduino-cli lib install "Adafruit BusIO@1.17.4"
+          retry arduino-cli lib install "OneWire@2.3.8"
+          retry arduino-cli lib install "DallasTemperature@4.0.6"
+          retry arduino-cli lib install "Adafruit GFX Library@1.13.0"
+          retry arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
+          retry arduino-cli lib install "Adafruit ILI9341@1.7.0"
+          retry arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+      - name: Generate verified Google trust bundle
+        run: python3 ci/generate_google_ca.py --output firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h
+      - name: Validate canonical source and run regressions (no patching)
+        run: |
+          set -euo pipefail
+          python3 -B ci/ble_cold_start_patch.py
+          python3 -B ci/ble_official_provisioning.py
+          python3 -B ci/busa_ble_ota_stability.py
+          python3 -B tests/test_ble_ota.py
+          python3 -B tests/test_rm_tracker.py
+          python3 -B tests/test_rm_telemetry.py
+          python3 -B tests/test_rm_preservation.py
+          python3 -B ci/generate_calculator.py --check
+          python3 -B tests/test_calculator.py
+          python3 -B tests/test_calculator_keypad.py
+          node --check calculator.js
+          node --check sw.js
+          python3 -B -m unittest discover -s tests -p test_firmware_contract.py -v
+          python3 - <<'PYJS'
+          import re,subprocess
+          from pathlib import Path
+          for path in [Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h'),Path('index.html')]:
+              for script in re.findall(r'<script>(.*?)</script>',path.read_text(),re.S):
+                  subprocess.run(['node','--check'],input=script.encode(),check=True)
+          PYJS
+          git diff --exit-code -- firmware ci
+      - name: Test Chromium and WebKit mobile calculator UI
+        run: |
+          python3 -m pip install playwright==1.56.0
+          python3 -m playwright install --with-deps chromium webkit
+          python3 -B tests/test_calculator_browser.py
+          BUSA_TEST_BROWSER=webkit python3 -B tests/test_calculator_browser.py
+      - name: Compile ESP32-S3 N16R8
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
+      - name: Package and verify the two BIN and complete source snapshot
+        run: |
+          python3 ci/package_calculator.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_N16R8_RAINMAKER_RM_CALC1_20261105
+          retention-days: 30
+          path: |
+            out/BUSA_N16R8_RM_CALC1_OTA.bin
+            out/BUSA_N16R8_RM_CALC1_USB_MERGED.bin
+            out/SHA256SUMS.txt
+            out/OTA_IMAGE_INFO.txt
+            out/PARTITIONS.csv
+            out/SOURCE_COMMIT.txt
+            out/SOURCE_SHA256SUMS.txt
+            out/BUSA_N16R8_RM_CALC1_SOURCE.zip

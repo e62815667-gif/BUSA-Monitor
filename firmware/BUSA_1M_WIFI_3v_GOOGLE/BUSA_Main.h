@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-TELEM2-20261105";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC1-20261105";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -555,7 +555,7 @@ bool pcfRead(uint16_t &value){
   value=(uint16_t)bytes[0]|((uint16_t)bytes[1]<<8);
   return true;
 }
-uint8_t currentPage=0; // 7 tabs including Diagnostics
+uint8_t currentPage=0; // 8 sections including Calculator
 uint8_t graphSubView=0; // 0 four isolated temperature lanes; 1 water + collection lanes
 uint8_t graphMenuCursor=0; // Selected item in the Graphs submenu; ENTER opens it
 uint32_t busaGraphLastDrawnCapture=0;
@@ -718,9 +718,11 @@ void startKeyLearning(){
   currentPage=6;diagModule=1;tftView=1;tftDirty=true;
 }
 
+#include "BUSA_CalculatorUI.h"
 #include "BUSA_KeypadTFT_UI.h"
 void navigatePage(uint8_t target){
-  if(target>=7||target==currentPage)return;
+  if(target>=8||target==currentPage)return;
+  busaCalcEditing=false;
   if(currentPage==5 && target!=5 && approvedSettingsItem==1 && tftView){
     wifiUiLeave(); // scrub unsaved password; AP BUSA keeps running
   }
@@ -753,6 +755,7 @@ void keypadAction(int k){
   // # and * always remain unassigned; hold 0 >2 seconds for decimal comma.
   if(k==2 || k==3)return; // # and * always unused
   if(wifiUiKey(k))return;
+  if(busaCalcKey(k))return;
   if(calEditing){
     // A single inline editor for each of the four visible sensor rows.
     if(k==7||k==11){
@@ -991,7 +994,7 @@ void pollKeys(uint32_t now){
   if(pair!=pendingPair){
     // Zero is classified only on release, so a long press never enters "0,".
     if(pair<0 && keypadDeferredZero && keyHeld && !keypadLearning){
-      if((uint32_t)(now-pendingAt)>2000)wifiUiLongZero();
+      if((uint32_t)(now-pendingAt)>2000){if(currentPage==7&&busaCalcEditing)busaCalcDecimal();else wifiUiLongZero();}
       else keypadAction(17);
     }
     pendingPair=pair;pendingAt=now;keyHeld=false;keypadDeferredZero=false;
@@ -1000,7 +1003,7 @@ void pollKeys(uint32_t now){
   if(keyHeld){
     if(keypadDeferredZero && (uint32_t)(now-pendingAt)>2000){
       keypadDeferredZero=false;
-      wifiUiLongZero();
+      if(currentPage==7&&busaCalcEditing)busaCalcDecimal();else wifiUiLongZero();
     }
     return;
   }
@@ -1019,7 +1022,7 @@ void pollKeys(uint32_t now){
     if(k<0)keyMessage="Не назначено: "+rawPair;
     else{
       keyMessage=String(KEY_CAPS[k])+" ("+rawPair+")";
-      if(k==17 && (editingTemp ||
+      if(k==17 && (editingTemp || (currentPage==7&&busaCalcEditing) ||
           (currentPage==5 && approvedSettingsItem==1 &&
            tftView && wifiUiStage==WIFIUI_PASSWORD))){
         keypadDeferredZero=true;
@@ -1086,11 +1089,11 @@ uint32_t tftRebootAt=0;
 const char* tftProfileName(){return tftProfile==2?"ILI9341":"ST7789";}
 const uint16_t BG=0x080f,PANEL=0x10a3,BLUE=0x1c9f,GREEN=0x07e0,WHITE=0xffff,
                YELLOW=0xffe0,GRAY=0xbdf7;
-const char* pages[7]={"Главная","Температуры","Отбор","Графики","События","Настройки","Диагностика"};
-const uint8_t UI_ORDER[7]={0,1,2,5,6,3,4}; // Main T Collection Settings Graphs Events
+const char* pages[8]={"Главная","Температуры","Отбор","Графики","События","Настройки","Диагностика","Калькулятор"};
+const uint8_t UI_ORDER[8]={0,1,2,5,6,3,4,7}; // Main T Collection Settings Graphs Events
 void navigatePage(uint8_t target); // forward declaration
-uint8_t orderSlot(uint8_t page){for(uint8_t i=0;i<7;i++)if(UI_ORDER[i]==page)return i;return 0;}
-void moveApprovedTab(int direction){int slot=(orderSlot(currentPage)+7+direction)%7;navigatePage(UI_ORDER[slot]);}
+uint8_t orderSlot(uint8_t page){for(uint8_t i=0;i<8;i++)if(UI_ORDER[i]==page)return i;return 0;}
+void moveApprovedTab(int direction){int slot=(orderSlot(currentPage)+8+direction)%8;navigatePage(UI_ORDER[slot]);}
 // Defined below with the web server; needed by the TFT renderer.
 extern String stationSsid,otaMessage,nearbyNames[5];
 extern uint8_t nearbyCount;
@@ -1213,6 +1216,7 @@ void darkenTftDisplay(){
 bool busaSoundEnabled(uint8_t i); bool busaSoundActive(uint8_t i);
 extern volatile bool googleEnabled; // Google status read by both TFT renderers
 extern volatile int googleInternet,googleHttp; // TFT indicators; definitions in Google module
+#include "BUSA_CalculatorTft.h"
 #include "BUSA_ApprovedUI_V13.h"
 
 #include "BUSA_ApprovedGraphics_HQ_V14.h"
@@ -1744,6 +1748,7 @@ void uploadOTA(){
  }
 }
 #include "BUSA_Google.h"
+#include "BUSA_CalculatorWeb.h"
 const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
 <!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>БУСА-1М №001</title>
 <style>
@@ -2154,7 +2159,9 @@ section[data-section="1"] .approvedSensorIcon .busaRefTempIcon{display:block;wid
 section[data-section="1"] .approvedSensor{background:linear-gradient(140deg,#071d34,#041224);border-color:#1979b8}
 section[data-section="1"] .approvedSensorLive{color:#32f03e!important;font-variant-numeric:tabular-nums}
 section[data-section="1"] .approvedSensorHead{min-height:83px}
-</style></head><body>
+
+.appTabs{display:flex!important;overflow-x:auto!important}.appTabs button{flex:0 0 78px!important;min-width:78px!important;font-size:10px!important}
+</style><link rel="stylesheet" href="/calculator.css?v=CALC1"></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <div class="brandSmall">BUSA MONITOR · №001</div><h1>БУСА-1М <span class="brandSub">Монитор</span></h1></div>
 <span class="readOnlyLabel">● МОНИТОРИНГ</span></div>
@@ -2170,7 +2177,7 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <button data-page="2"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><span>Отбор</span></button>
 <button data-page="3"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><span>Графики</span></button>
 <button data-page="4"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h5"/></svg><span>События</span></button>
-<button data-page="5"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><span>Настройки</span></button></nav></header><main><section class="page" data-section="0">
+<button data-page="5"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><span>Настройки</span></button><button data-page="7"><span class="tabIcon">▦</span><span>Калькулятор</span></button></nav></header><main><section class="page" data-section="0">
 <div class="approvedHomeTitle"><strong>БУСА-1М №001</strong><span id="mainwifi">Wi-Fi: ожидание</span></div>
 <div class="approvedDashboard">
   <div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon0" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><path d="M24 4C17 17 7 28 7 37a17 17 0 0034 0C41 28 31 17 24 4Z" fill="url(#busaIcon0)" stroke="#28cdff" stroke-width="2"/><path d="M15 35q0 12 12 13" fill="none" stroke="#dcfaff" stroke-width="2.5" stroke-linecap="round"/></svg></span><span>Вода</span></div><strong id="t0">Н/Д</strong><small id="homeSet0">ВКЛ — · ВЫКЛ —</small></div>
@@ -2364,7 +2371,7 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <p class="hint">Пока не откалиброван; значения расхода и объёма оценочные.</p></div>
 </div>
 </section>
-</main>
+<section class="page" data-section="7" hidden><div id="busaCalculator"></div></section></main>
 <script>
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let busaGraphData={temperature:[[],[],[],[]],water_pulses:[]},busaGraphFetchedAt=0,busaGraphLoading=false;
@@ -2914,7 +2921,7 @@ showPhoneClock();setInterval(showPhoneClock,1000);
  // No endless scan timer. Reopening Wi-Fi requests a new finite search.
 syncClock();setInterval(syncClock,300000);
 update();setInterval(update,3000);
-</script></body></html>
+</script><script src="/calculator.js?v=CALC1"></script></body></html>
 )HTMLBUSA";
 
 void handleCommand(String x){
@@ -3086,6 +3093,8 @@ void setup(){
       "STA manually disabled in NVS; BUSA softAP remains ON":
       "STA credentials missing; BUSA softAP remains ON");
   }
+  server.on("/calculator.js",HTTP_GET,[]{server.sendHeader("Cache-Control","no-cache");server.send_P(200,"application/javascript; charset=utf-8",BUSA_CALCULATOR_JS);});
+  server.on("/calculator.css",HTTP_GET,[]{server.sendHeader("Cache-Control","no-cache");server.send_P(200,"text/css; charset=utf-8",BUSA_CALCULATOR_CSS);});
   server.on("/",HTTP_GET,[]{server.sendHeader("Cache-Control","no-store");server.send_P(200,"text/html; charset=utf-8",WEB_PAGE);});
   server.on("/api/time/sync",HTTP_POST,[]{
     if(!apClient()){
