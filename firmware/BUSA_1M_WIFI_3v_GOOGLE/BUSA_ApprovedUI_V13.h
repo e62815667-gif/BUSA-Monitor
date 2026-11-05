@@ -43,7 +43,9 @@ static void v13Collect(uint32_t now){
   }
   if(flowSeen!=v13OldFlow){v13Log("YF-S401: импульсы воды");v13OldFlow=flowSeen;}
   if(v13HistoryCount==0 || elapsed(now,v13LastCapture,5000)){
-    v13LastCapture=now;
+    // Keep the 5s schedule anchored; a slow loop must not accumulate drift.
+    if(v13HistoryCount==0)v13LastCapture=now;
+    else v13LastCapture+=((uint32_t)(now-v13LastCapture)/5000u)*5000u;
     busaCaptureChart(now);
     for(int i=0;i<4;i++)v13History[i][v13HistoryHead]=hasTemp(i,now)?temperature[i]:NAN;
     v13HistoryHead=(v13HistoryHead+1)%48;

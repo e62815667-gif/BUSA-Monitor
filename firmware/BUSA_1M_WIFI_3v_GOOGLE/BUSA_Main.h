@@ -2482,7 +2482,8 @@ get('settingsBack').onclick=()=>{
  settingsTab(-1,false);
 };
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
-let chartView=0,chartHours=1,chartFetchToken=0;
+let chartView=0,chartHours=1,chartFetchToken=0,chartRequestController=null;
+const CHART_REFRESH_MS=5000;
 const RELAY_NAMES=['ТЭН откл.','Кран закрыт','Кран открыт','Авария'];
 function updateRelayBadges(channels){
  for(let i=0;i<4;i++){
@@ -2632,9 +2633,17 @@ function graphs(){
  if(message){ctx.fillStyle='#a6c2d5';ctx.font='21px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(message,x0+pw/2,y0+ph/2);}
 }
 async function refreshGraphHistory(force=false){
- if(!force&&Date.now()-busaGraphFetchedAt<4500)return;
+ if(document.hidden&&!force)return;
+ if(chartRequestController){if(!force)return;chartRequestController.abort();}
+ const controller=new AbortController();chartRequestController=controller;
  const token=++chartFetchToken,hours=chartHours;busaGraphFetchedAt=Date.now();
- try{const r=await fetch('/api/chart-history?hours='+hours,{cache:'no-store'});if(!r.ok)throw Error(r.status);const j=await r.json();if(token===chartFetchToken&&j.ok&&j.hours===chartHours&&Array.isArray(j.temperature)){busaGraphData=j;if(active===3)graphs();}}catch(e){}
+ const timeout=setTimeout(()=>controller.abort(),4000);
+ try{
+  const r=await fetch('/api/chart-history?hours='+hours,{cache:'no-store',signal:controller.signal});
+  if(!r.ok)throw Error(r.status);const j=await r.json();
+  if(token===chartFetchToken&&j.ok&&j.hours===chartHours&&Array.isArray(j.temperature)){busaGraphData=j;if(active===3)graphs();}
+ }catch(e){if(token===chartFetchToken&&active===3)get('chartState').textContent='Нет связи';}
+ finally{clearTimeout(timeout);if(chartRequestController===controller)chartRequestController=null;}
 }
 async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;statusFailures=0;
 networkLeds(s.network_indicators,s.station,s.google);
@@ -2746,7 +2755,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (проверка изображения визуальная)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)refreshGraphHistory();
+get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (проверка изображения визуальная)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}
 }catch(e){statusFailures++;if(statusFailures>=3){if(connected)message('Нет ответа ESP32: проверь локальный Wi-Fi');connected=false;networkLeds(null,'');updateRelayBadges(null)}}finally{pollBusy=false}}
 get('temperatureSave').onclick=async()=>{
  const button=get('temperatureSave'),result=get('temperatureSaveResult');
@@ -2906,6 +2915,9 @@ showPhoneClock();setInterval(showPhoneClock,1000);
  // No endless scan timer. Reopening Wi-Fi requests a new finite search.
 syncClock();setInterval(syncClock,300000);
 update();setInterval(update,3000);
+// Graph cadence is fixed and independent of status polling and selected time range.
+setInterval(()=>{if(active===3&&!document.hidden)refreshGraphHistory();},CHART_REFRESH_MS);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&active===3)refreshGraphHistory(true);});
 </script><script src="/calculator.js?v=CALC1"></script></body></html>
 )HTMLBUSA";
 

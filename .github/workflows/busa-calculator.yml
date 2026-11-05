@@ -74,6 +74,7 @@ jobs:
           python3 -B tests/test_wifi_scan.py
           python3 -B tests/test_ui6_navigation.py
           python3 -B tests/test_ui6_history.py
+          python3 -B tests/test_ui6_chart_cadence.py
           python3 -B tests/test_ui6_tft.py
           node --check calculator.js
           node --check sw.js
