@@ -46,6 +46,7 @@ def package(build,core,esptool,sketch_dir=None):
         for path in files:archive.write(path,'firmware/'+sketch.name+'/'+path.name)
         for path in sorted((root/'ci').glob('*.py')):archive.write(path,'ci/'+path.name)
         archive.write(root/'.github/workflows/busa-calculator.yml','.github/workflows/busa-calculator.yml')
+        archive.write(root/'.github/workflows/busa-calculator-online.yml','.github/workflows/busa-calculator-online.yml')
         archive.writestr('SOURCE_COMMIT.txt',commit)
         for path in sorted((root/'tests').rglob('*')):
             if path.is_file() and path.suffix in {'.py','.js','.json','.hpp','.cpp'}:archive.write(path,str(path.relative_to(root)))

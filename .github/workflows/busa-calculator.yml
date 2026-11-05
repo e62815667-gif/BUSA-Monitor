@@ -83,7 +83,7 @@ jobs:
         run: |
           set -euo pipefail
           exec > >(tee -a /tmp/busa-browser-tests.log) 2>&1
-          trap 'code=$?; { echo "### Calculator browser checks"; echo ~~~text; tail -120 /tmp/busa-browser-tests.log; echo ~~~; } >> "$GITHUB_STEP_SUMMARY"; exit "$code"' EXIT
+          trap 'code=$?; python3 ci/report_browser_failure.py /tmp/busa-browser-tests.log "$code"; exit "$code"' EXIT
           python3 -m pip install playwright==1.56.0
           python3 -m playwright install --with-deps chromium webkit
           python3 -B tests/test_calculator_browser.py
