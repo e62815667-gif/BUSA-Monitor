@@ -1,13 +1,16 @@
 """Browser UI tests on a local HTTP fixture, never a claim of real ESP/iPhone testing."""
 from pathlib import Path
-import threading,http.server,socketserver,os,re,json
+import threading,http.server,socketserver,socket,os,re,json
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1];sketch=root/'firmware/BUSA_1M_WIFI_3v_GOOGLE'
+origin_offline=False
 local=(sketch/'BUSA_Main.h').read_text().split('R"HTMLBUSA(',1)[1].split(')HTMLBUSA"',1)[0]
 class Handler(http.server.SimpleHTTPRequestHandler):
  def __init__(self,*a,**kw):super().__init__(*a,directory=str(root),**kw)
  def log_message(self,*args):pass
  def do_GET(self):
+  if origin_offline:
+   self.connection.shutdown(socket.SHUT_RDWR);self.connection.close();return
   if self.path=='/local.html':
    self.send_response(200);self.send_header('Content-Type','text/html; charset=utf-8');self.end_headers();self.wfile.write(local.encode())
   elif self.path.startswith('/api/'):
@@ -41,9 +44,15 @@ with sync_playwright() as p:
    page.locator('[data-page="7"]' if local_app else '[data-tab="calculator"]').click();page.locator('#calc-panel-0 button[type=reset]').click();page.wait_for_function("document.getElementById('calc-0-v').value===''")
    page.evaluate("document.documentElement.dataset.theme='dark'");assert page.locator('#calc-panel-0 button[type=submit]').is_visible()
    if not local_app:
-    page.evaluate('navigator.serviceWorker.ready.then(()=>true)');page.reload();page.wait_for_function('!!navigator.serviceWorker.controller');context.set_offline(True)
+    page.evaluate('navigator.serviceWorker.ready.then(()=>true)');page.reload();page.wait_for_function('!!navigator.serviceWorker.controller')
+    # WebKit's Playwright setOffline causes an internal navigation error before
+    # service worker fallback. Drop origin TCP responses instead; cached navigation
+    # and both JS/CSS must still load successfully, with no server response.
+    if os.environ.get('BUSA_TEST_BROWSER')=='webkit':origin_offline=True
+    else:context.set_offline(True)
     page.reload();page.wait_for_selector('#busaCalculator .calcPanel',state='attached');page.locator('[data-tab="calculator"]').click()
     page.locator('#calc-0-v').fill('1');page.locator('#calc-0-from').fill('60');page.locator('#calc-0-to').fill('40');assert page.locator('#calc-panel-0 [data-value=water]').inner_text()
+    origin_offline=False
    # API fixture responses are handled by the existing app; JS exceptions are failures.
    assert not errors,errors
    context.close()
