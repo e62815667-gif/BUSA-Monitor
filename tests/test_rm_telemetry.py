@@ -20,13 +20,20 @@ fixed=r'''
 #include "BUSA_RainMakerTelemetry.h"
 '''+new+r'''
 void tick(uint32_t at){advance(at);int before=wireCalls;busaRainMakerPoll(at);assert(wireCalls==before);runWorker();}
-int main(){initialize();busaRmTelemetryInit();assert(busaRmTelemetryInitRc==ESP_OK);
+int main(){
+ assert(fabs(busaRmTemperatureForCloud(30.875f)-30.9f)<0.0001f);
+ assert(fabs(busaRmTemperatureForCloud(35.75f)-35.8f)<0.0001f);
+ assert(fabs(busaRmTemperatureForCloud(-2.25f)+2.3f)<0.0001f);
+ assert(!std::signbit(busaRmTemperatureForCloud(-0.01f)));
+ initialize();busaRmTelemetryInit();assert(busaRmTelemetryInitRc==ESP_OK);
  events(nullptr,RMAKER_COMMON_EVENT,RMAKER_MQTT_EVENT_CONNECTED,nullptr);
  tick(10000);assert(wireCalls==1&&busaRmTrackerCopy().acked==1);
  auto* temp=tempDevices[2].getParamByName(ESP_RMAKER_DEF_TEMPERATURE_NAME);
  auto* setting=tempDevices[0].getParamByName(RM_ON);int updates=setting->updates;
- assert(fabs(cloud[temp].val.f-24.81f)<0.01f);
- temperature[2]=29.69f;tick(20000);assert(wireCalls==2&&fabs(cloud[temp].val.f-29.69f)<0.01f);
+ assert(fabs(cloud[temp].val.f-24.8f)<0.01f);
+ assert(temperature[2]==24.81f&&busaRmFrame.temperatures[2]==24.81f);
+ for(int i=0;i<4;i++)assert(cloud[tempDevices[i].getParamByName(ESP_RMAKER_DEF_TEMPERATURE_NAME)].val.f==busaRmTemperatureForCloud(temperature[i]));
+ temperature[2]=29.69f;tick(20000);assert(wireCalls==2&&fabs(cloud[temp].val.f-29.7f)<0.01f);
  assert(setting->updates==updates);
  busaGoogleNetworkBusy=true;
  for(uint32_t t=30000;t<=3600000;t+=10000)tick(t);
@@ -47,7 +54,7 @@ int main(){initialize();busaRmTelemetryInit();assert(busaRmTelemetryInitRc==ESP_
  busaWifiScanRunning=true;tick(3690000);assert(wireCalls==count+1);busaWifiScanRunning=false;
  valid[2]=false;temperature[2]=NAN;tick(3700000);
  assert(!cloud[tempDevices[2].getParamByName("Датчик подключен")].val.b);
- assert(fabs(cloud[temp].val.f-29.69f)<0.01f); // no invented zero/NaN sample
+ assert(fabs(cloud[temp].val.f-29.7f)<0.01f); // no invented zero/NaN sample
  valid[2]=true;temperature[2]=31;
  advance(3710000);busaRainMakerPoll(nowMs);assert(queued);advance(3740000);runWorker();assert(busaRmStaleFrames==1);
  tokens=0;tick(3740001);assert(busaRmBudgetDeferrals>0);tokens=20;tick(3750001);

@@ -6,6 +6,11 @@
 #include "BUSA_RmPublishTracker.h"
 
 static constexpr uint32_t BUSA_RM_REPORT_MS=10000U;
+// Round only the RainMaker presentation value; keep sensor/local/Google precision.
+static float busaRmTemperatureForCloud(float measured){
+  const float rounded=roundf(measured*10.0f)/10.0f;
+  return rounded==0.0f?0.0f:rounded;
+}
 struct BusaRmFrame {
   uint32_t seq=0,at=0,revision=0;int uptime=0;
   float temperatures[4]={},on[4]={},off[4]={},cal[4]={},flow=0,total=0;
@@ -101,7 +106,7 @@ static void busaRmReportFrame(void*){
   if(epoch!=lastEpoch||f.revision!=lastRevision)busaRmInvalidateCache();
   bool ok=true;
   for(int i=0;i<4;i++){
-    if(f.valid[i])ok=busaRmStage(busaRmTemps[i],ESP_RMAKER_DEF_TEMPERATURE_NAME,esp_rmaker_float(f.temperatures[i]),true)&&ok;
+    if(f.valid[i])ok=busaRmStage(busaRmTemps[i],ESP_RMAKER_DEF_TEMPERATURE_NAME,esp_rmaker_float(busaRmTemperatureForCloud(f.temperatures[i])),true)&&ok;
     ok=busaRmStage(busaRmTemps[i],"Датчик подключен",esp_rmaker_bool(f.valid[i]))&&ok;
     ok=busaRmStage(busaRmTemps[i],RM_ON,esp_rmaker_float(f.on[i]))&&ok;
     ok=busaRmStage(busaRmTemps[i],RM_OFF,esp_rmaker_float(f.off[i]))&&ok;

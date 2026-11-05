@@ -1,4 +1,4 @@
-name: BUSA N16R8 RainMaker telemetry TELEM1 verified build
+name: BUSA N16R8 RainMaker telemetry TELEM2 verified build
 on:
   push:
     branches: [fix/busa-rainmaker-telemetry-20261105]
@@ -76,17 +76,17 @@ jobs:
           arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
       - name: Package and verify the two BIN and complete source snapshot
         run: |
-          python3 ci/package_rm_telemetry.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          python3 ci/package_rm_telem2.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_N16R8_RAINMAKER_RM_TELEM1_20261105
+          name: BUSA_N16R8_RAINMAKER_RM_TELEM2_20261105
           retention-days: 30
           path: |
-            out/BUSA_N16R8_RM_TELEM1_OTA.bin
-            out/BUSA_N16R8_RM_TELEM1_USB_MERGED.bin
+            out/BUSA_N16R8_RM_TELEM2_OTA.bin
+            out/BUSA_N16R8_RM_TELEM2_USB_MERGED.bin
             out/SHA256SUMS.txt
             out/OTA_IMAGE_INFO.txt
             out/PARTITIONS.csv
             out/SOURCE_COMMIT.txt
             out/SOURCE_SHA256SUMS.txt
-            out/BUSA_N16R8_RM_TELEM1_SOURCE.zip
+            out/BUSA_N16R8_RM_TELEM2_SOURCE.zip
