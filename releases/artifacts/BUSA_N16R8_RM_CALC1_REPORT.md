@@ -1,6 +1,7 @@
 # БУСА-1М №001 — CALC1, калькулятор
 
-Исходный коммит: f322b11 (SOURCE_COMMIT.txt содержит полный SHA).
+Исходный коммит: 99a2f9b119d7178f105d2388b41a2a8f6b838ae1.
+Прошивка побайтово совпадает с f322b11; далее менялись только CI/тесты/упаковщик.
 База — TELEM2, рабочие выпуски и main не изменены.
 
 Добавлены три расчёта — разбавление, ареометр, вторая перегонка —
@@ -16,11 +17,18 @@ Storage 2038457 байт, RAM 79548 байт. Образ/валидационн�
 включая запятую, 3 расчёта, ошибки, localStorage/сброс, тёмную тему и PWA offline.
 Существующие BLE/OTA/RainMaker/4 contract tests PASS.
 
-GitHub Actions: https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/42071696736
-Статус этого прогона будет дополнен после завершения. Первый браузерный прогон
-не прошёл, добавлен выбор bundled Chromium и открытый диагностический журнал.
-Локальный WebKit отсутствует, скачать его не позволил сетевой шлюз (403).
-Наличие Linux WebKit теста не означает проверку настоящего Safari на iPhone.
+GitHub Actions **SUCCESS**, все шаги compile/package/upload завершены:
+https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/42073581629
+Chromium и WebKit прошли local/online сценарии на размерах iPhone 12/16.
+Тестируются валидация, запятая, все 3 расчёта, отсутствие переполнения ширины,
+сохранение/очистка полей, тёмная тема и offline-кэш.
+В старых прогонах программный setOffline в WebKit вызывал внутреннюю ошибку
+навигации. В итоговом тесте WebKit сервер обрывает TCP-ответы: браузер загружает
+приложение/JS/CSS из service worker cache и выполняет расчёты. Chromium также
+прошёл тест с setOffline. Это HTTP fixture, не настоящий ESP32 и не iOS Safari.
+Локально WebKit недоступен; успешный прогон WebKit выполнен в GitHub Actions.
+Опубликованные BIN собраны локально из идентичных исходников firmware;
+побайтовое совпадение с BIN независимой CI-сборки не заявляется.
 
 **Онлайн ещё не опубликовано:** GitHub protection rule отклонило ветку:
 “Branch feat/busa-calculator-20261105 is not allowed to deploy to github-pages
@@ -44,5 +52,5 @@ SHA-256:
 ```text
 0f55e7ea93ebc67b5051f139aec9cad848a18a6603181cff0d5e2c20ce5061f2  BUSA_N16R8_RM_CALC1_OTA.bin
 7246458f8b19425f2b8728c786be8c74054cf1607b060dffb63eff575f0360cd  BUSA_N16R8_RM_CALC1_USB_MERGED.bin
-e4eae20cbec41a22b9c0083ba598c93c217e51eb844de7dd08762cf69440f484  BUSA_N16R8_RM_CALC1_SOURCE.zip
+34c1a4d0d60fb1ae32f46eea3451e36630b8db77bf1f476804cba8f33b144f11  BUSA_N16R8_RM_CALC1_SOURCE.zip
 ```
