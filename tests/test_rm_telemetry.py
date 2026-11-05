@@ -25,6 +25,12 @@ int main(){
  assert(fabs(busaRmTemperatureForCloud(35.75f)-35.8f)<0.0001f);
  assert(fabs(busaRmTemperatureForCloud(-2.25f)+2.3f)<0.0001f);
  assert(!std::signbit(busaRmTemperatureForCloud(-0.01f)));
+ // Pinned json_generator emits %.*f with precision 5 (SDK object inspected).
+ // Verify no binary-float residue survives serialization across DS18B20 range.
+ for(int sixteenths=-880;sixteenths<=2000;sixteenths++){
+   char jsonNumber[40];snprintf(jsonNumber,sizeof jsonNumber,"%.5f",double(busaRmTemperatureForCloud(sixteenths/16.0f)));
+   double parsed=std::stod(jsonNumber);assert(fabs(parsed*10.0-std::round(parsed*10.0))<1e-8);
+ }
  initialize();busaRmTelemetryInit();assert(busaRmTelemetryInitRc==ESP_OK);
  events(nullptr,RMAKER_COMMON_EVENT,RMAKER_MQTT_EVENT_CONNECTED,nullptr);
  tick(10000);assert(wireCalls==1&&busaRmTrackerCopy().acked==1);
