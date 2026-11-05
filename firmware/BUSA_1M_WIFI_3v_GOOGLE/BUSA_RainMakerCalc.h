@@ -2,7 +2,10 @@
 // SDK callback only queues bounded commands; no math/network/NVS/GPIO in callback.
 static void busaRmCalcWrite(Device* device,Param* param,const param_val_t val,void*,write_ctx_t*){
  if(!busaRmQueue||!device||!param)return;
- int mode=-1;for(int i=0;i<3;i++)if(device==busaRmCalcDevices[i]){mode=i;break;}
+ // Arduino creates a temporary Device wrapper for every callback. Match the
+ // stable SDK handle, never the address of that temporary C++ wrapper.
+ const auto* handle=device->getDeviceHandle();int mode=-1;
+ for(int i=0;i<3;i++)if(handle&&busaRmCalcDevices[i]&&handle==busaRmCalcDevices[i]->getDeviceHandle()){mode=i;break;}
  if(mode<0)return;
  const char* name=param->getParamName();if(!name)return;
  BusaRmRequest q={};q.target=6+mode;bool found=false;

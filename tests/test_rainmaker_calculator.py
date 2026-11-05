@@ -10,7 +10,7 @@ const int pdPASS=1;
 int xQueueSend(void*,const BusaRmRequest* q,int){if(writeQueueFull)return 0;requests.push_back(*q);return pdPASS;}
 #include "BUSA_RainMakerTelemetry.h"
 #include "BUSA_RainMakerCalc.h"
-void deliver(int mode,const char* name,param_val_t value){Param param(name,nullptr,value,0);busaRmCalcWrite(busaRmCalcDevices[mode],&param,value,nullptr,nullptr);}
+void deliver(int mode,const char* name,param_val_t value){Param param(name,nullptr,value,0);Device wrapper;wrapper.setDeviceHandle(busaRmCalcDevices[mode]->getDeviceHandle());assert(&wrapper!=busaRmCalcDevices[mode]);busaRmCalcWrite(&wrapper,&param,value,nullptr,nullptr);}
 void drain(){for(const auto& q:requests){assert(q.target>=6&&q.target<9);busaRmCalcApply(q.target-6,q.action,q.role,q.f,q.b);}requests.clear();}
 void input(int m,int field,float v){deliver(m,busaRmCalcInputNames[m][field],esp_rmaker_float(v));drain();}
 void calculate(int m){deliver(m,"Рассчитать",esp_rmaker_bool(true));drain();}

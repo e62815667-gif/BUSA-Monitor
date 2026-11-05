@@ -31,9 +31,10 @@ class Param{public:std::string name,ui;param_val_t val;int flags;
 };
 param_val_t value(float x){return esp_rmaker_float(x);}param_val_t value(bool x){return esp_rmaker_bool(x);}param_val_t value(const char* x){return esp_rmaker_str(x);}
 struct Device;using WriteCallback=void(*)(Device*,Param*,param_val_t,void*,write_ctx_t*);
-struct Device{std::map<std::string,esp_rmaker_param_t> params;std::string deviceName;WriteCallback callback=nullptr;
- Device(const char* name="",const char* =nullptr):deviceName(name){}
+struct Device{std::map<std::string,esp_rmaker_param_t> params;std::string deviceName;const void* deviceHandle=nullptr;WriteCallback callback=nullptr;
+ Device(const char* name="",const char* =nullptr):deviceName(name),deviceHandle(this){}
  const char* getDeviceName(){return deviceName.c_str();}
+ const void* getDeviceHandle(){return deviceHandle;}void setDeviceHandle(const void* h){deviceHandle=h;}
  int addParam(Param p){add(p.name.c_str(),p.val);auto* h=getParamByName(p.name.c_str());h->flags=p.flags;h->ui=p.ui;return ESP_OK;}
  void addCb(WriteCallback fn){callback=fn;}
 
