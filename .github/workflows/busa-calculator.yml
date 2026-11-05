@@ -85,7 +85,7 @@ jobs:
           exec > >(tee -a /tmp/busa-browser-tests.log) 2>&1
           trap 'code=$?; python3 ci/report_browser_failure.py /tmp/busa-browser-tests.log "$code"; exit "$code"' EXIT
           python3 -m pip install playwright==1.56.0
-          python3 -m playwright install --with-deps chromium webkit
+          CI=1 python3 -m playwright install --with-deps chromium webkit
           python3 -B tests/test_calculator_browser.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_calculator_browser.py
       - name: Compile ESP32-S3 N16R8
