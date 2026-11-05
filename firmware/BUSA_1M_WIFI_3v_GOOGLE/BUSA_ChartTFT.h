@@ -29,16 +29,16 @@ static void busaDrawChart(uint32_t now){
   const int y=py+ph-i*ph/5;screen->drawFastHLine(px,y,pw,line);
   if(graphSubView==0)busaChartText(String(i*25),2,y+3,muted,true);
  }
- const uint8_t hours=BUSA_GRAPH_HOURS[graphHoursIndex%4];
+ const uint8_t minutes=BUSA_GRAPH_MINUTES[graphRangeIndex%5];
  for(int j=0;j<=3;j++){
   const int x=px+j*(pw-1)/3;screen->drawFastVLine(x,py,ph,line);
-  const time_t stamp=time(nullptr)+(time_t)clockUtcOffsetMinutes*60-(time_t)(3-j)*hours*1200;
+  const time_t stamp=time(nullptr)+(time_t)clockUtcOffsetMinutes*60-(time_t)(3-j)*minutes*20;
   struct tm tmv;gmtime_r(&stamp,&tmv);char label[6];strftime(label,sizeof(label),"%H:%M",&tmv);
   busaChartText(deviceClockValid()?String(label):String("--:--"),j==0?px:j==3?w-29:x-12,py+ph+12,muted,true);
  }
  int points=0;
  if(graphSubView==0){
-  const int bins=min((int)hours*60,160);int16_t indices[160];busaChartHistory.select(now,hours,indices,bins);
+  const int bins=min((int)minutes*30,160);int16_t indices[160];busaChartHistory.selectMs(now,(uint32_t)minutes*60000u,indices,bins);
   for(int k=0;k<4;k++){
    int priorX=0,priorY=0;bool prior=false;
    for(int b=0;b<bins;b++){
@@ -54,11 +54,11 @@ static void busaDrawChart(uint32_t now){
   const char* msg=graphSubView==1?"Нет датчика отбора":graphSubView==2?"Нет данных питания":"Нет измерений";
   busaChartText(msg,px+5,py+ph/2+4,muted,true);
  }
- const int ry=portrait?247:188,rw=(w-19)/4;
- for(int i=0;i<4;i++){
-  const int x=5+i*(rw+3);screen->fillRoundRect(x,ry,rw,21,3,i==graphHoursIndex?selected:bg);
-  screen->drawRoundRect(x,ry,rw,21,3,i==graphHoursIndex&&tftView?0x07ff:line);
-  busaChartText(String(BUSA_GRAPH_HOURS[i])+" ч",x+rw/2-9,ry+14,i==graphHoursIndex?0xffff:fg,true);
+ const int ry=portrait?247:188,rw=(w-22)/5;
+ for(int i=0;i<5;i++){
+  const int x=5+i*(rw+3);screen->fillRoundRect(x,ry,rw,21,3,i==graphRangeIndex?selected:bg);
+  screen->drawRoundRect(x,ry,rw,21,3,i==graphRangeIndex&&tftView?0x07ff:line);
+  busaChartText((BUSA_GRAPH_MINUTES[i]==60?String("1 ч"):String(BUSA_GRAPH_MINUTES[i])+" мин"),x+rw/2-(BUSA_GRAPH_MINUTES[i]==60?8:BUSA_GRAPH_MINUTES[i]<10?13:15),ry+14,i==graphRangeIndex?0xffff:fg,true);
  }
 }
 static void busaDrawRelayStrip(int y){

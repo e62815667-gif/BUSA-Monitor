@@ -42,10 +42,10 @@ static void v13Collect(uint32_t now){
     }
   }
   if(flowSeen!=v13OldFlow){v13Log("YF-S401: импульсы воды");v13OldFlow=flowSeen;}
-  if(v13HistoryCount==0 || elapsed(now,v13LastCapture,5000)){
-    // Keep the 5s schedule anchored; a slow loop must not accumulate drift.
+  if(v13HistoryCount==0 || elapsed(now,v13LastCapture,2000)){
+    // Keep the 2s schedule anchored; a slow loop must not accumulate drift.
     if(v13HistoryCount==0)v13LastCapture=now;
-    else v13LastCapture+=((uint32_t)(now-v13LastCapture)/5000u)*5000u;
+    else v13LastCapture+=((uint32_t)(now-v13LastCapture)/2000u)*2000u;
     busaCaptureChart(now);
     for(int i=0;i<4;i++)v13History[i][v13HistoryHead]=hasTemp(i,now)?temperature[i]:NAN;
     v13HistoryHead=(v13HistoryHead+1)%48;
@@ -224,8 +224,8 @@ static void v13TemperatureGraph(int x,int y,int w,int h){
 }
 static void v13Graphs(bool layout){
  static uint32_t capture=0;static uint8_t view=255,range=255,focus=255;
- if(layout||capture!=v13LastCapture||view!=graphSubView||range!=graphHoursIndex||focus!=tftView){
-  busaDrawChart(millis());capture=v13LastCapture;view=graphSubView;range=graphHoursIndex;focus=tftView;
+ if(layout||capture!=v13LastCapture||view!=graphSubView||range!=graphRangeIndex||focus!=tftView){
+  busaDrawChart(millis());capture=v13LastCapture;view=graphSubView;range=graphRangeIndex;focus=tftView;
  }
 }
 static void v13EventsPage(bool layout){

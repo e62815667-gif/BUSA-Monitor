@@ -4,8 +4,8 @@ import re,subprocess,tempfile
 root=Path(__file__).resolve().parents[1];fw=root/'firmware/BUSA_1M_WIFI_3v_GOOGLE';source=(fw/'BUSA_Main.h').read_text()
 prefix=(root/'tests/test_calculator_keypad.py').read_text().split("code=r'''",1)[1].split('int currentPage=7',1)[0]
 code='#include <cstdint>\n#include <ctime>\n#include <cstdio>\n'+prefix+r'''
-using std::min;int tftThemeMode=0,graphSubView=0,graphHoursIndex=0,tftView=0,clockUtcOffsetMinutes=300;
-const uint8_t BUSA_GRAPH_HOURS[4]={1,6,12,24};
+using std::min;int tftThemeMode=0,graphSubView=0,graphRangeIndex=0,tftView=0,clockUtcOffsetMinutes=300;
+const uint8_t BUSA_GRAPH_MINUTES[5]={5,10,15,30,60};
 '''+re.search(r'static const char\* const BUSA_RELAY_LABELS\[4\]=.*?;',source).group()+r'''
 #include "BUSA_ChartHistory.h"
 BusaChart::History busaChartHistory;uint32_t fakeNow=0;
@@ -27,9 +27,9 @@ struct Display{
 void ruText(const String& s,int x,int y,uint16_t){int chars=0;for(unsigned char c:s)if((c&0xc0)!=0x80)++chars;assert(x>=0&&x+chars*ru.size<=screen->w&&y>=7&&y<screen->h);}
 #include "BUSA_ChartTFT.h"
 int main(){
- BusaChart::Row rows[1441];busaChartHistory.begin(rows,1441);float v[4]={24,78,96,NAN};
- for(int m=0;m<1440;m++){fakeNow=m*60000;v[0]+=0.01f;busaChartHistory.capture(fakeNow,v);}
- for(int portrait=0;portrait<2;portrait++)for(tftThemeMode=0;tftThemeMode<3;tftThemeMode++)for(graphSubView=0;graphSubView<3;graphSubView++)for(graphHoursIndex=0;graphHoursIndex<4;graphHoursIndex++)for(tftView=0;tftView<2;tftView++){
+ BusaChart::Row rows[1801];busaChartHistory.begin(rows,1801,0);float v[4]={24,78,96,NAN};
+ for(int m=0;m<1801;m++){fakeNow=m*2000;v[0]+=0.01f;busaChartHistory.capture(fakeNow,v);}
+ for(int portrait=0;portrait<2;portrait++)for(tftThemeMode=0;tftThemeMode<3;tftThemeMode++)for(graphSubView=0;graphSubView<3;graphSubView++)for(graphRangeIndex=0;graphRangeIndex<5;graphRangeIndex++)for(tftView=0;tftView<2;tftView++){
   display.w=portrait?240:320;display.h=portrait?320:240;busaDrawChart(fakeNow);
   busaDrawRelayStrip(portrait?242:180);
  }
@@ -38,4 +38,4 @@ int main(){
 with tempfile.TemporaryDirectory() as d:
  p=Path(d)/'tft.cpp';p.write_text(code);exe=Path(d)/'tft'
  subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-Werror','-I'+str(fw),str(p),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)
-print('PASS production TFT chart/relay geometry: 144 orientation/theme/tab/range/focus combinations; no out-of-screen text or draw commands')
+print('PASS production TFT chart/relay geometry: 180 orientation/theme/tab/range/focus combinations; no out-of-screen text or draw commands')

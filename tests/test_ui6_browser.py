@@ -16,9 +16,9 @@ with sync_playwright() as pw:
     elif path.path=='/calculator.css':r.fulfill(content_type='text/css',body=(root/'calculator.css').read_text())
     elif path.path=='/calculator.js':r.fulfill(content_type='application/javascript',body=(root/'calculator.js').read_text())
     elif path.path=='/api/chart-history':
-     hours=int(urllib.parse.parse_qs(path.query)['hours'][0]);state['requests'].append(hours);n=min(hours*60,160)
+     minutes=int(urllib.parse.parse_qs(path.query)['minutes'][0]);state['requests'].append(minutes);n=min(minutes*30,160)
      series=[[None if state['empty'] or i< n-10 or i==n-3 else 20+k*20+i/100 for i in range(n)] for k in range(4)]
-     r.fulfill(content_type='application/json',body=json.dumps({'ok':True,'hours':hours,'temperature':series,'collection_sensor':False,'power_sensor':False}))
+     r.fulfill(content_type='application/json',body=json.dumps({'ok':True,'minutes':minutes,'temperature':series,'collection_sensor':False,'power_sensor':False}))
     else:r.fulfill(status=503,body='{}')
    page.route('**/*',route);page.goto('http://busa.test/');page.wait_for_selector('#busaCalculator .calcPanel',state='attached');page.evaluate('(v)=>document.documentElement.dataset.theme=v',theme)
    assert page.locator('h1').inner_text()=='BUSA MONITOR'
@@ -33,9 +33,9 @@ with sync_playwright() as pw:
    page.evaluate('updateRelayBadges(null)');assert page.locator('#soundStatus0').inner_text()=='Нет связи'
    for tab in [1,2,3,7,5,0]:
     page.locator(f'[data-page="{tab}"]').click();assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-   page.locator('[data-page="3"]').click();page.wait_for_function('busaGraphData.hours===1')
-   for hours in [6,12,24,1]:
-    page.locator(f'[data-hours="{hours}"]').click();page.wait_for_function('(h)=>busaGraphData.hours===h',arg=hours);assert page.locator(f'[data-hours="{hours}"]').get_attribute('aria-pressed')=='true'
+   page.locator('[data-page="3"]').click();page.wait_for_function('busaGraphData.minutes===5')
+   for minutes in [10,15,30,60,5]:
+    page.locator(f'[data-minutes="{minutes}"]').click();page.wait_for_function('(h)=>busaGraphData.minutes===h',arg=minutes);assert page.locator(f'[data-minutes="{minutes}"]').get_attribute('aria-pressed')=='true'
    assert page.locator('#chartState').inner_text()=='Данные с включения'
    if width==390 and theme=='system':page.screenshot(path=str(artifacts/'graphs-fixture.png'),full_page=True)
    page.locator('[data-chart="1"]').click();assert page.locator('#chartState').inner_text()=='Нет датчика отбора'

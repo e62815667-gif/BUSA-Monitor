@@ -13,7 +13,7 @@ prefix=(root/'tests/test_calculator_keypad.py').read_text().split("code=r'''",1)
 prefix=prefix.replace('String(int n):','String(double v,int n){char b[64];snprintf(b,sizeof(b),"%.*f",n,v);assign(b);}\n bool isEmpty()const{return empty();} float toFloat()const{return strtof(c_str(),nullptr);}\n String(int n):')
 code='#include <cstdio>\n#include <cstdint>\n'+prefix+r'''
 uint8_t currentPage=0,tftView=0,previousMainPage=0,approvedSettingsItem=0,settingsSubTab=0;
-uint8_t graphHoursIndex=0;
+uint8_t graphRangeIndex=0;
 uint8_t graphMenuCursor=0,graphSubView=0,diagModule=0,calSensor=0,themeDraft=2,tftThemeMode=2;
 uint8_t wifiUiMenuIndex=0,editCursor=0;
 int wifiUiStage=0;const int WIFIUI_STATUS=0;
@@ -52,10 +52,10 @@ int main(){ busaCalcDecimal();
   assert(currentPage==5&&!tftView);keypadAction(11);
  }
  assert(scans==1&&approvedSettingsItem==0);
- navigatePage(3);graphSubView=0;graphHoursIndex=0;
+ navigatePage(3);graphSubView=0;graphRangeIndex=0;
  for(int i=0;i<6;i++){assert(graphSubView==i%3);keypadAction(11);}
  keypadAction(19);assert(tftView==1);
- for(int i=0;i<8;i++){assert(graphHoursIndex==i%4);keypadAction(11);}
+ for(int i=0;i<10;i++){assert(graphRangeIndex==i%5);keypadAction(11);}
  keypadAction(15);assert(tftView==0&&currentPage==3);
  navigatePage(7);assert(busaCalcMode==0);keypadAction(11);assert(busaCalcMode==1);keypadAction(19);assert(tftView);keypadAction(15);assert(!tftView);
  navigatePage(0);keypadAction(4);assert(currentPage==0);keypadAction(1);assert(displayOff==1);
@@ -66,4 +66,4 @@ with tempfile.TemporaryDirectory() as d:
  p=Path(d)/'nav.cpp';p.write_text(code);exe=Path(d)/'nav'
  subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-Werror','-I'+str(sketch),str(p),'-o',str(exe)],check=True)
  subprocess.run([str(exe)],check=True)
-print('PASS UI6 physical navigation: 6 main sections; 7 Settings items; Events/Diagnostics return to parent; 3 graph tabs and 4 ranges; calculator/editor/F2 preserved. Hardware mocked.')
+print('PASS UI6 physical navigation: 6 main sections; 7 Settings items; Events/Diagnostics return to parent; 3 graph tabs and 5 ranges; calculator/editor/F2 preserved. Hardware mocked.')

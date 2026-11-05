@@ -560,8 +560,8 @@ uint8_t graphSubView=0; // 0 four isolated temperature lanes; 1 water + collecti
 uint8_t graphMenuCursor=0; // Selected item in the Graphs submenu; ENTER opens it
 uint32_t busaGraphLastDrawnCapture=0;
 uint8_t approvedSettingsItem=0; // Seven Settings entries, including Events and Diagnostics
-uint8_t graphHoursIndex=0;
-static const uint8_t BUSA_GRAPH_HOURS[4]={1,6,12,24};
+uint8_t graphRangeIndex=0;
+static const uint8_t BUSA_GRAPH_MINUTES[5]={5,10,15,30,60};
 static const char* const BUSA_RELAY_LABELS[4]={"ТЭН откл.","Кран закрыт","Кран открыт","Авария"};
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 uint8_t diagModule=0,calSensor=0,themeDraft=2,tftThemeMode=2;
@@ -867,7 +867,7 @@ void keypadAction(int k){
       if(!tftView)diagModule=(diagModule+(k==7?6:1))%7;
     }else if(currentPage==3){
       // Select Graphs entries in sequence. Do not switch a graph during preview.
-      if(tftView)graphHoursIndex=(graphHoursIndex+(k==7?3:1))%4;
+      if(tftView)graphRangeIndex=(graphRangeIndex+(k==7?4:1))%5;
       else {graphSubView=(graphSubView+(k==7?2:1))%3;graphMenuCursor=graphSubView;}
     }
     // Home/Collection/Events are read-only panels; no invisible submenus.
@@ -1226,8 +1226,8 @@ static bool busaChartReady=false,busaChartAttempted=false;
 static void busaCaptureChart(uint32_t now){
  if(!busaChartAttempted){
   busaChartAttempted=true;
-  auto* memory=(BusaChart::Row*)heap_caps_malloc(sizeof(BusaChart::Row)*1441,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
-  if(memory){busaChartHistory.begin(memory,1441);busaChartReady=true;}
+  auto* memory=(BusaChart::Row*)heap_caps_malloc(sizeof(BusaChart::Row)*1801,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+  if(memory){busaChartHistory.begin(memory,1801,0);busaChartReady=true;}
  }
  if(!busaChartReady)return;
  float values[4];for(int k=0;k<4;k++)values[k]=hasTemp(k,now)?temperature[k]:NAN;
@@ -2052,7 +2052,7 @@ section[data-section="1"] .sensorEdit{border:0}
 .chartTabs,.chartRanges{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .chartTabs button,.chartRanges button{min-width:0;background:#0a2032;color:#c2d8e7;border:1px solid #284b64;padding:10px 2px;font-size:12px}
 .chartTabs button.on,.chartRanges button.on{background:#0872ce;color:#fff;border-color:#53cfff;box-shadow:0 0 8px #0587f733}
-.chartRanges{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:10px}
+.chartRanges{grid-template-columns:repeat(5,minmax(0,1fr));margin-top:10px}
 .chartHeading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:16px 0 10px;font-size:13px;color:#d8eaf7}
 .chartHeading span{font-size:10px;color:#98b8cd;text-align:right}
 .chartLegend{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin:8px 0 12px;font-size:11px;color:#b8d0df}
@@ -2261,7 +2261,7 @@ section[data-section="1"] .sensorEdit{border:0}
 <div class="chartHeading"><strong id="chartTitle">Температура, °C</strong><span id="chartState">Ожидание данных</span></div>
 <div id="chartLegend" class="chartLegend"><span style="--series:#33c9f4">Вода</span><span style="--series:#ff666a">Колонна</span><span style="--series:#f2bc47">Куб</span><span style="--series:#62df8b">Верх колонны</span></div>
 <canvas id="chartCanvas" width="640" height="440" role="img" aria-label="График реальных измерений"></canvas>
-<div class="chartRanges" aria-label="Период"><button type="button" data-hours="1" class="on" aria-pressed="true">1 ч</button><button type="button" data-hours="6" aria-pressed="false">6 ч</button><button type="button" data-hours="12" aria-pressed="false">12 ч</button><button type="button" data-hours="24" aria-pressed="false">24 ч</button></div>
+<div class="chartRanges" aria-label="Период"><button type="button" data-minutes="5" class="on" aria-pressed="true">5 мин</button><button type="button" data-minutes="10" aria-pressed="false">10 мин</button><button type="button" data-minutes="15" aria-pressed="false">15 мин</button><button type="button" data-minutes="30" aria-pressed="false">30 мин</button><button type="button" data-minutes="60" aria-pressed="false">1 ч</button></div>
 </div></section>
 <section class="page" data-section="5" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><strong>НАСТРОЙКИ</strong></div>
 <div class="card approvedSettingsMain" id="settingsMenu"><button type="button" data-stab-btn="0" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg></span><span>Температура</span><span class="approvedArrow">›</span></button>
@@ -2482,8 +2482,8 @@ get('settingsBack').onclick=()=>{
  settingsTab(-1,false);
 };
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
-let chartView=0,chartHours=1,chartFetchToken=0,chartRequestController=null;
-const CHART_REFRESH_MS=5000;
+let chartView=0,chartMinutes=5,chartFetchToken=0,chartRequestController=null;
+const CHART_REFRESH_MS=2000;
 const RELAY_NAMES=['ТЭН откл.','Кран закрыт','Кран открыт','Авария'];
 function updateRelayBadges(channels){
  for(let i=0;i<4;i++){
@@ -2495,8 +2495,8 @@ function updateRelayBadges(channels){
 document.querySelectorAll('[data-chart]').forEach(b=>b.onclick=()=>{
  chartView=Number(b.dataset.chart);document.querySelectorAll('[data-chart]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-selected',String(x===b));});graphs();
 });
-document.querySelectorAll('[data-hours]').forEach(b=>b.onclick=()=>{
- chartHours=Number(b.dataset.hours);document.querySelectorAll('[data-hours]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',String(x===b));});busaGraphData={};graphs();refreshGraphHistory(true);
+document.querySelectorAll('[data-minutes]').forEach(b=>b.onclick=()=>{
+ chartMinutes=Number(b.dataset.minutes);document.querySelectorAll('[data-minutes]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',String(x===b));});busaGraphData={};graphs();refreshGraphHistory(true);
 });
 async function keyCommand(action){
  try{
@@ -2613,7 +2613,7 @@ get('tempCalSave').onclick=async()=>{
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
 document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.dataset.page)));
-// Shared 24h passive measurement history; missing data never becomes a demo line.
+// Shared one-hour passive measurement history; missing data never becomes a demo line.
 function graphs(){
  const canvas=get('chartCanvas'),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
  const x0=58,y0=28,pw=w-82,ph=h-83;ctx.clearRect(0,0,w,h);ctx.fillStyle='#04101e';ctx.fillRect(0,0,w,h);
@@ -2621,8 +2621,8 @@ function graphs(){
  ctx.lineWidth=1;ctx.font='18px system-ui';ctx.textAlign='right';ctx.textBaseline='middle';
  for(let j=0;j<=5;j++){const yy=y0+ph-j*ph/5;ctx.strokeStyle='#1b354a';ctx.beginPath();ctx.moveTo(x0,yy);ctx.lineTo(x0+pw,yy);ctx.stroke();ctx.fillStyle='#90aec3';ctx.fillText(chartView===0?String(j*25):'—',x0-10,yy);}
  const now=Date.now();ctx.textAlign='center';ctx.textBaseline='top';
- for(let j=0;j<=3;j++){const xx=x0+pw*j/3;ctx.strokeStyle='#142b3e';ctx.beginPath();ctx.moveTo(xx,y0);ctx.lineTo(xx,y0+ph);ctx.stroke();ctx.fillStyle='#90aec3';ctx.fillText(new Date(now-(1-j/3)*chartHours*3600000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',hour12:false}),xx,y0+ph+15);}
- const series=busaGraphData.hours===chartHours?busaGraphData.temperature||[]:[],colors=['#33c9f4','#ff666a','#f2bc47','#62df8b'];let points=0;
+ for(let j=0;j<=3;j++){const xx=x0+pw*j/3;ctx.strokeStyle='#142b3e';ctx.beginPath();ctx.moveTo(xx,y0);ctx.lineTo(xx,y0+ph);ctx.stroke();ctx.fillStyle='#90aec3';ctx.fillText(new Date(now-(1-j/3)*chartMinutes*60000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',hour12:false}),xx,y0+ph+15);}
+ const series=busaGraphData.minutes===chartMinutes?busaGraphData.temperature||[]:[],colors=['#33c9f4','#ff666a','#f2bc47','#62df8b'];let points=0;
  if(chartView===0)series.forEach((values,k)=>{
   ctx.strokeStyle=colors[k];ctx.fillStyle=colors[k];ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();let drawing=false;
   values.forEach((v,i)=>{if(!Number.isFinite(v)){drawing=false;return;}points++;const xx=x0+pw*(i+.5)/values.length,yy=y0+ph-Math.max(0,Math.min(125,v))*ph/125;if(drawing)ctx.lineTo(xx,yy);else ctx.moveTo(xx,yy);drawing=true;});ctx.stroke();
@@ -2636,12 +2636,12 @@ async function refreshGraphHistory(force=false){
  if(document.hidden&&!force)return;
  if(chartRequestController){if(!force)return;chartRequestController.abort();}
  const controller=new AbortController();chartRequestController=controller;
- const token=++chartFetchToken,hours=chartHours;busaGraphFetchedAt=Date.now();
- const timeout=setTimeout(()=>controller.abort(),4000);
+ const token=++chartFetchToken,minutes=chartMinutes;busaGraphFetchedAt=Date.now();
+ const timeout=setTimeout(()=>controller.abort(),1800);
  try{
-  const r=await fetch('/api/chart-history?hours='+hours,{cache:'no-store',signal:controller.signal});
+  const r=await fetch('/api/chart-history?minutes='+minutes,{cache:'no-store',signal:controller.signal});
   if(!r.ok)throw Error(r.status);const j=await r.json();
-  if(token===chartFetchToken&&j.ok&&j.hours===chartHours&&Array.isArray(j.temperature)){busaGraphData=j;if(active===3)graphs();}
+  if(token===chartFetchToken&&j.ok&&j.minutes===chartMinutes&&Array.isArray(j.temperature)){busaGraphData=j;if(active===3)graphs();}
  }catch(e){if(token===chartFetchToken&&active===3)get('chartState').textContent='Нет связи';}
  finally{clearTimeout(timeout);if(chartRequestController===controller)chartRequestController=null;}
 }
@@ -3499,11 +3499,11 @@ void setup(){
   // One shared history source for the physical TFT and local iPhone.
   // No invented collection values: only cooling-water pulse counts are sampled.
   server.on("/api/chart-history",HTTP_GET,[]{
-    const uint32_t now=millis();int hours=server.arg("hours").toInt();
-    if(hours!=1&&hours!=6&&hours!=12&&hours!=24){server.send(400,"application/json","{\"error\":\"hours\"}");return;}
-    const int bins=min(hours*60,160);int16_t selected[160];
-    busaChartHistory.select(now,hours,selected,bins);
-    String j="{\"ok\":true,\"hours\":"+String(hours)+",\"temperature\":[";
+    const uint32_t now=millis();int minutes=server.arg("minutes").toInt();
+    if(minutes!=5&&minutes!=10&&minutes!=15&&minutes!=30&&minutes!=60){server.send(400,"application/json","{\"error\":\"minutes\"}");return;}
+    const int bins=min(minutes*30,160);int16_t selected[160];
+    busaChartHistory.selectMs(now,(uint32_t)minutes*60000u,selected,bins);
+    String j="{\"ok\":true,\"minutes\":"+String(minutes)+",\"temperature\":[";
     for(int k=0;k<4;k++){
       if(k)j+=",";j+="[";
       for(int b=0;b<bins;b++){if(b)j+=",";float v=busaChartHistory.value(selected[b],k);j+=isfinite(v)?String(v,2):String("null");}
@@ -3514,7 +3514,7 @@ void setup(){
   });
   server.on("/api/graph-history",HTTP_GET,[]{
     uint32_t now=millis();
-    String j="{\"ok\":true,\"sample_period_ms\":5000,\"temperature\":[";
+    String j="{\"ok\":true,\"sample_period_ms\":2000,\"temperature\":[";
     for(int k=0;k<4;k++){
       if(k)j+=",";
       j+="[";
