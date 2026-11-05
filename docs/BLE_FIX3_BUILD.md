@@ -17,11 +17,13 @@ U8g2_for_Adafruit_GFX 1.8.0. RainMaker/WiFiProv входят в платформ
 
 ```sh
 python3 -B ci/validate_ble_ota.py
-python3 -B tests/test_ble_ota.py # в checkout; исходный тест доступен на GitHub
+python3 -B tests/test_ble_ota.py
 python3 ci/generate_google_ca.py --output firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h
 arduino-cli compile --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
 ```
 
+Старый вложенный архив `.ino.zip` не компилируется и не включается в FIX3 source ZIP.
+В source ZIP добавлены регрессионные тесты.
 Готовый source ZIP содержит сгенерированный проверенный `BUSA_GoogleCA.h`.
 Для повторной генерации используются GTS Root R1–R4 с обязательной сверкой SHA-256.
 TLS-проверка не отключается. Подробная установка библиотек и упаковка приведены

@@ -38,13 +38,18 @@ def package(build,core,esptool,sketch_dir=None):
     try:commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError:commit=(root/'SOURCE_COMMIT.txt').read_bytes()
     (build/'SOURCE_COMMIT.txt').write_bytes(commit)
-    files=sorted(p for p in sketch.iterdir() if p.is_file())
+    # Do not republish the legacy .ino.zip snapshot as if it were FIX3 source.
+    source_suffixes={'.ino','.h','.hpp','.c','.cpp','.s','.S','.csv'}
+    files=sorted(p for p in sketch.iterdir() if p.is_file() and p.suffix in source_suffixes)
     (build/'SOURCE_SHA256SUMS.txt').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in files))
     with zipfile.ZipFile(build/'BUSA_N16R8_BLE_FIX3_SOURCE.zip','w',zipfile.ZIP_DEFLATED) as archive:
         for path in files:archive.write(path,'firmware/'+sketch.name+'/'+path.name)
         for path in sorted((root/'ci').glob('*.py')):archive.write(path,'ci/'+path.name)
         archive.write(root/'.github/workflows/busa-ble-fix3.yml','.github/workflows/busa-ble-fix3.yml')
         archive.writestr('SOURCE_COMMIT.txt',commit)
+        for path in sorted((root/'tests').rglob('*')):
+            if path.is_file() and path.suffix in {'.py','.js','.json'}:archive.write(path,str(path.relative_to(root)))
+        archive.write(root/'index.html','index.html')
         if (root/'docs/BLE_FIX3_BUILD.md').exists():archive.write(root/'docs/BLE_FIX3_BUILD.md','README_BUILD.md')
     print('PASS APP/USB target, checksums, boundaries, partitions and source snapshot')
 
