@@ -59,10 +59,9 @@ static void busaRmStopProvisioning(){
 static uint32_t busaRmBleSessionAt=0;
 static const uint32_t BUSA_BLE_PAIR_TIMEOUT_MS=180000;
 static String busaRmBleFeedback="Bluetooth выключен";
-static uint32_t busaRmLastSent=0,busaRmLastSettingsSent=0;
-static uint8_t busaRmSettingsCursor=0;
 static char busaRmService[24]={};
 static char busaRmPoP[16]={};
+#include "BUSA_RainMakerTelemetry.h"
 
 static void busaRmProvisionEvent(arduino_event_t *event){
   switch(event->event_id){
@@ -125,8 +124,10 @@ static void busaRmWrite(Device*device,Param*param,const param_val_t val,
     else if(strcmp(p,RM_KEYSTOP)==0){q.action=9;q.b=val.val.b;}
     else return;
   }else return;
-  if(xQueueSend(busaRmQueue,&q,0)!=pdPASS)
+  if(xQueueSend(busaRmQueue,&q,0)!=pdPASS){
+    ++busaRmWriteQueueDrops;
     Serial0.println("BUSA RainMaker: command queue full; settings unchanged");
+  }
 }
 static void busaRmAddFloat(Device*d,const char*name,float initial,float lo,float hi,float step){
   if(!d)return;
@@ -214,6 +215,7 @@ static void busaRainMakerStart(){
     busaRmHealth->addParam(Param("Зуммер активен",nullptr,value(false),PROP_FLAG_READ));
     node.addDevice(*busaRmHealth);
   }
+  busaRmTelemetryInit();
   esp_err_t rc=RMaker.start();
   if(rc!=ESP_OK){Serial0.printf("BUSA RainMaker: start error 0x%X\n",(unsigned)rc);return;}
   busaRmStarted=true;
@@ -244,6 +246,7 @@ static void busaRainMakerProvision(){
 // Apply only writes accepted by the signed-in RainMaker device owner.
 // Never touch main TFT, NVS or GPIO from the RainMaker callback's task.
 static void busaRainMakerApply(){
+  busaRmSnapshotPaused=otaActive||busaWifiScanRunning;
   if(!busaRmStarted||!busaRmQueue||otaActive)return;
   BusaRmRequest q;
   for(int attempt=0;attempt<5 && xQueueReceive(busaRmQueue,&q,0)==pdPASS;attempt++){
@@ -291,68 +294,12 @@ static void busaRainMakerApply(){
     }
     if(!ok)Serial0.printf("BUSA RainMaker: rejected target=%u action=%u\n",(unsigned)q.target,(unsigned)q.action);
     // Publish the actual local values after each attempted write, not the untrusted requested value.
-    busaRmSettingsCursor=(uint8_t)q.target;
-    busaRmLastSettingsSent=0;
+    ++busaRmSettingsRevision;
   }
 }
 static void busaRainMakerPoll(uint32_t now){
-  if(!busaRmStarted||WiFi.status()!=WL_CONNECTED||otaActive||
-     busaGoogleNetworkBusy||busaWifiScanRunning)return;
-  // Settings sync also reflects changes made via keyboard or original local web UI.
-  // One device per interval avoids flooding MQTT and stalling local TFT/I2C.
-  if(!busaRmLastSettingsSent||elapsed(now,busaRmLastSettingsSent,2500)){
-    busaRmLastSettingsSent=now;
-    const uint8_t slot=busaRmSettingsCursor;
-    busaRmSettingsCursor=(busaRmSettingsCursor+1)%6;
-    if(slot<4&&busaRmTemps[slot]){
-      const int i=slot;
-      const float on=refTemp[i],off=noticeTemp[i];
-      busaRmTemps[i]->updateAndReportParam(RM_ON,isfinite(on)?on:0.0f);
-      busaRmTemps[i]->updateAndReportParam(RM_OFF,isfinite(off)?off:0.0f);
-      busaRmTemps[i]->updateAndReportParam(RM_CAL,tempOffset[i]);
-      busaRmTemps[i]->updateAndReportParam(RM_SET,BusaSound::valid(on,off));
-      busaRmTemps[i]->updateAndReportParam(RM_CLEAR,false);
-      if(i<2)busaRmTemps[i]->updateAndReportParam(RM_BUZ,buzzerEnabled[i]);
-      if(i==2){
-        busaRmTemps[i]->updateAndReportParam(RM_K1,soundEnabled[0]);
-        busaRmTemps[i]->updateAndReportParam(RM_K2,soundEnabled[1]);
-        busaRmTemps[i]->updateAndReportParam(RM_K3,soundEnabled[2]);
-      }
-      if(i==3)busaRmTemps[i]->updateAndReportParam(RM_K4,soundEnabled[3]);
-    }
-    if(slot==4&&busaRmScreen){
-      busaRmScreen->updateAndReportParam(RM_THEME,(int)tftThemeMode);
-      busaRmScreen->updateAndReportParam(RM_SCREEN,!tftDisplayOff);
-      busaRmScreen->updateAndReportParam(RM_PAGE,(int)currentPage);
-    }
-    if(slot==5&&busaRmKeys){
-      busaRmKeys->updateAndReportParam("Раскладка сохранена",keypadReady);
-      busaRmKeys->updateAndReportParam("Обучение идет",keypadLearning);
-      busaRmKeys->updateAndReportParam("Следующая клавиша",keypadLearning?(int)learnStep+1:0);
-      busaRmKeys->updateAndReportParam(RM_KEYLEARN,false);
-      busaRmKeys->updateAndReportParam(RM_KEYSTOP,false);
-    }
-  }
-  if(busaRmLastSent && !elapsed(now,busaRmLastSent,30000))return;
-  busaRmLastSent=now;
-  for(int i=0;i<4;i++)if(busaRmTemps[i]){
-    const bool present=hasTemp(i,now);
-    if(present)busaRmTemps[i]->updateAndReportParam(ESP_RMAKER_DEF_TEMPERATURE_NAME,temperature[i]);
-    busaRmTemps[i]->updateAndReportParam("Датчик подключен",present);
-  }
-  if(busaRmWater){
-    busaRmWater->updateAndReportParam("Расход л/мин",flowLpm);
-    busaRmWater->updateAndReportParam("Объем л",totalWaterLitres());
-    busaRmWater->updateAndReportParam("Калиброван",false);
-  }
-  if(busaRmHealth){
-    busaRmHealth->updateAndReportParam("Работает секунд",(int)(now/1000u));
-    busaRmHealth->updateAndReportParam("Google настроен",(bool)googleEnabled);
-    busaRmHealth->updateAndReportParam("Звук К1",soundChannels[0].on);
-    busaRmHealth->updateAndReportParam("Звук К2",soundChannels[1].on);
-    busaRmHealth->updateAndReportParam("Звук К3",soundChannels[2].on);
-    busaRmHealth->updateAndReportParam("Звук К4",soundChannels[3].on);
-    busaRmHealth->updateAndReportParam("Зуммер активен",buzzerSoundOn);
-  }
-  if(busaRmKeys)busaRmKeys->updateAndReportParam("PCF8575 подключен",pcfDetected);
+  busaRmSnapshotPaused=otaActive||busaWifiScanRunning;
+  if(!busaRmStarted||otaActive)return;
+  // Snapshot/queue only. MQTT publishing runs on the official nonblocking work queue.
+  busaRmCaptureAndQueue(now);
 }

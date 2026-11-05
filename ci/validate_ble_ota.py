@@ -10,7 +10,7 @@ def validate():
     main=(SKETCH/'BUSA_Main.h').read_text()
     rain=(SKETCH/'BUSA_RainMaker.h').read_text()
     ota=(SKETCH/'BUSA_OtaBoot.h').read_text()
-    assert main.count('14v9-N16R8-RM-BLE-FIX3-20261105')==1
+    assert sum(main.count(v) for v in ['14v9-N16R8-RM-BLE-FIX3-20261105','14v9-N16R8-RM-TELEM1-20261105'])==1
     assert 'static bool busaRmBleBootMode=false;' in main
     assert 'busaRmPairDeferred=' in main and '&&busaOtaPendingVerification()' in main
     assert 'busaConfirmRunningImage(busaNvsReady&&wifiRunning)' in main

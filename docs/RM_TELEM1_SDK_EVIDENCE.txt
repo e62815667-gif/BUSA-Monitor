@@ -1,0 +1,179 @@
+ESP32 Arduino official core 2.0.17; ESP32-S3 qio_opi
+16d53cc7a1bdaff19c2ca72240c01be9d48ddf53bd1b4bfe4d690891a8d25f4b  tools/sdk/esp32s3/lib/libesp_rainmaker.a
+f54270c00edbcfb23c9160b90d40630fe49d41e0591968d427daaf27e69ac5c5  tools/sdk/esp32s3/lib/librmaker_common.a
+09b7ecccbd4960d49aa9aacc57662c7982221c3f49bc500c663bf117afe78fdd  tools/sdk/esp32s3/qio_opi/include/sdkconfig.h
+
+#define CONFIG_ESP_RMAKER_MQTT_ENABLE_BUDGETING 1
+#define CONFIG_ESP_RMAKER_MQTT_DEFAULT_BUDGET 100
+#define CONFIG_ESP_RMAKER_MQTT_MAX_BUDGET 1024
+#define CONFIG_ESP_RMAKER_MQTT_BUDGET_REVIVE_PERIOD 5
+#define CONFIG_ESP_RMAKER_MQTT_BUDGET_REVIVE_COUNT 1
+#define CONFIG_ESP_RMAKER_WORK_QUEUE_TASK_STACK 4096
+
+Disassembly of section .text.esp_rmaker_report_param_internal:
+
+00000000 <esp_rmaker_report_param_internal>:
+   0:	004136        	entry	a1, 32
+   3:	02ad      	mov.n	a10, a2
+   5:	01a0b2        	movi	a11, 1
+   8:	000081        	l32r	a8, fffc0008 <esp_rmaker_report_param_internal+0xfffc0008>
+			8: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x1c
+			8: R_XTENSA_ASM_EXPAND	.text.esp_rmaker_allocate_and_populate_params
+   b:	0008e0        	callx8	a8
+   e:	025d      	mov.n	a5, a2
+  10:	0a2d      	mov.n	a2, a10
+  12:	04ea56        	bnez	a10, 64 <esp_rmaker_report_param_internal+0x64>
+			12: R_XTENSA_SLOT0_OP	.text.esp_rmaker_report_param_internal+0x64
+  15:	000031        	l32r	a3, fffc0018 <esp_rmaker_report_param_internal+0xfffc0018>
+			15: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal
+  18:	0348      	l32i.n	a4, a3, 0
+  1a:	a30c      	movi.n	a3, 10
+  1c:	04ad      	mov.n	a10, a4
+  1e:	000081        	l32r	a8, fffc0020 <esp_rmaker_report_param_internal+0xfffc0020>
+			1e: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x20
+			1e: R_XTENSA_ASM_EXPAND	strlen
+  21:	0008e0        	callx8	a8
+  24:	3cb3a7        	bgeu	a3, a10, 64 <esp_rmaker_report_param_internal+0x64>
+			24: R_XTENSA_SLOT0_OP	.text.esp_rmaker_report_param_internal+0x64
+  27:	000031        	l32r	a3, fffc0028 <esp_rmaker_report_param_internal+0xfffc0028>
+			27: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0xc
+  2a:	0000d1        	l32r	a13, fffc002c <esp_rmaker_report_param_internal+0xfffc002c>
+			2a: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x4
+  2d:	0000c1        	l32r	a12, fffc0030 <esp_rmaker_report_param_internal+0xfffc0030>
+			2d: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x8
+  30:	051526        	beqi	a5, 1, 39 <esp_rmaker_report_param_internal+0x39>
+			30: R_XTENSA_SLOT0_OP	.text.esp_rmaker_report_param_internal+0x39
+  33:	0000d1        	l32r	a13, fffc0034 <esp_rmaker_report_param_internal+0xfffc0034>
+			33: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x10
+  36:	0000c1        	l32r	a12, fffc0038 <esp_rmaker_report_param_internal+0xfffc0038>
+			36: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x14
+  39:	96a0b2        	movi	a11, 150
+  3c:	03ad      	mov.n	a10, a3
+  3e:	000081        	l32r	a8, fffc0040 <esp_rmaker_report_param_internal+0xfffc0040>
+			3e: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x24
+			3e: R_XTENSA_ASM_EXPAND	esp_rmaker_create_mqtt_topic
+  41:	0008e0        	callx8	a8
+  44:	000051        	l32r	a5, fffc0044 <esp_rmaker_report_param_internal+0xfffc0044>
+			44: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x18
+  47:	000552        	l8ui	a5, a5, 0
+  4a:	659c      	beqz.n	a5, 64 <esp_rmaker_report_param_internal+0x64>
+			4a: R_XTENSA_SLOT0_OP	.text.esp_rmaker_report_param_internal+0x64
+  4c:	04ad      	mov.n	a10, a4
+  4e:	000081        	l32r	a8, fffc0050 <esp_rmaker_report_param_internal+0xfffc0050>
+			4e: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x28
+			4e: R_XTENSA_ASM_EXPAND	strlen
+  51:	0008e0        	callx8	a8
+  54:	0acd      	mov.n	a12, a10
+  56:	0e0c      	movi.n	a14, 0
+  58:	1d0c      	movi.n	a13, 1
+  5a:	04bd      	mov.n	a11, a4
+  5c:	03ad      	mov.n	a10, a3
+  5e:	000081        	l32r	a8, fffc0060 <esp_rmaker_report_param_internal+0xfffc0060>
+			5e: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_report_param_internal+0x2c
+			5e: R_XTENSA_ASM_EXPAND	esp_rmaker_mqtt_publish
+  61:	0008e0        	callx8	a8
+  64:	f01d      	retw.n
+
+
+
+Disassembly of section .text.esp_rmaker_work_queue_add_task:
+
+00000000 <esp_rmaker_work_queue_add_task>:
+   0:	006136        	entry	a1, 48
+   3:	000081        	l32r	a8, fffc0004 <esp_rmaker_work_queue_add_task+0xfffc0004>
+			3: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_work_queue_add_task
+   6:	08a8      	l32i.n	a10, a8, 0
+   8:	dadc      	bnez.n	a10, 29 <esp_rmaker_work_queue_add_task+0x29>
+			8: R_XTENSA_SLOT0_OP	.text.esp_rmaker_work_queue_add_task+0x29
+   a:	000081        	l32r	a8, fffc000c <esp_rmaker_work_queue_add_task+0xfffc000c>
+			a: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_work_queue_add_task+0xc
+			a: R_XTENSA_ASM_EXPAND	esp_log_timestamp
+   d:	0008e0        	callx8	a8
+  10:	0000b1        	l32r	a11, fffc0010 <esp_rmaker_work_queue_add_task+0xfffc0010>
+			10: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_work_queue_add_task+0x4
+  13:	0000c1        	l32r	a12, fffc0014 <esp_rmaker_work_queue_add_task+0xfffc0014>
+			13: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_work_queue_add_task+0x8
+  16:	0add      	mov.n	a13, a10
+  18:	20ebb0        	or	a14, a11, a11
+  1b:	01a0a2        	movi	a10, 1
+  1e:	000081        	l32r	a8, fffc0020 <esp_rmaker_work_queue_add_task+0xfffc0020>
+			1e: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_work_queue_add_task+0x10
+			1e: R_XTENSA_ASM_EXPAND	esp_log_write
+  21:	0008e0        	callx8	a8
+  24:	03a122        	movi	a2, 0x103
+  27:	f01d      	retw.n
+  29:	0d0c      	movi.n	a13, 0
+  2b:	0dcd      	mov.n	a12, a13
+  2d:	b18b      	addi.n	a11, a1, 8
+  2f:	2129      	s32i.n	a2, a1, 8
+  31:	3139      	s32i.n	a3, a1, 12
+  33:	000081        	l32r	a8, fffc0034 <esp_rmaker_work_queue_add_task+0xfffc0034>
+			33: R_XTENSA_SLOT0_OP	.literal.esp_rmaker_work_queue_add_task+0x14
+			33: R_XTENSA_ASM_EXPAND	xQueueGenericSend
+  36:	0008e0        	callx8	a8
+  39:	2a0b      	addi.n	a2, a10, -1
+  3b:	180c      	movi.n	a8, 1
+  3d:	0a0c      	movi.n	a10, 0
+  3f:	93a820        	movnez	a10, a8, a2
+  42:	6020a0        	neg	a2, a10
+  45:	fff786        	j	27 <esp_rmaker_work_queue_add_task+0x27>
+			45: R_XTENSA_SLOT0_OP	.text.esp_rmaker_work_queue_add_task+0x27
+
+
+
+Disassembly of section .text.esp_mqtt_glue_publish:
+
+00000000 <esp_mqtt_glue_publish>:
+   0:	004136        	entry	a1, 32
+   3:	74e050        	extui	a14, a5, 0, 8
+   6:	000051        	l32r	a5, fffc0008 <esp_mqtt_glue_publish+0xfffc0008>
+			6: R_XTENSA_SLOT0_OP	.literal.esp_mqtt_glue_publish
+   9:	02bd      	mov.n	a11, a2
+   b:	0588      	l32i.n	a8, a5, 0
+   d:	03cd      	mov.n	a12, a3
+   f:	04dd      	mov.n	a13, a4
+  11:	f27c      	movi.n	a2, -1
+  13:	042816        	beqz	a8, 59 <esp_mqtt_glue_publish+0x59>
+			13: R_XTENSA_SLOT0_OP	.text.esp_mqtt_glue_publish+0x59
+  16:	150c      	movi.n	a5, 1
+  18:	0f0c      	movi.n	a15, 0
+  1a:	83f5b0        	moveqz	a15, a5, a11
+  1d:	74f0f0        	extui	a15, a15, 0, 8
+  20:	cfec      	bnez.n	a15, 50 <esp_mqtt_glue_publish+0x50>
+			20: R_XTENSA_SLOT0_OP	.text.esp_mqtt_glue_publish+0x50
+  22:	0f2d      	mov.n	a2, a15
+  24:	832530        	moveqz	a2, a5, a3
+  27:	52ec      	bnez.n	a2, 50 <esp_mqtt_glue_publish+0x50>
+			27: R_XTENSA_SLOT0_OP	.text.esp_mqtt_glue_publish+0x50
+  29:	08a8      	l32i.n	a10, a8, 0
+  2b:	20f220        	or	a15, a2, a2
+  2e:	000081        	l32r	a8, fffc0030 <esp_mqtt_glue_publish+0xfffc0030>
+			2e: R_XTENSA_SLOT0_OP	.literal.esp_mqtt_glue_publish+0xc
+			2e: R_XTENSA_ASM_EXPAND	esp_mqtt_client_publish
+  31:	0008e0        	callx8	a8
+  34:	01dad6        	bgez	a10, 55 <esp_mqtt_glue_publish+0x55>
+			34: R_XTENSA_SLOT0_OP	.text.esp_mqtt_glue_publish+0x55
+  37:	000081        	l32r	a8, fffc0038 <esp_mqtt_glue_publish+0xfffc0038>
+			37: R_XTENSA_SLOT0_OP	.literal.esp_mqtt_glue_publish+0x10
+			37: R_XTENSA_ASM_EXPAND	esp_log_timestamp
+  3a:	0008e0        	callx8	a8
+  3d:	0000b1        	l32r	a11, fffc0040 <esp_mqtt_glue_publish+0xfffc0040>
+			3d: R_XTENSA_SLOT0_OP	.literal.esp_mqtt_glue_publish+0x4
+  40:	0000c1        	l32r	a12, fffc0040 <esp_mqtt_glue_publish+0xfffc0040>
+			40: R_XTENSA_SLOT0_OP	.literal.esp_mqtt_glue_publish+0x8
+  43:	0add      	mov.n	a13, a10
+  45:	0bed      	mov.n	a14, a11
+  47:	20a550        	or	a10, a5, a5
+  4a:	000081        	l32r	a8, fffc004c <esp_mqtt_glue_publish+0xfffc004c>
+			4a: R_XTENSA_SLOT0_OP	.literal.esp_mqtt_glue_publish+0x14
+			4a: R_XTENSA_ASM_EXPAND	esp_log_write
+  4d:	0008e0        	callx8	a8
+  50:	f27c      	movi.n	a2, -1
+  52:	0000c6        	j	59 <esp_mqtt_glue_publish+0x59>
+			52: R_XTENSA_SLOT0_OP	.text.esp_mqtt_glue_publish+0x59
+  55:	068c      	beqz.n	a6, 59 <esp_mqtt_glue_publish+0x59>
+			55: R_XTENSA_SLOT0_OP	.text.esp_mqtt_glue_publish+0x59
+  57:	06a9      	s32i.n	a10, a6, 0
+  59:	f01d      	retw.n
+
+
