@@ -102,7 +102,9 @@ static void v13Frame(uint32_t now){
       case 4: screen->drawRect(cx-6,cy-7,12,15,WHITE);screen->drawFastHLine(cx-3,cy-3,7,WHITE);screen->drawFastHLine(cx-3,cy+1,7,WHITE);break;
       default: screen->drawCircle(cx,cy,7,WHITE);screen->fillCircle(cx,cy,3,WHITE);break;
     }
+    ru.setFont(u8g2_font_5x7_t_cyrillic);
     v13Text(tab[i],x+2,314,i==currentPage?WHITE:GRAY);
+    ru.setFont(u8g2_font_6x13_t_cyrillic);
   }
   if(tftView && currentPage!=1 && currentPage!=5){
     v13Badge(199,36,"INFO",V13_CYAN);

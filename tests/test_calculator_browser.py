@@ -17,7 +17,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 server=socketserver.TCPServer(('127.0.0.1',0),Handler);threading.Thread(target=server.serve_forever,daemon=True).start();url=f'http://127.0.0.1:{server.server_address[1]}'
 artifacts=Path(os.environ.get('BUSA_BROWSER_ARTIFACTS','/tmp/busa-calculator-browser'));artifacts.mkdir(parents=True,exist_ok=True)
 with sync_playwright() as p:
- browser=p.webkit.launch() if os.environ.get('BUSA_TEST_BROWSER')=='webkit' else p.chromium.launch(executable_path=os.environ.get('BUSA_CHROMIUM', '/usr/bin/chromium' if Path('/usr/bin/chromium').exists() else p.chromium.executable_path),args=['--no-sandbox'])
+ browser=p.webkit.launch() if os.environ.get('BUSA_TEST_BROWSER')=='webkit' else p.chromium.launch(executable_path=os.environ.get('BUSA_CHROMIUM', '/usr/bin/chromium' if Path('/usr/bin/chromium').exists() and not os.environ.get('GITHUB_ACTIONS') else p.chromium.executable_path),args=['--no-sandbox'])
  for local_app in [False,True]:
   for width,height in [(390,844),(393,852)]:
    context=browser.new_context(viewport={'width':width,'height':height},is_mobile=True,has_touch=True,locale='ru-RU')
