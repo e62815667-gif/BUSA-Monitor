@@ -17,12 +17,18 @@ def once(old, new):
 once("#include <Update.h>", "#include <Update.h>\n#include <esp_ota_ops.h>")
 
 once(
+    "WebServer server(80);",
+    """WebServer server(80);
+static esp_err_t busaOtaConfirmResult=ESP_ERR_NOT_FOUND;
+static esp_err_t busaOtaSelectResult=ESP_OK;
+static String busaOtaRunning="unknown",busaOtaBoot="unknown";"""
+)
+
+
+once(
     "static uint32_t busaRmCloudBootAt=0;",
     """static uint32_t busaRmCloudBootAt=0;
 static bool busaRmBleBootError=false;
-static esp_err_t busaOtaConfirmResult=ESP_ERR_NOT_FOUND;
-static esp_err_t busaOtaSelectResult=ESP_OK;
-static String busaOtaRunning="unknown",busaOtaBoot="unknown";
 static void busaConfirmRunningImage(){
   const esp_partition_t* running=esp_ota_get_running_partition();
   const esp_partition_t* boot=esp_ota_get_boot_partition();
@@ -43,7 +49,7 @@ static void busaConfirmRunningImage(){
     busaOtaSelectResult=esp_ota_set_boot_partition(running);
     if(busaOtaSelectResult==ESP_OK)busaOtaBoot=String(running->label);
   }
-  Serial0.printf("BUSA OTA running=%s boot=%s validate=0x%X select=0x%X\n",
+  Serial0.printf("BUSA OTA running=%s boot=%s validate=0x%X select=0x%X\\n",
     busaOtaRunning.c_str(),busaOtaBoot.c_str(),
     (unsigned)busaOtaConfirmResult,(unsigned)busaOtaSelectResult);
 }
