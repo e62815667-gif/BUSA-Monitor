@@ -1,4 +1,4 @@
-name: BUSA N16R8 RainMaker Calculator CALC2 verified build
+name: BUSA N16R8 CALC3 Wi-Fi scan recovery verified build
 on:
   push:
     branches: [feat/busa-calculator-20261105]
@@ -69,6 +69,7 @@ jobs:
           python3 -B tests/test_calculator.py
           python3 -B tests/test_calculator_keypad.py
           python3 -B tests/test_rainmaker_calculator.py
+          python3 -B tests/test_wifi_scan.py
           node --check calculator.js
           node --check sw.js
           python3 -B -m unittest discover -s tests -p test_firmware_contract.py -v
@@ -89,6 +90,8 @@ jobs:
           CI=1 python3 -m playwright install --with-deps chromium webkit
           python3 -B tests/test_calculator_browser.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_calculator_browser.py
+          python3 -B tests/test_wifi_browser.py
+          BUSA_TEST_BROWSER=webkit python3 -B tests/test_wifi_browser.py
       - name: Compile ESP32-S3 N16R8
         run: |
           set -euo pipefail
@@ -96,17 +99,17 @@ jobs:
           arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
       - name: Package and verify the two BIN and complete source snapshot
         run: |
-          python3 ci/package_rainmaker_calculator.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          python3 ci/package_wifi1.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_N16R8_RAINMAKER_RM_CALC2_20261105
+          name: BUSA_N16R8_RAINMAKER_RM_CALC3_WIFI1_20261105
           retention-days: 30
           path: |
-            out/BUSA_N16R8_RM_CALC2_OTA.bin
-            out/BUSA_N16R8_RM_CALC2_USB_MERGED.bin
+            out/BUSA_N16R8_RM_CALC3_WIFI1_OTA.bin
+            out/BUSA_N16R8_RM_CALC3_WIFI1_USB_MERGED.bin
             out/SHA256SUMS.txt
             out/OTA_IMAGE_INFO.txt
             out/PARTITIONS.csv
             out/SOURCE_COMMIT.txt
             out/SOURCE_SHA256SUMS.txt
-            out/BUSA_N16R8_RM_CALC2_SOURCE.zip
+            out/BUSA_N16R8_RM_CALC3_WIFI1_SOURCE.zip

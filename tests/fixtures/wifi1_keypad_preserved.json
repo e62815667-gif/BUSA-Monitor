@@ -1,0 +1,18 @@
+{
+  "const char* wifiUiModeCaption()": "e65f1cc95f997279c16817e710be1d9ce99462737928e91ffbc65752cf1f18e6",
+  "String wifiUiPasswordMask()": "ec67a7edd8941895829a0893bd7521e6a8cb4d8d90f9ef5ea2456bdf7a6bdc71",
+  "String wifiUiPasswordPreview()": "aba27993552c65826b4521b85dcf708a65dc536378f084697b3ac538921ca6ab",
+  "void wifiUiResetTap()": "b3c010b95225e5097363cf3f71178db0bb9f42f6986219ae6b8daeedce434662",
+  "int wifiUiDigitFromKey(int k)": "546e3bb2fc86f3a7defa0e1e95c30a67c57f9d6c5268825f3220f4a976e7eeb9",
+  "const char* wifiUiLetters(int digit)": "783b65ce0404e2e8069523a40435ba9ccf83dac0be9da5808be6e572020ada9b",
+  "void wifiUiInsertChar(char c)": "65071d6175b28c4c763876ec10785146ad905e8bcbbd4a20c99cfc4ca9701980",
+  "void wifiUiTypeDigit(int k)": "51665f9296f302a9feb9b5920f1a03cda74708489f0389569bc1d08c95973fb4",
+  "void wifiUiBackspace()": "1e8da0dcabf1e61ca3c99be4af2cfe00990125342aedc0cc168932eeb72e4cdc",
+  "void wifiUiApplyStationDisconnect()": "65b884bc154dc8d7dc5e56c3ac2547409b4e5c2305ed4ccac2408d929bd0b22c",
+  "void wifiUiRequestStationDisconnect()": "d571518fca78b7a894c2ccbbbbcc8ab7f87414937a2574433146366e4be6ea69",
+  "void wifiUiLeave()": "041dd3999f3a1b348a180464d5fb0c683b220beed874320e74a9ccfe3af35f76",
+  "void wifiUiBeginScan()": "e52d5da483287d6cbb10b8c07908f82fb96ba2e59569d8b9c7cf8797be820dcb",
+  "void wifiUiSaveConnection()": "66d822f72b321584914bf0c95354b2dea43a459362266479891f630ef5023cc9",
+  "bool wifiUiKey(int k)": "6005ddde40eba381dd3a7be25d5b2abea45ea51c89e6754840babba3f34adb12",
+  "void wifiUiLongZero()": "fe5a21ef8e7d66294b7717c89bba5328e933eaf6f75da8a5339e3aed6e7cffd1"
+}

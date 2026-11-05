@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC2-20261105";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC3-WIFI1-20261105";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1265,20 +1265,6 @@ String otaToken="",otaMessage="Ожидание",nearbyNames[5];
 uint8_t nearbyCount=0;
 volatile bool busaWifiScanRunning=false;
 uint32_t busaWifiScanStartedAt=0,busaWifiScanLastAt=0;
-bool busaWebScanPending=false,busaWebScanResumeSTA=false,busaWebScanPassive=false;
-uint8_t busaWebScanAttempts=0;
-uint32_t busaWebScanStartDueAt=0;
-enum BusaSharedScanState : uint8_t {
-  BUSA_SCAN_IDLE=0,BUSA_SCAN_REQUESTED=1,BUSA_SCAN_RUNNING=2,
-  BUSA_SCAN_READY=3,BUSA_SCAN_EMPTY=4,BUSA_SCAN_ERROR=5
-};
-BusaSharedScanState busaSharedScanState=BUSA_SCAN_IDLE;
-uint8_t busaSharedScanAttempt=0;
-uint32_t busaSharedScanAttemptAt=0,busaSharedScanFinishedAt=0,busaSharedScanRetryDueAt=0;
-bool busaSharedScanForTft=false;
-bool busaSharedScanReleasedSTA=false;
-int busaSharedScanStartResult=0,busaSharedScanLastResult=0;
-String busaSharedScanError="";
 
 bool screenAttempted=false;
 bool apClient(){return server.client().localIP()==WiFi.softAPIP();}
@@ -1287,15 +1273,6 @@ String apPassword="";
 bool wifiRunning=false;
 uint32_t lastRender=0,lastUart=0,lastStationCheck=0;
 String consoleLine="",stationSsid="",stationPass="";
-// The physical TFT and local browser share the Wi-Fi radio, but NOT navigation.
-// This web-only scan runner leaves BUSA's AP and OTA accessible throughout.
-void busaWebScanFinish(){
-  WiFi.scanDelete();busaWifiScanRunning=false;busaWebScanPending=false;
-  busaWebScanStartDueAt=0;
-  // Do not silently reconnect to the previous network after searching.
-  // The local BUSA access point remains available for selecting another SSID.
-  busaWebScanResumeSTA=false;
-}
 String quoteJson(const String &x){
   String out="\"";
   for(unsigned i=0;i<x.length();i++){
@@ -1308,155 +1285,7 @@ String quoteJson(const String &x){
   return out+"\"";
 }
 
-bool busaWifiRequestSharedScan(bool physical){
-  const uint32_t now=millis();
-  if(otaActive)return false;
-  if(physical)busaSharedScanForTft=true;
-  // TFT and browser join the same in-flight scan.
-  if(busaSharedScanState==BUSA_SCAN_REQUESTED ||
-     busaSharedScanState==BUSA_SCAN_RUNNING)return true;
-  // A fresh successful scan may be reused without another RF scan.
-  if(busaSharedScanState==BUSA_SCAN_READY &&
-     (uint32_t)(now-busaSharedScanFinishedAt)<5000){
-    if(physical && wifiUiCount>0){
-      wifiUiStage=WIFIUI_NETWORKS;wifiUiMenuIndex=0;wifiUiIndex=0;
-      wifiUiFeedback="";busaSharedScanForTft=false;tftDirty=true;
-    }
-    return true;
-  }
-  // CRITICAL: esp_wifi_scan_start fails during an STA association.
-  // Cancel the old connection attempt before searching another router.
-  // Only the STA interface is disconnected; BUSA's AP stays running.
-  const bool pendingAssociation=wifiUiConnectPending || wifiUiAssociationDueAt ||
-                                wifiUiConnectAt;
-  wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
-  WiFi.setAutoReconnect(false);
-  const bool staNotConnected=WiFi.status()!=WL_CONNECTED;
-  busaSharedScanReleasedSTA=staNotConnected;
-  if(staNotConnected)WiFi.disconnect(false,false);
-  busaSharedScanAttempt=0;
-  busaSharedScanRetryDueAt=(staNotConnected||pendingAssociation)?now+900:0;
-  busaSharedScanError="";
-  busaSharedScanStartResult=0;busaSharedScanLastResult=0;
-  busaSharedScanState=BUSA_SCAN_REQUESTED;
-  busaWifiScanRunning=true;busaWifiScanStartedAt=now;
-  wifiUiCount=0;
-  Serial0.printf("BUSA WIFI SCAN requested mode=%d connected=%d pending=%d\n",
-     (int)WiFi.getMode(),(int)!staNotConnected,(int)pendingAssociation);
-  return true;
-}
-void busaWifiScanFinish(uint8_t state,uint32_t now){
-  // Driver buffers released in exactly one place, after completion.
-  WiFi.scanDelete();
-  busaWifiScanRunning=false;
-  busaSharedScanState=(BusaSharedScanState)state;
-  busaSharedScanFinishedAt=now;
-  busaWifiScanLastAt=now;
-  wifiUiScanAt=now;
-  if(busaSharedScanForTft && wifiUiStage==WIFIUI_SCANNING &&
-     currentPage==5 && approvedSettingsItem==1 && tftView){
-    wifiUiStage=wifiUiCount>0?WIFIUI_NETWORKS:WIFIUI_STATUS;
-    wifiUiIndex=0;wifiUiMenuIndex=0;
-    wifiUiFeedback=wifiUiCount>0?String(""):
-      (state==BUSA_SCAN_EMPTY?"Сети не найдены":"Ошибка поиска Wi-Fi");
-    tftDirty=true;
-  }
-  busaSharedScanForTft=false;
-}
-void busaWifiScanPoll(uint32_t now){
-  if(busaSharedScanState==BUSA_SCAN_REQUESTED){
-    if(otaActive)return;
-    if(busaSharedScanRetryDueAt && (int32_t)(now-busaSharedScanRetryDueAt)<0)return;
-    if(WiFi.getMode()!=WIFI_AP_STA && !WiFi.mode(WIFI_AP_STA)){
-      busaSharedScanError="sta_unavailable";
-      busaWifiScanFinish(BUSA_SCAN_ERROR,now);return;
-    }
-    // Never disconnect current Wi-Fi, never restart the AP for a scan.
-    // Both UIs request scanning, only this loop drives the actual radio.
-    WiFi.setSleep(false);
-    WiFi.scanDelete();
-    ++busaSharedScanAttempt;
-    busaSharedScanAttemptAt=now;
-    busaSharedScanRetryDueAt=0;
-    const bool passive=busaSharedScanAttempt>1;
-    const int result=WiFi.scanNetworks(true,true,passive,passive?280:140);
-    busaSharedScanStartResult=result;
-    Serial0.printf("BUSA WIFI SCAN start attempt=%d result=%d mode=%d STA=%d\n",
-       (int)busaSharedScanAttempt,result,(int)WiFi.getMode(),(int)WiFi.status());
-    if(result==WIFI_SCAN_RUNNING || result>=0){
-      busaSharedScanState=BUSA_SCAN_RUNNING;return;
-    }
-    busaSharedScanError="scan_start_failed";
-    if(busaSharedScanAttempt<2){
-      busaSharedScanRetryDueAt=now+800;return;
-    }
-    busaWifiScanFinish(BUSA_SCAN_ERROR,now);return;
-  }
-  if(busaSharedScanState!=BUSA_SCAN_RUNNING)return;
-  const int count=WiFi.scanComplete();
-  busaSharedScanLastResult=count;
-  if(count==WIFI_SCAN_RUNNING && (uint32_t)(now-busaSharedScanAttemptAt)<9000)
-    return;
-  if(count==WIFI_SCAN_RUNNING){
-    // An unresponsive driver must never leave the application "Searching".
-    busaSharedScanError="scan_timeout";
-    busaWifiScanFinish(BUSA_SCAN_ERROR,now);return;
-  }
-  if(count<=0){
-    busaSharedScanError=count==0?"no_networks":"scan_failed";
-    Serial0.printf("BUSA WIFI SCAN finished attempt=%d count=%d STA=%d\n",
-       (int)busaSharedScanAttempt,count,(int)WiFi.status());
-    if(busaSharedScanAttempt<2){
-      // An already-connected STA may suppress the all-channel scan.
-      // Release only the external STA once before the passive retry.
-      if(!busaSharedScanReleasedSTA){
-        WiFi.setAutoReconnect(false);
-        WiFi.disconnect(false,false);
-        busaSharedScanReleasedSTA=true;
-        busaSharedScanRetryDueAt=now+900;
-      }else busaSharedScanRetryDueAt=now+700;
-      WiFi.scanDelete();
-      busaSharedScanState=BUSA_SCAN_REQUESTED;return;
-    }
-    busaWifiScanFinish(count==0?BUSA_SCAN_EMPTY:BUSA_SCAN_ERROR,now);
-    return;
-  }
-  wifiUiCount=0;
-  for(int i=0;i<count && wifiUiCount<48;i++){
-    const String name=WiFi.SSID(i);
-    if(name.isEmpty() || name.length()>32)continue;
-    bool duplicate=false;
-    for(int j=0;j<wifiUiCount;j++)if(wifiUiNetworks[j]==name){duplicate=true;break;}
-    if(duplicate)continue;
-    wifiUiNetworks[wifiUiCount]=name;
-    wifiUiSignals[wifiUiCount]=WiFi.RSSI(i);
-    ++wifiUiCount;
-  }
-  Serial0.printf("BUSA WIFI SCAN discovered=%d\n",(int)wifiUiCount);
-  busaSharedScanError=wifiUiCount?"":"no_networks";
-  busaWifiScanFinish(wifiUiCount?BUSA_SCAN_READY:BUSA_SCAN_EMPTY,now);
-}
-String busaWifiScanJSON(){
-  const bool scanning=busaSharedScanState==BUSA_SCAN_REQUESTED ||
-                      busaSharedScanState==BUSA_SCAN_RUNNING;
-  String out=String("{\"scanning\":")+(scanning?"true":"false")+
-    ",\"networks\":[";
-  if(!scanning && busaSharedScanState==BUSA_SCAN_READY){
-    for(int i=0;i<wifiUiCount;i++){
-      if(i)out+=",";
-      out+="{\"ssid\":"+quoteJson(wifiUiNetworks[i])+
-           ",\"rssi\":"+String(wifiUiSignals[i])+"}";
-    }
-  }
-  out+="],\"error\":"+quoteJson(scanning?"":busaSharedScanError);
-  out+=",\"diagnostic\":{\"attempt\":"+String(busaSharedScanAttempt);
-  out+=",\"start_result\":"+String(busaSharedScanStartResult);
-  out+=",\"scan_result\":"+String(busaSharedScanLastResult);
-  out+=",\"wifi_mode\":"+String((int)WiFi.getMode());
-  out+=",\"station_status\":"+String((int)WiFi.status());
-  out+="}}";
-  return out;
-}
+#include "BUSA_WifiScan.h"
 
 String otaJSON(); // forward declaration
 #include "BUSA_SoundAlarms.h"
@@ -1674,6 +1503,8 @@ String statusJSON(){
   // Scan diagnostics let Google telemetry distinguish zero visible SSIDs
   // from a driver error, a timeout or an overlapping local-app scan.
   s+=",\"scan_result_code\":"+String(wifiUiLastScanCode);
+  s+=",\"scan_driver_rc\":"+String(busaSharedScanStartResult);
+  s+=",\"scan_event_status\":"+String(busaScanEventStatus.load());
   s+=",\"scan_attempts\":"+String(wifiUiScanAttempts);
   s+=",\"scan_network_count\":"+String(wifiUiCount);
   s+=",\"scan_in_progress\":"+(busaWifiScanRunning?String("true"):String("false"));
@@ -2268,6 +2099,8 @@ section[data-section="1"] .approvedSensorHead{min-height:83px}
 <div class="busaWifiMode"><h3>Wi-Fi с интернетом</h3>
 <div id="wstatus">Проверка подключения...</div>
 <label for="net">Выберите сеть</label><select id="net"><option value="">Поиск сетей...</option></select>
+<div id="manualSsidRow" hidden><label for="manualSsid">SSID вручную</label><input id="manualSsid" type="text" autocomplete="off" placeholder="Точное имя сети"></div>
+<button type="button" id="wifiRetry" class="full">Повторить поиск</button>
 <label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль">
 <button type="button" class="full" id="save">Сохранить и подключить</button>
 <button type="button" class="full" id="disconnectWifi">Отключить Wi-Fi</button>
@@ -2828,56 +2661,40 @@ get('manualUpdate').onclick=async function(){
 };
 let wifiListBusy=false,wifiRescanAfterDisconnect=false;
 // Single bounded radio scan per opening of the Wi-Fi page.
-async function wifiRefreshNetworks(){
-  if(wifiListBusy||settingsActive!==1)return;
-  wifiListBusy=true;
-  const sel=get('net');
-  sel.replaceChildren(new Option('Поиск сетей...',''));
-  get('response').textContent='Поиск сетей...';
-  try{
-    const start=await fetch('/api/wifi/scan?start=1',{
-      cache:'no-store',signal:AbortSignal.timeout(7000)});
-    let j=await start.json();
-    if(!start.ok)throw Error(j.error||'scan_unavailable');
-    for(let i=0;i<30&&j.scanning;i++){
-      if(settingsActive!==1)return;
-      await new Promise(resolve=>setTimeout(resolve,650));
-      try{
-        const resp=await fetch('/api/wifi/scan',{
-          cache:'no-store',signal:AbortSignal.timeout(6500)});
-        if(resp.ok)j=await resp.json();
-      }catch(e){
-        // Radio channel changes can briefly pause the local AP.
-        // Keep polling the same scan, rather than starting a competing scan.
-      }
-    }
-    if(settingsActive!==1)return;
-    if(j.scanning)throw Error('scan_timeout');
-    const unique=new Set();
-    sel.replaceChildren(new Option('Выберите сеть',''));
-    (j.networks||[]).forEach(item=>{
-      if(!item.ssid||unique.has(item.ssid))return;
-      unique.add(item.ssid);
-      sel.add(new Option(item.ssid,item.ssid));
-    });
-    // Never leave a permanent "Searching..." banner after the scan ends.
-    get('response').textContent=unique.size?'':(
-      j.error&&j.error!=='no_networks'?'Ошибка поиска Wi-Fi':'Сети не найдены');
-  }catch(e){
-    if(settingsActive===1){
-      sel.replaceChildren(new Option('Сети не найдены',''));
-      get('response').textContent='Ошибка поиска Wi-Fi';
-    }
-  }finally{
-    wifiListBusy=false;
-    if(wifiRescanAfterDisconnect&&settingsActive===1){
-      wifiRescanAfterDisconnect=false;
-      await new Promise(resolve=>setTimeout(resolve,650));
-      if(settingsActive===1)wifiRefreshNetworks();
-    }
-  }
+function wifiManualVisibility(){get('manualSsidRow').hidden=get('net').value!=='__manual__';}
+function wifiScanMessage(j){
+ const names={scan_start_failed:'Не удалось запустить сканер',scan_driver_failed:'Ошибка драйвера поиска',scan_results_unavailable:'Результаты сканера недоступны',scan_timeout:'Поиск превысил время ожидания',sta_unavailable:'Режим AP+STA недоступен',scan_event_unavailable:'Обработчик поиска не готов',scan_cancelled_ota:'Поиск остановлен на время OTA',busy:'Устройство занято',only_hidden_networks:'Обнаружены только скрытые сети'};
+ if(!j.error||j.error==='no_networks')return 'Доступные сети 2,4 ГГц не найдены. Можно ввести SSID вручную.';
+ const detail=j.diagnostic?(' · код '+j.diagnostic.start_result+', событие '+j.diagnostic.event_status):'';
+ return (names[j.error]||'Ошибка поиска Wi-Fi: '+j.error)+detail;
 }
-get('net').onchange=()=>{get('response').textContent='';};
+async function wifiRefreshNetworks(fresh=false){
+ if(wifiListBusy||settingsActive!==1)return;
+ wifiListBusy=true;get('wifiRetry').disabled=true;
+ const sel=get('net'),keepManual=sel.value==='__manual__';
+ sel.replaceChildren(new Option('Поиск сетей...',''));
+ get('response').textContent='Поиск сетей...';
+ try{
+  const start=await fetch('/api/wifi/scan?start=1'+(fresh?'&fresh=1':''),{cache:'no-store',signal:AbortSignal.timeout(7000)});
+  let j=await start.json();if(!start.ok)throw Error(wifiScanMessage(j));
+  for(let i=0;i<30&&j.scanning;i++){
+   if(settingsActive!==1)return;await new Promise(resolve=>setTimeout(resolve,650));
+   try{const resp=await fetch('/api/wifi/scan',{cache:'no-store',signal:AbortSignal.timeout(6500)});if(resp.ok)j=await resp.json();}catch(e){}
+  }
+  if(settingsActive!==1)return;if(j.scanning)throw Error('Поиск превысил время ожидания');
+  const unique=new Set();sel.replaceChildren(new Option('Выберите сеть',''));
+  (j.networks||[]).forEach(item=>{if(item.ssid&&!unique.has(item.ssid)){unique.add(item.ssid);sel.add(new Option(item.ssid,item.ssid));}});
+  sel.add(new Option('Ввести SSID вручную','__manual__'));if(keepManual||!unique.size)sel.value='__manual__';wifiManualVisibility();
+  get('response').textContent=unique.size?'':wifiScanMessage(j);
+ }catch(e){
+  if(settingsActive===1){sel.replaceChildren(new Option('Ввести SSID вручную','__manual__'));wifiManualVisibility();get('response').textContent='Ошибка поиска Wi-Fi: '+e.message;}
+ }finally{
+  wifiListBusy=false;get('wifiRetry').disabled=false;
+  if(wifiRescanAfterDisconnect&&settingsActive===1){wifiRescanAfterDisconnect=false;await new Promise(resolve=>setTimeout(resolve,650));if(settingsActive===1)wifiRefreshNetworks(true);}
+ }
+}
+get('net').onchange=()=>{wifiManualVisibility();get('response').textContent='';};
+get('wifiRetry').onclick=()=>wifiRefreshNetworks(true);
 get('disconnectWifi').onclick=async function(){
   this.disabled=true;
   get('response').textContent='Отключаю Wi-Fi...';
@@ -2900,9 +2717,10 @@ get('disconnectWifi').onclick=async function(){
   this.disabled=false;
 };
 get('save').onclick=async function(){
- let ssid=get('net').value.trim(),pass=get('pass').value;
- if(!ssid||ssid.length>32||pass.length<8||pass.length>63){
-  get('response').textContent='Выберите сеть и введите пароль.';return;
+ let ssid=(get('net').value==='__manual__'?get('manualSsid').value:get('net').value).trim(),pass=get('pass').value;
+ const encoder=new TextEncoder(),ssidBytes=encoder.encode(ssid).length,passBytes=encoder.encode(pass).length;
+ if(!ssid||ssidBytes>32||passBytes<8||passBytes>63){
+  get('response').textContent='Выберите сеть или введите SSID (до 32 байт), пароль 8–63 байта.';return;
  }
  this.disabled=true;get('response').textContent='Подключаю к '+ssid+'...';
  try{
@@ -3067,6 +2885,7 @@ void setup(){
   setupGoogleCloud();
   // RainMaker starts after the first local TFT frame; no startup dependency.
   busaReportStage("WIFI_BEGIN");
+  busaWifiInitScanner();
   WiFi.mode(WIFI_AP_STA);
   WiFi.setSleep(false); // Favor interactive local response over power saving
   configTime(0,0,"pool.ntp.org","time.google.com"); // NTP UTC; local offset from paired phone
@@ -3086,6 +2905,7 @@ void setup(){
   if(!wifiUiStaDisabled && stationSsid.length() && stationPass.length()>=8){
     WiFi.setAutoReconnect(false); // no endless reconnect to a vanished network
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
+    wifiUiConnectAt=millis();wifiUiStage=WIFIUI_CONNECTING;
     Serial0.printf("STA connect requested: SSID=%s; password is hidden\n",stationSsid.c_str());
   }else{
     WiFi.setAutoReconnect(false);
@@ -3317,7 +3137,7 @@ void setup(){
     }
     // HTTP is read-only except for requesting a single async scan.
     // Never manipulate the radio inside the browser request.
-    if(server.arg("start")=="1" && !busaWifiRequestSharedScan(false)){
+    if(server.arg("start")=="1" && !busaWifiRequestSharedScan(false,server.arg("fresh")=="1")){
       server.send(409,"application/json",
         "{\"scanning\":false,\"networks\":[],\"error\":\"busy\"}");return;
     }
@@ -3377,6 +3197,7 @@ void setup(){
       prefs.putBool("staOff",prevOff);
       server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;
     }
+    wifiUiResetReconnectBackoff();
     stationSsid=ssid;stationPass=pass;wifiUiStaDisabled=false;wifiUiDisablePending=false;
     wifiUiLastConnectError="";wifiUiResumeStation=false;
     wifiUiStage=WIFIUI_CONNECTING; // shared network state, NOT navigation state
@@ -3648,7 +3469,7 @@ void loop(){
   {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
   // One nonblocking driver scan serves both TFT and web UI. Every scan ends.
   busaWifiScanPoll(now);
-  // No automatic retry to an old router after a disconnect.
+  // Reconnect supervisor uses only the CURRENT saved target; explicit staOff wins.
   // BUSA AP and network selection always remain responsive.
   readConsole();
   busaRainMakerApply(); // Apply queued iPhone settings on the same thread as TFT, NVS and sound

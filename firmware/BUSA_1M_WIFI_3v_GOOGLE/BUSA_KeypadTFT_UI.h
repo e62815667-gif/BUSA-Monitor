@@ -15,7 +15,7 @@ uint8_t wifiUiLastTapKey=255,wifiUiLastTapIndex=0;
 uint32_t wifiUiLastTapAt=0,wifiUiScanAt=0,wifiUiConnectAt=0;
 uint8_t wifiUiCursor=0;
 bool wifiUiOwnsScan=false,wifiUiConnectPending=false;
-bool busaWifiRequestSharedScan(bool physical); // implemented in BUSA_Main.h
+bool busaWifiRequestSharedScan(bool physical,bool fresh=false); // implemented in BUSA_Main.h
 uint32_t wifiUiAssociationDueAt=0;
 String wifiUiLastConnectError=""; // displayed on physical TFT + local app
 uint8_t wifiUiScanAttempts=0; // One automatic retry for failed or empty scans
@@ -128,11 +128,12 @@ void wifiUiRequestStationDisconnect(){
   if(!busaGoogleNetworkBusy && !otaActive)wifiUiApplyStationDisconnect();
   tftDirty=true;
 }
-void wifiUiRestoreStationAfterScan(){
-  // Search is read-only. Do NOT reconnect the router the user left.
-  // A fresh explicit Save is required for any external Wi-Fi association.
-  wifiUiResumeStation=false;
-}
+// Bounded reconnect, always to the latest saved SSID. Never override staOff.
+static uint32_t wifiUiRetryLastAt=0,wifiUiRetryInterval=5000;
+static bool wifiUiRetryArmed=false;
+void wifiUiResetReconnectBackoff(){wifiUiRetryArmed=false;wifiUiRetryInterval=5000;}
+void wifiUiRestoreStationAfterScan(){wifiUiResumeStation=false;}
+
 void wifiUiLeave(){
   // Scan is owned by the shared radio service, not this UI page.
   wifiUiOwnsScan=false;
@@ -172,7 +173,7 @@ void wifiUiPoll(){
   }
   if(wifiUiConnectPending && !wifiUiDisablePending && !otaActive &&
      !busaWifiScanRunning){
-    wifiUiConnectPending=false;
+    wifiUiConnectPending=false;wifiUiRetryArmed=false;
     wifiUiResumeStation=false; // a new saved SSID wins over old iPhone
     WiFi.setAutoReconnect(false);
     WiFi.disconnect(false,false); // disconnect STA only; keep BUSA local AP
@@ -198,7 +199,7 @@ void wifiUiPoll(){
       wifiUiLastConnectError="";
       WiFi.setAutoReconnect(false);
       wifiUiFeedback="Подключено: "+stationSsid;
-      wifiUiConnectAt=0;wifiUiStage=WIFIUI_STATUS;
+      wifiUiConnectAt=0;wifiUiStage=WIFIUI_STATUS;wifiUiResetReconnectBackoff();
       tftDirty=true;
     }else if((uint32_t)(now-wifiUiConnectAt)>18000){
       wifiUiLastConnectError="Не подключено. Проверь пароль";
@@ -209,6 +210,14 @@ void wifiUiPoll(){
       tftDirty=true;
     }
   }
+  if(WiFi.status()==WL_CONNECTED){wifiUiResetReconnectBackoff();return;}
+  if(wifiUiStaDisabled||wifiUiDisablePending||otaActive||busaWifiScanRunning||wifiUiConnectPending||wifiUiAssociationDueAt||wifiUiConnectAt||stationSsid.isEmpty()||stationPass.length()<8){wifiUiRetryArmed=false;return;}
+  if(!wifiUiRetryArmed){wifiUiRetryLastAt=now;wifiUiRetryArmed=true;return;}
+  if((uint32_t)(now-wifiUiRetryLastAt)>=wifiUiRetryInterval){
+    wifiUiConnectPending=true;wifiUiRetryArmed=false;
+    wifiUiRetryInterval=wifiUiRetryInterval>=15000?30000:wifiUiRetryInterval*2;
+  }
+
 }
 // Only this explicit Save menu item commits Wi-Fi credentials and enables
 // automatic reconnection after ESP32 reboot; password entry does not commit.
@@ -234,6 +243,7 @@ void wifiUiSaveConnection(){
     prefs.putBool("staOff",oldOff);
     wifiUiFeedback="Ошибка сохранения Wi-Fi";tftDirty=true;return;
   }
+  wifiUiResetReconnectBackoff();
   stationSsid=wifiUiSelectedSsid;
   stationPass=wifiUiPassword;
   wifiUiStaDisabled=false;wifiUiDisablePending=false;

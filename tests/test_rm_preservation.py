@@ -2,9 +2,11 @@
 from pathlib import Path
 import hashlib,json
 root=Path(__file__).resolve().parents[1];sketch=root/'firmware/BUSA_1M_WIFI_3v_GOOGLE'
+wifi_fix='RM-CALC3-WIFI1' in (sketch/'BUSA_Main.h').read_text()
 calc='RM-CALC' in (sketch/'BUSA_Main.h').read_text()
 manifest=json.loads((root/'tests/fixtures/rm_fix3_preserved.json').read_text())
 for name,digest in manifest.items():
+ if (wifi_fix and name.endswith('BUSA_KeypadTFT_UI.h')):continue
  if name=='main_before_normalization' or (calc and name.endswith(('BUSA_Landscape_V14.h','BUSA_ApprovedUI_V13.h'))):continue
  assert hashlib.sha256((root/name).read_bytes()).hexdigest()==digest,name
 s=(sketch/'BUSA_Main.h').read_text().replace('14v9-N16R8-RM-TELEM2-20261105','14v9-N16R8-RM-BLE-FIX3-20261105')
