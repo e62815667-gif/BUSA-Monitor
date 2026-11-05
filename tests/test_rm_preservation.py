@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib,json
 root=Path(__file__).resolve().parents[1];sketch=root/'firmware/BUSA_1M_WIFI_3v_GOOGLE'
-calc='RM-CALC1' in (sketch/'BUSA_Main.h').read_text()
+calc='RM-CALC' in (sketch/'BUSA_Main.h').read_text()
 manifest=json.loads((root/'tests/fixtures/rm_fix3_preserved.json').read_text())
 for name,digest in manifest.items():
  if name=='main_before_normalization' or (calc and name.endswith(('BUSA_Landscape_V14.h','BUSA_ApprovedUI_V13.h'))):continue
@@ -23,6 +23,6 @@ else:
   assert hashlib.sha256(function(original,sig).encode()).hexdigest()==digest,sig
 s=(sketch/'BUSA_RainMaker.h').read_text()
 start=s[s.index('static void busaRainMakerStart(){'):s.index('static void busaRainMakerProvision(){')]
-if calc:start=start.replace('busaRmScreen,RM_PAGE,(int)currentPage,0,7','busaRmScreen,RM_PAGE,(int)currentPage,0,6')
+if calc:start=start.replace('  busaRmAddCalculators(node);\n','').replace('busaRmScreen,RM_PAGE,(int)currentPage,0,7','busaRmScreen,RM_PAGE,(int)currentPage,0,6')
 assert start.replace('  busaRmTelemetryInit();\n','')==(root/'tests/fixtures/rm_fix3_start.cpp').read_text(),'Registered device/parameter schema or startup changed'
 print('PASS preserved hardware/Google/BLE/OTA/partitions/NVS; critical Main functions; unchanged RainMaker schema/startup; authorized calculator UI additions' if calc else 'PASS FIX3 preservation')

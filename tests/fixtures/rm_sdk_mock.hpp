@@ -13,18 +13,36 @@ class String:public std::string{public:using std::string::string;String(const st
  String(int x):std::string(std::to_string(x)){}String(unsigned x):std::string(std::to_string(x)){}
  String(float x,int){char b[32];snprintf(b,sizeof b,"%.2f",x);assign(b);}};
 using esp_err_t=int;const int ESP_OK=0,ESP_FAIL=-1,ESP_ERR_NOT_FOUND=1,ESP_ERR_INVALID_STATE=2;
-enum{RMAKER_VAL_TYPE_INVALID,RMAKER_VAL_TYPE_BOOLEAN,RMAKER_VAL_TYPE_INTEGER,RMAKER_VAL_TYPE_FLOAT};
-struct esp_rmaker_param_val_t{int type=0;union V{bool b;int i;float f;V():i(0){}}val;};
+enum{RMAKER_VAL_TYPE_INVALID,RMAKER_VAL_TYPE_BOOLEAN,RMAKER_VAL_TYPE_INTEGER,RMAKER_VAL_TYPE_FLOAT,RMAKER_VAL_TYPE_STRING};
+struct esp_rmaker_param_val_t{int type=0;union V{bool b;int i;float f;const char* s;V():i(0){}}val;};
 esp_rmaker_param_val_t esp_rmaker_float(float x){esp_rmaker_param_val_t v;v.type=3;v.val.f=x;return v;}
 esp_rmaker_param_val_t esp_rmaker_int(int x){esp_rmaker_param_val_t v;v.type=2;v.val.i=x;return v;}
 esp_rmaker_param_val_t esp_rmaker_bool(bool x){esp_rmaker_param_val_t v;v.type=1;v.val.b=x;return v;}
-struct esp_rmaker_param_t{std::string name;esp_rmaker_param_val_t value;bool dirty=false;int updates=0;};
+esp_rmaker_param_val_t esp_rmaker_str(const char* s){esp_rmaker_param_val_t v;v.type=RMAKER_VAL_TYPE_STRING;v.val.s=s;return v;}
+struct esp_rmaker_param_t{std::string name,owned,ui;int flags=0;esp_rmaker_param_val_t value;bool dirty=false;int updates=0;};
 std::vector<esp_rmaker_param_t*> allParams;
-struct Device{std::map<std::string,esp_rmaker_param_t> params;
+const int PROP_FLAG_READ=1,PROP_FLAG_WRITE=2;
+const char* ESP_RMAKER_UI_TOGGLE="esp.ui.toggle";const char* ESP_RMAKER_UI_TEXT="esp.ui.text";
+using param_val_t=esp_rmaker_param_val_t;struct write_ctx_t{};
+class Param{public:std::string name,ui;param_val_t val;int flags;
+ Param(const char* n,const char*,param_val_t v,uint8_t f):name(n),val(v),flags(f){}
+ const void* getParamHandle(){return this;}const char* getParamName(){return name.c_str();}
+ int addUIType(const char* t){ui=t;return ESP_OK;}
+};
+param_val_t value(float x){return esp_rmaker_float(x);}param_val_t value(bool x){return esp_rmaker_bool(x);}param_val_t value(const char* x){return esp_rmaker_str(x);}
+struct Device;using WriteCallback=void(*)(Device*,Param*,param_val_t,void*,write_ctx_t*);
+struct Device{std::map<std::string,esp_rmaker_param_t> params;std::string deviceName;WriteCallback callback=nullptr;
+ Device(const char* name="",const char* =nullptr):deviceName(name){}
+ const char* getDeviceName(){return deviceName.c_str();}
+ int addParam(Param p){add(p.name.c_str(),p.val);auto* h=getParamByName(p.name.c_str());h->flags=p.flags;h->ui=p.ui;return ESP_OK;}
+ void addCb(WriteCallback fn){callback=fn;}
+
  void add(const char* name,esp_rmaker_param_val_t v){auto& p=params[name];p.name=name;p.value=v;allParams.push_back(&p);}
  esp_rmaker_param_t* getParamByName(const char* name){auto it=params.find(name);return it==params.end()?nullptr:&it->second;}
  int updateAndReportParam(const char* n,bool v);int updateAndReportParam(const char* n,int v);int updateAndReportParam(const char* n,float v);
 };
+struct Node{std::vector<Device*> devices;int addDevice(Device& d){devices.push_back(&d);return ESP_OK;}};
+struct FakeSerial{template<class... T>void printf(const char*,T...) {}}Serial0;
 using TemperatureSensor=Device;
 Device tempDevices[4],water,health,screen,keys;
 TemperatureSensor* busaRmTemps[4]={&tempDevices[0],&tempDevices[1],&tempDevices[2],&tempDevices[3]};
@@ -54,8 +72,9 @@ using esp_rmaker_mqtt_publish_t=int(*)(const char*,void*,size_t,uint8_t,int*);
 struct esp_rmaker_mqtt_config_t{esp_rmaker_mqtt_publish_t publish=nullptr;};esp_rmaker_mqtt_config_t config;
 bool connected=true,backendFail=false,autoAck=true,silentDrop=false,queueFail=false;int tokens=100,nextId=1,wireCalls=0,drops=0;uint32_t refillAt=0;
 std::map<const esp_rmaker_param_t*,esp_rmaker_param_val_t> cloud,payload;
+std::map<const esp_rmaker_param_t*,std::string> cloudStrings;
 int backend(const char*,void*,size_t,uint8_t,int* id){++wireCalls;if(backendFail)return ESP_FAIL;
- *id=nextId++;for(auto v:payload)cloud[v.first]=v.second;
+ *id=nextId++;for(auto v:payload){cloud[v.first]=v.second;if(v.second.type==RMAKER_VAL_TYPE_STRING){cloudStrings[v.first]=v.second.val.s;cloud[v.first].val.s=cloudStrings[v.first].c_str();}}
  if(autoAck&&events){int number=*id;events(nullptr,RMAKER_COMMON_EVENT,RMAKER_MQTT_EVENT_PUBLISHED,&number);}return ESP_OK;
 }
 int esp_rmaker_mqtt_glue_setup(esp_rmaker_mqtt_config_t* c){c->publish=backend;return ESP_OK;}
@@ -63,7 +82,7 @@ int esp_rmaker_mqtt_setup(esp_rmaker_mqtt_config_t c){config=c;return ESP_OK;}
 bool esp_rmaker_is_mqtt_connected(){return connected;}
 bool esp_rmaker_mqtt_is_budget_available(){return tokens>0;}
 void advance(uint32_t at){uint32_t delta=uint32_t(at-refillAt);tokens=std::min(1024,tokens+int(delta/5000));refillAt+=delta/5000*5000;nowMs=at;}
-int esp_rmaker_param_update(const esp_rmaker_param_t* p,esp_rmaker_param_val_t v){if(!p||p->value.type!=v.type)return ESP_FAIL;auto* m=const_cast<esp_rmaker_param_t*>(p);m->value=v;m->dirty=true;++m->updates;return ESP_OK;}
+int esp_rmaker_param_update(const esp_rmaker_param_t* p,esp_rmaker_param_val_t v){if(!p||p->value.type!=v.type)return ESP_FAIL;auto* m=const_cast<esp_rmaker_param_t*>(p);m->value=v;if(v.type==RMAKER_VAL_TYPE_STRING){m->owned=v.val.s;m->value.val.s=m->owned.c_str();}m->dirty=true;++m->updates;return ESP_OK;}
 int esp_rmaker_param_update_and_report(const esp_rmaker_param_t* p,esp_rmaker_param_val_t v){
  if(esp_rmaker_param_update(p,v)!=ESP_OK)return ESP_FAIL;
  payload.clear();for(auto* param:allParams)if(param->dirty){payload[param]=param->value;param->dirty=false;}
@@ -94,3 +113,5 @@ void initialize(){
  screen.add(RM_THEME,esp_rmaker_int(0));screen.add(RM_PAGE,esp_rmaker_int(0));screen.add(RM_SCREEN,esp_rmaker_bool(false));
  for(auto name:{"PCF8575 подключен","Раскладка сохранена","Обучение идет",RM_KEYLEARN,RM_KEYSTOP})keys.add(name,esp_rmaker_bool(false));keys.add("Следующая клавиша",esp_rmaker_int(0));
 }
+
+#include "BUSA_RmCalcState.h"

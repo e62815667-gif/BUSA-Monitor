@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC1-20261105";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC2-20261105";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;

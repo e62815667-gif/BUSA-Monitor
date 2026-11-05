@@ -17,6 +17,7 @@ struct BusaRmFrame {
   bool valid[4]={},set[4]={},buzzer[2]={},soundEnabled[4]={},soundOn[4]={};
   bool screen=false,keyReady=false,keyLearning=false,pcf=false,google=false,buzzerOn=false;
   int theme=0,page=0,keyStep=0;
+  BusaRmCalcState calculators[3];
 };
 static BusaRmFrame busaRmFrame;
 static std::atomic<bool> busaRmFrameBusy{false},busaRmSnapshotPaused{false};
@@ -73,7 +74,9 @@ static void busaRmTelemetryInit(){
 }
 struct BusaRmCachedParam {const esp_rmaker_param_t* handle=nullptr;esp_rmaker_param_val_t value={};bool valid=false;};
 static BusaRmCachedParam busaRmCache[64];
-static void busaRmInvalidateCache(){for(auto& p:busaRmCache)p.valid=false;}
+static uint32_t busaRmCalcReportedRevision[3]={UINT32_MAX,UINT32_MAX,UINT32_MAX};
+static bool busaRmCalcStaged[3]={};
+static void busaRmInvalidateCache(){for(auto& p:busaRmCache)p.valid=false;for(auto& revision:busaRmCalcReportedRevision)revision=UINT32_MAX;}
 static bool busaRmSameValue(const esp_rmaker_param_val_t& a,const esp_rmaker_param_val_t& b){
   if(a.type!=b.type)return false;
   if(a.type==RMAKER_VAL_TYPE_BOOLEAN)return a.val.b==b.val.b;
@@ -93,6 +96,24 @@ static bool busaRmStage(Device* device,const char* name,esp_rmaker_param_val_t v
   const esp_err_t rc=esp_rmaker_param_update(handle,value);
   if(rc!=ESP_OK){entry->valid=false;++busaRmModelFailures;return false;}
   entry->value=value;entry->valid=true;return true;
+}
+// Stage calculator values into the SAME node batch, only on change/reconnect/retry.
+static void busaRmStageCalculators(const BusaRmFrame& frame){
+ for(int mode=0;mode<3;mode++){
+  busaRmCalcStaged[mode]=false;if(!busaRmCalcReady[mode])continue;
+  const auto& state=frame.calculators[mode];
+  if(state.revision==busaRmCalcReportedRevision[mode]){busaRmCalcStaged[mode]=true;continue;}
+  auto* device=busaRmCalcDevices[mode];bool ok=true;
+  auto update=[&](const char* name,esp_rmaker_param_val_t value){
+   const auto* handle=device?device->getParamByName(name):nullptr;
+   if(!handle||esp_rmaker_param_update(handle,value)!=ESP_OK){++busaRmModelFailures;ok=false;}
+  };
+  for(int field=0;field<busaRmCalcInputCounts[mode];field++)update(busaRmCalcInputNames[mode][field],esp_rmaker_float(state.inputs[field]));
+  update("Рассчитать",esp_rmaker_bool(false));update("Сбросить",esp_rmaker_bool(false));
+  update("Статус",esp_rmaker_str(state.status));
+  for(int field=0;field<busaRmCalcOutputCounts[mode];field++)update(busaRmCalcOutputNames[mode][field],esp_rmaker_str(state.outputs[field]));
+  busaRmCalcStaged[mode]=ok;
+ }
 }
 static void busaRmReportFrame(void*){
   // Only this worker mutates the parameter cache. Never read sensor/UI/NVS state here.
@@ -139,6 +160,7 @@ static void busaRmReportFrame(void*){
   ok=busaRmStage(busaRmKeys,RM_KEYSTOP,esp_rmaker_bool(false))&&ok;
   const auto* heartbeat=busaRmHealth?busaRmHealth->getParamByName("Работает секунд"):nullptr;
   if(!ok||!heartbeat){busaRmInvalidateCache();busaRmFrameBusy=false;return;}
+  busaRmStageCalculators(f); // Calculator failure never suppresses T1-T4/uptime.
   // Official batched API: N local updates, ONE report for the entire node.
   ++busaRmReportCalls;busaRmLastTransportRc=ESP_ERR_NOT_FOUND;busaRmReportingTask=xTaskGetCurrentTaskHandle();busaRmInReport=true;
   const esp_err_t rc=esp_rmaker_param_update_and_report(heartbeat,esp_rmaker_int(f.uptime));
@@ -148,7 +170,9 @@ static void busaRmReportFrame(void*){
   if(rc!=ESP_OK||!transported){
     // This SDK can return ESP_OK despite a dropped publish. Restage on retry.
     ++busaRmReportNoTransport;busaRmInvalidateCache();
-  }else{lastEpoch=epoch;lastRevision=f.revision;}
+  }else{lastEpoch=epoch;lastRevision=f.revision;
+    for(int mode=0;mode<3;mode++)if(busaRmCalcStaged[mode])busaRmCalcReportedRevision[mode]=f.calculators[mode].revision;
+  }
   busaRmFrameBusy=false;
 }
 static void busaRmCaptureAndQueue(uint32_t now){
@@ -165,7 +189,7 @@ static void busaRmCaptureAndQueue(uint32_t now){
   if(!esp_rmaker_mqtt_is_budget_available()){
     ++busaRmBudgetDeferrals;busaRmFrameBusy=false;scheduled=true;lastAt=now;lastEpoch=epoch;return;
   }
-  auto& f=busaRmFrame;f.seq=++nextSeq;f.at=now;f.revision=busaRmSettingsRevision.load();f.uptime=(int)(now/1000U);
+  auto& f=busaRmFrame;memcpy(f.calculators,busaRmCalculators,sizeof(f.calculators));f.seq=++nextSeq;f.at=now;f.revision=busaRmSettingsRevision.load();f.uptime=(int)(now/1000U);
   for(int i=0;i<4;i++){
     f.valid[i]=hasTemp(i,now)&&isfinite(temperature[i]);f.temperatures[i]=temperature[i];
     f.on[i]=isfinite(refTemp[i])?refTemp[i]:0.0f;f.off[i]=isfinite(noticeTemp[i])?noticeTemp[i]:0.0f;
@@ -184,6 +208,7 @@ static void busaRmCaptureAndQueue(uint32_t now){
 static String busaRainMakerTelemetryJSON(){
   const auto t=busaRmTrackerCopy();String s;s.reserve(1600);
   s="{\"interval_ms\":10000,\"mqtt_connected\":"+String(busaRmStarted&&esp_rmaker_is_mqtt_connected()?"true":"false");
+  s+=",\"calculator_devices_ready\":"+String((int)busaRmCalcReady[0]+(int)busaRmCalcReady[1]+(int)busaRmCalcReady[2]);
   s+=",\"init_rc\":"+String((int)busaRmTelemetryInitRc)+",\"worker_pending\":"+String(busaRmFrameBusy.load()?"true":"false");
   s+=",\"snapshot_seq\":"+String(busaRmFrame.seq)+",\"snapshot_uptime_s\":"+String(busaRmFrame.uptime);
   s+=",\"snapshot_temperatures\":[";

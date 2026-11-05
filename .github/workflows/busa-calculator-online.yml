@@ -1,8 +1,5 @@
 name: Publish BUSA Calculator online
 on:
-  push:
-    branches: [feat/busa-calculator-20261105]
-    paths: ['index.html','calculator.js','calculator.css','sw.js','manifest.webmanifest','.github/workflows/busa-calculator-online.yml']
   workflow_dispatch:
 permissions:
   contents: read

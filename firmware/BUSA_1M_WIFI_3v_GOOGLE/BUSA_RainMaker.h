@@ -61,7 +61,9 @@ static const uint32_t BUSA_BLE_PAIR_TIMEOUT_MS=180000;
 static String busaRmBleFeedback="Bluetooth выключен";
 static char busaRmService[24]={};
 static char busaRmPoP[16]={};
+#include "BUSA_RmCalcState.h"
 #include "BUSA_RainMakerTelemetry.h"
+#include "BUSA_RainMakerCalc.h"
 
 static void busaRmProvisionEvent(arduino_event_t *event){
   switch(event->event_id){
@@ -215,6 +217,7 @@ static void busaRainMakerStart(){
     busaRmHealth->addParam(Param("Зуммер активен",nullptr,value(false),PROP_FLAG_READ));
     node.addDevice(*busaRmHealth);
   }
+  busaRmAddCalculators(node);
   busaRmTelemetryInit();
   esp_err_t rc=RMaker.start();
   if(rc!=ESP_OK){Serial0.printf("BUSA RainMaker: start error 0x%X\n",(unsigned)rc);return;}
@@ -251,7 +254,9 @@ static void busaRainMakerApply(){
   BusaRmRequest q;
   for(int attempt=0;attempt<5 && xQueueReceive(busaRmQueue,&q,0)==pdPASS;attempt++){
     bool ok=false;
-    if(q.target<4){
+    if(q.target>=6&&q.target<9){
+      ok=busaRmCalcApply(q.target-6,q.action,q.role,q.f,q.b);
+    }else if(q.target<4){
       const int i=q.target;
       if(q.action==0||q.action==1){
         if(isfinite(q.f)&&q.f>=0.0f&&q.f<=125.0f){
@@ -294,7 +299,7 @@ static void busaRainMakerApply(){
     }
     if(!ok)Serial0.printf("BUSA RainMaker: rejected target=%u action=%u\n",(unsigned)q.target,(unsigned)q.action);
     // Publish the actual local values after each attempted write, not the untrusted requested value.
-    ++busaRmSettingsRevision;
+    if(q.target<6)++busaRmSettingsRevision;
   }
 }
 static void busaRainMakerPoll(uint32_t now){
