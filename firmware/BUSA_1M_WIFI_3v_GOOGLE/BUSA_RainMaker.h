@@ -3,7 +3,9 @@
 // All writes are queued and applied by the main Arduino loop, never the RainMaker task.
 // No remote process outputs; K1-K4 remain low-voltage audible notification channels only.
 #include <RMaker.h>
+#include <atomic>
 #include <WiFiProv.h>
+#include <esp_wifi.h>
 #include <wifi_provisioning/manager.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
@@ -41,15 +43,19 @@ static bool busaRmStartRequested=false; // Start only from local app, never on b
 // Bluetooth pairing is a temporary, explicitly requested provisioning session.
 // IMPORTANT: WiFiProv's IDF BLE provisioning temporarily switches AP+STA to STA.
 // The pre-existing BUSA Wi-Fi preferences remain intact for automatic restoration.
-static volatile bool busaRmBleAdvertising=false;
-static volatile bool busaRmBleEnded=false;
-static volatile bool busaRmBleCredentialsAccepted=false;
-static volatile bool busaRmBleCredentialsRejected=false;
+static std::atomic<bool> busaRmBleAdvertising{false};
+static std::atomic<bool> busaRmBleEnded{false};
+static std::atomic<bool> busaRmBleCredentialsAccepted{false};
+static std::atomic<bool> busaRmBleCredentialsRejected{false};
 static bool busaRmBleSessionRequested=false;
 static bool busaRmBleSessionStarted=false;
 static bool busaRmBleRestorePending=false;
 static bool busaRmBleEverCompleted=false;
 static bool busaRmBleTimeoutPending=false;
+static std::atomic<bool> busaRmBleStopRequested{false};
+static void busaRmStopProvisioning(){
+  if(!busaRmBleStopRequested.exchange(true))wifi_prov_mgr_stop_provisioning();
+}
 static uint32_t busaRmBleSessionAt=0;
 static const uint32_t BUSA_BLE_PAIR_TIMEOUT_MS=180000;
 static String busaRmBleFeedback="Bluetooth выключен";
@@ -59,21 +65,28 @@ static char busaRmService[24]={};
 static char busaRmPoP[16]={};
 
 static void busaRmProvisionEvent(arduino_event_t *event){
-  if(event->event_id==ARDUINO_EVENT_PROV_START){
-    busaRmBleAdvertising=true;
-    busaRmBleFeedback="Bluetooth включен: ожидаю ESP RainMaker";
-    Serial0.printf("BUSA RainMaker BLE provisioning: %s\n",busaRmService);
-    printQR(busaRmService,busaRmPoP,"ble");
-  }else if(event->event_id==ARDUINO_EVENT_PROV_CRED_SUCCESS){
-    busaRmBleCredentialsAccepted=true;
-    busaRmBleFeedback="Учётные данные приняты: завершаю сопряжение";
-  }else if(event->event_id==ARDUINO_EVENT_PROV_CRED_FAIL){
-    busaRmBleCredentialsRejected=true;
-    busaRmBleFeedback="Ошибка при сопряжении; проверь пароль сети";
-  }else if(event->event_id==ARDUINO_EVENT_PROV_END){
-    busaRmBleAdvertising=false;
-    busaRmBleEnded=true;
-    busaRmBleFeedback="BLE-сеанс завершён; восстанавливаю локальную сеть";
+  switch(event->event_id){
+    case ARDUINO_EVENT_PROV_START:
+      busaRmBleAdvertising=true;
+      break;
+    case ARDUINO_EVENT_PROV_INIT:
+      wifi_prov_mgr_disable_auto_stop(10000);
+      break;
+    case ARDUINO_EVENT_PROV_CRED_SUCCESS:
+      busaRmBleCredentialsAccepted=true;
+      busaRmBleCredentialsRejected=false;
+      busaRmStopProvisioning();
+      break;
+    case ARDUINO_EVENT_PROV_CRED_FAIL:
+      busaRmBleCredentialsAccepted=false;
+      busaRmBleCredentialsRejected=true;
+      break;
+    case ARDUINO_EVENT_PROV_END:
+      busaRmBleAdvertising=false;
+      busaRmBleEnded=true;
+      break;
+    default:
+      break;
   }
 }
 static bool busaRmFindSensor(const char*name,int&out){
@@ -137,7 +150,7 @@ static void busaRmAddInt(Device*d,const char*name,int initial,int lo,int hi){
 static void busaRainMakerStart(){
   if(!busaRmQueue)busaRmQueue=xQueueCreate(20,sizeof(BusaRmRequest));
   if(!busaRmQueue){Serial0.println("BUSA RainMaker: no memory for settings queue");return;}
-  snprintf(busaRmService,sizeof(busaRmService),"BUSA_%04X",(unsigned)(ESP.getEfuseMac()&0xFFFF));
+  snprintf(busaRmService,sizeof(busaRmService),"PROV_BUSA_%04X",(unsigned)(ESP.getEfuseMac()&0xFFFF));
   // Approved fixed RainMaker BLE proof-of-possession (nine ASCII digits).
   // Do not read previously generated eight-digit PoP from NVS.
   constexpr const char *BUSA_RM_FIXED_POP="123456789";
@@ -201,13 +214,11 @@ static void busaRainMakerStart(){
     busaRmHealth->addParam(Param("Зуммер активен",nullptr,value(false),PROP_FLAG_READ));
     node.addDevice(*busaRmHealth);
   }
-  RMaker.enableOTA(OTA_USING_TOPICS);
-  RMaker.enableTZService();
   esp_err_t rc=RMaker.start();
   if(rc!=ESP_OK){Serial0.printf("BUSA RainMaker: start error 0x%X\n",(unsigned)rc);return;}
   busaRmStarted=true;
   WiFi.onEvent(busaRmProvisionEvent);
-  Serial0.printf("BUSA RainMaker: device %s ready, pairing PoP %s\n",busaRmService,busaRmPoP);
+  Serial0.printf("BUSA RainMaker: device %s ready\n",busaRmService);
 }
 static void busaRainMakerProvision(){
   if(!busaRmStarted)return;
@@ -224,6 +235,7 @@ static void busaRainMakerProvision(){
   busaRmBleCredentialsAccepted=false;
   busaRmBleCredentialsRejected=false;
   busaRmBleTimeoutPending=false;
+  busaRmBleStopRequested=false;
   busaRmBleFeedback="Запуск BLE-сопряжения (до 3 минут)";
   WiFiProv.beginProvision(WIFI_PROV_SCHEME_BLE,WIFI_PROV_SCHEME_HANDLER_FREE_BTDM,
                           WIFI_PROV_SECURITY_1,busaRmPoP,busaRmService,

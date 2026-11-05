@@ -15,6 +15,7 @@
 #include <SPI.h>
 #include <WebServer.h>
 #include <Update.h>
+#include <esp_ota_ops.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <time.h>
@@ -47,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-BLE-ONCE-20261105";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-BLE-FIX3-20261105";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1251,6 +1252,9 @@ void renderScreen(uint32_t now){
 }
 
 WebServer server(80);
+static esp_err_t busaOtaConfirmResult=ESP_ERR_NOT_FOUND;
+static esp_err_t busaOtaSelectResult=ESP_ERR_NOT_SUPPORTED;
+static String busaOtaRunning="unknown",busaOtaBoot="unknown";
 bool otaActive=false,otaSuccess=false,otaRestart=false,otaWriteAllowed=false;
 uint32_t otaBytes=0,otaRestartAt=0,otaTokenIssued=0,startedAt=0;
 String otaToken="",otaMessage="Ожидание",nearbyNames[5];
@@ -1675,7 +1679,14 @@ String statusJSON(){
   s+=",\"ap\":{\"enabled\":"+(wifiRunning?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.softAPIP().toString())+"}";
   s+=",\"ota\":"+otaJSON();
+  s+=",\"ota_boot\":{\"running\":"+quoteJson(busaOtaRunning)+
+    ",\"selected\":"+quoteJson(busaOtaBoot)+
+    ",\"verification_rc\":"+String((int)busaOtaConfirmResult)+
+    ",\"selection_rc\":"+String((int)busaOtaSelectResult)+"}";
+  // Normal operation intentionally has BLE switched off. Last BLE outcome
+  // persists independently of this live field.
   s+=",\"bluetooth_enabled\":false";
+  s+=",\"ble_last_stage\":"+quoteJson(prefs.getString("rmStage","IDLE"));
   s+=",\"google\":"+cloudJSON();
   s+=",\"network_indicators\":{\"internet\":"+(googleInternet==1?String("true"):String("false"));
   s+=",\"local_client\":"+(WiFi.softAPgetStationNum()>0?String("true"):String("false"));
@@ -2520,7 +2531,7 @@ async function rainmakerRefreshStatus(){
 }
 get('rmStart').onclick=async function(){
  this.disabled=true;get('rmState').textContent='ЗАПУСКАЕТСЯ';
- get('rmMessage').textContent='Включаю Bluetooth. Дальше открой ESP RainMaker → Добавить устройство → Bluetooth, выбери BUSA_XXXX и введи 123456789.';
+ get('rmMessage').textContent='Включаю Bluetooth. Дальше открой ESP RainMaker → Добавить устройство → Bluetooth, выбери PROV_BUSA_XXXX и введи 123456789.';
  try{
   const resp=await fetch('/api/rainmaker/enable',{method:'POST',
     body:new URLSearchParams({confirm:'YES'}),cache:'no-store',signal:AbortSignal.timeout(7000)});
@@ -2929,6 +2940,34 @@ void readConsole(){
   }
 }
 #include "BUSA_RainMaker.h"
+static bool busaRmBleBootMode=false;
+static bool busaRmAutoCloud=false;
+static uint32_t busaRmCloudBootAt=0;
+static bool busaRmBleBootError=false;
+#include "BUSA_OtaBoot.h"
+#include "BUSA_BleBootRecovery.h"
+static bool busaRmPairDeferred=false;
+static bool busaNvsReady=false;
+// The local app has its own Wi-Fi Preferences. Sync only a successful explicit
+// provisioning result, on the main task, without printing credentials.
+static bool busaSaveProvisionedStation(){
+  wifi_config_t cfg={};
+  if(esp_wifi_get_config(WIFI_IF_STA,&cfg)!=ESP_OK)return false;
+  char ssid[33]={},password[65]={};
+  memcpy(ssid,cfg.sta.ssid,strnlen((const char*)cfg.sta.ssid,sizeof(cfg.sta.ssid)));
+  memcpy(password,cfg.sta.password,strnlen((const char*)cfg.sta.password,sizeof(cfg.sta.password)));
+  const String nextSsid(ssid),nextPass(password);
+  // Preserve the local app's existing supported network/password constraints.
+  if(nextSsid.isEmpty()||nextPass.length()<8||nextPass.length()>63)return false;
+  const String oldSsid=prefs.getString("ssid",""),oldPass=prefs.getString("pass","");
+  prefs.putString("ssid",nextSsid);prefs.putString("pass",nextPass);
+  const bool saved=prefs.getString("ssid","")==nextSsid&&prefs.getString("pass","")==nextPass;
+  if(!saved){prefs.putString("ssid",oldSsid);prefs.putString("pass",oldPass);}
+  // staOff is deliberately untouched: never override an explicit local STA-off choice.
+  return saved;
+}
+
+
 void setup(){
   Serial0.begin(115200);
   Serial.begin(115200);
@@ -2953,7 +2992,34 @@ void setup(){
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
-  prefs.begin("busa-r04",false);
+  busaNvsReady=prefs.begin("busa-r04",false);
+  // A pending OTA must first pass the normal local boot self-test. Keep the
+  // request in NVS; confirm below, then reboot into the existing isolated BLE mode.
+  busaRmPairDeferred=busaNvsReady&&prefs.getBool("rmPairNext",false)&&busaOtaPendingVerification();
+  if(busaNvsReady&&prefs.getBool("rmPairNext",false)&&!busaRmPairDeferred){
+    prefs.putBool("rmPairNext",false);
+    prefs.putString("rmStage","BLE_BOOT");
+    busaRmBleBootMode=true;
+    busaRmBleSessionAt=millis();
+    busaRainMakerStart();
+    if(busaRmStarted)busaRainMakerProvision();
+    else {prefs.putString("rmStage","BLE_RMAKER_ERROR");busaRmBleBootError=true;}
+    return;
+  }
+  const esp_reset_reason_t resetReason=esp_reset_reason();
+  const bool cloudCrash=resetReason==ESP_RST_PANIC||resetReason==ESP_RST_INT_WDT||
+    resetReason==ESP_RST_TASK_WDT||resetReason==ESP_RST_WDT||resetReason==ESP_RST_BROWNOUT;
+  if(prefs.getBool("rmCloudBusy",false)&&cloudCrash){
+    prefs.putBool("rmCloudBusy",false);
+    prefs.putBool("rmCloudOn",false);
+    prefs.putString("rmStage","CLOUD_RECOVERED");
+  }else if(prefs.getBool("rmCloudOn",false)){
+    prefs.putBool("rmCloudBusy",false);
+    // Only start cloud services after local Wi-Fi and HTTP are ready.
+    busaRmAutoCloud=true;
+    busaRmCloudBootAt=millis();
+  }
+
   busaRemoteAlarmInit();
   keypadBackupOpen=keypadBackupPrefs.begin("busa-key20",false);
   // User-approved ST7789 320x240 rotation 1 and software-drawn light theme.
@@ -2971,6 +3037,7 @@ void setup(){
     String key="tCal"+String(i);float v=prefs.getFloat(key.c_str(),0);
     tempOffset[i]=isfinite(v)&&v>=-10&&v<=10?roundf(v*10)/10:0;
   }
+  snprintf(busaRmService,sizeof(busaRmService),"PROV_BUSA_%04X",(unsigned)(ESP.getEfuseMac()&0xFFFF));
   startedAt=millis();
   tftProfile=1; // ST7789 only
   // Preserve original V14.7 splash-first boot; time every operation.
@@ -3007,8 +3074,8 @@ void setup(){
   Serial0.printf("Wi-Fi configured TX <=19.5 dBm: %s\n",txSet?"OK":"FAILED");
   busaReportStage(wifiRunning?"AP_READY":"AP_FAILED");
   updateBootStage(1);
-  Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 PASS=%s\n",
-                 (int)wifiRunning,WiFi.softAPIP().toString().c_str(),apPassword.c_str());
+  Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 password hidden\n",
+                 (int)wifiRunning,WiFi.softAPIP().toString().c_str());
   if(!wifiUiStaDisabled && stationSsid.length() && stationPass.length()>=8){
     WiFi.setAutoReconnect(false); // no endless reconnect to a vanished network
     WiFi.begin(stationSsid.c_str(),stationPass.c_str());
@@ -3457,6 +3524,9 @@ void setup(){
     if(!apClient() || server.arg("confirm")!="YES"){
       server.send(403,"application/json","{\"error\":\"local AP confirmation required\"}");return;
     }
+    if(busaOtaPendingVerification()){
+      server.send(409,"application/json","{\"error\":\"running image is not confirmed\"}");return;
+    }
     if(otaActive||busaWifiScanRunning){
       server.send(409,"application/json","{\"error\":\"OTA or Wi-Fi scan busy\"}");return;
     }
@@ -3466,6 +3536,10 @@ void setup(){
     if(busaRmBleEverCompleted){
       server.send(409,"application/json","{\"error\":\"already paired; reboot device for a new BLE session\"}");return;
     }
+    if(!prefs.putBool("rmPairNext",true)){
+      server.send(500,"application/json","{\"error\":\"pairing request was not saved\"}");return;
+    }
+    prefs.putString("rmStage","BLE_REQUESTED");
     busaRmStartRequested=true;
     busaRmBleSessionRequested=true;
     busaRmBleFeedback="Запуск BLE по запросу из локального приложения";
@@ -3496,6 +3570,7 @@ void setup(){
     server.send(200,"application/json",String("{\"rainmaker\":")+quoteJson(state)+
        ",\"ble\":"+quoteJson(ble)+
        ",\"feedback\":"+quoteJson(busaRmBleFeedback)+
+       ",\"last_stage\":"+quoteJson(prefs.getString("rmStage","IDLE"))+
        ",\"automatic_start\":false,\"service\":"+quoteJson(busaRmService)+
        ",\"pop\":\"123456789\"}");
   });
@@ -3512,6 +3587,8 @@ void setup(){
   const char *headers[]={"X-Busa-Token"};
   server.collectHeaders(headers,1);
   server.begin();
+  busaConfirmRunningImage(busaNvsReady&&wifiRunning);
+  if(busaRmPairDeferred&&!busaOtaPendingVerification())busaRmStartRequested=true;
   busaReportStage("HTTP_READY");
   // Never do a full I2C address scan inside setup.
   busaReportStage("I2C_BEGIN");
@@ -3528,9 +3605,33 @@ void setup(){
   busaSetupDoneMs=millis()-busaBootAt;
   busaReportStage("SETUP_DONE");
   Serial.printf("BUSA SETUP DONE ms=%lu K1-K4 sound-only\n",(unsigned long)busaSetupDoneMs);
-  Serial0.println("BUSA CORE STABLE: local TFT + AP first; RainMaker manual-only; PoP 123456789");
+  Serial0.println("BUSA CORE STABLE: local TFT + AP first; RainMaker explicit pairing; credentials hidden");
 }
 void loop(){
+  if(busaRmBleBootMode){
+    static BusaBleBootRecovery recovery;
+    static bool advertisementRecorded=false;
+    if(busaRmBleAdvertising&&!advertisementRecorded){
+      advertisementRecorded=true;prefs.putString("rmStage","BLE_ADVERTISING");
+    }
+    const auto action=recovery.tick(millis(),busaRmBleSessionAt,
+      busaRmBleAdvertising.load(),busaRmBleEnded.load(),busaRmBleBootError);
+    if(action.stop)busaRmStopProvisioning();
+    if(action.restart){
+      const bool paired=busaRmBleCredentialsAccepted&&busaRmBleEnded;
+      const bool saved=paired&&busaSaveProvisionedStation();
+      prefs.putBool("rmCloudOn",saved);prefs.putBool("rmCloudBusy",false);
+      if(saved)prefs.putString("rmStage","PAIRED");
+      else if(paired)prefs.putString("rmStage","BLE_CONFIG_SAVE_ERROR");
+      else if(busaRmBleBootError)prefs.putString("rmStage","BLE_RMAKER_ERROR");
+      else if(recovery.stopTimeout)prefs.putString("rmStage","BLE_STOP_TIMEOUT");
+      else if(recovery.noAdvertisement)prefs.putString("rmStage","BLE_NOT_ADVERTISING");
+      else if(busaRmBleCredentialsRejected)prefs.putString("rmStage","BLE_CREDENTIALS_REJECTED");
+      else prefs.putString("rmStage","BLE_TIMEOUT");
+      soundOutputsOff();ESP.restart();
+    }
+    delay(20);return;
+  }
   uint32_t now=millis();
   const uint32_t tickStart=now;
   soundPoll(now);
@@ -3581,62 +3682,33 @@ void loop(){
     busaLastTftRenderMs=millis()-started;
     busaObserve("TFT",started,busaTftWorstMs);
   }
-  // RainMaker BLE is started ONLY after explicit local app authorization.
-  // The existing Wi-Fi scan, connect, NVS, and SoftAP routines are unchanged.
-  static bool rainmakerBootAttempted=false;
-  if(busaRmStartRequested && !rainmakerBootAttempted &&
-     bootSplashComplete && elapsed(now,busaBootAt,15000) && !otaActive){
+  // Pairing uses a clean boot. The original Wi-Fi procedures are untouched.
+  static uint32_t bleRestartAt=0;
+  if(busaRmStartRequested&&!busaOtaPendingVerification()){
     busaRmStartRequested=false;
-    rainmakerBootAttempted=true;
-    busaReportStage("RAINMAKER_BLE_MANUAL_BEGIN");
-    busaRainMakerStart();
-    if(busaRmStarted)busaRainMakerProvision();
-    else{
-      busaRmBleSessionRequested=false;
-      busaRmBleFeedback="Не удалось запустить RainMaker. Сохранённая версия Wi-Fi не затронута";
-    }
-    busaReportStage(busaRmStarted?"RAINMAKER_BLE_MANUAL_READY":"RAINMAKER_BLE_MANUAL_FAILED");
+    bleRestartAt=millis();
   }
-  // When pairing finishes or times out, end provisioning then restore
-  // the BUSA AP+STA network from separately saved preferences.
-  static bool bleStopIssued=false;
-  static uint32_t bleRestoreAfter=0;
-  if(busaRmBleSessionStarted){
-    const uint32_t duration=millis()-busaRmBleSessionAt;
-    if(duration>BUSA_BLE_PAIR_TIMEOUT_MS && !busaRmBleTimeoutPending){
-      busaRmBleTimeoutPending=true;
-      busaRmBleFeedback="Время сопряжения истекло; восстанавливаю Wi-Fi";
+  if(bleRestartAt && elapsed(millis(),bleRestartAt,1400)&&!otaActive&&!otaRestart){
+    soundOutputsOff();
+    ESP.restart();
+  }
+  static bool busaCloudAttempted=false;
+  if(busaRmAutoCloud && !busaCloudAttempted && !busaRmStartRequested && !bleRestartAt && !busaOtaPendingVerification() &&
+     elapsed(millis(),busaBootAt,20000) && WiFi.status()==WL_CONNECTED &&
+     !otaActive && !busaWifiScanRunning){
+    busaCloudAttempted=true;
+    prefs.putBool("rmCloudBusy",true);
+    busaRainMakerStart();
+    busaRmCloudBootAt=millis();
+    if(!busaRmStarted){
+      prefs.putBool("rmCloudBusy",false);
+      prefs.putBool("rmCloudOn",false);
+      prefs.putString("rmStage","CLOUD_INIT_ERROR");
     }
-    if(busaRmBleTimeoutPending && !bleStopIssued){
-      bleStopIssued=true;
-      wifi_prov_mgr_stop_provisioning();
-      bleRestoreAfter=millis()+2500;
-    }
-    if(busaRmBleEnded && bleRestoreAfter==0)bleRestoreAfter=millis()+2200;
-    if(bleRestoreAfter && (int32_t)(millis()-bleRestoreAfter)>=0){
-      busaRmBleEverCompleted=busaRmBleCredentialsAccepted;
-      busaRmBleSessionStarted=false;
-      busaRmBleSessionRequested=false;
-      busaRmBleAdvertising=false;
-      busaRmBleEnded=false;
-      busaRmBleTimeoutPending=false;
-      bleStopIssued=false;bleRestoreAfter=0;
-      // WiFiProv only affects ESP-IDF Wi-Fi provisioning; BUSA Preferences
-      // still hold the proven local SSID/password and manual STA-off flag.
-      // Restore the original AP at 192.168.4.1 as before the one-time session.
-      WiFi.mode(WIFI_AP_STA);
-      WiFi.setSleep(false);
-      wifiRunning=WiFi.softAP("BUSA-1M-001-R04",apPassword.c_str());
-      WiFi.setAutoReconnect(false);
-      if(!wifiUiStaDisabled && stationSsid.length() && stationPass.length()>=8){
-        WiFi.begin(stationSsid.c_str(),stationPass.c_str());
-      }
-      busaRmBleFeedback=busaRmBleEverCompleted?
-         "Bluetooth-сопряжение закончено. Wi-Fi БУСА восстановлен. Проверь устройство в ESP RainMaker":
-         "Bluetooth выключен. Локальный Wi-Fi БУСА восстановлен";
-      Serial0.printf("BUSA BLE pairing done=%d AP restored=%d\n",
-        (int)busaRmBleEverCompleted,(int)wifiRunning);
-    }
+  }
+  if(busaCloudAttempted && busaRmStarted && prefs.getBool("rmCloudBusy",false) &&
+     elapsed(millis(),busaRmCloudBootAt,30000)){
+    prefs.putBool("rmCloudBusy",false);
   }
   // Display updates take priority over peripheral diagnostics.
   if(i2cOnline){
