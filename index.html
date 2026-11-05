@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f6f1"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>БУСА-Монитор №001</title><link rel="manifest" href="./manifest.webmanifest">
+<style>
+:root{color-scheme:light;--ink:#273f50;--muted:#667e8b;--paper:#faf9f4;--border:#dce6e9;--orange:#dfa05a;--teal:#007fa9;--warn:#ae452f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--paper);color:var(--ink)}
+*{box-sizing:border-box}body{margin:0}header{position:sticky;top:0;z-index:3;background:#fff;border-bottom:2px solid var(--orange);padding:14px 16px 10px;box-shadow:0 3px 12px #283e4f0b}
+h1{font-size:21px;margin:0 0 5px}header small{color:#647c89}main{max-width:660px;margin:auto;padding:13px 14px 108px}
+.card{background:#fff;border:1px solid var(--border);border-radius:15px;margin-bottom:13px;padding:16px;box-shadow:0 4px 12px #2448610a}
+.card h2{font-size:17px;margin:0 0 14px}.hero{background:linear-gradient(126deg,#fff4df,#ebf8fd);border:1px solid #ebd9be;border-radius:15px;padding:17px;margin-bottom:13px}
+.hero small{font-size:10px;letter-spacing:1.3px;font-weight:bold;color:#925829}.hero h2{font-size:27px;margin:7px 0}
+.status{display:inline-block;color:#965c1e;background:#fff5e5;border:1px solid #eacaa1;border-radius:30px;padding:6px 11px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.tile{padding:13px 11px;background:#f7fafb;border:1px solid #e0e9ed;border-radius:11px}.tile small{font-size:12px;color:#4c6c7b}.tile strong{display:block;margin:9px 0 1px;color:#207b6d;font-size:20px}
+.point{display:inline-block;border-radius:50%;width:9px;height:9px;margin-right:6px}.p1{background:#1297c5}.p2{background:#d5813f}.p3{background:#c5503c}.p4{background:#3d9d70}
+.row{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #e9eff1;padding:10px 0;font-size:14px}.row:last-child{border-bottom:0}.row b{text-align:right}
+.muted{color:#667e8b;font-size:12px;line-height:1.5}.warn{color:var(--warn)}
+a.btn,button.btn{display:inline-flex;text-decoration:none;justify-content:center;align-items:center;padding:11px 15px;background:#f4d3a7;border:1px solid #d5a978;border-radius:9px;color:#3e413e;font-size:14px;font-weight:600;min-height:44px}
+a.btn.secondary{background:#eef7fa;border-color:#a8cfdf;color:#155e82}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0 4px}.actions a{flex:1 1 200px}
+.rigs svg{width:100%;height:auto;max-height:260px;display:block}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.chips span{background:#fff3e8;border:1px solid #edd5bd;border-radius:8px;padding:10px 3px;text-align:center;font-size:12px}.chips b{display:block;color:#a34d36;font-size:11px;margin-top:6px}
+section[hidden]{display:none!important}
+nav{position:fixed;bottom:0;left:0;right:0;z-index:4;display:flex;overflow-x:auto;background:#fff;border-top:2px solid #efc79b;padding:6px 6px max(7px,env(safe-area-inset-bottom));box-shadow:0 -4px 14px #1d3c510e;scrollbar-width:none}
+nav button{flex:1 0 auto;min-width:72px;border:1px solid transparent;border-radius:9px;background:#fff;color:#58707e;padding:12px 6px;font:12px system-ui;cursor:pointer}
+nav button.active{background:#f7d5a9;border-color:#e8b274;color:#354b55;font-weight:bold}
+.graphTabs{display:flex;gap:7px;margin-bottom:12px}.graphTabs button{flex:1;border:1px solid #c6d5dc;background:#f5fafb;border-radius:9px;padding:11px;color:#2b5b71;font:13px system-ui}.graphTabs button.on{background:#f6cf9c;border-color:#dca767;font-weight:700}
+@media(max-width:380px){.chips{grid-template-columns:repeat(2,1fr)}.tile strong{font-size:17px}nav button{min-width:67px;padding:10px 5px}}
+
+/* Color-preserving dark palette (not CSS filter:invert). */
+:root[data-theme="dark"]{color-scheme:dark;--ink:#f1f7ff;--muted:#bbd0db;--paper:#0c1929;--border:#386279;--orange:#ffac63;--teal:#65cfff;--warn:#ff9875;background:var(--paper);color:var(--ink)}
+:root[data-theme="dark"] body{background:var(--paper);color:var(--ink)}
+:root[data-theme="dark"] header,:root[data-theme="dark"] nav{background:#152b40;border-color:#f1a661}
+:root[data-theme="dark"] header small,:root[data-theme="dark"] .muted{color:#bbd2df}
+:root[data-theme="dark"] .card{background:#192f45;border-color:#385e78;box-shadow:none}
+:root[data-theme="dark"] .hero{background:linear-gradient(115deg,#493526,#173b52);border-color:#a7794a}
+:root[data-theme="dark"] .hero small{color:#ffcd92}
+:root[data-theme="dark"] .status{background:#473322;color:#ffc98d;border-color:#d99850}
+:root[data-theme="dark"] .tile{background:#254158;border-color:#3d647e}
+:root[data-theme="dark"] .tile small{color:#bad5e2}
+:root[data-theme="dark"] .tile strong{color:#72e4ad}
+:root[data-theme="dark"] .row{border-color:#38556b}
+:root[data-theme="dark"] .warn{color:#ff9675}
+:root[data-theme="dark"] .chips span{background:#493528;color:#f7dac0;border-color:#b18a65}
+:root[data-theme="dark"] .chips b{color:#ffb283}
+:root[data-theme="dark"] nav button{color:#d0e1eb;background:#193248}
+:root[data-theme="dark"] nav button.active{background:#e2974e;color:#152636;border-color:#f9be7e}
+:root[data-theme="dark"] .graphTabs button{background:#234158;color:#cae7f3;border-color:#527c94}
+:root[data-theme="dark"] .graphTabs button.on{background:#df9147;color:#122535;border-color:#ffbf72}
+:root[data-theme="dark"] a.btn,:root[data-theme="dark"] button.btn{background:#d99652;color:#1a2f3f;border-color:#ffb56f}
+:root[data-theme="dark"] a.btn.secondary{background:#254f68;color:#e0f6ff;border-color:#66a8c8}
+:root[data-theme="dark"] .rigs svg rect:first-of-type{fill:#183046}
+#connectStatus{display:flex;flex-wrap:wrap;gap:8px;margin:9px 0 3px;font-size:12px}\n.netChip{display:inline-flex;align-items:center;gap:7px;padding:7px 9px;background:var(--paper);border-radius:9px;border:1px solid var(--border);font-weight:650}\n.netBulb{width:11px;height:11px;display:inline-block;flex-shrink:0;border-radius:50%;background:#d83b35}\n.netBulb.internetUp{background:#16a653}\n.netBulb.localUp{background:#137ee9}\n#themeSwitch{margin:7px 0 1px;padding:9px 13px;border:1px solid #cda275;border-radius:9px;background:#fff0d9;color:#3b5a69;font-size:13px;font-weight:600}
+:root[data-theme="dark"] #themeSwitch{background:#3b576b;color:#e1f4ff;border-color:#75a3bc}
+
+/* Same approved graphic arrangement as local BUSA, with honest offline state. */
+:root,:root[data-theme="dark"]{color-scheme:dark;--ink:#e5f7ff;--paper:#021021;--border:#14608a;background:#020b18;color:#e5f7ff}
+body,:root[data-theme="dark"] body{background:#020b18;color:#e5f7ff}
+header,:root[data-theme="dark"] header{background:#061b2e;border-color:#1178b8}
+header h1,header small{color:#f1f9ff}
+#home{color:#edf8ff}
+.refBoard{background:linear-gradient(160deg,#071b2f,#010b18);border:1px solid #0b5c95;padding:9px;border-radius:7px;max-width:660px;margin:0 auto}
+.refTop{display:flex;align-items:center;gap:12px;padding:7px 4px 12px;border-bottom:1px solid #1e5982;font-size:clamp(12px,3.4vw,20px)}
+.refTop strong{flex:1}.refWifi{color:#3fceff;font-size:25px}.refTop time{font-size:18px}.refLed{background:#27e426;width:17px;height:17px;border-radius:50%;box-shadow:0 0 9px #2eeb33}
+.refCenter{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.9fr);gap:7px;padding:9px 0}
+.refTempStack{display:flex;flex-direction:column;gap:7px;min-width:0}
+.refTemp{display:flex;align-items:center;gap:5px;min-height:82px;border:1px solid #0878c9;border-radius:13px;background:linear-gradient(135deg,#08233b,#041322);padding:5px 7px;box-shadow:inset 0 0 8px #177ec524}
+.refTempIcon{width:30px;flex:none;text-align:center;font-size:28px;color:#1dd9ff;filter:drop-shadow(0 0 4px #03b7ff)}
+.refTempData{min-width:0}.refTempLabel{font-size:clamp(11px,2.6vw,15px);line-height:1.1}
+.refTemp strong{display:block;color:#2eec36;font-size:clamp(20px,4.6vw,34px);margin:5px 0 0}
+.refTemp small{display:block;color:#b3d8ed;font-size:11px}
+.refRig{display:flex;align-items:center;justify-content:center;background:#031120;min-width:0;overflow:hidden}
+.refRig svg{display:block;width:100%;max-height:360px;object-fit:contain}
+.refMetrics{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.refMetrics article{display:flex;align-items:center;gap:8px;background:#051b32;border:1px solid #087eca;border-radius:12px;padding:9px 7px}
+.refMetrics article>span{font-size:27px;color:#25c6ff}
+.refMetrics article div{min-width:0}.refMetrics small{display:block;color:#b1d9f1;font-size:11px}
+.refMetrics strong{display:block;color:#bcecff;font-size:24px}
+.refFoot{display:flex;justify-content:space-between;gap:6px;flex-wrap:wrap;margin:8px 0;color:#3bea49;font-size:12px}
+.refFoot>span:first-child{color:#e3a4fa}.refOffline{font-size:11px;color:#8db1cb;line-height:1.4}
+nav,:root[data-theme="dark"] nav{background:#041528;border-color:#177bcd}
+nav button,:root[data-theme="dark"] nav button{background:#06182b;color:#d0eaff;border-color:#17466e}
+nav button.active,:root[data-theme="dark"] nav button.active{background:linear-gradient(140deg,#1678f9,#0954cd);color:#fff;border-color:#0bc7ff}
+</style><link rel="stylesheet" href="./calculator.css?v=CALC1"></head><body>
+<header><h1>БУСА-1М №001</h1><small>Монитор · iPhone · две цветные темы</small>
+<div id="connectStatus" role="status"><span class="netChip"><span id="netInternet" class="netBulb"></span>ИНТЕРНЕТ <span id="netInternetText">проверка</span></span>
+<span class="netChip"><span id="netLocal" class="netBulb"></span>БУСА Wi-Fi <span id="netLocalText">нет прямой связи</span></span></div>
+<div><button type="button" id="themeSwitch">Тёмная цветная тема</button></div></header>
+<main>
+<div class="card"><div class="row"><span>Подключение</span><b id="statusText" class="warn">Не подключено</b></div>
+<p class="muted">Живые показания открываются непосредственно из локальной сети ESP32-S3. Эта страница сохранит знакомые вкладки даже без интернета.</p>
+<a class="btn" href="http://192.168.4.1/">Открыть БУСА по Wi-Fi</a></div>
+<section id="home"><div class="refBoard"><div class="refTop"><strong>БУСА-1М №001</strong><span class="refWifi">◉</span><time id="refClock">--:--</time><span class="refLed" title="Состояние соединения"></span></div><div class="refCenter"><div class="refTempStack"><article class="refTemp"><span class="refTempIcon">💧</span><div class="refTempData"><div class="refTempLabel">Вода</div><strong id="onlineT0">Н/Д</strong><small id="onlineSet0">Зад: —</small></div></article><article class="refTemp"><span class="refTempIcon">♧</span><div class="refTempData"><div class="refTempLabel">Колонна</div><strong id="onlineT1">Н/Д</strong><small id="onlineSet1">Зад: —</small></div></article><article class="refTemp"><span class="refTempIcon">▣</span><div class="refTempData"><div class="refTempLabel">Куб</div><strong id="onlineT2">Н/Д</strong><small id="onlineSet2">Зад: —</small></div></article><article class="refTemp"><span class="refTempIcon">♧</span><div class="refTempData"><div class="refTempLabel">Верх колонны</div><strong id="onlineT3">Н/Д</strong><small id="onlineSet3">Зад: —</small></div></article></div><div class="refRig"><svg viewBox="0 0 190 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Схематичная колонна БУСА: куб, колонна и охлаждение" preserveAspectRatio="xMidYMid meet">
+<defs>
+ <linearGradient id="busaSteel" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#475967"/><stop offset=".2" stop-color="#bfdae3"/><stop offset=".39" stop-color="#e4f0f3"/><stop offset=".62" stop-color="#6d8290"/><stop offset=".85" stop-color="#b7d0da"/><stop offset="1" stop-color="#435563"/></linearGradient>
+ <linearGradient id="busaGlass" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#081b2b"/><stop offset=".45" stop-color="#0d4160"/><stop offset="1" stop-color="#0a1a2b"/></linearGradient>
+ <linearGradient id="busaWater" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#13dcff"/><stop offset="1" stop-color="#065bcc"/></linearGradient>
+ <filter id="busaGlow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2"/></filter>
+</defs>
+<g fill="none" stroke="#8da6b4" stroke-width="2">
+ <path d="M67 31 V15 H89 V23 H130 V59"/>
+ <path d="M67 54 H40 V99"/><path d="M76 133 H130"/>
+ <path d="M138 196 V231 H154 V253" />
+</g>
+<g>
+ <rect x="55" y="24" width="28" height="186" rx="7" fill="url(#busaSteel)" stroke="#c8e2f0" stroke-width="1.4"/>
+ <rect x="59" y="33" width="20" height="166" rx="3" fill="url(#busaGlass)" stroke="#829fb2" stroke-width="1"/>
+ <path d="M65 38 V191" stroke="#298dd0" stroke-opacity=".85" stroke-width="1.7"/>
+ <g stroke="#71c9ea" stroke-width="2">
+ <path d="M60 49 H78"/><path d="M60 63 H78"/><path d="M60 77 H78"/><path d="M60 91 H78"/><path d="M60 105 H78"/><path d="M60 119 H78"/><path d="M60 133 H78"/><path d="M60 147 H78"/><path d="M60 161 H78"/><path d="M60 175 H78"/></g>
+ <rect x="53" y="18" width="32" height="12" rx="3" fill="url(#busaSteel)" stroke="#a7c6d5"/>
+ <circle cx="69" cy="19" r="3" fill="#dbeff6" stroke="#52bdeb"/>
+ <rect x="60" y="4" width="17" height="13" rx="3" fill="#899daa" stroke="#d9edf5"/>
+ <rect x="51" y="200" width="38" height="15" rx="5" fill="url(#busaSteel)" stroke="#daeaf0"/>
+</g>
+<g>
+ <ellipse cx="76" cy="225" rx="56" ry="12" fill="#183b50"/>
+ <rect x="21" y="228" width="111" height="58" rx="11" fill="url(#busaSteel)" stroke="#c1dce8" stroke-width="1.5"/>
+ <ellipse cx="76" cy="228" rx="55" ry="10" fill="#bcd4de" stroke="#e4f3f9" stroke-width="1"/>
+ <ellipse cx="76" cy="284" rx="51" ry="7" fill="#596f7c" stroke="#abcbd9"/>
+ <rect x="59" y="249" width="31" height="22" rx="3" fill="#163b51" stroke="#5ecaff"/>
+ <path d="M64 252 V268 M70 252 V268 M76 252 V268 M82 252 V268" stroke="#219ccb" stroke-width="1" />
+ <rect x="31" y="280" width="10" height="14" rx="2" fill="#a4c5d7"/>
+ <rect x="110" y="280" width="10" height="14" rx="2" fill="#a4c5d7"/>
+ <circle cx="115" cy="245" r="4" fill="#1cc8ea"/>
+</g>
+<g>
+ <rect x="120" y="61" width="33" height="128" rx="10" fill="url(#busaSteel)" stroke="#c4deeb" stroke-width="1.4"/>
+ <rect x="127" y="69" width="18" height="109" rx="5" fill="#06253f" stroke="#58b3e0"/>
+ <path d="M136 73c-15 8 15 15 0 23s15 15 0 23s15 15 0 23s15 15 0 23" fill="none" stroke="#06c8fa" stroke-width="3"/>
+ <circle cx="136" cy="81" r="4" fill="#70efff"/>
+ <rect x="119" y="57" width="35" height="9" rx="3" fill="url(#busaSteel)"/>
+ <rect x="121" y="183" width="31" height="10" rx="3" fill="url(#busaSteel)"/>
+ <path d="M153 101 h13 v16" stroke="#1399d1" stroke-width="3" fill="none"/>
+ <path d="M119 172 h-10 v18" stroke="#1399d1" stroke-width="3" fill="none"/>
+</g>
+<g>
+ <path d="M151 195 V249 H173" fill="none" stroke="#899eac" stroke-width="4"/>
+ <path d="M151 196 V234 H171" fill="none" stroke="#00acdc" stroke-width="2"/>
+ <rect x="146" y="248" width="32" height="45" rx="5" fill="#18415d" fill-opacity=".8" stroke="#a5d5ef"/>
+ <rect x="150" y="262" width="24" height="26" rx="2" fill="url(#busaWater)" fill-opacity=".9"/>
+ <g fill="#56efff"><circle cx="157" cy="272" r="2"/><circle cx="167" cy="282" r="2"/></g>
+ <path d="M164 235 Q157 241 164 246 Q171 241 164 235" fill="#21ccff"/>
+</g>
+<g fill="#38e6ff" filter="url(#busaGlow)" opacity=".48">
+ <circle cx="69" cy="77" r="5"/><circle cx="69" cy="136" r="5"/><circle cx="137" cy="120" r="5"/>
+</g>
+<g fill="#27d8ff"><circle cx="69" cy="77" r="2.5"/><circle cx="69" cy="136" r="2.5"/><circle cx="137" cy="120" r="2.5"/></g>
+<text x="101" y="307" font-family="sans-serif" font-size="8" fill="#7ec4e6" text-anchor="middle">БУСА-1М · Схема мониторинга</text>
+</svg></div></div><div class="refMetrics"><article><span>◉</span><div><small>Расход</small><strong id="onlineFlow">Н/Д</strong><small>мл/мин</small></div></article><article><span>▥</span><div><small>Собрано</small><strong id="onlineCollected">Н/Д</strong><small>мл</small></div></article></div><div class="refFoot"><span>⚡ Питание: Н/Д</span><span>◉ Интернет</span><strong>Мониторинг</strong></div><p class="refOffline">Интернет-страница пока не получает показания напрямую с ESP32. Здесь не выводятся вымышленные значения. Для живых показаний открой локальную панель БУСА по Wi-Fi.</p></div></section>
+<section id="temps" hidden><div class="card"><h2>Температуры · T1–T4</h2>
+<div class="row"><span>Вода</span><b>Н/Д</b></div><div class="row"><span>Колонна</span><b>Н/Д</b></div><div class="row"><span>Куб</span><b>Н/Д</b></div><div class="row"><span>Верх колонны</span><b>Н/Д</b></div>
+<p class="muted">Настройка справочных порогов температуры и реальные показания доступны после открытия локальной панели БУСА.</p></div></section>
+<section id="collection" hidden><div class="card"><h2>Отбор жидкости</h2><div class="row"><span>Расход, мл/мин</span><b class="warn">НЕТ ДАТЧИКА</b></div><div class="row"><span>Собрано, мл</span><b class="warn">Н/Д</b></div><p class="muted">YF-S401 измеряет импульсы охлаждающей воды, не отбор.</p></div></section>
+<section id="settings" hidden>
+<div class="card"><h2>Настройки</h2>
+<div class="row"><span>Температуры T1–T4</span><b>Локальная панель</b></div>
+<div class="row"><span>Экран ST7789</span><b>320 × 240</b></div>
+<div class="row"><span>Гашение экрана</span><b>Только вручную</b></div>
+<div class="row"><span>К1–К4</span><b>БЛОК</b></div>
+<div class="row"><span>Wi-Fi и Google</span><b>Настроить в БУСА</b></div>
+<div class="actions"><a class="btn" href="http://192.168.4.1/">Открыть настройки БУСА</a>
+<a class="btn secondary" href="https://github.com/e62815667-gif/BUSA-Monitor/blob/lab/busa-v14-3-final-display-google/google/README_BUSA_Google_Drive.md">Инструкция Google Диск</a></div>
+<p class="muted">Переключатель темы сверху меняет оформление этого приложения. Для переключения самой TFT-матрицы открой настройки экрана в локальной панели БУСА.</p>
+<p class="muted">Google Диск на iPhone позволяет смотреть таблицу. Для передачи каждые 30 секунд БУСА требует соединения с интернетом и Apps Script-приёмника.</p>
+</div></section>
+<section id="graphs" hidden>
+<div class="card"><h2>Графики</h2><div class="graphTabs"><button class="on" data-chart="0">T1–T4</button><button data-chart="1">Вода</button><button data-chart="2">Отбор</button></div>
+<div data-chart-panel="0"><p class="muted">Четыре температурные линии появятся после подключения к БУСА.</p></div>
+<div data-chart-panel="1" hidden><p class="muted">График реальных импульсов охлаждающей воды доступен в локальной панели.</p></div>
+<div data-chart-panel="2" hidden><p class="warn">Датчик отбора отсутствует. График не формируется.</p></div>
+</div></section>
+<section id="events" hidden><div class="card"><h2>Журнал событий</h2><p class="muted">Для просмотра текущих событий и ошибок PCF8575, DS18B20, YF-S401 открой локальную панель БУСА.</p></div></section>
+<section id="calculator" hidden><div id="busaCalculator"></div></section></main>
+<nav aria-label="Разделы"><button data-tab="home" class="active">Главная</button><button data-tab="temps">T1–T4</button><button data-tab="collection">Отбор</button><button data-tab="settings">Настройки</button><button data-tab="graphs">Графики</button><button data-tab="events">События</button><button data-tab="calculator">Калькулятор</button></nav>
+<script>
+(function(){function clock(){const c=document.getElementById("refClock");if(c)c.textContent=new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});}clock();setInterval(clock,30000);})();
+// Change the standalone iPhone page's palette only; the TFT palette is
+// changed from the controller's own Settings screen.
+let darkSaved=false;
+try{darkSaved=localStorage.getItem('busa-pwa-dark')==='1';}catch(e){}
+function applyTheme(dark){
+ document.documentElement.dataset.theme=dark?'dark':'light';
+ document.getElementById('themeSwitch').textContent=
+    dark?'Светлая цветная тема':'Тёмная цветная тема';
+ try{localStorage.setItem('busa-pwa-dark',dark?'1':'0');}catch(e){}
+}
+applyTheme(darkSaved);
+document.getElementById('themeSwitch').addEventListener('click',()=>{
+ applyTheme(document.documentElement.dataset.theme!=='dark');
+});
+document.querySelectorAll('nav [data-tab]').forEach(b=>b.addEventListener('click',()=>{
+ document.querySelectorAll('main section[id]').forEach(s=>s.hidden=s.id!==b.dataset.tab);
+ document.querySelectorAll('nav [data-tab]').forEach(t=>t.classList.toggle('active',t===b));
+ window.scrollTo(0,0);
+}));
+document.querySelectorAll('[data-chart]').forEach(b=>b.addEventListener('click',()=>{
+ document.querySelectorAll('[data-chart]').forEach(t=>t.classList.toggle('on',t===b));
+ document.querySelectorAll('[data-chart-panel]').forEach(p=>p.hidden=p.dataset.chartPanel!==b.dataset.chart);
+}));
+// Standalone GitHub Pages page is HTTPS, so it cannot inspect 192.168.4.1
+// over insecure HTTP due to mixed-content rules. Never fake local connectivity.
+async function networkCheck(){
+  const local=window.location.hostname==='192.168.4.1';
+  let online=false;
+  try{
+    const url=local?'http://192.168.4.1/api/status':'./manifest.webmanifest';
+    const resp=await fetch(url,{cache:'no-store',signal:AbortSignal.timeout(4000)});
+    if(local && resp.ok){
+      const s=await resp.json();
+      const a=s.network_indicators||{};
+      online=a.internet===true;
+      document.getElementById('netLocal').classList.toggle('localUp',a.local_client===true);
+      document.getElementById('netLocalText').textContent=a.local_client?'подключён':'нет клиентов';
+    } else if(resp.ok){online=true;}
+  }catch(e){}
+  document.getElementById('netInternet').classList.toggle('internetUp',online);
+  document.getElementById('netInternetText').textContent=online?'доступен':'нет связи';
+  if(!local){
+    document.getElementById('netLocalText').textContent='открой локальную панель';
+  }
+}
+networkCheck();setInterval(networkCheck,15000);
+if('serviceWorker' in navigator){const hadController=Boolean(navigator.serviceWorker.controller);let calcReloading=false;
+ if(hadController)navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!calcReloading){calcReloading=true;location.reload();}});
+ navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>reg.update()).catch(()=>{});}
+</script><script src="./calculator.js?v=CALC1"></script></body></html>

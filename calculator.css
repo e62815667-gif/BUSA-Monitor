@@ -1,0 +1,19 @@
+/* Scoped offline calculator styling: preserves application palettes and navigation. */
+#busaCalculator{max-width:660px;margin:auto;color:inherit;font:inherit}
+#busaCalculator .calcTabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+#busaCalculator button{min-height:44px;padding:10px 12px;border:1px solid var(--border,#397493);border-radius:9px;background:var(--paper,#102638);color:inherit;font:inherit;cursor:pointer}
+#busaCalculator button[aria-selected="true"]{background:#f5d43d;color:#20251c;border-color:#f5d43d;font-weight:700}
+#busaCalculator .calcPanel{margin:0;padding:14px;border:1px solid var(--border,#397493);border-radius:12px;background:var(--paper,#102638)}
+#busaCalculator h3{font-size:17px;margin:0 0 15px}
+#busaCalculator .calcGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#busaCalculator label{display:flex;flex-direction:column;gap:8px;font-size:14px;line-height:1.4;min-width:0}
+#busaCalculator input{box-sizing:border-box;width:100%;min-width:0;min-height:46px;padding:10px;font:20px system-ui;border:1px solid var(--border,#397493);border-radius:7px;background:var(--paper,#102638);color:inherit}
+#busaCalculator input[aria-invalid="true"]{outline:2px solid #ef705e}
+#busaCalculator .calcActions{display:flex;gap:9px;margin:16px 0 8px}
+#busaCalculator .calcResult:empty{display:none}
+#busaCalculator .calcResult{background:#ffe431;color:#172318;border-radius:9px;padding:12px;margin-top:12px}
+#busaCalculator .calcResult>div{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;padding:7px 0}
+#busaCalculator .calcResult strong{font-size:25px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+#busaCalculator .calcNote{font-size:12px;line-height:1.5;opacity:.85}
+#busaCalculator .calcError{color:#ed7461;line-height:1.4}
+@media(max-width:360px){#busaCalculator .calcGrid{grid-template-columns:1fr}#busaCalculator .calcPanel{padding:10px}}
