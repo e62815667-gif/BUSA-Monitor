@@ -67,7 +67,7 @@ jobs:
           assert 'wifi_prov_mgr_stop_provisioning()' in r
           assert 'BUSA_RM_FIXED_POP="123456789"' in r
           assert 'WiFiProv.beginProvision' in r
-          assert 'WiFi.softAP(' in s and 'busaGoogleNetworkBusy' in s
+          assert 'WiFi.softAP(' in s and 'launchGoogleCloud()' in s
           print('BLE and existing BUSA services confirmed')
           PY
       - name: Compile ESP32-S3 N16R8
