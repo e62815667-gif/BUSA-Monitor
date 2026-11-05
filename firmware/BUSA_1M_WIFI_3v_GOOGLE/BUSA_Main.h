@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI5-20261106";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI6-20261106";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -559,7 +559,10 @@ uint8_t currentPage=0; // 8 sections including Calculator
 uint8_t graphSubView=0; // 0 four isolated temperature lanes; 1 water + collection lanes
 uint8_t graphMenuCursor=0; // Selected item in the Graphs submenu; ENTER opens it
 uint32_t busaGraphLastDrawnCapture=0;
-uint8_t approvedSettingsItem=0; // 5 approved settings
+uint8_t approvedSettingsItem=0; // Seven Settings entries, including Events and Diagnostics
+uint8_t graphHoursIndex=0;
+static const uint8_t BUSA_GRAPH_HOURS[4]={1,6,12,24};
+static const char* const BUSA_RELAY_LABELS[4]={"ТЭН откл.","Кран закрыт","Кран открыт","Авария"};
 uint8_t settingsSubTab=0,tftView=0,previousMainPage=0;
 uint8_t diagModule=0,calSensor=0,themeDraft=2,tftThemeMode=2;
 bool calEditing=false;float calDraft=0;
@@ -707,7 +710,7 @@ void startKeyLearning(){
   candidatePair=-1;candidateStep=255;candidateAt=0;
   keypadMessage="Нажми F1, затем отпусти";
   // Stay in Settings / System keyboard diagnostics; never jump to Events.
-  previousMainPage=currentPage;
+  previousMainPage=5;approvedSettingsItem=6;
   currentPage=6;diagModule=1;tftView=1;tftDirty=true;
 }
 
@@ -719,7 +722,9 @@ void navigatePage(uint8_t target){
   if(currentPage==5 && target!=5 && approvedSettingsItem==1 && tftView){
     wifiUiLeave(); // scrub unsaved password; AP BUSA keeps running
   }
-  previousMainPage=currentPage;
+  previousMainPage=(target==4||target==6||currentPage==4||currentPage==6)?5:currentPage;
+  if(target==4)approvedSettingsItem=5;
+  if(target==6)approvedSettingsItem=6;
   // Open other section lists at their first visible row, just like Settings.
   if(target==1){selectedTemp=0;selectedField=0;}
   else if(target==3)graphMenuCursor=0;
@@ -818,7 +823,8 @@ void keypadAction(int k){
     tftDirty=true;return;
   }
   if(k==15){ // ESC: close detail or go back
-    if(tftView){tftView=0;if(currentPage==1)selectedField=0;}
+    if((currentPage==4||currentPage==6)&&!tftView){navigatePage(5);previousMainPage=0;}
+    else if(tftView){tftView=0;if(currentPage==1)selectedField=0;}
     else if(currentPage!=previousMainPage){
       uint8_t target=previousMainPage;
       previousMainPage=currentPage;currentPage=target;
@@ -848,7 +854,7 @@ void keypadAction(int k){
       }
     }else if(currentPage==5){
       if(!tftView){
-        approvedSettingsItem=(approvedSettingsItem+(k==7?4:1))%5;
+        approvedSettingsItem=(approvedSettingsItem+(k==7?6:1))%7;
         settingsSubTab=approvedSettingsItem;
       }else if(approvedSettingsItem==0){
         // Temperature subpage always shows T1..T4 simultaneously.
@@ -861,7 +867,8 @@ void keypadAction(int k){
       if(!tftView)diagModule=(diagModule+(k==7?6:1))%7;
     }else if(currentPage==3){
       // Select Graphs entries in sequence. Do not switch a graph during preview.
-      if(!tftView)graphMenuCursor=(graphMenuCursor+(k==7?1:1))%2;
+      if(tftView)graphHoursIndex=(graphHoursIndex+(k==7?3:1))%4;
+      else {graphSubView=(graphSubView+(k==7?2:1))%3;graphMenuCursor=graphSubView;}
     }
     // Home/Collection/Events are read-only panels; no invisible submenus.
   }else if(k==16 || k==18){ // LEFT/RIGHT: change sections everywhere
@@ -883,7 +890,9 @@ void keypadAction(int k){
       navigatePage(1);
     }else if(currentPage==5){
       if(!tftView){
-        // Settings is a real page; ENT opens the selected nested page.
+        // Events and Diagnostics belong to Settings, outside the main cycle.
+        if(approvedSettingsItem==5){navigatePage(4);return;}
+        if(approvedSettingsItem==6){navigatePage(6);return;}
         tftView=1;
         themeDraft=tftThemeMode;
         if(approvedSettingsItem==1){
@@ -904,7 +913,7 @@ void keypadAction(int k){
       if(!tftView)tftView=1;
     }else if(currentPage==3){
       // ENTER opens exactly the graph highlighted by UP/DOWN, not the next one.
-      if(!tftView){graphSubView=graphMenuCursor;tftView=1;}
+      tftView=tftView?0:1;
     }
     // Nothing else to open in read-only sections.
   }else if(k==1){ // F2: display OFF; monitoring continues
@@ -1086,10 +1095,10 @@ const char* tftProfileName(){return tftProfile==2?"ILI9341":"ST7789";}
 const uint16_t BG=0x080f,PANEL=0x10a3,BLUE=0x1c9f,GREEN=0x07e0,WHITE=0xffff,
                YELLOW=0xffe0,GRAY=0xbdf7;
 const char* pages[8]={"Главная","Температуры","Отбор","Графики","События","Настройки","Диагностика","Калькулятор"};
-const uint8_t UI_ORDER[8]={0,1,2,3,4,5,6,7}; // Visible section order, identical in both orientations
+const uint8_t UI_ORDER[6]={0,1,2,3,7,5}; // Six main sections; Events/Diagnostics are Settings children
 void navigatePage(uint8_t target); // forward declaration
-uint8_t orderSlot(uint8_t page){for(uint8_t i=0;i<8;i++)if(UI_ORDER[i]==page)return i;return 0;}
-void moveApprovedTab(int direction){int slot=(orderSlot(currentPage)+8+direction)%8;navigatePage(UI_ORDER[slot]);}
+uint8_t orderSlot(uint8_t page){if(page==4||page==6)return 5;for(uint8_t i=0;i<6;i++)if(UI_ORDER[i]==page)return i;return 0;}
+void moveApprovedTab(int direction){int slot=(orderSlot(currentPage)+6+direction)%6;navigatePage(UI_ORDER[slot]);}
 // Defined below with the web server; needed by the TFT renderer.
 extern String stationSsid,otaMessage,nearbyNames[5];
 extern uint8_t nearbyCount;
@@ -1166,11 +1175,9 @@ void drawBootSplash(uint32_t holdMs){
   screen->setTextWrap(false);
   const int scale=w>=300?3:2;
   screen->setTextSize(scale);
-  screen->setCursor((w-10*6*scale)/2,h/2-50);
-  screen->print("BUSA 1M AI");
-  screen->setTextSize(2);
-  screen->setCursor((w-36)/2,h/2+3);
-  screen->print("001");
+  screen->setCursor((w-12*6*scale)/2,h/2-30);
+  screen->print("BUSA MONITOR");
+
   screen->setTextSize(1);
   splashHoldMs=holdMs;
   splashStartedAt=millis();
@@ -1213,6 +1220,20 @@ bool busaSoundEnabled(uint8_t i); bool busaSoundActive(uint8_t i);
 extern volatile bool googleEnabled; // Google status read by both TFT renderers
 extern volatile int googleInternet,googleHttp; // TFT indicators; definitions in Google module
 static void busaCalcDraw();
+#include "BUSA_ChartHistory.h"
+static BusaChart::History busaChartHistory;
+static bool busaChartReady=false,busaChartAttempted=false;
+static void busaCaptureChart(uint32_t now){
+ if(!busaChartAttempted){
+  busaChartAttempted=true;
+  auto* memory=(BusaChart::Row*)heap_caps_malloc(sizeof(BusaChart::Row)*1441,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
+  if(memory){busaChartHistory.begin(memory,1441);busaChartReady=true;}
+ }
+ if(!busaChartReady)return;
+ float values[4];for(int k=0;k<4;k++)values[k]=hasTemp(k,now)?temperature[k]:NAN;
+ busaChartHistory.capture(now,values);
+}
+#include "BUSA_ChartTFT.h"
 #include "BUSA_ApprovedUI_V13.h"
 
 #include "BUSA_ApprovedGraphics_HQ_V14.h"
@@ -2015,6 +2036,30 @@ section[data-section="0"] .approvedRig .rigIllustration{display:block;width:100%
 :root section[data-section="1"] .approvedSensor{border:0;border-radius:0;box-shadow:none;background:transparent!important}
 section[data-section="1"] .sensorEdit{border:0}
 @media(min-width:600px){section[data-section="0"] .approvedDashboard{min-height:440px}section[data-section="0"] .approvedRig,section[data-section="0"] .approvedRig .rigIllustration{min-height:440px}}
+
+/* UI6: six sections, coherent chart/calculator controls and read-only output roles. */
+.appTabs{grid-template-columns:repeat(6,minmax(0,1fr))!important}
+.appTabs button{font-size:clamp(8px,2.3vw,11px)!important}
+.relayIndicators{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:12px 0}
+.relayBadge{display:grid;grid-template-columns:10px minmax(0,1fr);gap:5px 8px;align-items:center;border:1px solid #244356;border-radius:10px;background:#081a27;padding:11px;font-size:13px;color:#aec0cd}
+.relayBadge small{grid-column:2;font-size:10px;color:inherit;opacity:.8}
+.relayLamp{width:8px;height:8px;border-radius:50%;background:#526471}
+.relayBadge[data-state="on"]{background:#103e3a;border-color:#50e2ab;color:#9bffd5}
+.relayBadge[data-state="on"] .relayLamp{background:#62f1b6;box-shadow:0 0 8px #62f1b666}
+#relayBadge3[data-state="on"]{background:#49222d;border-color:#ff6b7c;color:#ffc2cb}
+#relayBadge3[data-state="on"] .relayLamp{background:#ff6b7c;box-shadow:0 0 8px #ff6b7c66}
+.chartCard{background:#061522;border:1px solid #24465d;border-radius:14px;padding:12px}
+.chartTabs,.chartRanges{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.chartTabs button,.chartRanges button{min-width:0;background:#0a2032;color:#c2d8e7;border:1px solid #284b64;padding:10px 2px;font-size:12px}
+.chartTabs button.on,.chartRanges button.on{background:#0872ce;color:#fff;border-color:#53cfff;box-shadow:0 0 8px #0587f733}
+.chartRanges{grid-template-columns:repeat(4,minmax(0,1fr));margin-top:10px}
+.chartHeading{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:16px 0 10px;font-size:13px;color:#d8eaf7}
+.chartHeading span{font-size:10px;color:#98b8cd;text-align:right}
+.chartLegend{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin:8px 0 12px;font-size:11px;color:#b8d0df}
+.chartLegend[hidden]{display:none}
+.chartLegend span:before{content:"";display:inline-block;width:14px;height:3px;background:var(--series);vertical-align:middle;margin-right:6px}
+#chartCanvas{display:block;width:100%;height:auto;aspect-ratio:640 / 440;border:0;border-radius:8px}
+@media(max-width:360px){.chartTabs button{font-size:10px}.chartCard{padding:9px}.relayBadge{font-size:12px;padding:9px}}
 </style><link rel="stylesheet" href="/calculator.css?v=CALC1"></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <h1>BUSA MONITOR</h1></div>
@@ -2030,8 +2075,8 @@ section[data-section="1"] .sensorEdit{border:0}
 <button data-page="1"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg><span>Температуры</span></button>
 <button data-page="2"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><span>Отбор</span></button>
 <button data-page="3"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><span>Графики</span></button>
-<button data-page="4"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h5"/></svg><span>События</span></button>
-<button data-page="5"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><span>Настройки</span></button><button data-page="7"><span class="tabIcon">▦</span><span>Калькулятор</span></button></nav></header><main><section class="page" data-section="0">
+<button data-page="7"><svg class="uiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 6h8M8 10h2m4 0h2M8 14h2m4 0h2M8 18h2m4 0h2"/></svg><span>Калькулятор</span></button>
+<button data-page="5"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><span>Настройки</span></button></nav></header><main><section class="page" data-section="0">
 
 <div class="approvedDashboard">
   <div class="approvedTempGrid"><div class="approvedTemp temp0"><div class="approvedTempTitle"><span class="approvedTempIcon"><svg class="busaRefTempIcon" viewBox="0 0 48 58" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="busaIcon0" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#d8faff"/><stop offset=".4" stop-color="#06caff"/><stop offset="1" stop-color="#0276e9"/></linearGradient></defs><path d="M24 4C17 17 7 28 7 37a17 17 0 0034 0C41 28 31 17 24 4Z" fill="url(#busaIcon0)" stroke="#28cdff" stroke-width="2"/><path d="M15 35q0 12 12 13" fill="none" stroke="#dcfaff" stroke-width="2.5" stroke-linecap="round"/></svg></span><span>Вода</span></div><strong id="t0">Н/Д</strong><small id="homeSet0">ВКЛ — · ВЫКЛ —</small></div>
@@ -2168,13 +2213,13 @@ section[data-section="1"] .sensorEdit{border:0}
   <div class="approvedMetric"><span>◉</span><div><small>Расход отбора</small><strong>Н/Д</strong><small>мл/мин · нет датчика</small></div></div>
   <div class="approvedMetric"><span>▤</span><div><small>Собрано</small><strong>Н/Д</strong><small>мл · нет датчика</small></div></div>
 </div>
-<div class="approvedStatus"><span>4 звуковых реле</span></div>
-<details class="card approvedAdditional"><summary>Охлаждающая вода и звуковые выходы</summary>
+<div class="relayIndicators" role="status" aria-label="Блок реле"><div class="relayBadge" id="relayBadge0" data-state="unknown"><span class="relayLamp"></span><span>ТЭН откл.</span><small id="soundStatus0">Нет связи</small></div><div class="relayBadge" id="relayBadge1" data-state="unknown"><span class="relayLamp"></span><span>Кран закрыт</span><small id="soundStatus1">Нет связи</small></div><div class="relayBadge" id="relayBadge2" data-state="unknown"><span class="relayLamp"></span><span>Кран открыт</span><small id="soundStatus2">Нет связи</small></div><div class="relayBadge" id="relayBadge3" data-state="unknown"><span class="relayLamp"></span><span>Авария</span><small id="soundStatus3">Нет связи</small></div></div>
+<details class="card approvedAdditional"><summary>Охлаждающая вода</summary>
   <div class="row">YF-S401 <b>GPIO15</b></div><div class="row">Импульсы <b id="pulses">—</b></div>
   <div class="row">Расход воды (не калиброван) <b id="flow">—</b></div>
   <p class="hint">Датчик на линии охлаждающей воды, а не на линии отбора. Его расчётный расход не подтверждён калибровкой.</p>
-  <div class="relayGrid"><span>K1 <b id="soundStatus0">ВЫКЛ</b></span><span>K2 <b id="soundStatus1">ВЫКЛ</b></span><span>K3 <b id="soundStatus2">ВЫКЛ</b></span><span>K4 <b id="soundStatus3">ВЫКЛ</b></span></div>
-  <p class="hint">К1–К4 используются только для звуковой сигнализации.</p>
+  
+  
 </details></section>
 <section class="page" data-section="1" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg><strong>ТЕМПЕРАТУРЫ</strong></div>
 <div class="approvedSensorList"><div class="approvedSensor temp0">
@@ -2211,18 +2256,13 @@ section[data-section="1"] .sensorEdit{border:0}
 <div class="row">Расход, л/мин (оценка) <b id="flow2">—</b></div><div class="row">Объём, л (оценка) <b id="total">—</b></div>
 </details></section>
 <section class="page" data-section="3" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><strong>ГРАФИКИ</strong></div>
-<div class="card approvedBlackGraph"><div class="settingsTabs approvedGraphTabs"><button type="button" data-graph-tft="0" class="on">Температуры</button>
-<button type="button" data-graph-tft="1">Вода и отбор</button></div>
-<div class="graphPanel" data-graph-panel="0"><h3>Т1–Т4 · отдельные линии</h3>
-<canvas id="graphT" class="approvedLaneCanvas" width="600" height="420" aria-label="Четыре отдельных графика T1, T2, T3 и T4 сверху вниз"></canvas>
-</div>
-<div class="graphPanel" data-graph-panel="1" hidden><h3>Вода и отбор · раздельно</h3>
-<canvas id="graphF" class="approvedWaterCanvas" width="600" height="280" aria-label="Охлаждающая вода сверху, отбор снизу"></canvas>
-</div>
+<div class="chartCard"><div class="chartTabs" role="tablist" aria-label="Вид графика">
+<button type="button" data-chart="0" class="on" aria-selected="true">Температуры</button><button type="button" data-chart="1" aria-selected="false">Расход</button><button type="button" data-chart="2" aria-selected="false">Питание</button></div>
+<div class="chartHeading"><strong id="chartTitle">Температура, °C</strong><span id="chartState">Ожидание данных</span></div>
+<div id="chartLegend" class="chartLegend"><span style="--series:#33c9f4">Вода</span><span style="--series:#ff666a">Колонна</span><span style="--series:#f2bc47">Куб</span><span style="--series:#62df8b">Верх колонны</span></div>
+<canvas id="chartCanvas" width="640" height="440" role="img" aria-label="График реальных измерений"></canvas>
+<div class="chartRanges" aria-label="Период"><button type="button" data-hours="1" class="on" aria-pressed="true">1 ч</button><button type="button" data-hours="6" aria-pressed="false">6 ч</button><button type="button" data-hours="12" aria-pressed="false">12 ч</button><button type="button" data-hours="24" aria-pressed="false">24 ч</button></div>
 </div></section>
-<section class="page" data-section="4" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h5"/></svg><strong>СОБЫТИЯ</strong></div>
-<div class="card"><div class="eventFilters"><button type="button" class="on" data-event="all">Все</button><button type="button" data-event="warn">Предупр.</button><button type="button" data-event="alarm">Аварии</button><button type="button" data-event="system">Система</button></div>
-<div id="events" class="approvedEvents">Ожидание...</div></div></section>
 <section class="page" data-section="5" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><strong>НАСТРОЙКИ</strong></div>
 <div class="card approvedSettingsMain" id="settingsMenu"><button type="button" data-stab-btn="0" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg></span><span>Температура</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="1" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M2 8c6-5 14-5 20 0M5 12c4-4 10-4 14 0M8 16c2-2 6-2 8 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg></span><span>Wi-Fi</span><span class="approvedArrow">›</span></button>
@@ -2230,9 +2270,14 @@ section[data-section="1"] .sensorEdit{border:0}
 <button type="button" data-stab-btn="3" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M7 19h11a4 4 0 0 0 .5-8A6.5 6.5 0 0 0 6 11a4 4 0 0 0 1 8z"/></svg></span><span>Google</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="7" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m7 7 10 10-5 4V3l5 4L7 17"/></svg></span><span>Bluetooth · RainMaker</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="5" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 18v3h16v-3"/></svg></span><span>Обновление ПО</span><span class="approvedArrow">›</span></button>
+<button type="button" data-stab-btn="8" class="approvedMenuItem"><span class="approvedMenuIcon">▤</span><span>Журнал событий</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="6" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 18h4l3-8 4 6 3-4h4"/><circle cx="12" cy="12" r="10"/></svg></span><span>Диагностика</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="4" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/></svg></span><span>О системе</span><span class="approvedArrow">›</span></button></div>
 <button type="button" id="settingsBack" hidden class="approvedBack">‹ Все настройки</button>
+<div class="settingCard" data-stab="8" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h5"/></svg><strong>СОБЫТИЯ</strong></div>
+<div class="card"><div class="eventFilters"><button type="button" class="on" data-event="all">Все</button><button type="button" data-event="warn">Предупр.</button><button type="button" data-event="alarm">Аварии</button><button type="button" data-event="system">Система</button></div>
+<div id="events" class="approvedEvents">Ожидание...</div></div></div>
+
 <div class="card settingCard" data-stab="0"><h2>Калибровка температуры</h2>
 <p class="hint">Поправки показаний T1–T4, шаг 0,1 °C, от −10 до +10 °C. Это НЕ пороги звуковых сигналов.</p>
 <div class="row"><label for="calOffset0">T1 · Вода</label><input id="calOffset0" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
@@ -2330,9 +2375,9 @@ section[data-section="1"] .sensorEdit{border:0}
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
 <div class="grid"><button id="keyUndo" type="button">Назад на шаг</button>
 <button id="keyCancel" type="button">Отмена</button></div></div>
-<div class="card" data-diag-panel="relays" hidden><h2>Звуковые реле K1–K4</h2>
+<div class="card" data-diag-panel="relays" hidden><h2>Блок реле</h2>
 <pre id="diagRelay" style="white-space:pre-wrap;word-break:break-word">Ожидание статуса...</pre>
-<p class="hint">Отчёт показывает команды реле, а не физический отклик звуковых оповещателей.</p></div>
+<p class="hint">Показано состояние выходов ESP32.</p></div>
 <div class="card" data-diag-panel="temps" hidden><h2>Датчики T1–T4</h2>
 <pre id="diagOneWire" style="white-space:pre-wrap;word-break:break-word">Ожидание DS18B20...</pre></div>
 <div class="card" data-diag-panel="wifi" hidden><h2>Wi-Fi / Google</h2>
@@ -2412,11 +2457,12 @@ document.querySelectorAll('[data-diag-btn]').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('[data-diag-panel]').forEach(x=>x.hidden=x.dataset.diagPanel!==b.dataset.diagBtn);
 });
 function page(n,send=true){
- const inDiag=n===6,visible=inDiag?5:n;
+ const inDiag=n===6,inEvents=n===4,visible=(inDiag||inEvents)?5:n;
  active=visible;
  document.querySelectorAll('[data-section]').forEach(e=>e.hidden=Number(e.dataset.section)!==visible);
  document.querySelectorAll('.appTabs button').forEach(e=>e.classList.toggle('on',Number(e.dataset.page)===visible));
  if(inDiag)settingsTab(6,false);
+ else if(inEvents)settingsTab(8,false);
  else if(visible===5&&send)settingsTab(-1,false);
  // Browser page selection never commands the physical TFT.
  if(visible===3){graphs();refreshGraphHistory(true);}
@@ -2436,15 +2482,20 @@ get('settingsBack').onclick=()=>{
  settingsTab(-1,false);
 };
 document.querySelectorAll('[data-stab-btn]').forEach(b=>b.onclick=()=>settingsTab(Number(b.dataset.stabBtn)));
-function selectGraphView(n,send=true){
- if(n<0||n>1)return;
- document.querySelectorAll('[data-graph-tft]').forEach(c=>c.classList.toggle('on',Number(c.dataset.graphTft)===n));
- document.querySelectorAll('[data-graph-panel]').forEach(p=>p.hidden=Number(p.dataset.graphPanel)!==n);
- graphs();
- // Browser graph selection does not control physical graph.
+let chartView=0,chartHours=1,chartFetchToken=0;
+const RELAY_NAMES=['ТЭН откл.','Кран закрыт','Кран открыт','Авария'];
+function updateRelayBadges(channels){
+ for(let i=0;i<4;i++){
+  const ch=Array.isArray(channels)?channels[i]:null,badge=get('relayBadge'+i);
+  const state=typeof ch?.sound_on==='boolean'?(ch.sound_on?'on':'off'):'unknown';
+  badge.dataset.state=state;get('soundStatus'+i).textContent=state==='on'?'Активен':state==='off'?'Неактивен':'Нет связи';
+ }
 }
-document.querySelectorAll('[data-graph-tft]').forEach(b=>b.onclick=()=>{
- selectGraphView(Number(b.dataset.graphTft));refreshGraphHistory(true);
+document.querySelectorAll('[data-chart]').forEach(b=>b.onclick=()=>{
+ chartView=Number(b.dataset.chart);document.querySelectorAll('[data-chart]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-selected',String(x===b));});graphs();
+});
+document.querySelectorAll('[data-hours]').forEach(b=>b.onclick=()=>{
+ chartHours=Number(b.dataset.hours);document.querySelectorAll('[data-hours]').forEach(x=>{x.classList.toggle('on',x===b);x.setAttribute('aria-pressed',String(x===b));});busaGraphData={};graphs();refreshGraphHistory(true);
 });
 async function keyCommand(action){
  try{
@@ -2464,7 +2515,7 @@ get('screenWake').onclick=()=>setScreenPower('wake');
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
 get('keyNext').onclick=()=>keyCommand('next');
 get('tftSave').onclick=async()=>{
- if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Звуковые реле временно выключатся на перезагрузке.'))return;
+ if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Блок реле временно выключатся на перезагрузке.'))return;
  try{
   const r=await fetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value,rotation:get('tftRotation').value})});
   get('tftProfileStatus').textContent=await r.text();
@@ -2561,58 +2612,29 @@ get('tempCalSave').onclick=async()=>{
 get('keyUndo').onclick=()=>keyCommand('undo');
 get('keyCancel').onclick=()=>keyCommand('cancel');
 document.querySelectorAll('nav button').forEach(e=>e.onclick=()=>page(Number(e.dataset.page)));
-// One controller history feeds the TFT and iPhone: no invented collection values.
-function chartFrame(ctx,w,h){ctx.fillStyle='#000';ctx.fillRect(0,0,w,h);ctx.strokeStyle='#2774a5';ctx.lineWidth=2;ctx.strokeRect(1,1,w-2,h-2);}
-function chartLine(ctx,values,color,x,y,w,h,zero=false,slots=48){
- const a=values.filter(v=>Number.isFinite(v));if(!a.length)return;
- let low=zero?0:Math.min(...a),high=Math.max(...a);
- if(zero)high=Math.max(1,high);else{let p=Math.max(.2,(high-low)*.22);low-=p;high+=p;}
- if(high<=low)high=low+1;ctx.strokeStyle=color;ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();
- let drawing=false;values.forEach((v,i)=>{
-  if(!Number.isFinite(v)){drawing=false;return;}
-  let xx=x+i*w/Math.max(1,slots-1);
-  let yy=y+h-3-Math.min(1,Math.max(0,(v-low)/(high-low)))*(h-6);
-  if(!drawing){ctx.moveTo(xx,yy);drawing=true}else ctx.lineTo(xx,yy);
- });ctx.stroke();
+// Shared 24h passive measurement history; missing data never becomes a demo line.
+function graphs(){
+ const canvas=get('chartCanvas'),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+ const x0=58,y0=28,pw=w-82,ph=h-83;ctx.clearRect(0,0,w,h);ctx.fillStyle='#04101e';ctx.fillRect(0,0,w,h);
+ const names=['Температура, °C','Расход отбора, мл/мин','Питание, В'];get('chartTitle').textContent=names[chartView];get('chartLegend').hidden=chartView!==0;
+ ctx.lineWidth=1;ctx.font='18px system-ui';ctx.textAlign='right';ctx.textBaseline='middle';
+ for(let j=0;j<=5;j++){const yy=y0+ph-j*ph/5;ctx.strokeStyle='#1b354a';ctx.beginPath();ctx.moveTo(x0,yy);ctx.lineTo(x0+pw,yy);ctx.stroke();ctx.fillStyle='#90aec3';ctx.fillText(chartView===0?String(j*25):'—',x0-10,yy);}
+ const now=Date.now();ctx.textAlign='center';ctx.textBaseline='top';
+ for(let j=0;j<=3;j++){const xx=x0+pw*j/3;ctx.strokeStyle='#142b3e';ctx.beginPath();ctx.moveTo(xx,y0);ctx.lineTo(xx,y0+ph);ctx.stroke();ctx.fillStyle='#90aec3';ctx.fillText(new Date(now-(1-j/3)*chartHours*3600000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit',hour12:false}),xx,y0+ph+15);}
+ const series=busaGraphData.hours===chartHours?busaGraphData.temperature||[]:[],colors=['#33c9f4','#ff666a','#f2bc47','#62df8b'];let points=0;
+ if(chartView===0)series.forEach((values,k)=>{
+  ctx.strokeStyle=colors[k];ctx.fillStyle=colors[k];ctx.lineWidth=3;ctx.lineJoin='round';ctx.beginPath();let drawing=false;
+  values.forEach((v,i)=>{if(!Number.isFinite(v)){drawing=false;return;}points++;const xx=x0+pw*(i+.5)/values.length,yy=y0+ph-Math.max(0,Math.min(125,v))*ph/125;if(drawing)ctx.lineTo(xx,yy);else ctx.moveTo(xx,yy);drawing=true;});ctx.stroke();
+  values.forEach((v,i)=>{if(Number.isFinite(v)){ctx.beginPath();ctx.arc(x0+pw*(i+.5)/values.length,y0+ph-Math.max(0,Math.min(125,v))*ph/125,2.7,0,Math.PI*2);ctx.fill();}});
+ });
+ const message=chartView===1?'Нет датчика отбора':chartView===2?'Нет данных питания':points?'':'Ожидание измерений';
+ get('chartState').textContent=chartView===0&&points?'Данные с включения':message;
+ if(message){ctx.fillStyle='#a6c2d5';ctx.font='21px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(message,x0+pw/2,y0+ph/2);}
 }
-function graphAllTemperatures(){
- const c=get('graphT'),x=c.getContext('2d');chartFrame(x,c.width,c.height);
- const names=['Т1 · Вода','Т2 · Колонна','Т3 · Куб','Т4 · Верх'];
- const colors=['#36c5f3','#ffac56','#ff6965','#5ee897'],series=busaGraphData.temperature||[[],[],[],[]];
- x.textBaseline='middle';
- for(let k=0;k<4;k++){
-  const y=8+k*102,vals=series[k]||[],good=vals.filter(Number.isFinite);
-  if(k){x.strokeStyle='#28608b';x.lineWidth=2;x.beginPath();x.moveTo(8,y-3);x.lineTo(592,y-3);x.stroke();}
-  x.font='16px sans-serif';x.fillStyle=colors[k];x.textAlign='left';x.fillText(names[k],14,y+16);
-  x.textAlign='right';x.fillStyle='#e4f5ff';x.fillText(good.length?good[good.length-1].toFixed(1)+' °C':'Н/Д',582,y+16);x.textAlign='left';
-  x.strokeStyle='#17384f';x.lineWidth=1;x.strokeRect(12,y+34,576,61);
-  chartLine(x,vals,colors[k],17,y+38,566,53);
-  if(good.length<2){x.fillStyle='#799eb8';x.font='12px sans-serif';x.fillText('Ожидание измерений',22,y+72);}
- }
-}
-function graphWaterAndCollection(){
- const c=get('graphF'),x=c.getContext('2d');chartFrame(x,c.width,c.height);
- x.textBaseline='middle';x.textAlign='left';x.font='18px sans-serif';x.fillStyle='#58d8ff';x.fillText('ВОДА · YF-S401',15,23);
- x.font='13px sans-serif';x.fillStyle='#bce6fb';x.textAlign='right';x.fillText('Импульсы за 2 с · без калибровки',585,23);x.textAlign='left';
- x.strokeStyle='#1a3f57';x.lineWidth=1;x.strokeRect(12,40,576,96);
- chartLine(x,busaGraphData.water_pulses||[],'#37bcff',17,43,566,88,true,40);
- x.strokeStyle='#28608b';x.lineWidth=2;x.beginPath();x.moveTo(8,146);x.lineTo(592,146);x.stroke();
- x.font='18px sans-serif';x.fillStyle='#ffae65';x.fillText('ОТБОР',15,173);
- x.fillStyle='#b6d6e9';x.font='17px sans-serif';x.fillText('НЕТ ДАТЧИКА ОТБОРА',20,215);
- x.font='13px sans-serif';x.fillText('Измерения отсутствуют — линия не строится',20,245);
-}
-function graphs(){graphAllTemperatures();graphWaterAndCollection();}
 async function refreshGraphHistory(force=false){
- if(busaGraphLoading||(!force&&Date.now()-busaGraphFetchedAt<4500))return;
- busaGraphLoading=true;busaGraphFetchedAt=Date.now();
- try{
-  const r=await fetch('/api/graph-history',{cache:'no-store'});
-  if(!r.ok)throw Error('HTTP '+r.status);
-  const j=await r.json();
-  if(j.ok&&Array.isArray(j.temperature)&&Array.isArray(j.water_pulses)){
-   busaGraphData=j;if(active===3)graphs();
-  }
- }catch(e){}finally{busaGraphLoading=false;}
+ if(!force&&Date.now()-busaGraphFetchedAt<4500)return;
+ const token=++chartFetchToken,hours=chartHours;busaGraphFetchedAt=Date.now();
+ try{const r=await fetch('/api/chart-history?hours='+hours,{cache:'no-store'});if(!r.ok)throw Error(r.status);const j=await r.json();if(token===chartFetchToken&&j.ok&&j.hours===chartHours&&Array.isArray(j.temperature)){busaGraphData=j;if(active===3)graphs();}}catch(e){}
 }
 async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;statusFailures=0;
 networkLeds(s.network_indicators,s.station,s.google);
@@ -2634,8 +2656,7 @@ if(s.sound_alerts?.channels?.length===4 && s.sound_alerts?.buzzer?.sensors?.leng
  });
  temperatureThresholdsInitialized=true;
 }
-if(s.sound_alerts?.channels?.length===4)
- s.sound_alerts.channels.forEach((ch,i)=>{get('soundStatus'+i).textContent=ch.sound_on?(ch.timed?'ЗВУК '+ch.remaining_seconds+'с':'ЗВУК'):(!ch.enabled?'ВЫКЛ':ch.reason==='SETPOINTS_REQUIRED'?'НУЖНЫ ПОРОГИ':'ГОТОВ')});
+updateRelayBadges(s.sound_alerts?.channels);
 let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'НЕТ ДАННЫХ':f.toFixed(2);get('flow2').textContent=get('flow').textContent;get('pulses').textContent=s.water.pulses;get('total').textContent=Number(s.water.total_l_estimate).toFixed(3);
 flog.push(f);if(flog.length>80)flog.shift();
 const currentPulse=Number(s.water.pulses);
@@ -2665,8 +2686,8 @@ if(!calInitialized&&Array.isArray(s.calibration_offsets)){
 }
 get('aboutWifi').textContent=s.station.connected?'Подключён':'Нет связи';
 get('aboutGoogle').textContent=!s.google.configured?'Не настроена':s.google.state===6?'Ошибка':'Настроена';
-get('aboutFirmware').textContent=s.firmware;
-get('otaFirmware').textContent=s.firmware;
+get('aboutFirmware').textContent=s.firmware.replace(/^БУСА\s*1М\s*WiFi\s*/, '');
+get('otaFirmware').textContent=s.firmware.replace(/^БУСА\s*1М\s*WiFi\s*/, '');
 get('aboutUptime').textContent=Math.floor(s.uptime_ms/3600000)+' ч '+Math.floor((s.uptime_ms%3600000)/60000)+' мин';
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent+' · DNS '+(cs.dns??'?')+' · TLS '+(cs.tls_error??'?')+' · этап '+(cs.error_stage??'?');
@@ -2697,9 +2718,9 @@ if(s.keypad){
       '\nGoogle: '+(s.google?.configured?'настроен':'не настроен')+
       ' · HTTP '+s.google?.http+' · TLS '+s.google?.tls_error;
    get('diagRelay').textContent=(s.sound_alerts?.channels||[]).map(c=>
-     'K'+c.channel+' GPIO'+c.gpio+' '+(c.sound_on?'ЗВУК':'ОЖИДАНИЕ')+
+     RELAY_NAMES[c.channel-1]+' · '+(c.sound_on?'Активен':'Неактивен')+
      ' · ВКЛ '+(c.on_c??'—')+' °C · ВЫКЛ '+(c.off_c??'—')+
-     ' °C · '+c.reason).join('\n')+
+     ' °C').join('\n')+
      '\nЗуммер T1/T2: '+(s.sound_alerts?.buzzer?.sound_on?'ЗВУК':'ОЖИДАНИЕ');
    get('diagFlow').textContent='GPIO15 · '+d.water_flow?.status+
      '\nИмпульсы: '+d.water_flow?.pulses+
@@ -2726,7 +2747,7 @@ if(s.keypad){
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
 get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (проверка изображения визуальная)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}if(active===3)refreshGraphHistory();
-}catch(e){statusFailures++;if(statusFailures>=3){if(connected)message('Нет ответа ESP32: проверь локальный Wi-Fi');connected=false;networkLeds(null,'')}}finally{pollBusy=false}}
+}catch(e){statusFailures++;if(statusFailures>=3){if(connected)message('Нет ответа ESP32: проверь локальный Wi-Fi');connected=false;networkLeds(null,'');updateRelayBadges(null)}}finally{pollBusy=false}}
 get('temperatureSave').onclick=async()=>{
  const button=get('temperatureSave'),result=get('temperatureSaveResult');
  const data=new URLSearchParams();
@@ -2776,7 +2797,7 @@ get('manualUpdate').onclick=async function(){
   if(!file || !file.name.endsWith('.bin') || file.size<60000 || file.size>3340000){
     get('updateResult').textContent='Нужен APP BIN подходящего размера';return;
   }
-  if(!confirm('Подтвердите ручное обновление диагностической прошивки. ESP32-S3 N16R8, звуковые реле К1–К4 временно отключаются, выбран APP BIN?'))return;
+  if(!confirm('Подтвердите ручное обновление диагностической прошивки. ESP32-S3 N16R8, блок реле временно отключаются, выбран APP BIN?'))return;
   this.disabled=true;
   try{
     const begin=await fetch('/api/ota/prepare',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
@@ -3465,6 +3486,20 @@ void setup(){
   });
   // One shared history source for the physical TFT and local iPhone.
   // No invented collection values: only cooling-water pulse counts are sampled.
+  server.on("/api/chart-history",HTTP_GET,[]{
+    const uint32_t now=millis();int hours=server.arg("hours").toInt();
+    if(hours!=1&&hours!=6&&hours!=12&&hours!=24){server.send(400,"application/json","{\"error\":\"hours\"}");return;}
+    const int bins=min(hours*60,160);int16_t selected[160];
+    busaChartHistory.select(now,hours,selected,bins);
+    String j="{\"ok\":true,\"hours\":"+String(hours)+",\"temperature\":[";
+    for(int k=0;k<4;k++){
+      if(k)j+=",";j+="[";
+      for(int b=0;b<bins;b++){if(b)j+=",";float v=busaChartHistory.value(selected[b],k);j+=isfinite(v)?String(v,2):String("null");}
+      j+="]";
+    }
+    j+="],\"collection_sensor\":false,\"power_sensor\":false,\"history_ready\":"+String(busaChartReady?"true":"false")+"}";
+    server.send(200,"application/json; charset=utf-8",j);
+  });
   server.on("/api/graph-history",HTTP_GET,[]{
     uint32_t now=millis();
     String j="{\"ok\":true,\"sample_period_ms\":5000,\"temperature\":[";
@@ -3493,7 +3528,7 @@ void setup(){
   });
   server.on("/api/graph-view",HTTP_GET,[]{
     int n=server.arg("view").toInt();
-    if(n<0||n>1){server.send(400,"text/plain","Bad graph");return;}
+    if(n<0||n>2){server.send(400,"text/plain","Bad graph");return;}
     server.send(200,"application/json","{\"ok\":true,\"scope\":\"browser_only\"}");
   });
   server.on("/api/rainmaker/enable",HTTP_POST,[]{

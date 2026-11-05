@@ -149,11 +149,12 @@ static void v14Frame(uint32_t now){
   hqBackground();
   screen->fillRect(0,0,320,21,V14_CARD);
   screen->drawFastHLine(0,21,320,V14_ORANGE);
-  v14Big("БУСА-1М",5,15,V14_TEXT);
+  v14Tiny("BUSA MONITOR",5,15,V14_TEXT);
   v14NetIndicators();
   // DD.MM.YY HH:MM. Exact pixel width is measured; date cannot clip at 320.
-  String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
-  if(dt.length()==16)dt=dt.substring(0,6)+dt.substring(8);
+  String stamp=clockStamp(true);
+  String dt=deviceClockValid()?stamp.substring(stamp.length()-5):String("--:--");
+
   ru.setFont(u8g2_font_6x13_t_cyrillic);
   int tw=ru.getUTF8Width(dt.c_str());
   v14Print(dt,max(220,317-tw),15,V14_TEXT);
@@ -173,7 +174,7 @@ static void v14Frame(uint32_t now){
   const int sectionX=139,sectionW=92;
   screen->fillRoundRect(sectionX,215,sectionW,22,4,V14_BADGE);
   screen->drawRoundRect(sectionX,215,sectionW,22,4,V14_ORANGE);
-  const char* section=v14FooterSectionNames[currentPage<8?currentPage:0];
+  const char* section=v14FooterSectionNames[(currentPage==4||currentPage==6)?5:currentPage<8?currentPage:0];
   ru.setFont(u8g2_font_5x7_t_cyrillic);
   const int sectionTextW=ru.getUTF8Width(section);
   v14Tiny(section,sectionX+max(2,(sectionW-sectionTextW)/2),229,V14_TEXT);
@@ -187,7 +188,7 @@ static void v14Frame(uint32_t now){
 }
 static void v14MiniRig(){
   // Enlarged approved illustration; only drawing coordinates have changed.
-  hqRig(117,25,130,181,false);
+  hqRig(117,25,130,148,false);
 }
 static void v14Home(uint32_t now,bool layout){
   static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -196,20 +197,20 @@ static void v14Home(uint32_t now,bool layout){
   v14MiniRig();
   // Larger frameless T1-T4 readings, retaining all four sensor names and data.
   for(int i=0;i<4;i++){
-    const int y=27+i*44;
+    const int y=27+i*36;
     screen->fillCircle(11,y+11,4,v14SeriesColors[i]);
     v14Print(names[i],21,y+16,V14_TEXT);
-    v14Metric(v13Temp(i,now),21,y+37,94,hasTemp(i,now),HQ_NAVY);
+    v14Metric(v13Temp(i,now),21,y+31,94,hasTemp(i,now),HQ_NAVY);
   }
-  hqPanel(248,27,69,84);
+  hqPanel(248,27,69,66);
   v14Tiny("ОТБОР",253,41,V14_TEXT);
   v14Metric("Н/Д",253,73,59,false);
-  v14Tiny("мл/мин",253,95,V14_MUTED);
-  hqPanel(248,119,69,87);
-  v14Tiny("СОБРАНО",252,134,V14_TEXT);
-  v14Metric("Н/Д",253,166,59,false);
-  v14Tiny("мл",253,192,V14_MUTED);
-  // Removed redundant K1-K4/flow pulse strip below the enlarged figure.
+  v14Tiny("мл/мин",253,86,V14_MUTED);
+  hqPanel(248,101,69,70);
+  v14Tiny("СОБРАНО",252,115,V14_TEXT);
+  v14Metric("Н/Д",253,142,59,false);
+  v14Tiny("мл",253,164,V14_MUTED);
+  busaDrawRelayStrip(180);
 }
 static void v14Temperature(uint32_t now,bool layout){
   // Sensor positions only; keep original T1/T2/T3/T4 pins and saved alarm values.
@@ -267,98 +268,7 @@ static void v14Collection(bool layout){
 }
 // Approved diagnostic-style graph layout: two views, independent vertical lanes.
 // All samples come from the same 5s DS18B20 circular history as /api/graph-history.
-static void v14GraphTabs(){
-  static const char* names[]={"Температуры","Вода / Отбор"};
-  if(!tftView){
-    // Same navigation model as Settings: UP/DOWN picks row, ENTER opens.
-    for(int j=0;j<2;j++){
-      const int x=8,y=27+j*91;
-      hqPanel(x,y,304,85);
-      if(graphMenuCursor==j)screen->fillRoundRect(x+4,y+4,5,77,2,V14_ORANGE);
-      v14Print(names[j],x+22,y+48,graphMenuCursor==j?V14_ORANGE:V14_TEXT);
-    }
-    return;
-  }
-  // In the child screen, label only the opened chart (no misleading selectors).
-  screen->fillRoundRect(5,26,310,23,4,V14_CARD);
-  v14Print(names[graphSubView],13,43,V14_TEXT);
-}
-static void v14Graphs(bool layout){
-  if(!tftView){
-    if(layout)v14GraphTabs();
-    return; // Menu never draws a stale graph behind the selected item.
-  }
-  if(layout){
-    v14GraphTabs();
-    hqPanel(5,54,310,153);
-    screen->fillRoundRect(10,59,300,145,5,0x0000);
-    screen->drawRoundRect(10,59,300,145,5,V14_BLUE);
-  }else{
-    // Repaint graph data only while an actual graph detail is open.
-    screen->fillRect(12,61,296,141,0x0000);
-  }
-  if(graphSubView==0){
-    const int x0=83,xw=215,bandY=66,bandH=33;
-    for(int k=0;k<4;k++){
-      const int rowY=bandY+k*bandH;
-      if(k)screen->drawFastHLine(14,rowY-3,290,V14_RULE);
-      static const char* names[]={"T1 Вода","T2 Кол.","T3 Куб","T4 Верх"};
-      v14Tiny(names[k],15,rowY+9,v14SeriesColors[k]);
-      const int lastIndex=(v13HistoryHead+47)%48;
-      const float latest=v13HistoryCount?v13History[k][lastIndex]:NAN;
-      v14Tiny(isfinite(latest)?String(latest,1):String("Н/Д"),26,rowY+27,V14_TEXT);
-      screen->drawFastVLine(x0-3,rowY+1,26,V14_RULE);
-      float lo=INFINITY,hi=-INFINITY;
-      for(int i=0;i<v13HistoryCount;i++){
-        const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
-        const float t=v13History[k][idx];
-        if(isfinite(t)){lo=fminf(lo,t);hi=fmaxf(hi,t);}
-      }
-      if(!isfinite(lo)||!isfinite(hi))continue;
-      const float padding=fmaxf(0.2f,(hi-lo)*0.22f);
-      lo-=padding;hi+=padding;
-      for(int i=0;i<v13HistoryCount;i++){
-        const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
-        const float t=v13History[k][idx];
-        if(!isfinite(t))continue;
-        const int x=x0+(v13HistoryCount<2?xw-1:(i*(xw-1))/47);
-        const int y=rowY+26-(int)(fminf(1.0f,fmaxf(0.0f,(t-lo)/(hi-lo)))*23.0f);
-        if(i==0 || !isfinite(v13History[k][(idx+47)%48]))screen->drawPixel(x,y,v14SeriesColors[k]);
-        else{
-          const int pidx=(idx+47)%48;
-          const float prev=v13History[k][pidx];
-          const int yp=rowY+26-(int)(fminf(1.0f,fmaxf(0.0f,(prev-lo)/(hi-lo)))*23.0f);
-          const int xp=x0+((i-1)*(xw-1))/47;
-          screen->drawLine(xp,yp,x,y,v14SeriesColors[k]);
-        }
-      }
-    }
-  }else{
-    // Only essential names/values. Preserve real water pulse trace; no demo data.
-    v14Tiny("Вода",16,76,V14_BLUE);
-    screen->drawFastHLine(14,149,291,V14_RULE);
-    v14Tiny("Отбор",16,166,V14_WARN);
-    v14Tiny("Н/Д",16,192,V14_MUTED);
-    const int px=77,py=82,pw=216,ph=56;
-    screen->drawFastVLine(px,py,ph,V14_RULE);
-    uint32_t vmax=1;
-    for(int i=0;i<waterSamplesRecorded;i++){
-      const int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
-      if(waterPulseHistory[idx]>vmax)vmax=waterPulseHistory[idx];
-    }
-    for(int i=0;i<waterSamplesRecorded;i++){
-      const int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
-      const int x=px+(i*pw)/39;
-      const int y=py+ph-1-(int)((uint64_t)waterPulseHistory[idx]*(ph-3)/vmax);
-      if(i==0)screen->drawPixel(x,y,V14_SEA);
-      else{
-        const int prev=(flowTraceHead+40-waterSamplesRecorded+i-1)%40;
-        const int yprev=py+ph-1-(int)((uint64_t)waterPulseHistory[prev]*(ph-3)/vmax);
-        screen->drawLine(px+((i-1)*pw)/39,yprev,x,y,V14_SEA);
-      }
-    }
-  }
-}
+static void v14Graphs(bool layout){busaDrawChart(millis());}
 static void v14Events(bool layout){
   hqPanel(5,25,310,181);
   v14Print("ЖУРНАЛ СОБЫТИЙ",14,46,V14_TEXT);
@@ -387,13 +297,13 @@ static void v14SystemInfoRows(){
            String(uptimeSeconds%60)+" сек",17,179,V14_TEXT);
 }
 static void v14Settings(bool layout){
-  static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе"};
+  static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе","Журнал событий","Диагностика"};
   if(!tftView){
-    for(int i=0;i<5;i++){
-      const int x=8,y=26+i*36;
-      hqPanel(x,y,304,33);
-      if(i==approvedSettingsItem)screen->fillRoundRect(x+4,y+4,5,25,2,V14_ORANGE);
-      v14Print(names[i],x+21,y+22,V14_TEXT);
+    for(int i=0;i<7;i++){
+      const int x=8,y=26+i*25;
+      hqPanel(x,y,304,23);
+      if(i==approvedSettingsItem)screen->fillRoundRect(x+4,y+3,4,17,2,V14_ORANGE);
+      v14Print(names[i],x+21,y+16,V14_TEXT);
     }
     return;
   }
@@ -488,7 +398,7 @@ static void v14Settings(bool layout){
   }
 }
 static void v14Diagnostics(bool layout){
-  static const char* modules[]={"Экран TFT","Клавиатура","Реле K1-K4","Датчики T1-T4",
+  static const char* modules[]={"Экран TFT","Клавиатура","Блок реле","Датчики T1-T4",
     "Wi-Fi / Google","ESP32","Расходомер"};
   if(!tftView){
     for(int i=0;i<7;i++){
@@ -513,7 +423,7 @@ static void v14Diagnostics(bool layout){
       v14Tiny(String("Ошибка: ")+pcfScanError,28,168,V14_TEXT);break;
     case 2:
       for(int i=0;i<4;i++)
-        v14Tiny(String("K")+String(i+1)+": "+(busaSoundActive(i)?"ЗВУК":"ОЖИДАНИЕ"),
+        v14Tiny(String(BUSA_RELAY_LABELS[i])+": "+(busaSoundActive(i)?"ВКЛ":"ВЫКЛ"),
           28+(i%2)*132,100+(i/2)*40,V14_TEXT);
       v14Tiny("Физическое срабатывание: отдельно",28,185,V14_MUTED);break;
     case 3:
@@ -529,7 +439,7 @@ static void v14Diagnostics(bool layout){
     case 5:
       v14Tiny("ESP32-S3 · 240 МГц",28,90,V14_TEXT);
       v14Tiny("RAM: "+String(ESP.getFreeHeap()/1024)+" КБ",28,133,V14_BLUE);
-      v14Tiny("Uptime: "+String(millis()/60000)+" мин",28,174,V14_TEXT);break;
+      v14Tiny("Работа: "+String(millis()/60000)+" мин",28,174,V14_TEXT);break;
     case 6:
       v14Tiny("GPIO15 · YF-S401",28,90,V14_TEXT);
       v14Tiny("Импульсы: "+String(flowPulses()),28,133,V14_BLUE);
@@ -570,14 +480,15 @@ void v14RefreshLive(uint32_t now){
       v14SystemInfoRows();
     }
   }
-  if(currentPage==3 && tftView && v13HistoryCount && 
+  if(currentPage==3 && v13HistoryCount && 
      v13LastCapture!=busaGraphLastDrawnCapture){
     v14Graphs(false); // chart pixels only; prevents full-screen flashing
     busaGraphLastDrawnCapture=v13LastCapture;
   }
   if(currentPage==0){
     for(int i=0;i<4;i++)
-      v14Metric(v13Temp(i,now),21,27+i*44+37,94,hasTemp(i,now),HQ_NAVY);
+      v14Metric(v13Temp(i,now),21,27+i*36+31,94,hasTemp(i,now),HQ_NAVY);
+    busaDrawRelayStrip(180);
   } else if(currentPage==1 && !editingTemp && !deleteConfirmPending){
     if(!tftView){
       for(int sensor=0;sensor<4;sensor++){
@@ -588,8 +499,9 @@ void v14RefreshLive(uint32_t now){
       v14Metric(v13Temp(selectedTemp,now),230,46,69,hasTemp(selectedTemp,now));
     }
   }
-  String dt=deviceClockValid()?clockStamp(true):String("--.--.-- --:--");
-  if(dt.length()==16)dt=dt.substring(0,6)+dt.substring(8);
+  String stamp=clockStamp(true);
+  String dt=deviceClockValid()?stamp.substring(stamp.length()-5):String("--:--");
+
   if(dt!=v14ClockLast){
     v14ClockLast=dt;
     screen->fillRect(220,1,100,19,V14_CARD);

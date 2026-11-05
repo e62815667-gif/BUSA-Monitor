@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib,json
 root=Path(__file__).resolve().parents[1];sketch=root/'firmware/BUSA_1M_WIFI_3v_GOOGLE'
-wifi_fix='WIFI1-20261105' in (sketch/'BUSA_Main.h').read_text()
+wifi_fix='#include "BUSA_WifiScan.h"' in (sketch/'BUSA_Main.h').read_text()
 calc='RM-CALC' in (sketch/'BUSA_Main.h').read_text()
 manifest=json.loads((root/'tests/fixtures/rm_fix3_preserved.json').read_text())
 for name,digest in manifest.items():

@@ -80,7 +80,7 @@ if(typeof document!=='undefined')(()=>{
   const reset=document.createElement('button');reset.type='reset';reset.textContent='Очистить';actions.append(calculate,reset);panel.append(actions);
   const error=document.createElement('p');error.className='calcError';error.setAttribute('role','alert');panel.append(error);
   const result=document.createElement('div');result.className='calcResult';result.setAttribute('role','status');result.setAttribute('aria-live','polite');panel.append(result);
-  const note=document.createElement('p');note.className='calcNote';note.textContent=spec.note;panel.append(note);
+  const note=document.createElement('details');note.className='calcNote';const summary=document.createElement('summary');summary.textContent='Условия расчёта';const noteText=document.createElement('p');noteText.textContent=spec.note;note.append(summary,noteText);panel.append(note);
   let saved={};try{saved=JSON.parse(localStorage.getItem('busa-calculator-v1-'+i)||'{}');}catch(e){}
   inputs.forEach(input=>{if(typeof saved[input.name]==='string')input.value=saved[input.name].slice(0,16);});
   function persist(){try{localStorage.setItem('busa-calculator-v1-'+i,JSON.stringify(Object.fromEntries(inputs.map(x=>[x.name,x.value]))));}catch(e){}}
@@ -121,4 +121,22 @@ static const char BUSA_CALCULATOR_CSS[] PROGMEM=R"BUSACALC(/* Scoped offline cal
 #busaCalculator .calcNote{font-size:12px;line-height:1.5;opacity:.85}
 #busaCalculator .calcError{color:#ed7461;line-height:1.4}
 @media(max-width:360px){#busaCalculator .calcGrid{grid-template-columns:1fr}#busaCalculator .calcPanel{padding:10px}}
+
+/* UI6 calculator uses the same palette and geometry as the app charts. */
+#busaCalculator>h2{font-size:18px;letter-spacing:.3px;margin:14px 0}
+#busaCalculator .calcTabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+#busaCalculator .calcTabs button{font-size:12px;padding:9px 3px;border-radius:9px;line-height:1.25}
+#busaCalculator button[aria-selected="true"]{background:#086dbe;color:#fff;border-color:#51c7ff}
+#busaCalculator .calcPanel{background:var(--surface,#071b2e);border-color:#285572;border-radius:14px;padding:16px}
+#busaCalculator .calcPanel h3{font-size:16px;margin:0 0 18px}
+#busaCalculator label{font-size:12px;color:var(--ink,#c4deee)}
+#busaCalculator input{font-size:22px;border-radius:9px;border-color:#325a72;font-variant-numeric:tabular-nums}
+#busaCalculator .calcActions button{flex:1}
+#busaCalculator button[type="submit"]{background:#0872ce;border-color:#53cfff;color:#fff}
+#busaCalculator .calcResult{background:#0b303d;color:#c1f2f5;border:1px solid #2d7e8b;border-radius:12px}
+#busaCalculator .calcResult>div+div{border-top:1px solid #24505d}
+#busaCalculator .calcResult strong{font-size:23px}
+#busaCalculator .calcNote{margin-top:15px;color:var(--muted,#92b6cb)}
+#busaCalculator .calcNote summary{cursor:pointer;padding:7px 0}
+@media(max-width:360px){#busaCalculator .calcTabs button{font-size:10px}#busaCalculator .calcPanel{padding:12px}}
 )BUSACALC";

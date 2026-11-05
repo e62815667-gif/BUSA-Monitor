@@ -14,7 +14,8 @@ static bool v13EventBoot=false,v13OldWifi=false,v13OldPcf=false,v13OldPca=false,
 static void v13Log(const String &msg){
   if(v13EventCount<7)v13EventCount++;
   for(int i=(int)v13EventCount-1;i>0;i--)v13Events[i]=v13Events[i-1];
-  v13Events[0]=String(millis()/1000)+"с · "+msg;
+  String stamp=clockStamp(true);
+  v13Events[0]=(deviceClockValid()?stamp.substring(stamp.length()-5):String(millis()/60000)+" мин")+" · "+msg;
 }
 static uint32_t v13LastCollectAt=0;
 static void v13Collect(uint32_t now){
@@ -24,7 +25,7 @@ static void v13Collect(uint32_t now){
   v13LastCollectAt=now;
   if(!v13EventBoot){
     v13EventBoot=true;
-    v13Log("БУСА запущена (V13)");
+    v13Log("Устройство включено");
     v13OldWifi=WiFi.status()==WL_CONNECTED;
     v13OldPcf=pcfDetected;v13OldPca=pcaDetected;
     for(int i=0;i<4;i++)v13OldTemps[i]=tempPresent[i];
@@ -43,6 +44,7 @@ static void v13Collect(uint32_t now){
   if(flowSeen!=v13OldFlow){v13Log("YF-S401: импульсы воды");v13OldFlow=flowSeen;}
   if(v13HistoryCount==0 || elapsed(now,v13LastCapture,5000)){
     v13LastCapture=now;
+    busaCaptureChart(now);
     for(int i=0;i<4;i++)v13History[i][v13HistoryHead]=hasTemp(i,now)?temperature[i]:NAN;
     v13HistoryHead=(v13HistoryHead+1)%48;
     if(v13HistoryCount<48)v13HistoryCount++;
@@ -73,42 +75,25 @@ static void v13Frame(uint32_t now){
   screen->fillScreen(BG);
   screen->fillRect(0,0,240,28,PANEL);
   v13Line(0,27,240);
-  v13Text("БУСА-1М",6,18,WHITE);
+  ru.setFont(u8g2_font_5x7_t_cyrillic);v13Text("BUSA MONITOR",6,18,WHITE);ru.setFont(u8g2_font_6x13_t_cyrillic);
   // Portrait: compact W/G/E legend (Wi-Fi, Google, ESP32) to preserve the clock.
   screen->fillCircle(76,11,3,WiFi.status()==WL_CONNECTED?GREEN:V13_RED);
-  v13Text("W",81,18,WHITE);
-  screen->fillCircle(101,11,3,(googleEnabled&&googleInternet==1&&(googleHttp==200||googleHttp==302))?GREEN:V13_RED);
-  v13Text("G",106,18,WHITE);
-  screen->fillCircle(125,11,3,WiFi.softAPgetStationNum()>0?GREEN:V13_RED);
-  v13Text("E",130,18,WHITE);
+  busaChartText("WiFi",80,18,WHITE,true);
+  screen->fillCircle(111,11,3,(googleEnabled&&googleInternet==1&&(googleHttp==200||googleHttp==302))?GREEN:V13_RED);
+  busaChartText("Google",117,18,WHITE,true);
+  screen->fillCircle(155,11,3,WiFi.softAPgetStationNum()>0?GREEN:V13_RED);
+  busaChartText("ESP32",161,18,WHITE,true);
   // Local STA status and clock; never infer that the AP is connected to the Internet.
-  v13Text(deviceClockValid()?clockStamp(true):"--:--",165,18,GRAY);
-  const char* tab[]={"Глав","Темп","Отбор","Граф","Событ","Настр","Диаг","Кал"};
-  screen->fillRect(0,276,240,44,PANEL);
-  v13Line(0,276,240);
-  for(int i=0;i<8;i++){
-    const int x=i*30;
-    if(i==currentPage){
-      screen->fillRoundRect(x+2,279,27,39,4,BLUE);
-      v13Line(x+3,279,24,V13_CYAN);
-    }
-    // Compact pictograms are rendered as vector primitives, not Unicode emoji.
-    const int cx=x+15,cy=288;
-    switch(i){
-      case 0: screen->drawTriangle(cx-7,cy,cx,cy-6,cx+7,cy,WHITE);screen->drawRect(cx-5,cy,10,9,WHITE);break;
-      case 1: screen->drawRoundRect(cx-3,cy-7,6,16,3,V13_CYAN);screen->fillCircle(cx,cy+6,3,V13_CYAN);break;
-      case 2: screen->drawTriangle(cx,cy-8,cx-6,cy+3,cx+6,cy+3,V13_CYAN);break;
-      case 3: screen->drawLine(cx-9,cy+8,cx-9,cy-7,WHITE);screen->drawLine(cx-9,cy+8,cx+9,cy+8,WHITE);screen->drawLine(cx-6,cy+4,cx,cy-4,GREEN);screen->drawLine(cx,cy-4,cx+7,cy+1,GREEN);break;
-      case 4: screen->drawRect(cx-6,cy-7,12,15,WHITE);screen->drawFastHLine(cx-3,cy-3,7,WHITE);screen->drawFastHLine(cx-3,cy+1,7,WHITE);break;
-      default: screen->drawCircle(cx,cy,7,WHITE);screen->fillCircle(cx,cy,3,WHITE);break;
-    }
-    ru.setFont(u8g2_font_5x7_t_cyrillic);
-    v13Text(tab[i],x+2,314,i==currentPage?WHITE:GRAY);
-    ru.setFont(u8g2_font_6x13_t_cyrillic);
+  v13Text(deviceClockValid()?clockStamp(true).substring(clockStamp(true).length()-5):String("--:--"),203,18,GRAY);
+  const char* tab[]={"Глав","Темп","Отбор","Граф","Кальк","Настр"};
+  screen->fillRect(0,276,240,44,PANEL);v13Line(0,276,240);
+  for(int slot=0;slot<6;slot++){
+   const int x=slot*40;const bool active=slot==orderSlot(currentPage);
+   if(active)screen->fillRoundRect(x+1,279,38,39,4,BLUE);
+   ru.setFont(u8g2_font_5x7_t_cyrillic);v13Text(tab[slot],x+3,303,active?WHITE:GRAY);
   }
-  if(tftView && currentPage!=1 && currentPage!=5){
-    v13Badge(199,36,"INFO",V13_CYAN);
-  }
+  ru.setFont(u8g2_font_6x13_t_cyrillic);
+  
 }
 static void v13HomeIllustration(){
   // A compact schematic illustration; not an operational process diagram.
@@ -133,24 +118,24 @@ static void v13Home(uint32_t now,bool layout){
   if(layout){
     v13HomeIllustration();
     for(int i=0;i<4;i++){
-      const int y=34+i*53;
-      v13Panel(4,y,116,48);
+      const int y=34+i*48;
+      v13Panel(4,y,116,44);
       screen->fillCircle(14,y+13,4,colors[i]);
       v13Text(labels[i],24,y+17,WHITE);
     }
-    v13Panel(125,189,111,64);
-    v13Text("РАСХОД",134,205,V13_CYAN);
-    v13Text("СОБРАНО",134,234,V13_CYAN);
-    v13Line(132,219,96);
-    v13Panel(4,252,232,20);
+    v13Panel(125,189,111,45);
+    v13Text("Расход",132,204,V13_CYAN);
+    v13Text("Собрано",132,226,V13_CYAN);
+    
+
   }
   for(int i=0;i<4;i++){
-    const int y=34+i*53;
+    const int y=34+i*48;
     screenField(v13Temp(i,now),24,y+34,84,hasTemp(i,now)?GREEN:YELLOW);
   }
-  screenField(v13Flow()+" мл/мин",134,218,96,YELLOW);
-  screenField(v13Total()+" мл",134,248,96,flowSeen?GREEN:YELLOW);
-  screenField(String("Wi-Fi ")+(WiFi.getMode()!=WIFI_OFF?"AP OK":"НЕТ")+"   К1–К4 звук",12,267,216,GREEN);
+  screenField(v13Flow(),192,204,39,YELLOW);
+  screenField(v13Total(),192,226,39,flowSeen?GREEN:YELLOW);
+  busaDrawRelayStrip(242);
 }
 static void v13Temperatures(uint32_t now,bool layout){
   static const char* labels[]={"Вода","Колонна","Куб","Верх колонны"};
@@ -236,73 +221,10 @@ static void v13TemperatureGraph(int x,int y,int w,int h){
   }
 }
 static void v13Graphs(bool layout){
-  screen->fillRect(0,32,240,244,PANEL);
-  v13Text("ГРАФИКИ",8,45,WHITE);
-  for(int j=0;j<2;j++){
-    int x=4+j*117;
-    screen->fillRoundRect(x,51,113,28,5,graphSubView==j?BLUE:PANEL);
-    screen->drawRoundRect(x,51,113,28,5,V13_CYAN);
-    v13Text(j==0?"ТЕМПЕРАТУРЫ":"ВОДА И ОТБОР",x+5,70,WHITE);
-  }
-  screen->fillRoundRect(7,86,226,152,5,0x0000);
-  screen->drawRoundRect(7,86,226,152,5,V13_CYAN);
-  if(graphSubView==0){
-    static const uint16_t colors[]={V13_CYAN,V13_ORANGE,V13_RED,GREEN};
-    for(int k=0;k<4;k++){
-      const int y=92+k*34;
-      if(k)screen->drawFastHLine(11,y-2,218,GRAY);
-      v13Text("T"+String(k+1),12,y+13,colors[k]);
-      const int last=(v13HistoryHead+47)%48;
-      const float latest=v13HistoryCount?v13History[k][last]:NAN;
-      v13Text(isfinite(latest)?String(latest,1):String("Н/Д"),35,y+13,WHITE);
-      float low=INFINITY,high=-INFINITY;
-      for(int i=0;i<v13HistoryCount;i++){
-        const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
-        const float t=v13History[k][idx];
-        if(isfinite(t)){low=fminf(low,t);high=fmaxf(high,t);}
-      }
-      if(!isfinite(low)||!isfinite(high))continue;
-      const float pad=fmaxf(0.2f,(high-low)*0.22f);
-      low-=pad;high+=pad;
-      for(int i=0;i<v13HistoryCount;i++){
-        const int idx=(v13HistoryHead+48-v13HistoryCount+i)%48;
-        const float v=v13History[k][idx];
-        if(!isfinite(v))continue;
-        int x=89+(i*136)/47;
-        int yt=y+27-(int)(fminf(1.0f,fmaxf(0.0f,(v-low)/(high-low)))*23.0f);
-        const int prior=(idx+47)%48;
-        if(!i||!isfinite(v13History[k][prior]))screen->drawPixel(x,yt,colors[k]);
-        else{
-          const int yp=y+27-(int)(fminf(1.0f,fmaxf(0.0f,(v13History[k][prior]-low)/(high-low)))*23.0f);
-          screen->drawLine(89+((i-1)*136)/47,yp,x,yt,colors[k]);
-        }
-      }
-    }
-    v13Text("Точки через 5 секунд",13,259,GRAY);
-  }else{
-    v13Text("ВОДА · импульсы/2c",15,108,V13_CYAN);
-    const int px=16,py=115,pw=207,ph=40;
-    uint32_t maxv=1;
-    for(int i=0;i<waterSamplesRecorded;i++){
-      const int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
-      if(waterPulseHistory[idx]>maxv)maxv=waterPulseHistory[idx];
-    }
-    for(int i=0;i<waterSamplesRecorded;i++){
-      const int idx=(flowTraceHead+40-waterSamplesRecorded+i)%40;
-      const int x=px+(i*pw)/39;
-      const int y=py+ph-1-(int)((uint64_t)waterPulseHistory[idx]*(ph-3)/maxv);
-      if(!i)screen->drawPixel(x,y,V13_CYAN);
-      else{
-        const int prev=(flowTraceHead+40-waterSamplesRecorded+i-1)%40;
-        const int yp=py+ph-1-(int)((uint64_t)waterPulseHistory[prev]*(ph-3)/maxv);
-        screen->drawLine(px+((i-1)*pw)/39,yp,x,y,V13_CYAN);
-      }
-    }
-    screen->drawFastHLine(12,172,216,GRAY);
-    v13Text("ОТБОР · нет датчика",15,191,YELLOW);
-    v13Text("Без выдуманных данных",15,217,GRAY);
-    v13Text("Вода не откалибрована",15,259,GRAY);
-  }
+ static uint32_t capture=0;static uint8_t view=255,range=255,focus=255;
+ if(layout||capture!=v13LastCapture||view!=graphSubView||range!=graphHoursIndex||focus!=tftView){
+  busaDrawChart(millis());capture=v13LastCapture;view=graphSubView;range=graphHoursIndex;focus=tftView;
+ }
 }
 static void v13EventsPage(bool layout){
   if(layout){v13Text("СОБЫТИЯ",9,43,WHITE);v13Panel(5,50,230,222);}
@@ -318,15 +240,15 @@ static void v13EventsPage(bool layout){
   }
 }
 static void v13Settings(uint32_t now,bool layout){
- static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе"};
+ static const char* names[]={"Температура","Wi-Fi","Экран","Google","О системе","Журнал событий","Диагностика"};
  if(!tftView){
   if(layout){
    v13Text("НАСТРОЙКИ",8,44,WHITE);
-   for(int i=0;i<5;i++){
-    const int y=52+i*39;
-    v13Panel(5,y,230,35);
-    if(i==approvedSettingsItem)screen->fillRect(7,y+3,4,29,V13_CYAN);
-    v13Text(names[i],17,y+22,WHITE);
+   for(int i=0;i<7;i++){
+    const int y=51+i*31;
+    v13Panel(5,y,230,28);
+    if(i==approvedSettingsItem)screen->fillRect(7,y+3,4,22,V13_CYAN);
+    v13Text(names[i],17,y+19,WHITE);
    }
   }
   return;
@@ -407,7 +329,7 @@ static void v13Settings(uint32_t now,bool layout){
  }
 }
 static void v13Diagnostics(uint32_t now,bool layout){
- static const char* names[]={"Экран","Клавиатура","Реле","Датчики","Wi-Fi/Google","ESP32","Расходомер"};
+ static const char* names[]={"Экран","Клавиатура","Блок реле","Датчики","Wi-Fi/Google","ESP32","Расходомер"};
  if(layout){
   v13Text("ДИАГНОСТИКА",8,43,WHITE);
   for(int i=0;i<7;i++){
@@ -423,7 +345,7 @@ static void v13Diagnostics(uint32_t now,bool layout){
   switch(diagModule){
    case 0:v13Text("ST7789 · OK",23,157,WHITE);break;
    case 1:v13Text(pcfDetected?"PCF8575 · есть":"PCF8575 · нет",23,157,WHITE);break;
-   case 2:v13Text("K1-K4 · ЗВУК",23,157,WHITE);break;
+   case 2:for(int i=0;i<4;i++){ru.setFont(u8g2_font_5x7_t_cyrillic);v13Text(String(BUSA_RELAY_LABELS[i])+": "+(busaSoundActive(i)?"ВКЛ":"ВЫКЛ"),23,143+i*11,busaSoundActive(i)?GREEN:GRAY);}ru.setFont(u8g2_font_6x13_t_cyrillic);break;
    case 3:v13Text("T1-T4 · DS18B20",23,157,WHITE);break;
    case 4:v13Text("Wi-Fi / Google",23,157,WHITE);break;
    case 5:v13Text("ESP32-S3",23,157,WHITE);break;
@@ -456,8 +378,8 @@ void renderPortrait(uint32_t now){
   }
   // Refresh status dots with no full-screen redraw, preserving W/G/E labels.
   screen->fillCircle(76,11,3,WiFi.status()==WL_CONNECTED?GREEN:V13_RED);
-  screen->fillCircle(101,11,3,(googleEnabled&&googleInternet==1&&(googleHttp==200||googleHttp==302))?GREEN:V13_RED);
-  screen->fillCircle(125,11,3,WiFi.softAPgetStationNum()>0?GREEN:V13_RED);
+  screen->fillCircle(111,11,3,(googleEnabled&&googleInternet==1&&(googleHttp==200||googleHttp==302))?GREEN:V13_RED);
+  screen->fillCircle(155,11,3,WiFi.softAPgetStationNum()>0?GREEN:V13_RED);
   // Update clock without repainting the whole UI.
   screen->fillRect(162,5,60,19,PANEL);
   v13Text(deviceClockValid()?clockStamp(true):"--:--",165,18,WHITE);

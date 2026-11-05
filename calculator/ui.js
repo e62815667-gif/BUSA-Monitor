@@ -24,7 +24,7 @@ if(typeof document!=='undefined')(()=>{
   const reset=document.createElement('button');reset.type='reset';reset.textContent='Очистить';actions.append(calculate,reset);panel.append(actions);
   const error=document.createElement('p');error.className='calcError';error.setAttribute('role','alert');panel.append(error);
   const result=document.createElement('div');result.className='calcResult';result.setAttribute('role','status');result.setAttribute('aria-live','polite');panel.append(result);
-  const note=document.createElement('p');note.className='calcNote';note.textContent=spec.note;panel.append(note);
+  const note=document.createElement('details');note.className='calcNote';const summary=document.createElement('summary');summary.textContent='Условия расчёта';const noteText=document.createElement('p');noteText.textContent=spec.note;note.append(summary,noteText);panel.append(note);
   let saved={};try{saved=JSON.parse(localStorage.getItem('busa-calculator-v1-'+i)||'{}');}catch(e){}
   inputs.forEach(input=>{if(typeof saved[input.name]==='string')input.value=saved[input.name].slice(0,16);});
   function persist(){try{localStorage.setItem('busa-calculator-v1-'+i,JSON.stringify(Object.fromEntries(inputs.map(x=>[x.name,x.value]))));}catch(e){}}
