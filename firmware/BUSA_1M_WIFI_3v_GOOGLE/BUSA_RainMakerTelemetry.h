@@ -109,8 +109,8 @@ static void busaRmStageCalculators(const BusaRmFrame& frame){
    if(!handle||esp_rmaker_param_update(handle,value)!=ESP_OK){++busaRmModelFailures;ok=false;}
   };
   for(int field=0;field<busaRmCalcInputCounts[mode];field++)update(busaRmCalcInputNames[mode][field],esp_rmaker_float(state.inputs[field]));
-  update("Рассчитать",esp_rmaker_bool(false));update("Сбросить",esp_rmaker_bool(false));
-  update("Статус",esp_rmaker_str(state.status));
+  update(busaRmCalcActionNames[mode][0],esp_rmaker_bool(false));update(busaRmCalcActionNames[mode][1],esp_rmaker_bool(false));
+  update(busaRmCalcActionNames[mode][2],esp_rmaker_str(state.status));
   for(int field=0;field<busaRmCalcOutputCounts[mode];field++)update(busaRmCalcOutputNames[mode][field],esp_rmaker_str(state.outputs[field]));
   busaRmCalcStaged[mode]=ok;
  }
@@ -208,7 +208,7 @@ static void busaRmCaptureAndQueue(uint32_t now){
 static String busaRainMakerTelemetryJSON(){
   const auto t=busaRmTrackerCopy();String s;s.reserve(1600);
   s="{\"interval_ms\":10000,\"mqtt_connected\":"+String(busaRmStarted&&esp_rmaker_is_mqtt_connected()?"true":"false");
-  s+=",\"calculator_devices_ready\":"+String((int)busaRmCalcReady[0]+(int)busaRmCalcReady[1]+(int)busaRmCalcReady[2]);
+  s+=",\"calculator_devices_ready\":"+String((int)(busaRmCalcReady[0]&&busaRmCalcReady[1]&&busaRmCalcReady[2]));
   s+=",\"init_rc\":"+String((int)busaRmTelemetryInitRc)+",\"worker_pending\":"+String(busaRmFrameBusy.load()?"true":"false");
   s+=",\"snapshot_seq\":"+String(busaRmFrame.seq)+",\"snapshot_uptime_s\":"+String(busaRmFrame.uptime);
   s+=",\"snapshot_temperatures\":[";

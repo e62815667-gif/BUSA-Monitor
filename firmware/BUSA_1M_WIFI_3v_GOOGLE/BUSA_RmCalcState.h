@@ -11,6 +11,12 @@ static BusaRmCalcState busaRmCalculators[3];
 static Device* busaRmCalcDevices[3]={};
 static bool busaRmCalcReady[3]={};
 static const char* const busaRmCalcNames[3]={"Калькулятор · Разбавление","Калькулятор · Ареометр","Калькулятор · Перегонка"};
+// Unique labels keep all three independent calculations in one native card.
+static const char* const busaRmCalcActionNames[3][4]={
+ {"Разбавление: рассчитать","Разбавление: сбросить","Разбавление: статус","Разбавление: примечание"},
+ {"Ареометр: рассчитать","Ареометр: сбросить","Ареометр: статус","Ареометр: примечание"},
+ {"Перегонка: рассчитать","Перегонка: сбросить","Перегонка: статус","Перегонка: примечание"}
+};
 static const uint8_t busaRmCalcInputCounts[3]={3,2,5},busaRmCalcOutputCounts[3]={2,1,4};
 static const char* const busaRmCalcInputNames[3][5]={
  {"Объём спирта, л","Начальная крепость, %","Нужная крепость, %","",""},

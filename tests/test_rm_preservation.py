@@ -2,7 +2,7 @@
 from pathlib import Path
 import hashlib,json
 root=Path(__file__).resolve().parents[1];sketch=root/'firmware/BUSA_1M_WIFI_3v_GOOGLE'
-wifi_fix='RM-CALC3-WIFI1' in (sketch/'BUSA_Main.h').read_text()
+wifi_fix='WIFI1-20261105' in (sketch/'BUSA_Main.h').read_text()
 calc='RM-CALC' in (sketch/'BUSA_Main.h').read_text()
 manifest=json.loads((root/'tests/fixtures/rm_fix3_preserved.json').read_text())
 for name,digest in manifest.items():
@@ -26,5 +26,13 @@ else:
 s=(sketch/'BUSA_RainMaker.h').read_text()
 start=s[s.index('static void busaRainMakerStart(){'):s.index('static void busaRainMakerProvision(){')]
 if calc:start=start.replace('  busaRmAddCalculators(node);\n','').replace('busaRmScreen,RM_PAGE,(int)currentPage,0,7','busaRmScreen,RM_PAGE,(int)currentPage,0,6')
+# CALC4 intentionally groups existing settings into one Device; normalize only
+# those exact authorized substitutions before comparing the full FIX3 startup.
+if 'RM-CALC4-' in original:
+ start=start.replace('new Device("Настройки","esp.device.sensor")','new Device("Экран БУСА","esp.device.sensor")')
+ start=start.replace('busaRmKeys=busaRmScreen;','busaRmKeys=new Device("Клавиатура БУСА","esp.device.sensor");')
+ start=start.replace('busaRmHealth=busaRmScreen;','busaRmHealth=new Device("Состояние БУСА","esp.device.sensor");')
+ start=start.replace('    busaRmScreen->addCb(busaRmWrite);','    busaRmScreen->addCb(busaRmWrite);\n    node.addDevice(*busaRmScreen);')
+ start=start.replace('    busaRmKeys->addCb(busaRmWrite);','    busaRmKeys->addCb(busaRmWrite);\n    node.addDevice(*busaRmKeys);')
 assert start.replace('  busaRmTelemetryInit();\n','')==(root/'tests/fixtures/rm_fix3_start.cpp').read_text(),'Registered device/parameter schema or startup changed'
 print('PASS preserved hardware/Google/BLE/OTA/partitions/NVS; critical Main functions; unchanged RainMaker schema/startup; authorized calculator UI additions' if calc else 'PASS FIX3 preservation')

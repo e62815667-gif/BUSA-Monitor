@@ -10,7 +10,7 @@ def validate():
     main=(SKETCH/'BUSA_Main.h').read_text()
     rain=(SKETCH/'BUSA_RainMaker.h').read_text()
     ota=(SKETCH/'BUSA_OtaBoot.h').read_text()
-    assert sum(main.count(v) for v in ['14v9-N16R8-RM-BLE-FIX3-20261105','14v9-N16R8-RM-TELEM1-20261105','14v9-N16R8-RM-TELEM2-20261105','14v9-N16R8-RM-CALC1-20261105','14v9-N16R8-RM-CALC2-20261105','14v9-N16R8-RM-CALC3-WIFI1-20261105'])==1
+    assert sum(main.count(v) for v in ['14v9-N16R8-RM-BLE-FIX3-20261105','14v9-N16R8-RM-TELEM1-20261105','14v9-N16R8-RM-TELEM2-20261105','14v9-N16R8-RM-CALC1-20261105','14v9-N16R8-RM-CALC2-20261105','14v9-N16R8-RM-CALC3-WIFI1-20261105','14v9-N16R8-RM-CALC4-WIFI1-20261105'])==1
     assert 'static bool busaRmBleBootMode=false;' in main
     assert 'busaRmPairDeferred=' in main and '&&busaOtaPendingVerification()' in main
     assert 'busaConfirmRunningImage(busaNvsReady&&wifiRunning)' in main
@@ -32,7 +32,7 @@ def validate():
                     'sampleTemperatures(now)', 'startScreen()', 'pollKeys(now)',
                     'void uploadOTA()', 'server.on("/api/status"', 'busaRainMakerApply()']:
         assert feature in main,feature
-    if 'RM-CALC3-WIFI1' in main:
+    if 'WIFI1-20261105' in main:
         scan=(SKETCH/'BUSA_WifiScan.h').read_text()
         assert main.count('WiFi.scanNetworks')==0 and scan.count('esp_wifi_scan_start(')==1
         assert 'wifi_scan_config_t config={}' in scan

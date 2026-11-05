@@ -114,13 +114,13 @@ static void busaRmWrite(Device*device,Param*param,const param_val_t val,
     else if(sensor==2 && strcmp(p,RM_K3)==0){q.action=4;q.role=2;q.b=val.val.b;}
     else if(sensor==3 && strcmp(p,RM_K4)==0){q.action=4;q.role=3;q.b=val.val.b;}
     else return;
-  }else if(strcmp(d,"Экран БУСА")==0){
+  }else if(strcmp(d,"Настройки")==0 && (strcmp(p,RM_THEME)==0||strcmp(p,RM_SCREEN)==0||strcmp(p,RM_PAGE)==0)){
     q.target=4;
     if(strcmp(p,RM_THEME)==0){q.action=5;q.i=val.val.i;}
     else if(strcmp(p,RM_SCREEN)==0){q.action=6;q.b=val.val.b;}
     else if(strcmp(p,RM_PAGE)==0){q.action=7;q.i=val.val.i;}
     else return;
-  }else if(strcmp(d,"Клавиатура БУСА")==0){
+  }else if(strcmp(d,"Настройки")==0){
     q.target=5;
     if(strcmp(p,RM_KEYLEARN)==0){q.action=8;q.b=val.val.b;}
     else if(strcmp(p,RM_KEYSTOP)==0){q.action=9;q.b=val.val.b;}
@@ -187,15 +187,14 @@ static void busaRainMakerStart(){
     busaRmWater->addParam(Param("Калиброван",nullptr,value(false),PROP_FLAG_READ));
     node.addDevice(*busaRmWater);
   }
-  busaRmScreen=new Device("Экран БУСА","esp.device.sensor");
+  busaRmScreen=new Device("Настройки","esp.device.sensor");
   if(busaRmScreen){
     busaRmAddInt(busaRmScreen,RM_THEME,(int)tftThemeMode,0,2);
     busaRmAddInt(busaRmScreen,RM_PAGE,(int)currentPage,0,7);
     busaRmAddSwitch(busaRmScreen,RM_SCREEN,!tftDisplayOff);
     busaRmScreen->addCb(busaRmWrite);
-    node.addDevice(*busaRmScreen);
   }
-  busaRmKeys=new Device("Клавиатура БУСА","esp.device.sensor");
+  busaRmKeys=busaRmScreen;
   if(busaRmKeys){
     busaRmKeys->addParam(Param("PCF8575 подключен",nullptr,value(false),PROP_FLAG_READ));
     busaRmKeys->addParam(Param("Раскладка сохранена",nullptr,value(false),PROP_FLAG_READ));
@@ -204,9 +203,8 @@ static void busaRainMakerStart(){
     busaRmAddSwitch(busaRmKeys,RM_KEYLEARN,false);
     busaRmAddSwitch(busaRmKeys,RM_KEYSTOP,false);
     busaRmKeys->addCb(busaRmWrite);
-    node.addDevice(*busaRmKeys);
   }
-  busaRmHealth=new Device("Состояние БУСА","esp.device.sensor");
+  busaRmHealth=busaRmScreen;
   if(busaRmHealth){
     busaRmHealth->addParam(Param("Работает секунд",nullptr,value(0),PROP_FLAG_READ));
     busaRmHealth->addParam(Param("Google настроен",nullptr,value(false),PROP_FLAG_READ));

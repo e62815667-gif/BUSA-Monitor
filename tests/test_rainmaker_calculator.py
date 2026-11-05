@@ -13,12 +13,14 @@ int xQueueSend(void*,const BusaRmRequest* q,int){if(writeQueueFull)return 0;requ
 void deliver(int mode,const char* name,param_val_t value){Param param(name,nullptr,value,0);Device wrapper;wrapper.setDeviceHandle(busaRmCalcDevices[mode]->getDeviceHandle());assert(&wrapper!=busaRmCalcDevices[mode]);busaRmCalcWrite(&wrapper,&param,value,nullptr,nullptr);}
 void drain(){for(const auto& q:requests){assert(q.target>=6&&q.target<9);busaRmCalcApply(q.target-6,q.action,q.role,q.f,q.b);}requests.clear();}
 void input(int m,int field,float v){deliver(m,busaRmCalcInputNames[m][field],esp_rmaker_float(v));drain();}
-void calculate(int m){deliver(m,"Рассчитать",esp_rmaker_bool(true));drain();}
+void calculate(int m){deliver(m,busaRmCalcActionNames[m][0],esp_rmaker_bool(true));drain();}
 void tick(uint32_t t){advance(t);int before=wireCalls;busaRmCaptureAndQueue(t);assert(wireCalls==before);runWorker();}
 int main(){
- initialize();Node node;busaRmAddCalculators(node);assert(node.devices.size()==3);
+ initialize();Node node;busaRmAddCalculators(node);assert(node.devices.size()==1);
  assert(busaRmCalcReady[0]&&busaRmCalcReady[1]&&busaRmCalcReady[2]);
- assert(node.devices[0]->params.size()==9&&node.devices[1]->params.size()==7&&node.devices[2]->params.size()==13);
+ assert(node.devices[0]->params.size()==29);
+ assert(busaRmCalcDevices[0]==busaRmCalcDevices[1]&&busaRmCalcDevices[1]==busaRmCalcDevices[2]);
+ assert(node.devices[0]->deviceName=="Калькулятор");
  for(int m=0;m<3;m++){
   for(int i=0;i<busaRmCalcInputCounts[m];i++){auto* p=busaRmCalcDevices[m]->getParamByName(busaRmCalcInputNames[m][i]);assert(p&&p->value.type==RMAKER_VAL_TYPE_FLOAT&&(p->flags&PROP_FLAG_WRITE));}
   for(int i=0;i<busaRmCalcOutputCounts[m];i++){auto* p=busaRmCalcDevices[m]->getParamByName(busaRmCalcOutputNames[m][i]);assert(p&&p->value.type==RMAKER_VAL_TYPE_STRING&&!(p->flags&PROP_FLAG_WRITE));}
@@ -41,10 +43,10 @@ int main(){
  advance(50000);busaRmCaptureAndQueue(nowMs);input(0,0,3);calculate(0);runWorker();assert(std::string(cloud[output].val.s)=="2,94 л");
  tick(60000);assert(std::string(cloud[output].val.s)=="4,41 л");
  before=busaRmCalculators[0].revision;deliver(0,busaRmCalcInputNames[0][0],esp_rmaker_bool(true));assert(requests.empty()&&busaRmCalculators[0].revision==before);
- writeQueueFull=true;deliver(0,"Рассчитать",esp_rmaker_bool(true));assert(requests.empty()&&busaRmWriteQueueDrops==1);writeQueueFull=false;
+ writeQueueFull=true;deliver(0,busaRmCalcActionNames[0][0],esp_rmaker_bool(true));assert(requests.empty()&&busaRmWriteQueueDrops==1);writeQueueFull=false;
  input(0,1,NAN);assert(std::string(busaRmCalculators[0].outputs[0])=="—");assert(busaRmCalculators[0].inputs[1]==96);
  input(2,3,90);input(2,4,20);calculate(2);assert(std::string(busaRmCalculators[2].outputs[0])=="—");
- deliver(0,"Сбросить",esp_rmaker_bool(true));drain();assert(busaRmCalculators[0].inputs[0]==0&&std::string(busaRmCalculators[0].outputs[0])=="—");
+ deliver(0,busaRmCalcActionNames[0][1],esp_rmaker_bool(true));drain();assert(busaRmCalculators[0].inputs[0]==0&&std::string(busaRmCalculators[0].outputs[0])=="—");
  // One unavailable calculator model must never suppress temperature publication.
  busaRmCalcReady[1]=false;tick(70000);assert(cloud[health.getParamByName("Работает секунд")].val.i==70);
  for(uint32_t t=80000;t<=3600000;t+=10000)tick(t);assert(wireCalls==359&&drops==1);
@@ -58,4 +60,4 @@ with tempfile.TemporaryDirectory() as d:
  for h in ['esp_rmaker_mqtt.h','esp_rmaker_common_events.h','esp_rmaker_work_queue.h','freertos/task.h']:(d/h).write_text('')
  p=d/'native.cpp';p.write_text(code);exe=d/'native'
  subprocess.run(['g++','-std=c++11','-I'+str(d),'-I'+str(sketch),str(p),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)
-print('PASS native RainMaker: 3 schemas, queued typed writes, actual calculations, invalid/reset, immutable frames, one batch/10s, unchanged-input suppression, retry, calc-failure isolation; no real cloud tested')
+print('PASS native RainMaker: one card / three independent calculations, queued typed writes, actual calculations, invalid/reset, immutable frames, one batch/10s, unchanged-input suppression, retry, calc-failure isolation; no real cloud tested')
