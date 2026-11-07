@@ -1,26 +1,15 @@
-/* UI10: one viewport; long forms and reports use explicit pages. */
+/* UI11: preserve approved controls; fit the frame and illustration only. */
 html{height:100%;overflow:hidden;overscroll-behavior:none}
 body{position:fixed;inset:0;width:100%;height:var(--app-height,100dvh);min-height:0!important;padding:0!important;overflow:hidden;overscroll-behavior:none;display:flex;flex-direction:column}
 [hidden]{display:none!important}
-.appHeader{order:0;position:relative!important;flex:0 0 auto;padding:6px 9px 5px!important;min-height:0}
-.appHeader .headerRow{min-height:0;padding:0 0 2px}
-.appHeader h1{font-size:17px!important;line-height:1.2;margin:0!important}
-.appHeader .clockBar{font-size:10px!important;line-height:1.3;margin:2px 0!important}
-.appHeader .netIndicators{gap:4px;margin:3px 0 0}
-.appHeader .netPill{font-size:10px;padding:3px 5px;line-height:1.15}
-.appHeader .netDot{width:8px;height:8px}
-main{order:1;flex:1 1 0;width:100%;max-width:680px;min-height:0;padding:5px 9px!important;overflow:hidden;display:flex;flex-direction:column;position:relative}
+.appHeader{order:0;position:relative!important;flex:0 0 auto;min-height:0}
+.appHeader .netPill{white-space:nowrap;flex-shrink:0}
+main{order:1;flex:1 1 0;width:100%;max-width:620px;min-height:0;padding:0 11px!important;overflow:hidden;display:flex;flex-direction:column;position:relative}
 main>.page{flex:1 1 0;min-height:0;height:auto;max-height:100%;width:100%;margin:0!important;padding:0!important;overflow:hidden;position:relative}
-.appTabs{order:2;position:relative!important;left:auto;right:auto;bottom:auto;flex:0 0 auto;margin:0!important;padding:3px 3px max(4px,env(safe-area-inset-bottom))!important;width:100%;min-height:0}
-.appTabs button{min-height:43px;padding:3px 0!important;font-size:9px!important;gap:2px}
-.appTabs .uiIcon{width:20px;height:20px}
-.approvedPageTitle{font-size:16px!important;line-height:1.2;margin:3px 0 7px!important;min-height:22px;gap:6px}
-.approvedPageTitle .uiIcon{width:20px;height:20px}
+.appTabs{order:2;position:relative!important;left:auto;right:auto;bottom:auto;flex:0 0 auto;margin:0 auto!important;width:100%}
 /* Main readouts stay readable while the illustration follows the available height. */
 section[data-section="0"]{display:flex;flex-direction:column}
 section[data-section="0"] .relayIndicators{flex:0 0 auto;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:0 0 4px!important}
-section[data-section="0"] .relayBadge{padding:4px 3px;min-height:30px;font-size:9px;line-height:1.1}
-section[data-section="0"] .relayBadge small{font-size:8px}
 section[data-section="0"] .approvedDashboard{flex:1 1 0;min-height:0;height:auto;max-width:none;width:100%;padding:0!important;margin:0!important;overflow:visible;position:relative}
 section[data-section="0"] .approvedRig{position:absolute;left:var(--scene-left);top:var(--scene-top);width:var(--scene-w);height:var(--scene-h);min-height:0!important;margin:0!important}
 .rigArtStage{width:100%;height:100%;aspect-ratio:auto;overflow:visible}
@@ -51,38 +40,11 @@ section[data-section="0"] .temp2 strong{font-size:clamp(10px,calc(var(--scene-w)
 .smallScene .cubeSetBelow{flex-direction:column;gap:0;font-size:8px;line-height:10px;height:20px}
 .smallScene .cubeSetBelow span{line-height:10px}
 .smallScene .collectionRateLabel{font-size:8px;line-height:10px}
-/* Compact section controls. All original IDs, inputs and handlers are retained. */
-.page h2{font-size:15px;margin:3px 0 7px}.page h3{font-size:13px;margin:7px 0}
-.page p{margin:5px 0;font-size:11px;line-height:1.3}
-.page .card{padding:9px;margin:5px 0;min-height:0}
-.page .row{padding:6px 0;font-size:11px;gap:8px;overflow-wrap:anywhere}
-.page input,.page select,.page textarea{font-size:16px;min-height:32px;padding:6px 7px;max-width:100%}
-.page button{font-size:12px;padding:7px;min-height:32px}
-.page label{font-size:11px;line-height:1.25}
-.page pre{font-size:10px;line-height:1.35;white-space:pre-wrap!important;overflow-wrap:anywhere;word-break:break-word;max-width:100%;margin:5px 0}
-.page textarea{max-height:100px;min-height:44px;overflow:hidden}
+/* Charts keep their approved aspect ratio; JS can only reduce their height. */
+.chartCard{flex:0 0 auto}
+#chartCanvas{flex:none}
+/* Presentation pages retain the original controls and their sizes. */
 section[data-section="1"] .approvedSensorList{display:contents}
-section[data-section="1"] .approvedSensor{margin:4px 0;min-height:60px}
-section[data-section="1"] .approvedSensorHead{min-height:60px;padding:7px 30px 7px 8px;gap:8px}
-section[data-section="1"] .approvedSensorLive{font-size:24px}
-section[data-section="1"] .approvedSensorIcon{width:26px;height:37px}
-section[data-section="1"] .temperatureSaveRow{margin-top:6px}
-.liquidPanel{padding:12px;margin:6px 0;border-radius:12px}
-.liquidPanelHeading{margin-bottom:10px}.liquidPanelHeading h2{font-size:16px}
-.liquidRateGrid{gap:10px}.liquidRateGrid strong{font-size:27px;margin:5px 0}
-.liquidRateGrid small{font-size:11px}.liquidSummary{margin-top:10px;padding-top:7px;gap:8px;font-size:12px}
-section[data-section="3"]{display:flex;flex-direction:column}
-.chartCard{display:flex;flex:1 1 0;min-height:0;flex-direction:column;padding:8px!important;margin:0!important;overflow:hidden}
-.chartTabs,.chartRanges{flex:0 0 auto;gap:4px}.chartTabs button,.chartRanges button{font-size:10px;min-height:29px;padding:6px 2px}
-.chartHeading{flex:0 0 auto;margin:9px 0 6px;font-size:12px}.chartHeading span{font-size:9px}
-.chartLegend{flex:0 0 auto;font-size:10px;margin:3px 0 7px;gap:4px}
-#chartCanvas{flex:1 1 0;width:100%!important;height:0!important;min-height:40px;max-height:none;aspect-ratio:auto}
-.chartRanges{margin-top:7px}
-#settingsMenu{margin:0}.approvedMenuItem{min-height:35px!important;padding:6px 8px!important;font-size:12px;gap:8px}
-.approvedMenuIcon{width:20px;min-width:20px}.approvedMenuIcon .uiIcon{width:19px;height:19px}
-#settingsBack{flex:0 0 auto;margin:0 0 5px;padding:7px;font-size:12px;min-height:30px}
-.settingCard{margin:0!important;min-height:0;overflow:hidden}
-.settingsTabs{gap:4px;margin:4px 0}.settingsTabs button{font-size:10px;min-height:29px;padding:5px 3px}
 .vpHidden{display:none!important}
 .vpPager{flex:0 0 31px;display:flex;align-items:center;justify-content:space-between;gap:7px;padding:3px 0 0;min-height:31px;background:var(--paper);z-index:3}
 .vpPager button{min-height:27px;padding:4px 10px;font-size:11px;border-radius:6px}
@@ -90,19 +52,9 @@ section[data-section="3"]{display:flex;flex-direction:column}
 .vpLongWindow{position:relative;overflow:hidden;flex-shrink:0;width:100%}
 .vpLongWindow>pre{margin:0!important;will-change:transform}
 .vpLongWindow>textarea{resize:none;scrollbar-width:none}
-.keyboardViewport .clockBar,.keyboardViewport .netIndicators{display:none}
-.keyboardViewport .appHeader{padding-top:3px!important;padding-bottom:3px!important}
-.keyboardViewport .appHeader h1{font-size:13px!important}
-.keyboardViewport .appTabs button{min-height:30px;font-size:8px!important}
-.keyboardViewport .appTabs .uiIcon{width:15px;height:15px}
+textarea[readonly]{pointer-events:none;white-space:pre-wrap!important;overflow-wrap:anywhere;word-break:break-word}
+.page pre{white-space:pre-wrap!important;overflow-wrap:anywhere;word-break:break-word;max-width:100%}
 
-.diagTabs{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:4px}
-.settingCard[data-stab="6"]>.card:first-child h2{display:none}
-textarea[readonly]{pointer-events:none}
-@media(max-height:500px){.appHeader .headerRow{float:left}.appHeader h1{font-size:14px!important}.appHeader .clockBar{float:right;font-size:9px!important;margin:0!important}.appHeader .netIndicators{clear:both;padding-top:2px}.appHeader .netPill{font-size:8px;padding:2px 4px}.approvedPageTitle{font-size:14px!important;margin:2px 0 4px!important;min-height:18px}.approvedPageTitle .uiIcon{width:17px;height:17px}#settingsBack{min-height:26px;padding:5px;margin-bottom:3px}}
-.keyboardViewport .approvedPageTitle{display:none}
-.keyboardViewport .settingCard[data-stab="6"]>.card:first-child{display:none}
-
-@media(max-height:500px){.settingCard[data-stab="6"]>.card:first-child{padding:4px!important;margin:0 0 3px!important}.diagTabs{margin:0!important}.diagTabs button{min-height:24px!important;padding:3px!important;font-size:9px!important}}
-
-.page textarea[readonly]{white-space:pre-wrap!important;overflow-wrap:anywhere;word-break:break-word}
+.vpDiagContent{display:contents}
+/* Free the section heading only in short windows (keyboard or landscape). */
+@media(max-height:500px){.approvedPageTitle{display:none}}

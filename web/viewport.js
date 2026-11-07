@@ -36,6 +36,17 @@ function fitHome(section){
  for(const [n,v] of Object.entries({'--scene-w':sw+'px','--scene-h':h+'px','--scene-left':left+'px','--scene-top':top+'px','--panel-w':w+'px'}))set(panel,n,v);
  section.classList.toggle('smallScene',sw<220);
 }
+function fitGraph(){
+ const c=$('#chartCanvas'),card=c.closest('.chartCard');
+ card.style.zoom='';card.style.width='';
+ c.style.removeProperty('height');c.style.removeProperty('aspect-ratio');
+ const natural=c.getBoundingClientRect().height;
+ const excess=card.getBoundingClientRect().bottom-main.getBoundingClientRect().bottom;
+ if(excess>0){set(c,'height',Math.max(40,natural-excess-2)+'px');set(c,'aspect-ratio','auto');}
+ if(card.getBoundingClientRect().bottom>main.getBoundingClientRect().bottom){const room=main.getBoundingClientRect().bottom-card.getBoundingClientRect().top-2;const zoom=Math.min(1,room/card.getBoundingClientRect().height);card.style.zoom=String(zoom);card.style.width=(100/zoom)+'%';}
+ const r=c.getBoundingClientRect(),size=r.width+'x'+r.height;
+ if(size!==lastChartSize&&typeof graphs==='function'){lastChartSize=size;graphs();}
+}
 function view(){
  const section=Array.from(main.querySelectorAll(':scope>.page')).find(visible);if(!section)return null;
  const id=Number(section.dataset.section);
@@ -49,7 +60,8 @@ function view(){
   if(card.dataset.stab==='1')return {section,id,unchanged:true,key:'wifi'};
   if(card.dataset.stab==='6'){
    const host=Array.from(card.querySelectorAll('[data-diag-panel]')).find(visible);if(!host)return null;
-   return {section,id,host,units:Array.from(host.children).filter(e=>e.tagName!=='H2'),key:'diag-'+host.dataset.diagPanel};
+   host.classList.add('vpDiagContent');
+   return {section,id,host:card,units:[card.firstElementChild,...host.children],key:'diag-'+host.dataset.diagPanel};
   }
   if(card.dataset.stab==='8'){
    const host=$('#events'),rows=[...host.children];return {section,id,host,units:rows.length?rows:[],key:'events'};
@@ -59,6 +71,7 @@ function view(){
  return null;
 }
 function clearUnits(){
+ document.querySelectorAll('[data-vp-zoom]').forEach(e=>{e.style.zoom='';e.removeAttribute('data-vp-zoom');});
  document.querySelectorAll('.vpHidden').forEach(e=>e.classList.remove('vpHidden'));
  document.querySelectorAll('.vpLongWindow').forEach(e=>{e.style.height='auto';const p=e.firstElementChild;if(p&&p.tagName!=='TEXTAREA')p.style.transform='';});
 }
@@ -100,7 +113,7 @@ function measure(v,reserved){
   }else if(e.classList.contains('vpLongWindow')){
    const original=e.firstElementChild,natural=original.tagName==='TEXTAREA'?Math.max(original.scrollHeight,h):original.getBoundingClientRect().height+(parseFloat(getComputedStyle(original).marginTop)||0)+(parseFloat(getComputedStyle(original).marginBottom)||0);
    for(let i=0;i<Math.ceil(natural/budget);i++)records.push({el:e,original,slice:i,step:budget,h:Math.min(budget,natural-i*budget),exclusive:true});
-  }else records.push({el:e,h,exclusive:false});
+  }else {let fitted=h;if(h>budget+1){e.dataset.vpZoom='1';e.style.zoom=String(budget/h);fitted=budget;}records.push({el:e,h:fitted,exclusive:false});}
  }
  const result=[];let page=[],used=0;
  for(const r of records){
@@ -135,12 +148,13 @@ function fit(){
   size();if(scrollY!==0)scrollTo(0,0);clearUnits();pager.hidden=true;
   const v=view();if(!v)return;
   if(v.id===0){currentHost=null;fitHome(v.section);return;}
-  if(v.id===3){currentHost=null;const c=$('#chartCanvas'),r=c.getBoundingClientRect(),size=r.width+'x'+r.height;if(size!==lastChartSize&&typeof graphs==='function'){lastChartSize=size;graphs();}return;}
+  if(v.id===3){currentHost=null;fitGraph();return;}
   if(!v.host)return;
   if(currentHost!==v.key){currentHost=v.key;currentPage=0;}
   pages=measure(v,0);
   if(pages.length>1){pager.hidden=false;clearUnits();pages=measure(view(),32);}
   if(focusUnit){const i=pages.findIndex(p=>p.some(r=>r.el===focusUnit||r.el.contains(focusUnit)));if(i>=0)currentPage=i;}
+  if(pages.length===1){set(v.host,'height','auto');if(v.host===v.section)set(v.host,'flex','1 1 0');}
   currentPage=Math.min(Math.max(currentPage,0),pages.length-1);show(v);
  }finally{busy=false;document.documentElement.dataset.viewportReady='1';}
 }
