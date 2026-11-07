@@ -1,4 +1,4 @@
-name: BUSA N16R8 CALC4 WIFI1 UI9 local interface build
+name: BUSA N16R8 CALC4 WIFI1 UI10 local interface build
 on:
   push:
     branches: [feat/busa-calculator-20261105, feat/busa-ui7-local]
@@ -9,6 +9,7 @@ on:
       - 'ci/**'
       - 'tests/**'
       - 'calculator/**'
+      - 'web/**'
       - 'calculator.js'
       - 'calculator.css'
       - 'index.html'
@@ -66,6 +67,8 @@ jobs:
           python3 -B tests/test_rm_telemetry.py
           python3 -B tests/test_rm_preservation.py
           python3 -B ci/generate_calculator.py --check
+          python3 -B ci/generate_viewport.py --check
+          node --check web/viewport.js
           python3 -B tests/test_calculator.py
           python3 -B tests/test_calculator_keypad.py
           python3 -B tests/test_rainmaker_calculator.py
@@ -97,7 +100,7 @@ jobs:
           CI=1 python3 -m playwright install --with-deps chromium webkit
           python3 -B tests/test_calculator_browser.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_calculator_browser.py
-          python3 -B tests/test_ui9_browser.py
+          python3 -B tests/test_ui10_viewport.py
           python3 -B tests/test_ui9_live.py
           python3 -B tests/test_wifi_browser.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_wifi_browser.py
@@ -108,17 +111,17 @@ jobs:
           arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
       - name: Package and verify the two BIN and complete source snapshot
         run: |
-          python3 ci/package_ui9.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          python3 ci/package_ui10.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_UI9_20261107
+          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_UI10_20261107
           retention-days: 30
           path: |
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI9_APP_OTA.bin
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI9_USB_MERGED.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI10_APP_OTA.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI10_USB_MERGED.bin
             out/SHA256SUMS.txt
             out/OTA_IMAGE_INFO.txt
             out/PARTITIONS.csv
             out/SOURCE_COMMIT.txt
             out/SOURCE_SHA256SUMS.txt
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI9_SOURCE.zip
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI10_SOURCE.zip

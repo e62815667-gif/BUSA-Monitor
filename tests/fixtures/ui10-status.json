@@ -1,0 +1,106 @@
+{
+  "network_indicators": {
+    "local_client": true,
+    "internet": true
+  },
+  "station": {
+    "connected": true,
+    "ssid": "test",
+    "ip": "192.0.2.1"
+  },
+  "google": {
+    "configured": true,
+    "state": 5,
+    "http": 200,
+    "sent": 1
+  },
+  "temperatures": [
+    {
+      "c": 26.4
+    },
+    {
+      "c": 78.6
+    },
+    {
+      "c": 96.2
+    },
+    {
+      "c": 80
+    }
+  ],
+  "sound_alerts": {
+    "channels": [
+      {
+        "channel": 1,
+        "on_c": 96,
+        "off_c": 94,
+        "sound_on": false
+      },
+      {
+        "channel": 2,
+        "on_c": 96,
+        "off_c": 94,
+        "sound_on": false
+      },
+      {
+        "channel": 3,
+        "on_c": 96,
+        "off_c": 94,
+        "sound_on": false
+      },
+      {
+        "channel": 4,
+        "on_c": 85,
+        "off_c": 80,
+        "sound_on": true
+      }
+    ],
+    "buzzer": {
+      "sensors": [
+        {
+          "on_c": 30,
+          "off_c": 28
+        },
+        {
+          "on_c": 78,
+          "off_c": 76
+        }
+      ],
+      "sound_on": false
+    }
+  },
+  "water": {
+    "lpm": 0.6,
+    "pulses": 100,
+    "seen_pulses": true,
+    "total_l_estimate": 1.2,
+    "calibrated": false
+  },
+  "collection": {
+    "sensor_present": false,
+    "ml_per_min": null,
+    "total_ml": null
+  },
+  "uptime_ms": 10000,
+  "display_sleep": false,
+  "tft_theme_mode": 1,
+  "calibration_offsets": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "firmware": "BUSA UI9",
+  "ota": {
+    "message": "test",
+    "active": false
+  },
+  "modules": {
+    "pcf8575": true,
+    "tft_attempted": true,
+    "tft_profile": "ST7789",
+    "tft_rotation": 0,
+    "tft_boot_complete": true,
+    "tft_profile_id": 1
+  }
+}
