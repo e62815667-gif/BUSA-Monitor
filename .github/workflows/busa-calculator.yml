@@ -1,7 +1,7 @@
-name: BUSA N16R8 CALC4 WIFI1 UI6 interface and ordered navigation build
+name: BUSA N16R8 CALC4 WIFI1 UI7 local interface build
 on:
   push:
-    branches: [feat/busa-calculator-20261105]
+    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local]
     paths:
       - 'ci/ble_official_provisioning.py'
       - 'ci/busa_ble_ota_stability.py'
@@ -74,6 +74,7 @@ jobs:
           python3 -B tests/test_wifi_scan.py
           python3 -B tests/test_ui6_navigation.py
           python3 -B tests/test_ui6_history.py
+          python3 -B tests/test_ui7_journal.py
           python3 -B tests/test_ui6_chart_cadence.py
           python3 -B tests/test_ui6_tft.py
           node --check calculator.js
@@ -96,7 +97,7 @@ jobs:
           CI=1 python3 -m playwright install --with-deps chromium webkit
           python3 -B tests/test_calculator_browser.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_calculator_browser.py
-          python3 -B tests/test_ui6_browser.py
+          python3 -B tests/test_ui7_browser.py
           python3 -B tests/test_wifi_browser.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_wifi_browser.py
       - name: Compile ESP32-S3 N16R8
@@ -106,17 +107,17 @@ jobs:
           arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
       - name: Package and verify the two BIN and complete source snapshot
         run: |
-          python3 ci/package_ui6.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          python3 ci/package_ui7.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_20261105
+          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_UI7_20261106
           retention-days: 30
           path: |
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI6_APP_OTA.bin
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI6_USB_MERGED.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI7_APP_OTA.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI7_USB_MERGED.bin
             out/SHA256SUMS.txt
             out/OTA_IMAGE_INFO.txt
             out/PARTITIONS.csv
             out/SOURCE_COMMIT.txt
             out/SOURCE_SHA256SUMS.txt
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI6_SOURCE.zip
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI7_SOURCE.zip
