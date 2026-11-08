@@ -2,7 +2,7 @@
 
 User decisions: ESP32 and four-channel sound-relay block are replaceable modules. Sensor connections are modular. Add a dedicated connector for a future pulse-output collection flowmeter. Drawings are conceptual placement/connection views, not a verified electrical schematic or manufacturing layout.
 
-The ESP32-S3 N16R8 development module plugs into female headers. Exact module model, pin count, header spacing, USB clearance and antenna keep-out must follow its drawing before placement is frozen. External relay module plugs into a labelled keyed harness. The PCF8575 keypad interface, power conversion and input protection belong on the carrier unless exact chosen parts require a separate footprint/module.
+The ESP32-S3 N16R8 development module plugs into female headers. Exact module model, pin count, header spacing, USB clearance and antenna keep-out must follow its drawing before placement is frozen. External relay module plugs into a labelled keyed harness. Final user decision: the existing PCF8575 keyboard-expander module plugs into female sockets on the carrier, like ESP32. Power conversion and input protection are carrier functions to be specified separately.
 
 Existing firmware pins preserved:
 
@@ -44,4 +44,15 @@ Verified source references found on connected Drive:
 
 Historical October connection documents contain outdated GPIO assignments. Their part descriptions/photos are useful references; retain the current firmware pin map above rather than copying those old wires into the new board.
 
-Needed before a faithful all-real-components illustration: photos of the actual membrane keyboard, display module, relay assembly and cooling flowmeter. A clear overall photo plus close-ups where markings are unreadable is sufficient for the visual stage; physical footprint dimensions will still be required for routing.
+User subsequently supplied actual photos of the ESP32, PCF8575 module, relay block, TFT, temperature probes, current mint-green membrane keypad, and white YF-S401. Physical footprint dimensions are still required for routing.
+
+## Final modular arrangement after supplied photos
+
+- User briefly considered a soldered PCF8575, then explicitly chose the complete PCF8575 module plugged into the carrier like ESP32. This latest choice supersedes the chip-only proposal.
+- Reuse the actual short rectangular blue PCF8575 module from the photo. Its two eight-I/O pin banks and separate five-pin I2C edge need matching sockets; measure its actual holes/pitch before producing a footprint.
+- Current keyboard is the light mint-green flat membrane 5×4 with yellow F1/F2, red #/*/Esc/Ent and white number/arrow keys. Earlier black 4×4 hardware in the group photo is obsolete.
+- Four temperature probes connect directly to separate ESP32 inputs (GPIO16,17,18,21 in the current firmware), without DS2482 or another temperature bridge. PCF8575 is for the keypad only.
+- PCA9685 light driver is removed. Retain the actual blue four-channel SONGLE SRD-12VDC-SL-C sound-relay board as a separate removable module.
+- User's flowmeter close-up confirms a white/translucent YF-S401, four lid screws, opposed ribbed hose barbs, red/yellow/black leads, label range 0.3–6 L/min. This image is a visual reference, not a confirmed voltage/output-level specification.
+- The future collection sensor remains a reserved separate input; its exact model is unconfirmed. Do not substitute a generic pictured sensor as the selected part.
+- Latest concept image: /workspace/generated_images/exec-7fd3c63c-110a-46d3-9c94-385c8f5aa191.png. It illustrates the corrected module identities and upward-facing carrier connectors. Component footprints, pin counts, trace routing and electrical ratings must come from measured hardware/datasheets, not from this rendering.
