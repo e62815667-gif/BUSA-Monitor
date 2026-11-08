@@ -97,6 +97,9 @@ inline void evaluateRouted(Routed& r,const bool enable[4],
     // Do not turn ongoing pulses into new events. Missing data on one
     // temperature source does not disable the *other* source.
   }
+  // Expire old pulses before deciding whether they block a new signal.
+  tickPulse(r.k2,now,pulseDurationMs);
+  tickPulse(r.k3,now,pulseDurationMs);
   const bool openingEvent=r.t3OffEvent||r.t4OffEvent;
   const bool closingEvent=r.t3OnEvent||r.t4OnEvent;
   if(r.t3OnEvent)r.k1Hold=false;

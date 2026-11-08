@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI11-20261107";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI12-20261108";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -110,7 +110,11 @@ void sampleTemperatures(uint32_t now){
       float v=cachedTempValid[i]?sensors[i]->getTempC(cachedTempRom[i]):DEVICE_DISCONNECTED_C;
       if(tempPresent[i] && isfinite(v) && v>=-55 && v<=125 && v!=DEVICE_DISCONNECTED_C){
         temperature[i]=v+tempOffset[i];tempAt[i]=now;
-      }else{temperature[i]=NAN;tempAt[i]=0;}
+      }else{
+        temperature[i]=NAN;tempAt[i]=0;
+        // Permit bounded rediscovery when a sensor is unplugged or replaced.
+        tempPresent[i]=false;cachedTempValid[i]=false;
+      }
     }
     tempConverting=false;
   }
@@ -461,7 +465,7 @@ String clockStamp(bool compact=false){
   time_t localEpoch=time(nullptr)+(time_t)(clockUtcOffsetMinutes*60);
   struct tm t={};
   gmtime_r(&localEpoch,&t);
-  char buf[32];
+  char buf[80]; // Full int-width fields also fit; normal dates retain their format.
   if(compact)snprintf(buf,sizeof(buf),"%02d.%02d.%04d %02d:%02d",
      t.tm_mday,t.tm_mon+1,t.tm_year+1900,t.tm_hour,t.tm_min);
   else snprintf(buf,sizeof(buf),"%02d.%02d.%04d %02d:%02d:%02d",
@@ -1300,11 +1304,12 @@ String consoleLine="",stationSsid="",stationPass="";
 String quoteJson(const String &x){
   String out="\"";
   for(unsigned i=0;i<x.length();i++){
-    char c=x[i];
-    if(c=='\"'||c=='\\'){out+='\\';out+=c;}
-    else if(c=='\n')out+="\\n";
-    else if(c=='\r')out+="\\r";
-    else out+=c;
+    const unsigned char c=(unsigned char)x[i];
+    if(c=='"'||c=='\\'){out+='\\';out+=(char)c;}
+    else if(c<0x20){
+      char escaped[7];snprintf(escaped,sizeof(escaped),"\\u%04x",(unsigned)c);
+      out+=escaped;
+    }else out+=(char)c;
   }
   return out+"\"";
 }
@@ -4128,12 +4133,12 @@ void loop(){
   readConsole();
   busaRainMakerApply(); // Apply queued iPhone settings on the same thread as TFT, NVS and sound
   if(!otaActive)wifiUiPoll(); // nonblocking Wi-Fi scan and password-provisioning on physical TFT
-  if(otaRestart && elapsed(now,otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
+  if(otaRestart && elapsed(millis(),otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
   if(otaActive){soundOutputsOff();delay(0);return;}
-  if(tftRebootPending && elapsed(now,tftRebootAt,3000)){soundOutputsOff();ESP.restart();}
-  if(googleRestart && elapsed(now,googleRestartAt,3500)){soundOutputsOff();ESP.restart();}
+  if(tftRebootPending && elapsed(millis(),tftRebootAt,3000)){soundOutputsOff();ESP.restart();}
+  if(googleRestart && elapsed(millis(),googleRestartAt,3500)){soundOutputsOff();ESP.restart();}
   busaRemoteAlarmApply(); // remote sound thresholds only; writes NVS in main loop
   {const uint32_t started=millis();sampleTemperatures(now);busaObserve("TEMP",started,busaTempWorstMs);}
   {const uint32_t started=millis();probeOneWire(now);busaObserve("ONEWIRE",started,busaOneWireWorstMs);} // Diagnose on idle 1-Wire bus only
@@ -4145,6 +4150,7 @@ void loop(){
     tftDirty=true;
   }
     sampleFlow(now);
+  busaGoogleSnapshotPoll(); // Main-loop-only capture; worker owns immutable JSON.
   busaRainMakerPoll(now);
   v13Collect(now); // Shared graph sampling, including when TFT screen is asleep.
   // TFT graph is repainted inside its own plot border by v14RefreshLive().

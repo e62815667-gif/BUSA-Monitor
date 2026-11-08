@@ -4,6 +4,8 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <time.h>
+#include <new>
+#include "BUSA_SnapshotMailbox.h"
 // Generated from Google Trust Services root CA certificates in the verified CI build.
 #include "BUSA_GoogleCA.h"
 
@@ -111,6 +113,22 @@ static void busaGooglePollRemoteAlarms(){
   busaGoogleNetworkBusy=false;
 }
 
+struct BusaGoogleStatusSnapshot {uint32_t at;String json;};
+static BusaSnapshotMailbox<BusaGoogleStatusSnapshot> busaGoogleSnapshots;
+// Called only by the Arduino loop; no live String/model access from Google task.
+static void busaGoogleSnapshotPoll(){
+  static uint32_t lastAttempt=0;
+  const uint32_t now=millis();
+  if(lastAttempt&&(uint32_t)(now-lastAttempt)<1000)return;
+  if(!busaGoogleSnapshots.needsSnapshot())return;
+  lastAttempt=now;
+  auto* frame=new(std::nothrow) BusaGoogleStatusSnapshot;
+  if(!frame){busaGoogleSnapshots.request();return;}
+  frame->at=now;frame->json=statusJSON();
+  if(frame->json.length()<2){delete frame;busaGoogleSnapshots.request();return;}
+  busaGoogleSnapshots.publish(frame);
+}
+
 void googleWorker(void* unused){
   (void)unused;
   // NTP is configured once in setup(); this worker never launches network probes.
@@ -144,6 +162,10 @@ void googleWorker(void* unused){
       continue;
     }
     if(!googleTestRequested && (uint32_t)(now-last)<30000)continue;
+    auto* snapshot=busaGoogleSnapshots.take();
+    if(!snapshot||(uint32_t)(now-snapshot->at)>5000){
+      delete snapshot;busaGoogleSnapshots.request();continue;
+    }
     googleTestRequested=false;
     last=now;
     busaGoogleNetworkBusy=true;
@@ -153,8 +175,9 @@ void googleWorker(void* unused){
     // Never save the authentication token inside telemetry/raw sheet rows.
     String packet=String("{\"version\":3,\"kind\":\"monitor_diagnostics\",\"device_id\":\"BUSA-1M-001\",\"sent_epoch\":")
       +String((uint32_t)time(nullptr))
-      +",\"telemetry\":"+statusJSON()
+      +",\"telemetry\":"+snapshot->json
       +",\"token\":"+quoteJson(googleSecret)+"}";
+    delete snapshot; // Packet owns its JSON copy; the live model stays on main loop.
     // HTTPS already resolves the host. A second DNS lookup and a separate
     // TCP:443 probe caused unnecessary radio traffic every 15 seconds.
     googleDns=-1;googleTlsError=0;googleErrorStage=0;

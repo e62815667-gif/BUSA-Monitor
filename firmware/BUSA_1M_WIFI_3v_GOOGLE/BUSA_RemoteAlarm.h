@@ -76,6 +76,10 @@ static void busaRemoteAlarmApply() {
   const char *onKeys[4]={"buzOn0","buzOn1","sndT3On","sndT4On"};
   const char *offKeys[4]={"buzOff0","buzOff1","sndT3Off","sndT4Off"};
   float priorOn[4],priorOff[4];
+  bool priorEnable[6];
+  const char* enableKeys[6]={"buzE0","buzE1","sndRoleEnable0","sndRoleEnable1","sndRoleEnable2","sndRoleEnable3"};
+  for(int i=0;i<6;i++)priorEnable[i]=prefs.getBool(enableKeys[i],true);
+  const String priorId=prefs.getString("remoteAlarmId","");
   for(int i=0;i<4;i++){
     priorOn[i]=prefs.getFloat(onKeys[i],NAN);
     priorOff[i]=prefs.getFloat(offKeys[i],NAN);
@@ -89,9 +93,14 @@ static void busaRemoteAlarmApply() {
   for(int i=0;i<2;i++)if(!prefs.putBool((String("buzE")+i).c_str(),true))written=false;
   for(int i=0;i<4;i++)if(!prefs.putBool((String("sndRoleEnable")+i).c_str(),true))written=false;
   for(int i=0;i<4;i++){
-    if(fabsf(prefs.getFloat(onKeys[i],NAN)-cmd.on[i])>0.051f||
-       fabsf(prefs.getFloat(offKeys[i],NAN)-cmd.off[i])>0.051f)written=false;
+    const float on=prefs.getFloat(onKeys[i],NAN),off=prefs.getFloat(offKeys[i],NAN);
+    if(!isfinite(on)||!isfinite(off)||fabsf(on-cmd.on[i])>0.051f||
+       fabsf(off-cmd.off[i])>0.051f)written=false;
   }
+  for(int i=0;i<6;i++)if(!prefs.getBool(enableKeys[i],false))written=false;
+  // Commit command identity before changing RAM; a failed ID write is a failed save.
+  if(written&&(prefs.putString("remoteAlarmId",cmd.id)!=24||
+      prefs.getString("remoteAlarmId","")!=String(cmd.id)))written=false;
   if(!written){
     // Roll back the threshold keys on failure instead of claiming saved.
     for(int i=0;i<4;i++){
@@ -100,6 +109,9 @@ static void busaRemoteAlarmApply() {
       if(isfinite(priorOff[i]))prefs.putFloat(offKeys[i],priorOff[i]);
       else prefs.remove(offKeys[i]);
     }
+    for(int i=0;i<6;i++)prefs.putBool(enableKeys[i],priorEnable[i]);
+    if(priorId.length())prefs.putString("remoteAlarmId",priorId);
+    else prefs.remove("remoteAlarmId");
     busaRemoteAck(cmd.id,2);
     return;
   }
@@ -116,11 +128,6 @@ static void busaRemoteAlarmApply() {
   for(int i=0;i<4;i++){
     soundEnabled[i]=true;
     refTemp[i]=cmd.on[i];noticeTemp[i]=cmd.off[i];
-  }
-  // A successful NVS record avoids re-applying a command after reboot.
-  if(prefs.putString("remoteAlarmId",cmd.id)!=24){
-    busaRemoteAck(cmd.id,2);
-    return;
   }
   tftDirty=true;lastRender=0;
   busaRemoteAck(cmd.id,1);
