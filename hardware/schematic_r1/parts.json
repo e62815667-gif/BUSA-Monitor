@@ -1,0 +1,2321 @@
+[
+  {
+    "ref": "J1",
+    "value": "DC INPUT / 12V ONLY",
+    "pins": [
+      {
+        "number": "1",
+        "name": "+12V",
+        "type": "passive",
+        "side": "R",
+        "net": "VIN12"
+      },
+      {
+        "number": "2",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "PF1",
+    "value": "POWER_FLAG",
+    "pins": [
+      {
+        "number": "1",
+        "name": "VIN12",
+        "type": "power_out",
+        "side": "R",
+        "net": "VIN12"
+      }
+    ],
+    "description": "External supply after passive protection",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "PF2",
+    "value": "POWER_FLAG",
+    "pins": [
+      {
+        "number": "1",
+        "name": "GND",
+        "type": "power_out",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "External supply after passive protection",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "F1",
+    "value": "1A slow / 32V",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "VIN12"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "VIN12_FUSED"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "D1",
+    "value": "SS34",
+    "pins": [
+      {
+        "number": "A",
+        "name": "ANODE",
+        "type": "passive",
+        "side": "L",
+        "net": "VIN12_FUSED"
+      },
+      {
+        "number": "K",
+        "name": "CATHODE",
+        "type": "passive",
+        "side": "R",
+        "net": "V12_PROT"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "PF3",
+    "value": "POWER_FLAG",
+    "pins": [
+      {
+        "number": "1",
+        "name": "V12_PROT",
+        "type": "power_out",
+        "side": "R",
+        "net": "V12_PROT"
+      }
+    ],
+    "description": "External supply after passive protection",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "U2",
+    "value": "R-78E5.0-1.0",
+    "pins": [
+      {
+        "number": "1",
+        "name": "VIN",
+        "type": "power_in",
+        "side": "L",
+        "net": "V12_PROT"
+      },
+      {
+        "number": "2",
+        "name": "GND",
+        "type": "power_in",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "3",
+        "name": "5V OUT",
+        "type": "power_out",
+        "side": "R",
+        "net": "V5"
+      }
+    ],
+    "description": "New selected regulator option, not claimed existing user component",
+    "footprint": "",
+    "datasheet": "https://recom-power.com/pdf/Innoline/R-78E-1.0.pdf"
+  },
+  {
+    "ref": "C1",
+    "value": "10uF / 35V",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V12_PROT"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C2",
+    "value": "100nF / 50V",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V12_PROT"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C3",
+    "value": "10uF / 10V",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V5"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C4",
+    "value": "100nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V5"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "PF4",
+    "value": "POWER_FLAG",
+    "pins": [
+      {
+        "number": "1",
+        "name": "ESP_5V",
+        "type": "power_out",
+        "side": "R",
+        "net": "ESP_5V"
+      }
+    ],
+    "description": "External supply after passive protection",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "JP1",
+    "value": "ESP PWR LINK / OPEN",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V5"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "ESP_5V"
+      }
+    ],
+    "description": "Open before either ESP32 USB port is powered. Do not connect external 5V and USB concurrently.",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "U1",
+    "value": "ESP32-S3 / user 44PIN",
+    "pins": [
+      {
+        "number": "L01",
+        "name": "GND",
+        "type": "power_in",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "L02",
+        "name": "GND",
+        "type": "power_in",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "L03",
+        "name": "GPIO19",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L04",
+        "name": "GPIO20",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L05",
+        "name": "GPIO21",
+        "type": "bidirectional",
+        "side": "L",
+        "net": "TEMP_ALARM"
+      },
+      {
+        "number": "L06",
+        "name": "GPIO47",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L07",
+        "name": "GPIO48",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L08",
+        "name": "GPIO45",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L09",
+        "name": "GPIO0",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L10",
+        "name": "GPIO35",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L11",
+        "name": "GPIO36",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L12",
+        "name": "GPIO37",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L13",
+        "name": "GPIO38",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L14",
+        "name": "GPIO39",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L15",
+        "name": "GPIO40",
+        "type": "bidirectional",
+        "side": "L",
+        "net": "I2C_SDA"
+      },
+      {
+        "number": "L16",
+        "name": "GPIO41",
+        "type": "bidirectional",
+        "side": "L",
+        "net": "I2C_SCL"
+      },
+      {
+        "number": "L17",
+        "name": "GPIO42",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L18",
+        "name": "GPIO2",
+        "type": "output",
+        "side": "L",
+        "net": "BUZZER_SIG"
+      },
+      {
+        "number": "L19",
+        "name": "GPIO1",
+        "type": "input",
+        "side": "L",
+        "net": "COLLECT_GPIO1"
+      },
+      {
+        "number": "L20",
+        "name": "RX",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L21",
+        "name": "TX",
+        "type": "passive",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "L22",
+        "name": "GND",
+        "type": "power_in",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "R01",
+        "name": "GND",
+        "type": "power_in",
+        "side": "R",
+        "net": "GND"
+      },
+      {
+        "number": "R02",
+        "name": "5V",
+        "type": "power_in",
+        "side": "R",
+        "net": "ESP_5V"
+      },
+      {
+        "number": "R03",
+        "name": "GPIO14",
+        "type": "output",
+        "side": "R",
+        "net": "TFT_SCK"
+      },
+      {
+        "number": "R04",
+        "name": "GPIO13",
+        "type": "output",
+        "side": "R",
+        "net": "TFT_MOSI"
+      },
+      {
+        "number": "R05",
+        "name": "GPIO12",
+        "type": "output",
+        "side": "R",
+        "net": "TFT_RST"
+      },
+      {
+        "number": "R06",
+        "name": "GPIO11",
+        "type": "output",
+        "side": "R",
+        "net": "TFT_DC"
+      },
+      {
+        "number": "R07",
+        "name": "GPIO10",
+        "type": "output",
+        "side": "R",
+        "net": "TFT_CS"
+      },
+      {
+        "number": "R08",
+        "name": "GPIO9",
+        "type": "passive",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "R09",
+        "name": "GPIO46",
+        "type": "passive",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "R10",
+        "name": "GPIO3",
+        "type": "passive",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "R11",
+        "name": "GPIO8",
+        "type": "passive",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "R12",
+        "name": "GPIO18",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "TEMP_CUBE"
+      },
+      {
+        "number": "R13",
+        "name": "GPIO17",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "TEMP_COLUMN"
+      },
+      {
+        "number": "R14",
+        "name": "GPIO16",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "TEMP_WATER"
+      },
+      {
+        "number": "R15",
+        "name": "GPIO15",
+        "type": "input",
+        "side": "R",
+        "net": "COOL_GPIO15"
+      },
+      {
+        "number": "R16",
+        "name": "GPIO7",
+        "type": "output",
+        "side": "R",
+        "net": "K1_GPIO7"
+      },
+      {
+        "number": "R17",
+        "name": "GPIO6",
+        "type": "output",
+        "side": "R",
+        "net": "K2_GPIO6"
+      },
+      {
+        "number": "R18",
+        "name": "GPIO5",
+        "type": "output",
+        "side": "R",
+        "net": "K3_GPIO5"
+      },
+      {
+        "number": "R19",
+        "name": "GPIO4",
+        "type": "output",
+        "side": "R",
+        "net": "K4_GPIO4"
+      },
+      {
+        "number": "R20",
+        "name": "RST",
+        "type": "passive",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "R21",
+        "name": "3V3",
+        "type": "power_out",
+        "side": "R",
+        "net": "V3V3"
+      },
+      {
+        "number": "R22",
+        "name": "3V3",
+        "type": "passive",
+        "side": "R",
+        "net": "V3V3"
+      }
+    ],
+    "description": "L/R numbered top-to-bottom with both USB at top. Actual socket geometry still to measure.",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J12",
+    "value": "BUZZER LOGIC ONLY",
+    "pins": [
+      {
+        "number": "1",
+        "name": "GPIO2",
+        "type": "passive",
+        "side": "R",
+        "net": "BUZZER_SIG"
+      },
+      {
+        "number": "2",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "Logic control only; not direct supply for a bare buzzer",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J2",
+    "value": "TFT / VCC=3.3V",
+    "pins": [
+      {
+        "number": "1",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      },
+      {
+        "number": "2",
+        "name": "VCC",
+        "type": "passive",
+        "side": "R",
+        "net": "V3V3"
+      },
+      {
+        "number": "3",
+        "name": "SCK",
+        "type": "passive",
+        "side": "R",
+        "net": "TFT_SCK"
+      },
+      {
+        "number": "4",
+        "name": "SDA_MOSI",
+        "type": "passive",
+        "side": "R",
+        "net": "TFT_MOSI"
+      },
+      {
+        "number": "5",
+        "name": "RST",
+        "type": "passive",
+        "side": "R",
+        "net": "TFT_RST"
+      },
+      {
+        "number": "6",
+        "name": "DC",
+        "type": "passive",
+        "side": "R",
+        "net": "TFT_DC"
+      },
+      {
+        "number": "7",
+        "name": "CS",
+        "type": "passive",
+        "side": "R",
+        "net": "TFT_CS"
+      }
+    ],
+    "description": "New carrier pin order matches photographed display legends; confirm cable face/orientation",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C5",
+    "value": "100nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C6",
+    "value": "10uF / 6.3V",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "U3",
+    "value": "PCF8575 MODULE / 8+8+5",
+    "pins": [
+      {
+        "number": "VCC",
+        "name": "VCC",
+        "type": "power_in",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "GND",
+        "name": "GND",
+        "type": "power_in",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "SDA",
+        "name": "SDA",
+        "type": "bidirectional",
+        "side": "L",
+        "net": "I2C_SDA"
+      },
+      {
+        "number": "SCL",
+        "name": "SCL",
+        "type": "input",
+        "side": "L",
+        "net": "I2C_SCL"
+      },
+      {
+        "number": "INT",
+        "name": "INT",
+        "type": "open_collector",
+        "side": "L",
+        "net": null
+      },
+      {
+        "number": "P00",
+        "name": "P00",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "KEY1"
+      },
+      {
+        "number": "P01",
+        "name": "P01",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "KEY2"
+      },
+      {
+        "number": "P02",
+        "name": "P02",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "KEY3"
+      },
+      {
+        "number": "P03",
+        "name": "P03",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "KEY4"
+      },
+      {
+        "number": "P04",
+        "name": "P04",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "KEY5"
+      },
+      {
+        "number": "P05",
+        "name": "P05",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "KEY6"
+      },
+      {
+        "number": "P06",
+        "name": "P06",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "KEY7"
+      },
+      {
+        "number": "P07",
+        "name": "P07",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "KEY8"
+      },
+      {
+        "number": "P10",
+        "name": "P10",
+        "type": "bidirectional",
+        "side": "R",
+        "net": "KEY9"
+      },
+      {
+        "number": "P11",
+        "name": "P11",
+        "type": "bidirectional",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "P12",
+        "name": "P12",
+        "type": "bidirectional",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "P13",
+        "name": "P13",
+        "type": "bidirectional",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "P14",
+        "name": "P14",
+        "type": "bidirectional",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "P15",
+        "name": "P15",
+        "type": "bidirectional",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "P16",
+        "name": "P16",
+        "type": "bidirectional",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "P17",
+        "name": "P17",
+        "type": "bidirectional",
+        "side": "R",
+        "net": null
+      }
+    ],
+    "description": "Pin numbers are actual printed terminal names, not invented physical positions. INT and 7 unused I/O are NC.",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J3",
+    "value": "KEYPAD 9-WIRE",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "R",
+        "net": "KEY1"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "KEY2"
+      },
+      {
+        "number": "3",
+        "name": "3",
+        "type": "passive",
+        "side": "R",
+        "net": "KEY3"
+      },
+      {
+        "number": "4",
+        "name": "4",
+        "type": "passive",
+        "side": "R",
+        "net": "KEY4"
+      },
+      {
+        "number": "5",
+        "name": "5",
+        "type": "passive",
+        "side": "R",
+        "net": "KEY5"
+      },
+      {
+        "number": "6",
+        "name": "6",
+        "type": "passive",
+        "side": "R",
+        "net": "KEY6"
+      },
+      {
+        "number": "7",
+        "name": "7",
+        "type": "passive",
+        "side": "R",
+        "net": "KEY7"
+      },
+      {
+        "number": "8",
+        "name": "8",
+        "type": "passive",
+        "side": "R",
+        "net": "KEY8"
+      },
+      {
+        "number": "9",
+        "name": "9",
+        "type": "passive",
+        "side": "R",
+        "net": "KEY9"
+      }
+    ],
+    "description": "Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R1",
+    "value": "4.7k OPTIONAL",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "I2C_SDA"
+      }
+    ],
+    "description": "Measure existing module pullups first; effective target 2.2k..10k to 3.3V only",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R2",
+    "value": "4.7k OPTIONAL",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "I2C_SCL"
+      }
+    ],
+    "description": "Measure existing module pullups first; no 5V pullup",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C7",
+    "value": "100nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C8",
+    "value": "4.7uF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J6",
+    "value": "DS18B20 WATER",
+    "pins": [
+      {
+        "number": "1",
+        "name": "VDD",
+        "type": "passive",
+        "side": "R",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "DQ",
+        "type": "passive",
+        "side": "R",
+        "net": "TEMP_WATER"
+      },
+      {
+        "number": "3",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R30",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "TEMP_WATER"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C10",
+    "value": "100nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J7",
+    "value": "DS18B20 CUBE",
+    "pins": [
+      {
+        "number": "1",
+        "name": "VDD",
+        "type": "passive",
+        "side": "R",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "DQ",
+        "type": "passive",
+        "side": "R",
+        "net": "TEMP_CUBE"
+      },
+      {
+        "number": "3",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R31",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "TEMP_CUBE"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C11",
+    "value": "100nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J8",
+    "value": "DS18B20 COLUMN",
+    "pins": [
+      {
+        "number": "1",
+        "name": "VDD",
+        "type": "passive",
+        "side": "R",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "DQ",
+        "type": "passive",
+        "side": "R",
+        "net": "TEMP_COLUMN"
+      },
+      {
+        "number": "3",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R32",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "TEMP_COLUMN"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C12",
+    "value": "100nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J9",
+    "value": "DS18B20 ALARM",
+    "pins": [
+      {
+        "number": "1",
+        "name": "VDD",
+        "type": "passive",
+        "side": "R",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "DQ",
+        "type": "passive",
+        "side": "R",
+        "net": "TEMP_ALARM"
+      },
+      {
+        "number": "3",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R33",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "TEMP_ALARM"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C13",
+    "value": "100nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "U4",
+    "value": "SN74LVC07AD / SOIC14",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1A",
+        "type": "input",
+        "side": "L",
+        "net": "K1_GPIO7"
+      },
+      {
+        "number": "2",
+        "name": "1Y OD",
+        "type": "open_collector",
+        "side": "R",
+        "net": "RELAY_IN1"
+      },
+      {
+        "number": "3",
+        "name": "2A",
+        "type": "input",
+        "side": "L",
+        "net": "K2_GPIO6"
+      },
+      {
+        "number": "4",
+        "name": "2Y OD",
+        "type": "open_collector",
+        "side": "R",
+        "net": "RELAY_IN2"
+      },
+      {
+        "number": "5",
+        "name": "3A",
+        "type": "input",
+        "side": "L",
+        "net": "K3_GPIO5"
+      },
+      {
+        "number": "6",
+        "name": "3Y OD",
+        "type": "open_collector",
+        "side": "R",
+        "net": "RELAY_IN3"
+      },
+      {
+        "number": "9",
+        "name": "4A",
+        "type": "input",
+        "side": "L",
+        "net": "K4_GPIO4"
+      },
+      {
+        "number": "8",
+        "name": "4Y OD",
+        "type": "open_collector",
+        "side": "R",
+        "net": "RELAY_IN4"
+      },
+      {
+        "number": "11",
+        "name": "5A",
+        "type": "input",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "10",
+        "name": "5Y OD",
+        "type": "open_collector",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "13",
+        "name": "6A",
+        "type": "input",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "12",
+        "name": "6Y OD",
+        "type": "open_collector",
+        "side": "R",
+        "net": null
+      },
+      {
+        "number": "14",
+        "name": "VCC",
+        "type": "power_in",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "7",
+        "name": "GND",
+        "type": "power_in",
+        "side": "L",
+        "net": "GND"
+      }
+    ],
+    "description": "Noninverting open-drain; outputs tolerate 5.5V; Ioff; GPIO low => sink relay IN low",
+    "footprint": "",
+    "datasheet": "https://www.ti.com/lit/ds/symlink/sn74lvc07a.pdf"
+  },
+  {
+    "ref": "J4",
+    "value": "RELAY CTRL / 6",
+    "pins": [
+      {
+        "number": "1",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      },
+      {
+        "number": "2",
+        "name": "IN1",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_IN1"
+      },
+      {
+        "number": "3",
+        "name": "IN2",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_IN2"
+      },
+      {
+        "number": "4",
+        "name": "IN3",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_IN3"
+      },
+      {
+        "number": "5",
+        "name": "IN4",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_IN4"
+      },
+      {
+        "number": "6",
+        "name": "VCC",
+        "type": "passive",
+        "side": "R",
+        "net": "V5"
+      }
+    ],
+    "description": "Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R11",
+    "value": "10k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "K1_GPIO7"
+      }
+    ],
+    "description": "Reset pullup: relay OFF",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R21",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V5"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_IN1"
+      }
+    ],
+    "description": "Logic pullup only; not coil supply",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R12",
+    "value": "10k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "K2_GPIO6"
+      }
+    ],
+    "description": "Reset pullup: relay OFF",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R22",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V5"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_IN2"
+      }
+    ],
+    "description": "Logic pullup only; not coil supply",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R13",
+    "value": "10k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "K3_GPIO5"
+      }
+    ],
+    "description": "Reset pullup: relay OFF",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R23",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V5"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_IN3"
+      }
+    ],
+    "description": "Logic pullup only; not coil supply",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R14",
+    "value": "10k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "K4_GPIO4"
+      }
+    ],
+    "description": "Reset pullup: relay OFF",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R24",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V5"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_IN4"
+      }
+    ],
+    "description": "Logic pullup only; not coil supply",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C9",
+    "value": "100nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "JP2",
+    "value": "JD12 LINK / OPEN",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V12_PROT"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_JD12"
+      }
+    ],
+    "description": "Identify actual JD-VCC and remove module VCC/JD jumper BEFORE closing",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J5",
+    "value": "COIL SUPPLY / 2",
+    "pins": [
+      {
+        "number": "1",
+        "name": "JD_VCC",
+        "type": "passive",
+        "side": "R",
+        "net": "RELAY_JD12"
+      },
+      {
+        "number": "2",
+        "name": "GND_RETURN",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "New carrier connector; actual relay-board JD header pin order/return requires measurement",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J10",
+    "value": "COOL PULSE / 3",
+    "pins": [
+      {
+        "number": "1",
+        "name": "V_SENSOR",
+        "type": "passive",
+        "side": "R",
+        "net": "COOL_PWR"
+      },
+      {
+        "number": "2",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      },
+      {
+        "number": "3",
+        "name": "PULSE",
+        "type": "passive",
+        "side": "R",
+        "net": "COOL_RAW"
+      }
+    ],
+    "description": "Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified.",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "JP3",
+    "value": "COOL PWR LINK / OPEN",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V5"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COOL_PWR"
+      }
+    ],
+    "description": "Populate only after verifying sensor supply; collection model remains open",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R41",
+    "value": "10k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COOL_PWR"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COOL_RAW"
+      }
+    ],
+    "description": "Pullup supports open-collector sensor; inspect push-pull compatibility",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R42",
+    "value": "22k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COOL_RAW"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COOL_BASE"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "Q1",
+    "value": "BC847B / SOT23",
+    "pins": [
+      {
+        "number": "1",
+        "name": "B",
+        "type": "passive",
+        "side": "L",
+        "net": "COOL_BASE"
+      },
+      {
+        "number": "2",
+        "name": "E",
+        "type": "passive",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "3",
+        "name": "C",
+        "type": "passive",
+        "side": "R",
+        "net": "COOL_COL"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": "https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf"
+  },
+  {
+    "ref": "R43",
+    "value": "100k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COOL_BASE"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R44",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COOL_COL"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C14",
+    "value": "1nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COOL_COL"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "D2",
+    "value": "1N4148W",
+    "pins": [
+      {
+        "number": "A",
+        "name": "ANODE",
+        "type": "passive",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "K",
+        "name": "CATHODE",
+        "type": "passive",
+        "side": "R",
+        "net": "COOL_BASE"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "J11",
+    "value": "COL PULSE / 3",
+    "pins": [
+      {
+        "number": "1",
+        "name": "V_SENSOR",
+        "type": "passive",
+        "side": "R",
+        "net": "COL_PWR"
+      },
+      {
+        "number": "2",
+        "name": "GND",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      },
+      {
+        "number": "3",
+        "name": "PULSE",
+        "type": "passive",
+        "side": "R",
+        "net": "COL_RAW"
+      }
+    ],
+    "description": "Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified.",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "JP4",
+    "value": "COL PWR LINK / OPEN",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V5"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COL_PWR"
+      }
+    ],
+    "description": "Populate only after verifying sensor supply; collection model remains open",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R51",
+    "value": "10k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COL_PWR"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COL_RAW"
+      }
+    ],
+    "description": "Pullup supports open-collector sensor; inspect push-pull compatibility",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R52",
+    "value": "22k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COL_RAW"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COL_BASE"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "Q2",
+    "value": "BC847B / SOT23",
+    "pins": [
+      {
+        "number": "1",
+        "name": "B",
+        "type": "passive",
+        "side": "L",
+        "net": "COL_BASE"
+      },
+      {
+        "number": "2",
+        "name": "E",
+        "type": "passive",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "3",
+        "name": "C",
+        "type": "passive",
+        "side": "R",
+        "net": "COL_COL"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": "https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf"
+  },
+  {
+    "ref": "R53",
+    "value": "100k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COL_BASE"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R54",
+    "value": "4.7k",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COL_COL"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C15",
+    "value": "1nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COL_COL"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "D3",
+    "value": "1N4148W",
+    "pins": [
+      {
+        "number": "A",
+        "name": "ANODE",
+        "type": "passive",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "K",
+        "name": "CATHODE",
+        "type": "passive",
+        "side": "R",
+        "net": "COL_BASE"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "U5",
+    "value": "SN74LVC2G14DBV / SOT23-6",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1A",
+        "type": "input",
+        "side": "L",
+        "net": "COOL_COL"
+      },
+      {
+        "number": "3",
+        "name": "2A",
+        "type": "input",
+        "side": "L",
+        "net": "COL_COL"
+      },
+      {
+        "number": "5",
+        "name": "VCC",
+        "type": "power_in",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "GND",
+        "type": "power_in",
+        "side": "L",
+        "net": "GND"
+      },
+      {
+        "number": "6",
+        "name": "1Y",
+        "type": "output",
+        "side": "R",
+        "net": "COOL_BUF"
+      },
+      {
+        "number": "4",
+        "name": "2Y",
+        "type": "output",
+        "side": "R",
+        "net": "COL_BUF"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": "https://www.ti.com/lit/ds/symlink/sn74lvc2g14.pdf"
+  },
+  {
+    "ref": "R45",
+    "value": "330",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COOL_BUF"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COOL_GPIO15"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "R55",
+    "value": "330",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "COL_BUF"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "COLLECT_GPIO1"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  },
+  {
+    "ref": "C16",
+    "value": "100nF",
+    "pins": [
+      {
+        "number": "1",
+        "name": "1",
+        "type": "passive",
+        "side": "L",
+        "net": "V3V3"
+      },
+      {
+        "number": "2",
+        "name": "2",
+        "type": "passive",
+        "side": "R",
+        "net": "GND"
+      }
+    ],
+    "description": "",
+    "footprint": "",
+    "datasheet": ""
+  }
+]

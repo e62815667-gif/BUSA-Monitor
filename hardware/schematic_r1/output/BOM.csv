@@ -1,0 +1,68 @@
+Ref,Value,Kind,Datasheet,Notes
+J1,DC INPUT / 12V ONLY,Proposed carrier part/connector,,
+F1,1A slow / 32V,Proposed carrier part/connector,,
+D1,SS34,Proposed carrier part/connector,,
+U2,R-78E5.0-1.0,Proposed carrier part/connector,https://recom-power.com/pdf/Innoline/R-78E-1.0.pdf,"New selected regulator option, not claimed existing user component"
+C1,10uF / 35V,Proposed carrier part/connector,,
+C2,100nF / 50V,Proposed carrier part/connector,,
+C3,10uF / 10V,Proposed carrier part/connector,,
+C4,100nF,Proposed carrier part/connector,,
+JP1,ESP PWR LINK / OPEN,Open by default; see commissioning conditions,,Open before either ESP32 USB port is powered. Do not connect external 5V and USB concurrently.
+U1,ESP32-S3 / user 44PIN,Existing user module,,L/R numbered top-to-bottom with both USB at top. Actual socket geometry still to measure.
+J12,BUZZER LOGIC ONLY,Proposed carrier part/connector,,Logic control only; not direct supply for a bare buzzer
+J2,TFT / VCC=3.3V,Proposed carrier part/connector,,New carrier pin order matches photographed display legends; confirm cable face/orientation
+C5,100nF,Proposed carrier part/connector,,
+C6,10uF / 6.3V,Proposed carrier part/connector,,
+U3,PCF8575 MODULE / 8+8+5,Existing user module,,"Pin numbers are actual printed terminal names, not invented physical positions. INT and 7 unused I/O are NC."
+J3,KEYPAD 9-WIRE,Proposed carrier part/connector,,Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+R1,4.7k OPTIONAL,Optional - check module pullups before fitting,,Measure existing module pullups first; effective target 2.2k..10k to 3.3V only
+R2,4.7k OPTIONAL,Optional - check module pullups before fitting,,Measure existing module pullups first; no 5V pullup
+C7,100nF,Proposed carrier part/connector,,
+C8,4.7uF,Proposed carrier part/connector,,
+J6,DS18B20 WATER,Proposed carrier part/connector,,"Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+R30,4.7k,Proposed carrier part/connector,,
+C10,100nF,Proposed carrier part/connector,,
+J7,DS18B20 CUBE,Proposed carrier part/connector,,"Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+R31,4.7k,Proposed carrier part/connector,,
+C11,100nF,Proposed carrier part/connector,,
+J8,DS18B20 COLUMN,Proposed carrier part/connector,,"Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+R32,4.7k,Proposed carrier part/connector,,
+C12,100nF,Proposed carrier part/connector,,
+J9,DS18B20 ALARM,Proposed carrier part/connector,,"Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+R33,4.7k,Proposed carrier part/connector,,
+C13,100nF,Proposed carrier part/connector,,
+U4,SN74LVC07AD / SOIC14,Proposed carrier part/connector,https://www.ti.com/lit/ds/symlink/sn74lvc07a.pdf,Noninverting open-drain; outputs tolerate 5.5V; Ioff; GPIO low => sink relay IN low
+J4,RELAY CTRL / 6,Proposed carrier part/connector,,Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.
+R11,10k,Proposed carrier part/connector,,Reset pullup: relay OFF
+R21,4.7k,Proposed carrier part/connector,,Logic pullup only; not coil supply
+R12,10k,Proposed carrier part/connector,,Reset pullup: relay OFF
+R22,4.7k,Proposed carrier part/connector,,Logic pullup only; not coil supply
+R13,10k,Proposed carrier part/connector,,Reset pullup: relay OFF
+R23,4.7k,Proposed carrier part/connector,,Logic pullup only; not coil supply
+R14,10k,Proposed carrier part/connector,,Reset pullup: relay OFF
+R24,4.7k,Proposed carrier part/connector,,Logic pullup only; not coil supply
+C9,100nF,Proposed carrier part/connector,,
+JP2,JD12 LINK / OPEN,Open by default; see commissioning conditions,,Identify actual JD-VCC and remove module VCC/JD jumper BEFORE closing
+J5,COIL SUPPLY / 2,Proposed carrier part/connector,,New carrier connector; actual relay-board JD header pin order/return requires measurement
+J10,COOL PULSE / 3,Proposed carrier part/connector,,"Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified."
+JP3,COOL PWR LINK / OPEN,Open by default; see commissioning conditions,,Populate only after verifying sensor supply; collection model remains open
+R41,10k,Proposed carrier part/connector,,Pullup supports open-collector sensor; inspect push-pull compatibility
+R42,22k,Proposed carrier part/connector,,
+Q1,BC847B / SOT23,Proposed carrier part/connector,https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf,
+R43,100k,Proposed carrier part/connector,,
+R44,4.7k,Proposed carrier part/connector,,
+C14,1nF,Proposed carrier part/connector,,
+D2,1N4148W,Proposed carrier part/connector,,
+J11,COL PULSE / 3,Proposed carrier part/connector,,"Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified."
+JP4,COL PWR LINK / OPEN,Open by default; see commissioning conditions,,Populate only after verifying sensor supply; collection model remains open
+R51,10k,Proposed carrier part/connector,,Pullup supports open-collector sensor; inspect push-pull compatibility
+R52,22k,Proposed carrier part/connector,,
+Q2,BC847B / SOT23,Proposed carrier part/connector,https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf,
+R53,100k,Proposed carrier part/connector,,
+R54,4.7k,Proposed carrier part/connector,,
+C15,1nF,Proposed carrier part/connector,,
+D3,1N4148W,Proposed carrier part/connector,,
+U5,SN74LVC2G14DBV / SOT23-6,Proposed carrier part/connector,https://www.ti.com/lit/ds/symlink/sn74lvc2g14.pdf,
+R45,330,Proposed carrier part/connector,,
+R55,330,Proposed carrier part/connector,,
+C16,100nF,Proposed carrier part/connector,,

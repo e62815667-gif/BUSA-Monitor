@@ -1,0 +1,2417 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<export version="E">
+  <design>
+    <source>/workspace/work/calc4-source/hardware/schematic_r1/BUSA_R1.kicad_sch</source>
+    <date>2026-11-08T17:50:30+0000</date>
+    <tool>Eeschema 9.0.2+dfsg-1</tool>
+    <sheet number="1" name="/" tstamps="/">
+      <title_block>
+        <title>BUSA carrier — electrical schematic</title>
+        <company/>
+        <rev>R1 REVIEW</rev>
+        <date>2026-11-08</date>
+        <source>BUSA_R1.kicad_sch</source>
+        <comment number="1" value="ERC and netlist verified; bench/footprints pending"/>
+        <comment number="2" value=""/>
+        <comment number="3" value=""/>
+        <comment number="4" value=""/>
+        <comment number="5" value=""/>
+        <comment number="6" value=""/>
+        <comment number="7" value=""/>
+        <comment number="8" value=""/>
+        <comment number="9" value=""/>
+      </title_block>
+    </sheet>
+  </design>
+  <components>
+    <comp ref="C1">
+      <value>10uF / 35V</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C1" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>687c9e48-ed74-593d-99ac-844db4ab934e</tstamps>
+    </comp>
+    <comp ref="C2">
+      <value>100nF / 50V</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C2" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ba1dfd02-e901-54ca-9f82-6030a721c845</tstamps>
+    </comp>
+    <comp ref="C3">
+      <value>10uF / 10V</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C3" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>3e0e71cc-aed3-52a0-9381-5b9cc33fa0c1</tstamps>
+    </comp>
+    <comp ref="C4">
+      <value>100nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C4" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>0c19e460-e0c0-5d6c-8a40-1011b3673dc0</tstamps>
+    </comp>
+    <comp ref="C5">
+      <value>100nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C5" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>27db2ad4-3b54-5f89-accb-fe108fc852b9</tstamps>
+    </comp>
+    <comp ref="C6">
+      <value>10uF / 6.3V</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C6" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>971f372e-697b-5130-9ef1-01172e41a179</tstamps>
+    </comp>
+    <comp ref="C7">
+      <value>100nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C7" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ceccdbcf-dcef-5743-829f-05c5dc838f80</tstamps>
+    </comp>
+    <comp ref="C8">
+      <value>4.7uF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C8" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>9fbf488e-78bd-55ca-acc6-09aaf6f63c44</tstamps>
+    </comp>
+    <comp ref="C9">
+      <value>100nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C9" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>8e48d8dd-1e2a-56f4-8a0d-e1a2c2b03f51</tstamps>
+    </comp>
+    <comp ref="C10">
+      <value>100nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C10" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>ed6fbebd-30f0-5f52-a48c-77cdebc69476</tstamps>
+    </comp>
+    <comp ref="C11">
+      <value>100nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C11" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>083bd3eb-12b0-5486-871a-1eab14c7cbf7</tstamps>
+    </comp>
+    <comp ref="C12">
+      <value>100nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C12" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>51b67614-b0c1-5312-bfc4-51c6c6c28da2</tstamps>
+    </comp>
+    <comp ref="C13">
+      <value>100nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C13" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>5fa2566d-f267-5669-970e-eb20f24e8098</tstamps>
+    </comp>
+    <comp ref="C14">
+      <value>1nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C14" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>0ab03fa4-87f6-53a7-8eb8-c49b81b1f6c4</tstamps>
+    </comp>
+    <comp ref="C15">
+      <value>1nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C15" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>5d12fae6-85ed-5b13-82a3-95ace034eea8</tstamps>
+    </comp>
+    <comp ref="C16">
+      <value>100nF</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="C16" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>6a26e2b7-4e0d-543d-a1b4-7fc880861921</tstamps>
+    </comp>
+    <comp ref="D1">
+      <value>SS34</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="D1" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>588886c9-650d-5abf-a73b-2c62063d0629</tstamps>
+    </comp>
+    <comp ref="D2">
+      <value>1N4148W</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="D2" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>07f545ec-d9a0-5779-9009-df268ed96cee</tstamps>
+    </comp>
+    <comp ref="D3">
+      <value>1N4148W</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="D3" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>13a13a04-ce1f-5e3b-b070-a403c9a25b0e</tstamps>
+    </comp>
+    <comp ref="F1">
+      <value>1A slow / 32V</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="F1" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>18e41796-9d65-5ce4-bc5c-5403857d3900</tstamps>
+    </comp>
+    <comp ref="J1">
+      <value>DC INPUT / 12V ONLY</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="J1" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>3baf2d5b-0d06-5b56-8e02-157fbb23c4a3</tstamps>
+    </comp>
+    <comp ref="J2">
+      <value>TFT / VCC=3.3V</value>
+      <description>New carrier pin order matches photographed display legends; confirm cable face/orientation</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">New carrier pin order matches photographed display legends; confirm cable face/orientation</field>
+      </fields>
+      <libsource lib="BUSA" part="J2" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>88777e3e-c873-5163-ab2b-b0c03f549d81</tstamps>
+    </comp>
+    <comp ref="J3">
+      <value>KEYPAD 9-WIRE</value>
+      <description>Harness 1..8 -&gt; P00..P07; 9 -&gt; P10. Preserve installed harness mapping or retrain.</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Harness 1..8 -&gt; P00..P07; 9 -&gt; P10. Preserve installed harness mapping or retrain.</field>
+      </fields>
+      <libsource lib="BUSA" part="J3" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>2df43828-7097-5d2f-ad19-5c0c647179a4</tstamps>
+    </comp>
+    <comp ref="J4">
+      <value>RELAY CTRL / 6</value>
+      <description>Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.</field>
+      </fields>
+      <libsource lib="BUSA" part="J4" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>1c2cd2e7-6039-530c-8284-7253f348fa19</tstamps>
+    </comp>
+    <comp ref="J5">
+      <value>COIL SUPPLY / 2</value>
+      <description>New carrier connector; actual relay-board JD header pin order/return requires measurement</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">New carrier connector; actual relay-board JD header pin order/return requires measurement</field>
+      </fields>
+      <libsource lib="BUSA" part="J5" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>baf50f05-6cb0-5a8d-ac22-cc19c8b17817</tstamps>
+    </comp>
+    <comp ref="J6">
+      <value>DS18B20 WATER</value>
+      <description>Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping</field>
+      </fields>
+      <libsource lib="BUSA" part="J6" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f01e0d43-e336-57db-b467-59f8cc656a41</tstamps>
+    </comp>
+    <comp ref="J7">
+      <value>DS18B20 CUBE</value>
+      <description>Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping</field>
+      </fields>
+      <libsource lib="BUSA" part="J7" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>13ada1ed-a8d8-596c-986c-f247a52d922f</tstamps>
+    </comp>
+    <comp ref="J8">
+      <value>DS18B20 COLUMN</value>
+      <description>Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping</field>
+      </fields>
+      <libsource lib="BUSA" part="J8" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>9dffa96e-7f6e-5808-8171-aa19f98d006b</tstamps>
+    </comp>
+    <comp ref="J9">
+      <value>DS18B20 ALARM</value>
+      <description>Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping</field>
+      </fields>
+      <libsource lib="BUSA" part="J9" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b3ad5163-813a-5033-b24c-7b5c73cfdfea</tstamps>
+    </comp>
+    <comp ref="J10">
+      <value>COOL PULSE / 3</value>
+      <description>Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified.</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified.</field>
+      </fields>
+      <libsource lib="BUSA" part="J10" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b1cc4313-0205-5a19-acb5-ccdf9c12b87b</tstamps>
+    </comp>
+    <comp ref="J11">
+      <value>COL PULSE / 3</value>
+      <description>Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified.</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified.</field>
+      </fields>
+      <libsource lib="BUSA" part="J11" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>8b0c8b5d-0460-51c7-935b-7ac28a44614c</tstamps>
+    </comp>
+    <comp ref="J12">
+      <value>BUZZER LOGIC ONLY</value>
+      <description>Logic control only; not direct supply for a bare buzzer</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Logic control only; not direct supply for a bare buzzer</field>
+      </fields>
+      <libsource lib="BUSA" part="J12" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>e4e16e7c-4802-5768-a72d-505249436c3a</tstamps>
+    </comp>
+    <comp ref="JP1">
+      <value>ESP PWR LINK / OPEN</value>
+      <description>Open before either ESP32 USB port is powered. Do not connect external 5V and USB concurrently.</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Open before either ESP32 USB port is powered. Do not connect external 5V and USB concurrently.</field>
+      </fields>
+      <libsource lib="BUSA" part="JP1" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>fb5430bf-f00c-5ef8-b4d1-9a7d641d3585</tstamps>
+    </comp>
+    <comp ref="JP2">
+      <value>JD12 LINK / OPEN</value>
+      <description>Identify actual JD-VCC and remove module VCC/JD jumper BEFORE closing</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Identify actual JD-VCC and remove module VCC/JD jumper BEFORE closing</field>
+      </fields>
+      <libsource lib="BUSA" part="JP2" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>3c31ee3c-7b92-5a6b-8c2c-15fe4907d66d</tstamps>
+    </comp>
+    <comp ref="JP3">
+      <value>COOL PWR LINK / OPEN</value>
+      <description>Populate only after verifying sensor supply; collection model remains open</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Populate only after verifying sensor supply; collection model remains open</field>
+      </fields>
+      <libsource lib="BUSA" part="JP3" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>909fba70-63b6-5e9b-b249-368bdc43b607</tstamps>
+    </comp>
+    <comp ref="JP4">
+      <value>COL PWR LINK / OPEN</value>
+      <description>Populate only after verifying sensor supply; collection model remains open</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Populate only after verifying sensor supply; collection model remains open</field>
+      </fields>
+      <libsource lib="BUSA" part="JP4" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>c8b8d7d5-8e35-5492-a6cd-bf82a3f311b2</tstamps>
+    </comp>
+    <comp ref="PF1">
+      <value>POWER_FLAG</value>
+      <description>External supply after passive protection</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">External supply after passive protection</field>
+      </fields>
+      <libsource lib="BUSA" part="PF1" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b4c01029-1823-51b5-b922-ba59d298a9ab</tstamps>
+    </comp>
+    <comp ref="PF2">
+      <value>POWER_FLAG</value>
+      <description>External supply after passive protection</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">External supply after passive protection</field>
+      </fields>
+      <libsource lib="BUSA" part="PF2" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>e20fd0e6-37cc-5aab-870b-99518012993c</tstamps>
+    </comp>
+    <comp ref="PF3">
+      <value>POWER_FLAG</value>
+      <description>External supply after passive protection</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">External supply after passive protection</field>
+      </fields>
+      <libsource lib="BUSA" part="PF3" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>3c8f22ce-4f2e-5f8a-8c5c-418fba600685</tstamps>
+    </comp>
+    <comp ref="PF4">
+      <value>POWER_FLAG</value>
+      <description>External supply after passive protection</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">External supply after passive protection</field>
+      </fields>
+      <libsource lib="BUSA" part="PF4" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>960f8927-eef6-5683-a303-c8c034ee5aee</tstamps>
+    </comp>
+    <comp ref="Q1">
+      <value>BC847B / SOT23</value>
+      <datasheet>https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf</datasheet>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet">https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf</field>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="Q1" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>9f503b87-c47d-55c9-a49f-2210ac927d94</tstamps>
+    </comp>
+    <comp ref="Q2">
+      <value>BC847B / SOT23</value>
+      <datasheet>https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf</datasheet>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet">https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf</field>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="Q2" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>4610be3f-1053-531a-896b-678b66d01e0b</tstamps>
+    </comp>
+    <comp ref="R1">
+      <value>4.7k OPTIONAL</value>
+      <description>Measure existing module pullups first; effective target 2.2k..10k to 3.3V only</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Measure existing module pullups first; effective target 2.2k..10k to 3.3V only</field>
+      </fields>
+      <libsource lib="BUSA" part="R1" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>dbe04dd3-a47d-5089-8072-15c52a830991</tstamps>
+    </comp>
+    <comp ref="R2">
+      <value>4.7k OPTIONAL</value>
+      <description>Measure existing module pullups first; no 5V pullup</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Measure existing module pullups first; no 5V pullup</field>
+      </fields>
+      <libsource lib="BUSA" part="R2" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>29fdeb37-954d-55fc-ba86-a339be48176c</tstamps>
+    </comp>
+    <comp ref="R11">
+      <value>10k</value>
+      <description>Reset pullup: relay OFF</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Reset pullup: relay OFF</field>
+      </fields>
+      <libsource lib="BUSA" part="R11" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>337943e3-e18d-5482-83b1-04385dbe32f1</tstamps>
+    </comp>
+    <comp ref="R12">
+      <value>10k</value>
+      <description>Reset pullup: relay OFF</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Reset pullup: relay OFF</field>
+      </fields>
+      <libsource lib="BUSA" part="R12" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>5925b65d-2a4d-5737-bfc3-4a054bbe8bdc</tstamps>
+    </comp>
+    <comp ref="R13">
+      <value>10k</value>
+      <description>Reset pullup: relay OFF</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Reset pullup: relay OFF</field>
+      </fields>
+      <libsource lib="BUSA" part="R13" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d81ef7aa-dd7e-54a2-92f8-8587a1f140a6</tstamps>
+    </comp>
+    <comp ref="R14">
+      <value>10k</value>
+      <description>Reset pullup: relay OFF</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Reset pullup: relay OFF</field>
+      </fields>
+      <libsource lib="BUSA" part="R14" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>8407f6d9-5888-5a88-97d7-1ca1ab3bcbd6</tstamps>
+    </comp>
+    <comp ref="R21">
+      <value>4.7k</value>
+      <description>Logic pullup only; not coil supply</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Logic pullup only; not coil supply</field>
+      </fields>
+      <libsource lib="BUSA" part="R21" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>12bb4214-cb3f-5e3e-945e-96ee56120921</tstamps>
+    </comp>
+    <comp ref="R22">
+      <value>4.7k</value>
+      <description>Logic pullup only; not coil supply</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Logic pullup only; not coil supply</field>
+      </fields>
+      <libsource lib="BUSA" part="R22" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>71b154ca-1bfa-52e2-8257-caaa34288e89</tstamps>
+    </comp>
+    <comp ref="R23">
+      <value>4.7k</value>
+      <description>Logic pullup only; not coil supply</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Logic pullup only; not coil supply</field>
+      </fields>
+      <libsource lib="BUSA" part="R23" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d08d6ac7-26e2-56b4-af04-84634e04b9fa</tstamps>
+    </comp>
+    <comp ref="R24">
+      <value>4.7k</value>
+      <description>Logic pullup only; not coil supply</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Logic pullup only; not coil supply</field>
+      </fields>
+      <libsource lib="BUSA" part="R24" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>9351d6ff-7684-5050-9f07-12bd420b6279</tstamps>
+    </comp>
+    <comp ref="R30">
+      <value>4.7k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R30" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>11771785-8ab5-5a47-adab-73bfbce2e548</tstamps>
+    </comp>
+    <comp ref="R31">
+      <value>4.7k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R31" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>fcb4c558-d757-5cad-88e4-997d56d0ccb0</tstamps>
+    </comp>
+    <comp ref="R32">
+      <value>4.7k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R32" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>602ab45b-f881-565a-9154-c145f545f47c</tstamps>
+    </comp>
+    <comp ref="R33">
+      <value>4.7k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R33" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>a97d6d14-744a-5891-aef4-ca464bf078c2</tstamps>
+    </comp>
+    <comp ref="R41">
+      <value>10k</value>
+      <description>Pullup supports open-collector sensor; inspect push-pull compatibility</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Pullup supports open-collector sensor; inspect push-pull compatibility</field>
+      </fields>
+      <libsource lib="BUSA" part="R41" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>da319cdb-86ee-537c-af35-58a574b033c4</tstamps>
+    </comp>
+    <comp ref="R42">
+      <value>22k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R42" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>a4b5baef-b6c2-5dcf-91cb-34d9e8d51e7b</tstamps>
+    </comp>
+    <comp ref="R43">
+      <value>100k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R43" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>04c998f9-f64c-5c3b-a867-4750032edd3a</tstamps>
+    </comp>
+    <comp ref="R44">
+      <value>4.7k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R44" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>bfd33cb7-9030-5dbd-878b-24f6d29033f3</tstamps>
+    </comp>
+    <comp ref="R45">
+      <value>330</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R45" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>469e1335-987f-54f0-8874-d4a3f649b1e2</tstamps>
+    </comp>
+    <comp ref="R51">
+      <value>10k</value>
+      <description>Pullup supports open-collector sensor; inspect push-pull compatibility</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Pullup supports open-collector sensor; inspect push-pull compatibility</field>
+      </fields>
+      <libsource lib="BUSA" part="R51" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b5b205f6-9c95-5b75-afef-03ab81e70b15</tstamps>
+    </comp>
+    <comp ref="R52">
+      <value>22k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R52" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>9a0ae4f4-4e47-57f9-8457-56535c4dcefb</tstamps>
+    </comp>
+    <comp ref="R53">
+      <value>100k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R53" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>f3875136-c2ff-5ace-9624-82bac7d403dc</tstamps>
+    </comp>
+    <comp ref="R54">
+      <value>4.7k</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R54" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>21672991-a496-530a-b2ad-7d4fbca0a857</tstamps>
+    </comp>
+    <comp ref="R55">
+      <value>330</value>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="R55" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>c6cac064-18f0-5163-8c35-00816b203959</tstamps>
+    </comp>
+    <comp ref="U1">
+      <value>ESP32-S3 / user 44PIN</value>
+      <description>L/R numbered top-to-bottom with both USB at top. Actual socket geometry still to measure.</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">L/R numbered top-to-bottom with both USB at top. Actual socket geometry still to measure.</field>
+      </fields>
+      <libsource lib="BUSA" part="U1" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>03fe7f6a-2ff2-5d7c-8393-7244e0c33480</tstamps>
+    </comp>
+    <comp ref="U2">
+      <value>R-78E5.0-1.0</value>
+      <datasheet>https://recom-power.com/pdf/Innoline/R-78E-1.0.pdf</datasheet>
+      <description>New selected regulator option, not claimed existing user component</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet">https://recom-power.com/pdf/Innoline/R-78E-1.0.pdf</field>
+        <field name="Description">New selected regulator option, not claimed existing user component</field>
+      </fields>
+      <libsource lib="BUSA" part="U2" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>682ba194-1573-5b05-8002-836347a7428d</tstamps>
+    </comp>
+    <comp ref="U3">
+      <value>PCF8575 MODULE / 8+8+5</value>
+      <description>Pin numbers are actual printed terminal names, not invented physical positions. INT and 7 unused I/O are NC.</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description">Pin numbers are actual printed terminal names, not invented physical positions. INT and 7 unused I/O are NC.</field>
+      </fields>
+      <libsource lib="BUSA" part="U3" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>d4ba92ec-6fa5-5233-a37e-479910cc997f</tstamps>
+    </comp>
+    <comp ref="U4">
+      <value>SN74LVC07AD / SOIC14</value>
+      <datasheet>https://www.ti.com/lit/ds/symlink/sn74lvc07a.pdf</datasheet>
+      <description>Noninverting open-drain; outputs tolerate 5.5V; Ioff; GPIO low =&gt; sink relay IN low</description>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet">https://www.ti.com/lit/ds/symlink/sn74lvc07a.pdf</field>
+        <field name="Description">Noninverting open-drain; outputs tolerate 5.5V; Ioff; GPIO low =&gt; sink relay IN low</field>
+      </fields>
+      <libsource lib="BUSA" part="U4" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>b8bf41ae-00ad-56d5-b59c-b33336ed415b</tstamps>
+    </comp>
+    <comp ref="U5">
+      <value>SN74LVC2G14DBV / SOT23-6</value>
+      <datasheet>https://www.ti.com/lit/ds/symlink/sn74lvc2g14.pdf</datasheet>
+      <fields>
+        <field name="Footprint"/>
+        <field name="Datasheet">https://www.ti.com/lit/ds/symlink/sn74lvc2g14.pdf</field>
+        <field name="Description"/>
+      </fields>
+      <libsource lib="BUSA" part="U5" description=""/>
+      <property name="Sheetname" value=""/>
+      <property name="Sheetfile" value="BUSA_R1.kicad_sch"/>
+      <sheetpath names="/" tstamps="/"/>
+      <tstamps>6149531f-4154-503b-9a33-5a9c165c101d</tstamps>
+    </comp>
+  </components>
+  <libparts>
+    <libpart lib="BUSA" part="C1">
+      <fields>
+        <field name="Reference">C1</field>
+        <field name="Value">10uF / 35V</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C10">
+      <fields>
+        <field name="Reference">C10</field>
+        <field name="Value">100nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C11">
+      <fields>
+        <field name="Reference">C11</field>
+        <field name="Value">100nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C12">
+      <fields>
+        <field name="Reference">C12</field>
+        <field name="Value">100nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C13">
+      <fields>
+        <field name="Reference">C13</field>
+        <field name="Value">100nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C14">
+      <fields>
+        <field name="Reference">C14</field>
+        <field name="Value">1nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C15">
+      <fields>
+        <field name="Reference">C15</field>
+        <field name="Value">1nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C16">
+      <fields>
+        <field name="Reference">C16</field>
+        <field name="Value">100nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C2">
+      <fields>
+        <field name="Reference">C2</field>
+        <field name="Value">100nF / 50V</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C3">
+      <fields>
+        <field name="Reference">C3</field>
+        <field name="Value">10uF / 10V</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C4">
+      <fields>
+        <field name="Reference">C4</field>
+        <field name="Value">100nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C5">
+      <fields>
+        <field name="Reference">C5</field>
+        <field name="Value">100nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C6">
+      <fields>
+        <field name="Reference">C6</field>
+        <field name="Value">10uF / 6.3V</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C7">
+      <fields>
+        <field name="Reference">C7</field>
+        <field name="Value">100nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C8">
+      <fields>
+        <field name="Reference">C8</field>
+        <field name="Value">4.7uF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="C9">
+      <fields>
+        <field name="Reference">C9</field>
+        <field name="Value">100nF</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="D1">
+      <fields>
+        <field name="Reference">D1</field>
+        <field name="Value">SS34</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="A" name="ANODE" type="passive"/>
+        <pin num="K" name="CATHODE" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="D2">
+      <fields>
+        <field name="Reference">D2</field>
+        <field name="Value">1N4148W</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="A" name="ANODE" type="passive"/>
+        <pin num="K" name="CATHODE" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="D3">
+      <fields>
+        <field name="Reference">D3</field>
+        <field name="Value">1N4148W</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="A" name="ANODE" type="passive"/>
+        <pin num="K" name="CATHODE" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="F1">
+      <fields>
+        <field name="Reference">F1</field>
+        <field name="Value">1A slow / 32V</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J1">
+      <fields>
+        <field name="Reference">J1</field>
+        <field name="Value">DC INPUT / 12V ONLY</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="+12V" type="passive"/>
+        <pin num="2" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J10">
+      <fields>
+        <field name="Reference">J10</field>
+        <field name="Value">COOL PULSE / 3</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="V_SENSOR" type="passive"/>
+        <pin num="2" name="GND" type="passive"/>
+        <pin num="3" name="PULSE" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J11">
+      <fields>
+        <field name="Reference">J11</field>
+        <field name="Value">COL PULSE / 3</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="V_SENSOR" type="passive"/>
+        <pin num="2" name="GND" type="passive"/>
+        <pin num="3" name="PULSE" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J12">
+      <fields>
+        <field name="Reference">J12</field>
+        <field name="Value">BUZZER LOGIC ONLY</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="GPIO2" type="passive"/>
+        <pin num="2" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J2">
+      <fields>
+        <field name="Reference">J2</field>
+        <field name="Value">TFT / VCC=3.3V</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="GND" type="passive"/>
+        <pin num="2" name="VCC" type="passive"/>
+        <pin num="3" name="SCK" type="passive"/>
+        <pin num="4" name="SDA_MOSI" type="passive"/>
+        <pin num="5" name="RST" type="passive"/>
+        <pin num="6" name="DC" type="passive"/>
+        <pin num="7" name="CS" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J3">
+      <fields>
+        <field name="Reference">J3</field>
+        <field name="Value">KEYPAD 9-WIRE</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+        <pin num="3" name="3" type="passive"/>
+        <pin num="4" name="4" type="passive"/>
+        <pin num="5" name="5" type="passive"/>
+        <pin num="6" name="6" type="passive"/>
+        <pin num="7" name="7" type="passive"/>
+        <pin num="8" name="8" type="passive"/>
+        <pin num="9" name="9" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J4">
+      <fields>
+        <field name="Reference">J4</field>
+        <field name="Value">RELAY CTRL / 6</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="GND" type="passive"/>
+        <pin num="2" name="IN1" type="passive"/>
+        <pin num="3" name="IN2" type="passive"/>
+        <pin num="4" name="IN3" type="passive"/>
+        <pin num="5" name="IN4" type="passive"/>
+        <pin num="6" name="VCC" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J5">
+      <fields>
+        <field name="Reference">J5</field>
+        <field name="Value">COIL SUPPLY / 2</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="JD_VCC" type="passive"/>
+        <pin num="2" name="GND_RETURN" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J6">
+      <fields>
+        <field name="Reference">J6</field>
+        <field name="Value">DS18B20 WATER</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="VDD" type="passive"/>
+        <pin num="2" name="DQ" type="passive"/>
+        <pin num="3" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J7">
+      <fields>
+        <field name="Reference">J7</field>
+        <field name="Value">DS18B20 CUBE</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="VDD" type="passive"/>
+        <pin num="2" name="DQ" type="passive"/>
+        <pin num="3" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J8">
+      <fields>
+        <field name="Reference">J8</field>
+        <field name="Value">DS18B20 COLUMN</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="VDD" type="passive"/>
+        <pin num="2" name="DQ" type="passive"/>
+        <pin num="3" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="J9">
+      <fields>
+        <field name="Reference">J9</field>
+        <field name="Value">DS18B20 ALARM</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="VDD" type="passive"/>
+        <pin num="2" name="DQ" type="passive"/>
+        <pin num="3" name="GND" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="JP1">
+      <fields>
+        <field name="Reference">JP1</field>
+        <field name="Value">ESP PWR LINK / OPEN</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="JP2">
+      <fields>
+        <field name="Reference">JP2</field>
+        <field name="Value">JD12 LINK / OPEN</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="JP3">
+      <fields>
+        <field name="Reference">JP3</field>
+        <field name="Value">COOL PWR LINK / OPEN</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="JP4">
+      <fields>
+        <field name="Reference">JP4</field>
+        <field name="Value">COL PWR LINK / OPEN</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="PF1">
+      <fields>
+        <field name="Reference">PF1</field>
+        <field name="Value">POWER_FLAG</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="VIN12" type="power_out"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="PF2">
+      <fields>
+        <field name="Reference">PF2</field>
+        <field name="Value">POWER_FLAG</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="GND" type="power_out"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="PF3">
+      <fields>
+        <field name="Reference">PF3</field>
+        <field name="Value">POWER_FLAG</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="V12_PROT" type="power_out"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="PF4">
+      <fields>
+        <field name="Reference">PF4</field>
+        <field name="Value">POWER_FLAG</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="ESP_5V" type="power_out"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="Q1">
+      <fields>
+        <field name="Reference">Q1</field>
+        <field name="Value">BC847B / SOT23</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="B" type="passive"/>
+        <pin num="2" name="E" type="passive"/>
+        <pin num="3" name="C" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="Q2">
+      <fields>
+        <field name="Reference">Q2</field>
+        <field name="Value">BC847B / SOT23</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="B" type="passive"/>
+        <pin num="2" name="E" type="passive"/>
+        <pin num="3" name="C" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R1">
+      <fields>
+        <field name="Reference">R1</field>
+        <field name="Value">4.7k OPTIONAL</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R11">
+      <fields>
+        <field name="Reference">R11</field>
+        <field name="Value">10k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R12">
+      <fields>
+        <field name="Reference">R12</field>
+        <field name="Value">10k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R13">
+      <fields>
+        <field name="Reference">R13</field>
+        <field name="Value">10k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R14">
+      <fields>
+        <field name="Reference">R14</field>
+        <field name="Value">10k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R2">
+      <fields>
+        <field name="Reference">R2</field>
+        <field name="Value">4.7k OPTIONAL</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R21">
+      <fields>
+        <field name="Reference">R21</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R22">
+      <fields>
+        <field name="Reference">R22</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R23">
+      <fields>
+        <field name="Reference">R23</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R24">
+      <fields>
+        <field name="Reference">R24</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R30">
+      <fields>
+        <field name="Reference">R30</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R31">
+      <fields>
+        <field name="Reference">R31</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R32">
+      <fields>
+        <field name="Reference">R32</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R33">
+      <fields>
+        <field name="Reference">R33</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R41">
+      <fields>
+        <field name="Reference">R41</field>
+        <field name="Value">10k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R42">
+      <fields>
+        <field name="Reference">R42</field>
+        <field name="Value">22k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R43">
+      <fields>
+        <field name="Reference">R43</field>
+        <field name="Value">100k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R44">
+      <fields>
+        <field name="Reference">R44</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R45">
+      <fields>
+        <field name="Reference">R45</field>
+        <field name="Value">330</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R51">
+      <fields>
+        <field name="Reference">R51</field>
+        <field name="Value">10k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R52">
+      <fields>
+        <field name="Reference">R52</field>
+        <field name="Value">22k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R53">
+      <fields>
+        <field name="Reference">R53</field>
+        <field name="Value">100k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R54">
+      <fields>
+        <field name="Reference">R54</field>
+        <field name="Value">4.7k</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="R55">
+      <fields>
+        <field name="Reference">R55</field>
+        <field name="Value">330</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1" type="passive"/>
+        <pin num="2" name="2" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="U1">
+      <fields>
+        <field name="Reference">U1</field>
+        <field name="Value">ESP32-S3 / user 44PIN</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="L01" name="GND" type="power_in"/>
+        <pin num="L02" name="GND" type="power_in"/>
+        <pin num="L03" name="GPIO19" type="passive"/>
+        <pin num="L04" name="GPIO20" type="passive"/>
+        <pin num="L05" name="GPIO21" type="bidirectional"/>
+        <pin num="L06" name="GPIO47" type="passive"/>
+        <pin num="L07" name="GPIO48" type="passive"/>
+        <pin num="L08" name="GPIO45" type="passive"/>
+        <pin num="L09" name="GPIO0" type="passive"/>
+        <pin num="L10" name="GPIO35" type="passive"/>
+        <pin num="L11" name="GPIO36" type="passive"/>
+        <pin num="L12" name="GPIO37" type="passive"/>
+        <pin num="L13" name="GPIO38" type="passive"/>
+        <pin num="L14" name="GPIO39" type="passive"/>
+        <pin num="L15" name="GPIO40" type="bidirectional"/>
+        <pin num="L16" name="GPIO41" type="bidirectional"/>
+        <pin num="L17" name="GPIO42" type="passive"/>
+        <pin num="L18" name="GPIO2" type="output"/>
+        <pin num="L19" name="GPIO1" type="input"/>
+        <pin num="L20" name="RX" type="passive"/>
+        <pin num="L21" name="TX" type="passive"/>
+        <pin num="L22" name="GND" type="power_in"/>
+        <pin num="R01" name="GND" type="power_in"/>
+        <pin num="R02" name="5V" type="power_in"/>
+        <pin num="R03" name="GPIO14" type="output"/>
+        <pin num="R04" name="GPIO13" type="output"/>
+        <pin num="R05" name="GPIO12" type="output"/>
+        <pin num="R06" name="GPIO11" type="output"/>
+        <pin num="R07" name="GPIO10" type="output"/>
+        <pin num="R08" name="GPIO9" type="passive"/>
+        <pin num="R09" name="GPIO46" type="passive"/>
+        <pin num="R10" name="GPIO3" type="passive"/>
+        <pin num="R11" name="GPIO8" type="passive"/>
+        <pin num="R12" name="GPIO18" type="bidirectional"/>
+        <pin num="R13" name="GPIO17" type="bidirectional"/>
+        <pin num="R14" name="GPIO16" type="bidirectional"/>
+        <pin num="R15" name="GPIO15" type="input"/>
+        <pin num="R16" name="GPIO7" type="output"/>
+        <pin num="R17" name="GPIO6" type="output"/>
+        <pin num="R18" name="GPIO5" type="output"/>
+        <pin num="R19" name="GPIO4" type="output"/>
+        <pin num="R20" name="RST" type="passive"/>
+        <pin num="R21" name="3V3" type="power_out"/>
+        <pin num="R22" name="3V3" type="passive"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="U2">
+      <fields>
+        <field name="Reference">U2</field>
+        <field name="Value">R-78E5.0-1.0</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="VIN" type="power_in"/>
+        <pin num="2" name="GND" type="power_in"/>
+        <pin num="3" name="5V_OUT" type="power_out"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="U3">
+      <fields>
+        <field name="Reference">U3</field>
+        <field name="Value">PCF8575 MODULE / 8+8+5</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="GND" name="GND" type="power_in"/>
+        <pin num="INT" name="INT" type="open_collector"/>
+        <pin num="P00" name="P00" type="bidirectional"/>
+        <pin num="P01" name="P01" type="bidirectional"/>
+        <pin num="P02" name="P02" type="bidirectional"/>
+        <pin num="P03" name="P03" type="bidirectional"/>
+        <pin num="P04" name="P04" type="bidirectional"/>
+        <pin num="P05" name="P05" type="bidirectional"/>
+        <pin num="P06" name="P06" type="bidirectional"/>
+        <pin num="P07" name="P07" type="bidirectional"/>
+        <pin num="P10" name="P10" type="bidirectional"/>
+        <pin num="P11" name="P11" type="bidirectional"/>
+        <pin num="P12" name="P12" type="bidirectional"/>
+        <pin num="P13" name="P13" type="bidirectional"/>
+        <pin num="P14" name="P14" type="bidirectional"/>
+        <pin num="P15" name="P15" type="bidirectional"/>
+        <pin num="P16" name="P16" type="bidirectional"/>
+        <pin num="P17" name="P17" type="bidirectional"/>
+        <pin num="SCL" name="SCL" type="input"/>
+        <pin num="SDA" name="SDA" type="bidirectional"/>
+        <pin num="VCC" name="VCC" type="power_in"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="U4">
+      <fields>
+        <field name="Reference">U4</field>
+        <field name="Value">SN74LVC07AD / SOIC14</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1A" type="input"/>
+        <pin num="2" name="1Y_OD" type="open_collector"/>
+        <pin num="3" name="2A" type="input"/>
+        <pin num="4" name="2Y_OD" type="open_collector"/>
+        <pin num="5" name="3A" type="input"/>
+        <pin num="6" name="3Y_OD" type="open_collector"/>
+        <pin num="7" name="GND" type="power_in"/>
+        <pin num="8" name="4Y_OD" type="open_collector"/>
+        <pin num="9" name="4A" type="input"/>
+        <pin num="10" name="5Y_OD" type="open_collector"/>
+        <pin num="11" name="5A" type="input"/>
+        <pin num="12" name="6Y_OD" type="open_collector"/>
+        <pin num="13" name="6A" type="input"/>
+        <pin num="14" name="VCC" type="power_in"/>
+      </pins>
+    </libpart>
+    <libpart lib="BUSA" part="U5">
+      <fields>
+        <field name="Reference">U5</field>
+        <field name="Value">SN74LVC2G14DBV / SOT23-6</field>
+        <field name="Footprint"/>
+        <field name="Datasheet"/>
+        <field name="Description"/>
+      </fields>
+      <pins>
+        <pin num="1" name="1A" type="input"/>
+        <pin num="2" name="GND" type="power_in"/>
+        <pin num="3" name="2A" type="input"/>
+        <pin num="4" name="2Y" type="output"/>
+        <pin num="5" name="VCC" type="power_in"/>
+        <pin num="6" name="1Y" type="output"/>
+      </pins>
+    </libpart>
+  </libparts>
+  <libraries>
+    <library logical="BUSA">
+      <uri>/workspace/work/calc4-source/hardware/schematic_r1/BUSA.kicad_sym</uri>
+    </library>
+  </libraries>
+  <nets>
+    <net code="1" name="/BUZZER_SIG" class="Default">
+      <node ref="J12" pin="1" pinfunction="GPIO2" pintype="passive"/>
+      <node ref="U1" pin="L18" pinfunction="GPIO2" pintype="output"/>
+    </net>
+    <net code="2" name="/COLLECT_GPIO1" class="Default">
+      <node ref="R55" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="L19" pinfunction="GPIO1" pintype="input"/>
+    </net>
+    <net code="3" name="/COL_BASE" class="Default">
+      <node ref="D3" pin="K" pinfunction="CATHODE" pintype="passive"/>
+      <node ref="Q2" pin="1" pinfunction="B" pintype="passive"/>
+      <node ref="R52" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R53" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="4" name="/COL_BUF" class="Default">
+      <node ref="R55" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="U5" pin="4" pinfunction="2Y" pintype="output"/>
+    </net>
+    <net code="5" name="/COL_COL" class="Default">
+      <node ref="C15" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="Q2" pin="3" pinfunction="C" pintype="passive"/>
+      <node ref="R54" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U5" pin="3" pinfunction="2A" pintype="input"/>
+    </net>
+    <net code="6" name="/COL_PWR" class="Default">
+      <node ref="J11" pin="1" pinfunction="V_SENSOR" pintype="passive"/>
+      <node ref="JP4" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R51" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="7" name="/COL_RAW" class="Default">
+      <node ref="J11" pin="3" pinfunction="PULSE" pintype="passive"/>
+      <node ref="R51" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R52" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="8" name="/COOL_BASE" class="Default">
+      <node ref="D2" pin="K" pinfunction="CATHODE" pintype="passive"/>
+      <node ref="Q1" pin="1" pinfunction="B" pintype="passive"/>
+      <node ref="R42" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R43" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="9" name="/COOL_BUF" class="Default">
+      <node ref="R45" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="U5" pin="6" pinfunction="1Y" pintype="output"/>
+    </net>
+    <net code="10" name="/COOL_COL" class="Default">
+      <node ref="C14" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="Q1" pin="3" pinfunction="C" pintype="passive"/>
+      <node ref="R44" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U5" pin="1" pinfunction="1A" pintype="input"/>
+    </net>
+    <net code="11" name="/COOL_GPIO15" class="Default">
+      <node ref="R45" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="R15" pinfunction="GPIO15" pintype="input"/>
+    </net>
+    <net code="12" name="/COOL_PWR" class="Default">
+      <node ref="J10" pin="1" pinfunction="V_SENSOR" pintype="passive"/>
+      <node ref="JP3" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R41" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="13" name="/COOL_RAW" class="Default">
+      <node ref="J10" pin="3" pinfunction="PULSE" pintype="passive"/>
+      <node ref="R41" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R42" pin="1" pinfunction="1" pintype="passive"/>
+    </net>
+    <net code="14" name="/ESP_5V" class="Default">
+      <node ref="JP1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="PF4" pin="1" pinfunction="ESP_5V" pintype="power_out"/>
+      <node ref="U1" pin="R02" pinfunction="5V" pintype="power_in"/>
+    </net>
+    <net code="15" name="/GND" class="Default">
+      <node ref="C1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C10" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C11" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C12" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C13" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C14" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C15" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C16" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C2" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C3" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C4" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C5" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C6" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C7" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C8" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="C9" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="D2" pin="A" pinfunction="ANODE" pintype="passive"/>
+      <node ref="D3" pin="A" pinfunction="ANODE" pintype="passive"/>
+      <node ref="J1" pin="2" pinfunction="GND" pintype="passive"/>
+      <node ref="J10" pin="2" pinfunction="GND" pintype="passive"/>
+      <node ref="J11" pin="2" pinfunction="GND" pintype="passive"/>
+      <node ref="J12" pin="2" pinfunction="GND" pintype="passive"/>
+      <node ref="J2" pin="1" pinfunction="GND" pintype="passive"/>
+      <node ref="J4" pin="1" pinfunction="GND" pintype="passive"/>
+      <node ref="J5" pin="2" pinfunction="GND_RETURN" pintype="passive"/>
+      <node ref="J6" pin="3" pinfunction="GND" pintype="passive"/>
+      <node ref="J7" pin="3" pinfunction="GND" pintype="passive"/>
+      <node ref="J8" pin="3" pinfunction="GND" pintype="passive"/>
+      <node ref="J9" pin="3" pinfunction="GND" pintype="passive"/>
+      <node ref="PF2" pin="1" pinfunction="GND" pintype="power_out"/>
+      <node ref="Q1" pin="2" pinfunction="E" pintype="passive"/>
+      <node ref="Q2" pin="2" pinfunction="E" pintype="passive"/>
+      <node ref="R43" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="R53" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="L01" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="L02" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="L22" pinfunction="GND" pintype="power_in"/>
+      <node ref="U1" pin="R01" pinfunction="GND" pintype="power_in"/>
+      <node ref="U2" pin="2" pinfunction="GND" pintype="power_in"/>
+      <node ref="U3" pin="GND" pinfunction="GND" pintype="power_in"/>
+      <node ref="U4" pin="11" pinfunction="5A" pintype="input"/>
+      <node ref="U4" pin="13" pinfunction="6A" pintype="input"/>
+      <node ref="U4" pin="7" pinfunction="GND" pintype="power_in"/>
+      <node ref="U5" pin="2" pinfunction="GND" pintype="power_in"/>
+    </net>
+    <net code="16" name="/I2C_SCL" class="Default">
+      <node ref="R2" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="L16" pinfunction="GPIO41" pintype="bidirectional"/>
+      <node ref="U3" pin="SCL" pinfunction="SCL" pintype="input"/>
+    </net>
+    <net code="17" name="/I2C_SDA" class="Default">
+      <node ref="R1" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="L15" pinfunction="GPIO40" pintype="bidirectional"/>
+      <node ref="U3" pin="SDA" pinfunction="SDA" pintype="bidirectional"/>
+    </net>
+    <net code="18" name="/K1_GPIO7" class="Default">
+      <node ref="R11" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="R16" pinfunction="GPIO7" pintype="output"/>
+      <node ref="U4" pin="1" pinfunction="1A" pintype="input"/>
+    </net>
+    <net code="19" name="/K2_GPIO6" class="Default">
+      <node ref="R12" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="R17" pinfunction="GPIO6" pintype="output"/>
+      <node ref="U4" pin="3" pinfunction="2A" pintype="input"/>
+    </net>
+    <net code="20" name="/K3_GPIO5" class="Default">
+      <node ref="R13" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="R18" pinfunction="GPIO5" pintype="output"/>
+      <node ref="U4" pin="5" pinfunction="3A" pintype="input"/>
+    </net>
+    <net code="21" name="/K4_GPIO4" class="Default">
+      <node ref="R14" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="R19" pinfunction="GPIO4" pintype="output"/>
+      <node ref="U4" pin="9" pinfunction="4A" pintype="input"/>
+    </net>
+    <net code="22" name="/KEY1" class="Default">
+      <node ref="J3" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="U3" pin="P00" pinfunction="P00" pintype="bidirectional"/>
+    </net>
+    <net code="23" name="/KEY2" class="Default">
+      <node ref="J3" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U3" pin="P01" pinfunction="P01" pintype="bidirectional"/>
+    </net>
+    <net code="24" name="/KEY3" class="Default">
+      <node ref="J3" pin="3" pinfunction="3" pintype="passive"/>
+      <node ref="U3" pin="P02" pinfunction="P02" pintype="bidirectional"/>
+    </net>
+    <net code="25" name="/KEY4" class="Default">
+      <node ref="J3" pin="4" pinfunction="4" pintype="passive"/>
+      <node ref="U3" pin="P03" pinfunction="P03" pintype="bidirectional"/>
+    </net>
+    <net code="26" name="/KEY5" class="Default">
+      <node ref="J3" pin="5" pinfunction="5" pintype="passive"/>
+      <node ref="U3" pin="P04" pinfunction="P04" pintype="bidirectional"/>
+    </net>
+    <net code="27" name="/KEY6" class="Default">
+      <node ref="J3" pin="6" pinfunction="6" pintype="passive"/>
+      <node ref="U3" pin="P05" pinfunction="P05" pintype="bidirectional"/>
+    </net>
+    <net code="28" name="/KEY7" class="Default">
+      <node ref="J3" pin="7" pinfunction="7" pintype="passive"/>
+      <node ref="U3" pin="P06" pinfunction="P06" pintype="bidirectional"/>
+    </net>
+    <net code="29" name="/KEY8" class="Default">
+      <node ref="J3" pin="8" pinfunction="8" pintype="passive"/>
+      <node ref="U3" pin="P07" pinfunction="P07" pintype="bidirectional"/>
+    </net>
+    <net code="30" name="/KEY9" class="Default">
+      <node ref="J3" pin="9" pinfunction="9" pintype="passive"/>
+      <node ref="U3" pin="P10" pinfunction="P10" pintype="bidirectional"/>
+    </net>
+    <net code="31" name="/RELAY_IN1" class="Default">
+      <node ref="J4" pin="2" pinfunction="IN1" pintype="passive"/>
+      <node ref="R21" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="2" pinfunction="1Y_OD" pintype="open_collector"/>
+    </net>
+    <net code="32" name="/RELAY_IN2" class="Default">
+      <node ref="J4" pin="3" pinfunction="IN2" pintype="passive"/>
+      <node ref="R22" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="4" pinfunction="2Y_OD" pintype="open_collector"/>
+    </net>
+    <net code="33" name="/RELAY_IN3" class="Default">
+      <node ref="J4" pin="4" pinfunction="IN3" pintype="passive"/>
+      <node ref="R23" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="6" pinfunction="3Y_OD" pintype="open_collector"/>
+    </net>
+    <net code="34" name="/RELAY_IN4" class="Default">
+      <node ref="J4" pin="5" pinfunction="IN4" pintype="passive"/>
+      <node ref="R24" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U4" pin="8" pinfunction="4Y_OD" pintype="open_collector"/>
+    </net>
+    <net code="35" name="/RELAY_JD12" class="Default">
+      <node ref="J5" pin="1" pinfunction="JD_VCC" pintype="passive"/>
+      <node ref="JP2" pin="2" pinfunction="2" pintype="passive"/>
+    </net>
+    <net code="36" name="/TEMP_ALARM" class="Default">
+      <node ref="J9" pin="2" pinfunction="DQ" pintype="passive"/>
+      <node ref="R33" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="L05" pinfunction="GPIO21" pintype="bidirectional"/>
+    </net>
+    <net code="37" name="/TEMP_COLUMN" class="Default">
+      <node ref="J8" pin="2" pinfunction="DQ" pintype="passive"/>
+      <node ref="R32" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="R13" pinfunction="GPIO17" pintype="bidirectional"/>
+    </net>
+    <net code="38" name="/TEMP_CUBE" class="Default">
+      <node ref="J7" pin="2" pinfunction="DQ" pintype="passive"/>
+      <node ref="R31" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="R12" pinfunction="GPIO18" pintype="bidirectional"/>
+    </net>
+    <net code="39" name="/TEMP_WATER" class="Default">
+      <node ref="J6" pin="2" pinfunction="DQ" pintype="passive"/>
+      <node ref="R30" pin="2" pinfunction="2" pintype="passive"/>
+      <node ref="U1" pin="R14" pinfunction="GPIO16" pintype="bidirectional"/>
+    </net>
+    <net code="40" name="/TFT_CS" class="Default">
+      <node ref="J2" pin="7" pinfunction="CS" pintype="passive"/>
+      <node ref="U1" pin="R07" pinfunction="GPIO10" pintype="output"/>
+    </net>
+    <net code="41" name="/TFT_DC" class="Default">
+      <node ref="J2" pin="6" pinfunction="DC" pintype="passive"/>
+      <node ref="U1" pin="R06" pinfunction="GPIO11" pintype="output"/>
+    </net>
+    <net code="42" name="/TFT_MOSI" class="Default">
+      <node ref="J2" pin="4" pinfunction="SDA_MOSI" pintype="passive"/>
+      <node ref="U1" pin="R04" pinfunction="GPIO13" pintype="output"/>
+    </net>
+    <net code="43" name="/TFT_RST" class="Default">
+      <node ref="J2" pin="5" pinfunction="RST" pintype="passive"/>
+      <node ref="U1" pin="R05" pinfunction="GPIO12" pintype="output"/>
+    </net>
+    <net code="44" name="/TFT_SCK" class="Default">
+      <node ref="J2" pin="3" pinfunction="SCK" pintype="passive"/>
+      <node ref="U1" pin="R03" pinfunction="GPIO14" pintype="output"/>
+    </net>
+    <net code="45" name="/V3V3" class="Default">
+      <node ref="C10" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C11" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C12" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C13" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C16" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C5" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C6" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C7" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C8" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C9" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J2" pin="2" pinfunction="VCC" pintype="passive"/>
+      <node ref="J6" pin="1" pinfunction="VDD" pintype="passive"/>
+      <node ref="J7" pin="1" pinfunction="VDD" pintype="passive"/>
+      <node ref="J8" pin="1" pinfunction="VDD" pintype="passive"/>
+      <node ref="J9" pin="1" pinfunction="VDD" pintype="passive"/>
+      <node ref="R1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R11" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R12" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R13" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R14" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R2" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R30" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R31" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R32" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R33" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R44" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R54" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="U1" pin="R21" pinfunction="3V3" pintype="power_out"/>
+      <node ref="U1" pin="R22" pinfunction="3V3" pintype="passive"/>
+      <node ref="U3" pin="VCC" pinfunction="VCC" pintype="power_in"/>
+      <node ref="U4" pin="14" pinfunction="VCC" pintype="power_in"/>
+      <node ref="U5" pin="5" pinfunction="VCC" pintype="power_in"/>
+    </net>
+    <net code="46" name="/V5" class="Default">
+      <node ref="C3" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C4" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J4" pin="6" pinfunction="VCC" pintype="passive"/>
+      <node ref="JP1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="JP3" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="JP4" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R21" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R22" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R23" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="R24" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="U2" pin="3" pinfunction="5V_OUT" pintype="power_out"/>
+    </net>
+    <net code="47" name="/V12_PROT" class="Default">
+      <node ref="C1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="C2" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="D1" pin="K" pinfunction="CATHODE" pintype="passive"/>
+      <node ref="JP2" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="PF3" pin="1" pinfunction="V12_PROT" pintype="power_out"/>
+      <node ref="U2" pin="1" pinfunction="VIN" pintype="power_in"/>
+    </net>
+    <net code="48" name="/VIN12" class="Default">
+      <node ref="F1" pin="1" pinfunction="1" pintype="passive"/>
+      <node ref="J1" pin="1" pinfunction="+12V" pintype="passive"/>
+      <node ref="PF1" pin="1" pinfunction="VIN12" pintype="power_out"/>
+    </net>
+    <net code="49" name="/VIN12_FUSED" class="Default">
+      <node ref="D1" pin="A" pinfunction="ANODE" pintype="passive"/>
+      <node ref="F1" pin="2" pinfunction="2" pintype="passive"/>
+    </net>
+    <net code="50" name="unconnected-(U1-GPIO0-PadL09)" class="Default">
+      <node ref="U1" pin="L09" pinfunction="GPIO0" pintype="passive+no_connect"/>
+    </net>
+    <net code="51" name="unconnected-(U1-GPIO3-PadR10)" class="Default">
+      <node ref="U1" pin="R10" pinfunction="GPIO3" pintype="passive+no_connect"/>
+    </net>
+    <net code="52" name="unconnected-(U1-GPIO8-PadR11)" class="Default">
+      <node ref="U1" pin="R11" pinfunction="GPIO8" pintype="passive+no_connect"/>
+    </net>
+    <net code="53" name="unconnected-(U1-GPIO9-PadR08)" class="Default">
+      <node ref="U1" pin="R08" pinfunction="GPIO9" pintype="passive+no_connect"/>
+    </net>
+    <net code="54" name="unconnected-(U1-GPIO19-PadL03)" class="Default">
+      <node ref="U1" pin="L03" pinfunction="GPIO19" pintype="passive+no_connect"/>
+    </net>
+    <net code="55" name="unconnected-(U1-GPIO20-PadL04)" class="Default">
+      <node ref="U1" pin="L04" pinfunction="GPIO20" pintype="passive+no_connect"/>
+    </net>
+    <net code="56" name="unconnected-(U1-GPIO35-PadL10)" class="Default">
+      <node ref="U1" pin="L10" pinfunction="GPIO35" pintype="passive+no_connect"/>
+    </net>
+    <net code="57" name="unconnected-(U1-GPIO36-PadL11)" class="Default">
+      <node ref="U1" pin="L11" pinfunction="GPIO36" pintype="passive+no_connect"/>
+    </net>
+    <net code="58" name="unconnected-(U1-GPIO37-PadL12)" class="Default">
+      <node ref="U1" pin="L12" pinfunction="GPIO37" pintype="passive+no_connect"/>
+    </net>
+    <net code="59" name="unconnected-(U1-GPIO38-PadL13)" class="Default">
+      <node ref="U1" pin="L13" pinfunction="GPIO38" pintype="passive+no_connect"/>
+    </net>
+    <net code="60" name="unconnected-(U1-GPIO39-PadL14)" class="Default">
+      <node ref="U1" pin="L14" pinfunction="GPIO39" pintype="passive+no_connect"/>
+    </net>
+    <net code="61" name="unconnected-(U1-GPIO42-PadL17)" class="Default">
+      <node ref="U1" pin="L17" pinfunction="GPIO42" pintype="passive+no_connect"/>
+    </net>
+    <net code="62" name="unconnected-(U1-GPIO45-PadL08)" class="Default">
+      <node ref="U1" pin="L08" pinfunction="GPIO45" pintype="passive+no_connect"/>
+    </net>
+    <net code="63" name="unconnected-(U1-GPIO46-PadR09)" class="Default">
+      <node ref="U1" pin="R09" pinfunction="GPIO46" pintype="passive+no_connect"/>
+    </net>
+    <net code="64" name="unconnected-(U1-GPIO47-PadL06)" class="Default">
+      <node ref="U1" pin="L06" pinfunction="GPIO47" pintype="passive+no_connect"/>
+    </net>
+    <net code="65" name="unconnected-(U1-GPIO48-PadL07)" class="Default">
+      <node ref="U1" pin="L07" pinfunction="GPIO48" pintype="passive+no_connect"/>
+    </net>
+    <net code="66" name="unconnected-(U1-RST-PadR20)" class="Default">
+      <node ref="U1" pin="R20" pinfunction="RST" pintype="passive+no_connect"/>
+    </net>
+    <net code="67" name="unconnected-(U1-RX-PadL20)" class="Default">
+      <node ref="U1" pin="L20" pinfunction="RX" pintype="passive+no_connect"/>
+    </net>
+    <net code="68" name="unconnected-(U1-TX-PadL21)" class="Default">
+      <node ref="U1" pin="L21" pinfunction="TX" pintype="passive+no_connect"/>
+    </net>
+    <net code="69" name="unconnected-(U3-PadINT)" class="Default">
+      <node ref="U3" pin="INT" pinfunction="INT" pintype="open_collector+no_connect"/>
+    </net>
+    <net code="70" name="unconnected-(U3-PadP11)" class="Default">
+      <node ref="U3" pin="P11" pinfunction="P11" pintype="bidirectional+no_connect"/>
+    </net>
+    <net code="71" name="unconnected-(U3-PadP12)" class="Default">
+      <node ref="U3" pin="P12" pinfunction="P12" pintype="bidirectional+no_connect"/>
+    </net>
+    <net code="72" name="unconnected-(U3-PadP13)" class="Default">
+      <node ref="U3" pin="P13" pinfunction="P13" pintype="bidirectional+no_connect"/>
+    </net>
+    <net code="73" name="unconnected-(U3-PadP14)" class="Default">
+      <node ref="U3" pin="P14" pinfunction="P14" pintype="bidirectional+no_connect"/>
+    </net>
+    <net code="74" name="unconnected-(U3-PadP15)" class="Default">
+      <node ref="U3" pin="P15" pinfunction="P15" pintype="bidirectional+no_connect"/>
+    </net>
+    <net code="75" name="unconnected-(U3-PadP16)" class="Default">
+      <node ref="U3" pin="P16" pinfunction="P16" pintype="bidirectional+no_connect"/>
+    </net>
+    <net code="76" name="unconnected-(U3-PadP17)" class="Default">
+      <node ref="U3" pin="P17" pinfunction="P17" pintype="bidirectional+no_connect"/>
+    </net>
+    <net code="77" name="unconnected-(U4-5Y_OD-Pad10)" class="Default">
+      <node ref="U4" pin="10" pinfunction="5Y_OD" pintype="open_collector+no_connect"/>
+    </net>
+    <net code="78" name="unconnected-(U4-6Y_OD-Pad12)" class="Default">
+      <node ref="U4" pin="12" pinfunction="6Y_OD" pintype="open_collector+no_connect"/>
+    </net>
+  </nets>
+</export>

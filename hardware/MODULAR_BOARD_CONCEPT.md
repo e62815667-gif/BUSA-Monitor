@@ -56,3 +56,7 @@ User subsequently supplied actual photos of the ESP32, PCF8575 module, relay blo
 - User's flowmeter close-up confirms a white/translucent YF-S401, four lid screws, opposed ribbed hose barbs, red/yellow/black leads, label range 0.3–6 L/min. This image is a visual reference, not a confirmed voltage/output-level specification.
 - The future collection sensor remains a reserved separate input; its exact model is unconfirmed. Do not substitute a generic pictured sensor as the selected part.
 - Latest concept image: /workspace/generated_images/exec-7fd3c63c-110a-46d3-9c94-385c8f5aa191.png. It illustrates the corrected module identities and upward-facing carrier connectors. Component footprints, pin counts, trace routing and electrical ratings must come from measured hardware/datasheets, not from this rendering.
+
+## Electrical R1 project
+
+User requested a checked electrical schematic after identifying the invented third DC power wire and incorrect relay rendering. Actual screen VCC confirmed by user: 3.3 V. R1 is now in hardware/schematic_r1: native KiCad project, exported netlist, 0 ERC violations, independent netlist-to-firmware checks and a real injected-output-conflict negative control. It replaces the illustration as the source of proposed electrical connections. See its README for outstanding relay JD-VCC, 3.3 V load, footprint and collection-model measurements. It is not bench approval or manufacturing Gerbers. Firmware is unchanged.
