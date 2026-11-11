@@ -1,4 +1,5 @@
 {
+  ".gitattributes": "9618185d97a7b73972851bc179ac276080c298f79adbc1847951e647f4254c27",
   ".gitignore": "0bf2b2ccab44838e483e30dd50ba20c9fa5bbb924dd5a89a9a3c02efdd34de53",
   "BUSA.kicad_sym": "911c7614b53000c4373dd407c82e12790905f9ef6aeff200a1fb7583818d8a7c",
   "BUSA.pretty/1N4148W_SOD123_LOGICAL_A_K.kicad_mod": "c4354e3cc8379c613da98dd934812622156ee1ac060d40510d60af5b56b9d7f7",
@@ -46,7 +47,7 @@
   "output/CPL_REVIEW.csv": "f935e612eeec274a977aa94d0e840421030fcb761a0da9c9d6aeaeac63e022d0",
   "output/ERC.json": "2f4f6d104c1c6d1b9071336d60f9ec588dd9ca4787d4f454f8ee118b6f017e40",
   "output/ERC_negative_control.json": "0917a16f5ea0e1fb2657a1d7452fe17d6c2ea94ad9af00143b8941861151151b",
-  "output/HARNESS.csv": "64388aab32ed5814a2c8173b4562bcb7bcafcbe7e1fe9ad38935484cc2b7b08c",
+  "output/HARNESS.csv": "4b474777b68b58428126aeb1dd25215223dbda4b0defeb7007c4911d2b175e96",
   "output/HEADER_44.csv": "78da7f9d8fc240764c578310eef10f934f382f7be0d04fa23f1c64a33f1c3677",
   "output/MEASUREMENT_GUIDE.png": "cdcd6867d95b5cca107522dc3427bead9cbe2fb9dad46372b82b0a5e5c1681a2",
   "output/NETLIST.xml": "34f04ed0152a51e1cacc9b48ab4dca524429e475dc6199da266584b185f4310e",
@@ -71,7 +72,7 @@
   "tools/pcb_import_route.py": "9cbea69fa0db811b1421b3f4b04c6696e8733f73126b58991cf60154948c7e22",
   "tools/pcb_negative_control.py": "f0e4965953f334d75d86174da40d0478e0c6ee1128e40eb89b7427a6457259ce",
   "tools/pcb_review.py": "ba49439acaaa9a66e5798dd274b5a692e61646e882188b4ea30e8c23eab34f97",
-  "tools/production_docs.py": "bd2ca4bb32c907f2c03f6b169516273510078544422397af175d3a002ac92f1f",
+  "tools/production_docs.py": "a8d9f7f69d2147fc4a8e0721308f7f57414fd3bcb49309ec49863226d26fe5dd",
   "tools/release_check.py": "8fae02ffdf5a3505fe5f68d2a637799b1be1ad7f71f2506e58f4b3edafb4f684",
   "tools/report.py": "9a29a2dfb33693fa3a1b180dc2d3f852b7792a7e553eb8571316ef7d20fac43a",
   "tools/run_checks.sh": "ab5ad5ef8b1579ea89a5dc4e8f3ff51a6a81c3678317ad1d245683e6e660a571",

@@ -1,6 +1,6 @@
 ﻿Carrier_connector,Pin,Signal,Net,Candidate_mating_housing,Notes
-J1,1,+12V,VIN12,XHP-2,Новая проводка; 
-J1,2,GND,GND,XHP-2,Новая проводка; 
+J1,1,+12V,VIN12,XHP-2,Новая проводка;
+J1,2,GND,GND,XHP-2,Новая проводка;
 J12,1,GPIO2,BUZZER_SIG,XHP-2,Новая проводка; Logic control only; not direct supply for a bare buzzer
 J12,2,GND,GND,XHP-2,Новая проводка; Logic control only; not direct supply for a bare buzzer
 J2,1,GND,GND,XHP-7,Новая проводка; New carrier pin order matches photographed display legends; confirm cable face/orientation

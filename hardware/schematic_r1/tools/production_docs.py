@@ -44,7 +44,7 @@ for part in parts:
     elif ref.startswith('JP'):mpn='TBD: 1×2, 2,54 мм, вертикальный';maker='TBD';fit='HEADER / NO SHUNT';note='Штыри установить, перемычку НЕ устанавливать до соответствующей проверки'
     elif ref.startswith('J'):
         count=len(part['pins']);mpn=f'B{count}B-XH-A(LF)(SN)';maker='JST';note='Новая вертикальная колодка XH, шаг 2,50 мм; не прямое совпадение со старым жгутом'
-        for pin in part['pins']:harness.append([ref,pin['number'],pin['name'],pin['net'],f'XHP-{count}',f'Новая проводка; {part["description"]}'])
+        for pin in part['pins']:harness.append([ref,pin['number'],pin['name'],pin['net'],f'XHP-{count}',f'Новая проводка; {part["description"]}'.rstrip()])
     bom.append([ref,value,fps[ref],1,maker,mpn,fit,note])
 with (OUT/'BOM_REVIEW.csv').open('w',encoding='utf-8-sig',newline='') as f:
     w=csv.writer(f,lineterminator="\n");w.writerow(['Reference','Value','Footprint','Qty_per_board','Manufacturer','Candidate_MPN_NOT_PURCHASE_RELEASE','Fit','Notes']);w.writerows(bom)
