@@ -2,6 +2,9 @@
 ~*~
 *.lck
 *.kicad_prl
-*.kicad_pcb
 *-backups/
 __pycache__/
+output/BUSA_R1.dsn
+output/BUSA_R1.ses
+output/PCB_DRC_INITIAL.json
+output/release/

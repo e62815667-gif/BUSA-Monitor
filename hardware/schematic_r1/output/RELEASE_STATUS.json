@@ -1,0 +1,40 @@
+{
+  "status": "NOT_RELEASED",
+  "manufacturer": {
+    "name": "ООО НПП Принт-Д",
+    "city": "Челябинск",
+    "requirements_confirmed": false
+  },
+  "board_mm": [
+    120,
+    100,
+    1.6
+  ],
+  "erc_violations": 0,
+  "drc_violations": 0,
+  "unconnected_items": 0,
+  "schematic_parity_issues": 0,
+  "connected_pads_audited": 207,
+  "blocking_items": [
+    "esp32_mechanical_verified",
+    "pcf8575_mechanical_verified",
+    "relay_interface_measured",
+    "rail_3v3_load_measured",
+    "manufacturer_rules_confirmed",
+    "bom_procurement_verified",
+    "bench_checks_passed",
+    "exact_mpn_selection_incomplete"
+  ],
+  "mpn_tbd_references": [
+    "JP1",
+    "JP2",
+    "JP3",
+    "C14",
+    "JP4",
+    "C15"
+  ],
+  "fabrication_files_created": false,
+  "assembly_files_released": false,
+  "order_submitted": false,
+  "note": "An engineering review archive is not a production order or a validated assembly package."
+}

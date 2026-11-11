@@ -5,8 +5,11 @@ U=lambda s:str(uuid.uuid5(uuid.NAMESPACE_URL,'busa-r1:'+s))
 Q=lambda s:json.dumps(str(s),ensure_ascii=False)
 G=lambda v:round(v/1.27)*1.27
 parts=[];items=[];libs=[];rid=U('root')
+footprints=json.loads((root/'footprints.json').read_text()) if (root/'footprints.json').exists() else {}
 def note(t,x,y,size=1.6):items.append(f'(text {Q(t)} (at {x} {y} 0) (effects (font (size {size} {size})) (justify left)) (uuid {Q(U(t+str(x)+str(y)))}))')
 def part(ref,value,x,y,pins,desc='',width=25,spacing=3.81,footprint='',url=''):
+ footprint=footprint or footprints.get(ref,'')
+ physical='no' if ref.startswith('PF') else 'yes'
  x,y=G(x),G(y);width=G(width);half=G((max(sum(p[3]==z for p in pins) for z in 'LR')+1)*spacing/2)
  positions={}
  for side in 'LR':
@@ -28,11 +31,12 @@ def part(ref,value,x,y,pins,desc='',width=25,spacing=3.81,footprint='',url=''):
   else:
    graphics=f'(rectangle (start -3.81 {syy+1.27}) (end 3.81 {syy-1.27}) (stroke (width .254) (type default)) (fill (type none)))'+ln(-edge,syy,-3.81,syy)+ln(3.81,syy,edge,syy)
    if ref.startswith('F'):graphics+=ln(-3.81,syy,3.81,syy)
- lib=f'(symbol {Q(name)} (pin_names (offset .5)) (exclude_from_sim no) (in_bom yes) (on_board yes) '+prop('Reference',ref,0,half+5.08)+prop('Value',value,0,half+2.54)+f'(symbol {Q(ref+"_0_1")} {graphics}) (symbol {Q(ref+"_1_1")} '
+ lib=f'(symbol {Q(name)} (pin_names (offset .5)) (exclude_from_sim no) (in_bom {physical}) (on_board {physical}) '+prop('Reference',ref,0,half+5.08)+prop('Value',value,0,half+2.54)+f'(symbol {Q(ref+"_0_1")} {graphics}) (symbol {Q(ref+"_1_1")} '
  for n,caption,typ,side,net in pins:
   a,b,angle=positions[n];lib+=f'(pin {typ} line (at {a} {b} {angle}) (length 5.08) (name {Q(caption)} (effects (font (size 1 1)))) (number {Q(n)} (effects (font (size .8 .8))))) '
  libs.append(lib+'))')
- sy=f'(symbol (lib_id {Q(name)}) (at {x} {y} 0) (unit 1) (in_bom yes) (on_board yes) (dnp no) (uuid {Q(U(ref))}) '
+ dnp='yes' if ref in ['R1','R2'] else 'no'
+ sy=f'(symbol (lib_id {Q(name)}) (at {x} {y} 0) (unit 1) (in_bom {physical}) (on_board {physical}) (dnp {dnp}) (uuid {Q(U(ref))}) '
  for key,val,dy,hide in [('Reference',ref,-half-5.08,False),('Value',value,-half-2.54,False),('Footprint',footprint,0,True),('Datasheet',url,0,True),('Description',desc,0,True)]:sy+=prop(key,val,x,y+dy,hide)
  for n,*_ in pins:sy+=f'(pin {Q(n)} (uuid {Q(U(ref+"."+n))})) '
  sy+=f'(instances (project "BUSA_R1" (path "/{rid}" (reference {Q(ref)}) (unit 1)))))';items.append(sy)

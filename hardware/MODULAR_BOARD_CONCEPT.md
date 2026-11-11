@@ -60,3 +60,9 @@ User subsequently supplied actual photos of the ESP32, PCF8575 module, relay blo
 ## Electrical R1 project
 
 User requested a checked electrical schematic after identifying the invented third DC power wire and incorrect relay rendering. Actual screen VCC confirmed by user: 3.3 V. R1 is now in hardware/schematic_r1: native KiCad project, exported netlist, 0 ERC violations, independent netlist-to-firmware checks and a real injected-output-conflict negative control. It replaces the illustration as the source of proposed electrical connections. See its README for outstanding relay JD-VCC, 3.3 V load, footprint and collection-model measurements. It is not bench approval or manufacturing Gerbers. Firmware is unchanged.
+
+## Physical engineering project and selected manufacturer
+
+User selected NPP Print-D in Chelyabinsk for fabrication. A physical 120×100mm, 2-layer engineering board now accompanies R1 in `schematic_r1`. It uses actual current GPIO mappings, top-entry carrier cable connectors, detachable ESP/PCF sockets and separate sound-relay harnesses. User confirmed 2.54mm contact pitch, then supplied a photo of the fitted ESP adapter marked **25.50mm** across the rows; that value replaces the provisional 25.4mm.
+
+PCF8575 socket geometry and ESP body/USB/antenna envelope are still not fully established. The native PCB is a review draft with explicit parameters and a 1:1 check print, not permission to manufacture it. See `PRODUCTION.md` and `output/RELEASE_STATUS.json`. Manufacturer capabilities/file acceptance and pricing have not been confirmed; no order/email was submitted. Firmware remains unchanged.

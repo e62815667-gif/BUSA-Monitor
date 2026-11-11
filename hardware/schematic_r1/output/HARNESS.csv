@@ -1,0 +1,47 @@
+﻿Carrier_connector,Pin,Signal,Net,Candidate_mating_housing,Notes
+J1,1,+12V,VIN12,XHP-2,Новая проводка; 
+J1,2,GND,GND,XHP-2,Новая проводка; 
+J12,1,GPIO2,BUZZER_SIG,XHP-2,Новая проводка; Logic control only; not direct supply for a bare buzzer
+J12,2,GND,GND,XHP-2,Новая проводка; Logic control only; not direct supply for a bare buzzer
+J2,1,GND,GND,XHP-7,Новая проводка; New carrier pin order matches photographed display legends; confirm cable face/orientation
+J2,2,VCC,V3V3,XHP-7,Новая проводка; New carrier pin order matches photographed display legends; confirm cable face/orientation
+J2,3,SCK,TFT_SCK,XHP-7,Новая проводка; New carrier pin order matches photographed display legends; confirm cable face/orientation
+J2,4,SDA_MOSI,TFT_MOSI,XHP-7,Новая проводка; New carrier pin order matches photographed display legends; confirm cable face/orientation
+J2,5,RST,TFT_RST,XHP-7,Новая проводка; New carrier pin order matches photographed display legends; confirm cable face/orientation
+J2,6,DC,TFT_DC,XHP-7,Новая проводка; New carrier pin order matches photographed display legends; confirm cable face/orientation
+J2,7,CS,TFT_CS,XHP-7,Новая проводка; New carrier pin order matches photographed display legends; confirm cable face/orientation
+J3,1,1,KEY1,XHP-9,Новая проводка; Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+J3,2,2,KEY2,XHP-9,Новая проводка; Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+J3,3,3,KEY3,XHP-9,Новая проводка; Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+J3,4,4,KEY4,XHP-9,Новая проводка; Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+J3,5,5,KEY5,XHP-9,Новая проводка; Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+J3,6,6,KEY6,XHP-9,Новая проводка; Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+J3,7,7,KEY7,XHP-9,Новая проводка; Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+J3,8,8,KEY8,XHP-9,Новая проводка; Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+J3,9,9,KEY9,XHP-9,Новая проводка; Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.
+J6,1,VDD,V3V3,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J6,2,DQ,TEMP_WATER,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J6,3,GND,GND,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J7,1,VDD,V3V3,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J7,2,DQ,TEMP_CUBE,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J7,3,GND,GND,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J8,1,VDD,V3V3,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J8,2,DQ,TEMP_COLUMN,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J8,3,GND,GND,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J9,1,VDD,V3V3,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J9,2,DQ,TEMP_ALARM,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J9,3,GND,GND,XHP-3,"Новая проводка; Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping"
+J4,1,GND,GND,XHP-6,Новая проводка; Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.
+J4,2,IN1,RELAY_IN1,XHP-6,Новая проводка; Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.
+J4,3,IN2,RELAY_IN2,XHP-6,Новая проводка; Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.
+J4,4,IN3,RELAY_IN3,XHP-6,Новая проводка; Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.
+J4,5,IN4,RELAY_IN4,XHP-6,Новая проводка; Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.
+J4,6,VCC,V5,XHP-6,Новая проводка; Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.
+J5,1,JD_VCC,RELAY_JD12,XHP-2,Новая проводка; New carrier connector; actual relay-board JD header pin order/return requires measurement
+J5,2,GND_RETURN,GND,XHP-2,Новая проводка; New carrier connector; actual relay-board JD header pin order/return requires measurement
+J10,1,V_SENSOR,COOL_PWR,XHP-3,"Новая проводка; Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified."
+J10,2,GND,GND,XHP-3,"Новая проводка; Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified."
+J10,3,PULSE,COOL_RAW,XHP-3,"Новая проводка; Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified."
+J11,1,V_SENSOR,COL_PWR,XHP-3,"Новая проводка; Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified."
+J11,2,GND,GND,XHP-3,"Новая проводка; Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified."
+J11,3,PULSE,COL_RAW,XHP-3,"Новая проводка; Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified."

@@ -77,6 +77,6 @@ j=json.loads((out/'ERC.json').read_text());assert not [v for sh in j['sheets'] f
 report={'result':'PASS_DESIGN_CHECKS_NOT_BENCH_APPROVAL','checks':checks,'component_count':71,'calculations':{'base_min_A':base_min,'collector_max_A':collector_max,'forced_beta':collector_max/base_min},'outstanding':['Relay module JD-VCC/header return continuity and 3.3V rail current measurement','Physical footprint dimensions and connector orientation','Exact collection sensor and firmware implementation']}
 (out/'CHECKS.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n')
 with (out/'PIN_NETS.csv').open('w') as f:
- w=csv.writer(f);w.writerow(['Reference','Pin','Net'])
+ w=csv.writer(f,lineterminator="\n");w.writerow(['Reference','Pin','Net'])
  for (ref,pin),net in sorted(pin_net.items()):w.writerow([ref,pin,net])
 print('PASS',len(checks),'independent netlist checks; KiCad ERC 0; deliberate conflict detected')

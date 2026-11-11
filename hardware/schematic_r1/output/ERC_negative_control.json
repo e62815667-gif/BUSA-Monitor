@@ -1,13 +1,178 @@
 {
   "$schema": "https://schemas.kicad.org/erc.v1.json",
   "coordinate_units": "mm",
-  "date": "2026-11-08T17:50:30+0000",
+  "date": "2026-11-08T18:33:41+0000",
   "kicad_version": "9.0.2",
   "sheets": [
     {
       "path": "/",
       "uuid_path": "/1eed6226-ec7d-5854-9382-d95c9fa5f1e0",
       "violations": [
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J1 [J1]",
+              "pos": {
+                "x": 0.3556,
+                "y": 0.6477
+              },
+              "uuid": "3baf2d5b-0d06-5b56-8e02-157fbb23c4a3"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol F1 [F1]",
+              "pos": {
+                "x": 0.3937,
+                "y": 1.0287
+              },
+              "uuid": "18e41796-9d65-5ce4-bc5c-5403857d3900"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol D1 [D1]",
+              "pos": {
+                "x": 1.1049,
+                "y": 1.0287
+              },
+              "uuid": "588886c9-650d-5abf-a73b-2c62063d0629"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol U2 [U2]",
+              "pos": {
+                "x": 0.7493,
+                "y": 1.3462
+              },
+              "uuid": "682ba194-1573-5b05-8002-836347a7428d"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C1 [C1]",
+              "pos": {
+                "x": 0.3937,
+                "y": 1.6637
+              },
+              "uuid": "687c9e48-ed74-593d-99ac-844db4ab934e"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C3 [C3]",
+              "pos": {
+                "x": 0.3937,
+                "y": 1.9177
+              },
+              "uuid": "3e0e71cc-aed3-52a0-9381-5b9cc33fa0c1"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C2 [C2]",
+              "pos": {
+                "x": 1.2954,
+                "y": 1.6637
+              },
+              "uuid": "ba1dfd02-e901-54ca-9f82-6030a721c845"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C4 [C4]",
+              "pos": {
+                "x": 1.2954,
+                "y": 1.9177
+              },
+              "uuid": "0c19e460-e0c0-5d6c-8a40-1011b3673dc0"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol JP1 [JP1]",
+              "pos": {
+                "x": 0.7493,
+                "y": 2.1971
+              },
+              "uuid": "fb5430bf-f00c-5ef8-b4d1-9a7d641d3585"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J6 [J6]",
+              "pos": {
+                "x": 0.3937,
+                "y": 3.0988
+              },
+              "uuid": "f01e0d43-e336-57db-b467-59f8cc656a41"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol U1 [U1]",
+              "pos": {
+                "x": 2.9464,
+                "y": 1.1684
+              },
+              "uuid": "03fe7f6a-2ff2-5d7c-8393-7244e0c33480"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
         {
           "description": "Pins of type Output and Output are connected",
           "items": [
@@ -30,6 +195,846 @@
           ],
           "severity": "error",
           "type": "pin_to_pin"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R30 [R30]",
+              "pos": {
+                "x": 0.3937,
+                "y": 3.3528
+              },
+              "uuid": "11771785-8ab5-5a47-adab-73bfbce2e548"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J8 [J8]",
+              "pos": {
+                "x": 1.397,
+                "y": 3.0988
+              },
+              "uuid": "9dffa96e-7f6e-5808-8171-aa19f98d006b"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J12 [J12]",
+              "pos": {
+                "x": 2.7051,
+                "y": 2.1463
+              },
+              "uuid": "e4e16e7c-4802-5768-a72d-505249436c3a"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C10 [C10]",
+              "pos": {
+                "x": 0.3937,
+                "y": 3.5814
+              },
+              "uuid": "ed6fbebd-30f0-5f52-a48c-77cdebc69476"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R32 [R32]",
+              "pos": {
+                "x": 1.397,
+                "y": 3.3528
+              },
+              "uuid": "602ab45b-f881-565a-9154-c145f545f47c"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J7 [J7]",
+              "pos": {
+                "x": 0.3937,
+                "y": 3.8227
+              },
+              "uuid": "13ada1ed-a8d8-596c-986c-f247a52d922f"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C12 [C12]",
+              "pos": {
+                "x": 1.397,
+                "y": 3.5814
+              },
+              "uuid": "51b67614-b0c1-5312-bfc4-51c6c6c28da2"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J9 [J9]",
+              "pos": {
+                "x": 1.397,
+                "y": 3.8227
+              },
+              "uuid": "b3ad5163-813a-5033-b24c-7b5c73cfdfea"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R31 [R31]",
+              "pos": {
+                "x": 0.3937,
+                "y": 4.064
+              },
+              "uuid": "fcb4c558-d757-5cad-88e4-997d56d0ccb0"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R33 [R33]",
+              "pos": {
+                "x": 1.397,
+                "y": 4.064
+              },
+              "uuid": "a97d6d14-744a-5891-aef4-ca464bf078c2"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C11 [C11]",
+              "pos": {
+                "x": 0.3937,
+                "y": 4.3053
+              },
+              "uuid": "083bd3eb-12b0-5486-871a-1eab14c7cbf7"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol U3 [U3]",
+              "pos": {
+                "x": 2.794,
+                "y": 3.302
+              },
+              "uuid": "d4ba92ec-6fa5-5233-a37e-479910cc997f"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C13 [C13]",
+              "pos": {
+                "x": 1.397,
+                "y": 4.3053
+              },
+              "uuid": "5fa2566d-f267-5669-970e-eb20f24e8098"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R1 [R1]",
+              "pos": {
+                "x": 2.5019,
+                "y": 3.7973
+              },
+              "uuid": "dbe04dd3-a47d-5089-8072-15c52a830991"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C7 [C7]",
+              "pos": {
+                "x": 2.5019,
+                "y": 4.0513
+              },
+              "uuid": "ceccdbcf-dcef-5743-829f-05c5dc838f80"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C5 [C5]",
+              "pos": {
+                "x": 4.699,
+                "y": 1.2319
+              },
+              "uuid": "27db2ad4-3b54-5f89-accb-fe108fc852b9"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J3 [J3]",
+              "pos": {
+                "x": 3.7973,
+                "y": 3.1623
+              },
+              "uuid": "2df43828-7097-5d2f-ad19-5c0c647179a4"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J2 [J2]",
+              "pos": {
+                "x": 4.953,
+                "y": 0.8255
+              },
+              "uuid": "88777e3e-c873-5163-ab2b-b0c03f549d81"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R2 [R2]",
+              "pos": {
+                "x": 3.556,
+                "y": 3.7973
+              },
+              "uuid": "29fdeb37-954d-55fc-ba86-a339be48176c"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C8 [C8]",
+              "pos": {
+                "x": 3.556,
+                "y": 4.0513
+              },
+              "uuid": "9fbf488e-78bd-55ca-acc6-09aaf6f63c44"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C16 [C16]",
+              "pos": {
+                "x": 1.9558,
+                "y": 5.3086
+              },
+              "uuid": "6a26e2b7-4e0d-543d-a1b4-7fc880861921"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C6 [C6]",
+              "pos": {
+                "x": 5.6007,
+                "y": 1.2319
+              },
+              "uuid": "971f372e-697b-5130-9ef1-01172e41a179"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol U5 [U5]",
+              "pos": {
+                "x": 2.8956,
+                "y": 5.0546
+              },
+              "uuid": "6149531f-4154-503b-9a33-5a9c165c101d"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J10 [J10]",
+              "pos": {
+                "x": 4.6482,
+                "y": 4.0132
+              },
+              "uuid": "b1cc4313-0205-5a19-acb5-ccdf9c12b87b"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R45 [R45]",
+              "pos": {
+                "x": 3.0988,
+                "y": 5.4102
+              },
+              "uuid": "469e1335-987f-54f0-8874-d4a3f649b1e2"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol JP3 [JP3]",
+              "pos": {
+                "x": 4.6482,
+                "y": 4.3688
+              },
+              "uuid": "909fba70-63b6-5e9b-b249-368bdc43b607"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R55 [R55]",
+              "pos": {
+                "x": 3.0988,
+                "y": 5.6515
+              },
+              "uuid": "c6cac064-18f0-5163-8c35-00816b203959"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R41 [R41]",
+              "pos": {
+                "x": 4.6482,
+                "y": 4.6101
+              },
+              "uuid": "da319cdb-86ee-537c-af35-58a574b033c4"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R42 [R42]",
+              "pos": {
+                "x": 4.6482,
+                "y": 4.8514
+              },
+              "uuid": "a4b5baef-b6c2-5dcf-91cb-34d9e8d51e7b"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R11 [R11]",
+              "pos": {
+                "x": 6.6548,
+                "y": 1.6002
+              },
+              "uuid": "337943e3-e18d-5482-83b1-04385dbe32f1"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R12 [R12]",
+              "pos": {
+                "x": 6.6548,
+                "y": 1.8415
+              },
+              "uuid": "5925b65d-2a4d-5737-bfc3-4a054bbe8bdc"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol U4 [U4]",
+              "pos": {
+                "x": 6.8453,
+                "y": 1.0287
+              },
+              "uuid": "b8bf41ae-00ad-56d5-b59c-b33336ed415b"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol Q1 [Q1]",
+              "pos": {
+                "x": 4.6482,
+                "y": 5.1562
+              },
+              "uuid": "9f503b87-c47d-55c9-a49f-2210ac927d94"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R21 [R21]",
+              "pos": {
+                "x": 6.6548,
+                "y": 2.2479
+              },
+              "uuid": "12bb4214-cb3f-5e3e-945e-96ee56120921"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R22 [R22]",
+              "pos": {
+                "x": 6.6548,
+                "y": 2.4892
+              },
+              "uuid": "71b154ca-1bfa-52e2-8257-caaa34288e89"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R43 [R43]",
+              "pos": {
+                "x": 4.6482,
+                "y": 5.4991
+              },
+              "uuid": "04c998f9-f64c-5c3b-a867-4750032edd3a"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R44 [R44]",
+              "pos": {
+                "x": 5.5499,
+                "y": 4.5974
+              },
+              "uuid": "bfd33cb7-9030-5dbd-878b-24f6d29033f3"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C9 [C9]",
+              "pos": {
+                "x": 6.6548,
+                "y": 2.794
+              },
+              "uuid": "8e48d8dd-1e2a-56f4-8a0d-e1a2c2b03f51"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C14 [C14]",
+              "pos": {
+                "x": 5.5499,
+                "y": 4.8387
+              },
+              "uuid": "0ab03fa4-87f6-53a7-8eb8-c49b81b1f6c4"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol D2 [D2]",
+              "pos": {
+                "x": 5.5499,
+                "y": 5.1054
+              },
+              "uuid": "07f545ec-d9a0-5779-9009-df268ed96cee"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J11 [J11]",
+              "pos": {
+                "x": 6.5532,
+                "y": 4.0132
+              },
+              "uuid": "8b0c8b5d-0460-51c7-935b-7ac28a44614c"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J5 [J5]",
+              "pos": {
+                "x": 7.2009,
+                "y": 3.1496
+              },
+              "uuid": "baf50f05-6cb0-5a8d-ac22-cc19c8b17817"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol JP4 [JP4]",
+              "pos": {
+                "x": 6.5532,
+                "y": 4.3688
+              },
+              "uuid": "c8b8d7d5-8e35-5492-a6cd-bf82a3f311b2"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R13 [R13]",
+              "pos": {
+                "x": 7.747,
+                "y": 1.6002
+              },
+              "uuid": "d81ef7aa-dd7e-54a2-92f8-8587a1f140a6"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol J4 [J4]",
+              "pos": {
+                "x": 7.8994,
+                "y": 0.9144
+              },
+              "uuid": "1c2cd2e7-6039-530c-8284-7253f348fa19"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R14 [R14]",
+              "pos": {
+                "x": 7.747,
+                "y": 1.8415
+              },
+              "uuid": "8407f6d9-5888-5a88-97d7-1ca1ab3bcbd6"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R51 [R51]",
+              "pos": {
+                "x": 6.5532,
+                "y": 4.6101
+              },
+              "uuid": "b5b205f6-9c95-5b75-afef-03ab81e70b15"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R23 [R23]",
+              "pos": {
+                "x": 7.747,
+                "y": 2.2479
+              },
+              "uuid": "d08d6ac7-26e2-56b4-af04-84634e04b9fa"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R24 [R24]",
+              "pos": {
+                "x": 7.747,
+                "y": 2.4892
+              },
+              "uuid": "9351d6ff-7684-5050-9f07-12bd420b6279"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R52 [R52]",
+              "pos": {
+                "x": 6.5532,
+                "y": 4.8514
+              },
+              "uuid": "9a0ae4f4-4e47-57f9-8457-56535c4dcefb"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol JP2 [JP2]",
+              "pos": {
+                "x": 7.747,
+                "y": 2.794
+              },
+              "uuid": "3c31ee3c-7b92-5a6b-8c2c-15fe4907d66d"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol Q2 [Q2]",
+              "pos": {
+                "x": 6.5532,
+                "y": 5.1562
+              },
+              "uuid": "4610be3f-1053-531a-896b-678b66d01e0b"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R53 [R53]",
+              "pos": {
+                "x": 6.5532,
+                "y": 5.4991
+              },
+              "uuid": "f3875136-c2ff-5ace-9624-82bac7d403dc"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol R54 [R54]",
+              "pos": {
+                "x": 7.4549,
+                "y": 4.5974
+              },
+              "uuid": "21672991-a496-530a-b2ad-7d4fbca0a857"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol C15 [C15]",
+              "pos": {
+                "x": 7.4549,
+                "y": 4.8387
+              },
+              "uuid": "5d12fae6-85ed-5b13-82a3-95ace034eea8"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
+        },
+        {
+          "description": "The current configuration does not include the footprint library 'BUSA'.",
+          "items": [
+            {
+              "description": "Symbol D3 [D3]",
+              "pos": {
+                "x": 7.4549,
+                "y": 5.1054
+              },
+              "uuid": "13a13a04-ce1f-5e3b-b070-a403c9a25b0e"
+            }
+          ],
+          "severity": "warning",
+          "type": "footprint_link_issues"
         }
       ]
     }

@@ -19,7 +19,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -74,12 +74,12 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:Fuse_Littelfuse_NANO2_454_DRAFT",
     "datasheet": ""
   },
   {
     "ref": "D1",
-    "value": "SS34",
+    "value": "B340A-13-F / SMA",
     "pins": [
       {
         "number": "A",
@@ -96,9 +96,9 @@
         "net": "V12_PROT"
       }
     ],
-    "description": "",
-    "footprint": "",
-    "datasheet": ""
+    "description": "Exact SMA Schottky choice; do not substitute a vendor SS34 in SMC",
+    "footprint": "BUSA:D_SMA_LOGICAL_A_K",
+    "datasheet": "https://www.diodes.com/datasheet/download/B340A.pdf"
   },
   {
     "ref": "PF3",
@@ -143,7 +143,7 @@
       }
     ],
     "description": "New selected regulator option, not claimed existing user component",
-    "footprint": "",
+    "footprint": "BUSA:RECOM_R78E10_11.6x8.5_P2.54",
     "datasheet": "https://recom-power.com/pdf/Innoline/R-78E-1.0.pdf"
   },
   {
@@ -166,7 +166,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_1210_3225Metric",
     "datasheet": ""
   },
   {
@@ -189,7 +189,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -212,7 +212,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_1210_3225Metric",
     "datasheet": ""
   },
   {
@@ -235,7 +235,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -274,7 +274,7 @@
       }
     ],
     "description": "Open before either ESP32 USB port is powered. Do not connect external 5V and USB concurrently.",
-    "footprint": "",
+    "footprint": "BUSA:PinHeader_1x02_P2.54mm_Vertical",
     "datasheet": ""
   },
   {
@@ -591,7 +591,7 @@
       }
     ],
     "description": "L/R numbered top-to-bottom with both USB at top. Actual socket geometry still to measure.",
-    "footprint": "",
+    "footprint": "BUSA:ESP32S3_44PIN_SOCKET_DRAFT",
     "datasheet": ""
   },
   {
@@ -614,7 +614,7 @@
       }
     ],
     "description": "Logic control only; not direct supply for a bare buzzer",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -672,7 +672,7 @@
       }
     ],
     "description": "New carrier pin order matches photographed display legends; confirm cable face/orientation",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B7B-XH-A_1x07_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -695,7 +695,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -718,7 +718,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -874,7 +874,7 @@
       }
     ],
     "description": "Pin numbers are actual printed terminal names, not invented physical positions. INT and 7 unused I/O are NC.",
-    "footprint": "",
+    "footprint": "BUSA:PCF8575_8_8_5_SOCKET_DRAFT",
     "datasheet": ""
   },
   {
@@ -946,7 +946,7 @@
       }
     ],
     "description": "Harness 1..8 -> P00..P07; 9 -> P10. Preserve installed harness mapping or retrain.",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B9B-XH-A_1x09_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -969,7 +969,7 @@
       }
     ],
     "description": "Measure existing module pullups first; effective target 2.2k..10k to 3.3V only",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -992,7 +992,7 @@
       }
     ],
     "description": "Measure existing module pullups first; no 5V pullup",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1015,7 +1015,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1038,7 +1038,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1068,7 +1068,7 @@
       }
     ],
     "description": "Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -1091,7 +1091,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1114,7 +1114,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1144,7 +1144,7 @@
       }
     ],
     "description": "Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -1167,7 +1167,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1190,7 +1190,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1220,7 +1220,7 @@
       }
     ],
     "description": "Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -1243,7 +1243,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1266,7 +1266,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1296,7 +1296,7 @@
       }
     ],
     "description": "Carrier standard: 1=VDD,2=DQ,3=GND; identify actual cable conductors before crimping",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -1319,7 +1319,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1342,7 +1342,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1449,7 +1449,7 @@
       }
     ],
     "description": "Noninverting open-drain; outputs tolerate 5.5V; Ioff; GPIO low => sink relay IN low",
-    "footprint": "",
+    "footprint": "BUSA:SOIC-14_3.9x8.7mm_P1.27mm",
     "datasheet": "https://www.ti.com/lit/ds/symlink/sn74lvc07a.pdf"
   },
   {
@@ -1500,7 +1500,7 @@
       }
     ],
     "description": "Matches photographed legends GND IN1 IN2 IN3 IN4 VCC. Check physical orientation.",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B6B-XH-A_1x06_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -1523,7 +1523,7 @@
       }
     ],
     "description": "Reset pullup: relay OFF",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1546,7 +1546,7 @@
       }
     ],
     "description": "Logic pullup only; not coil supply",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1569,7 +1569,7 @@
       }
     ],
     "description": "Reset pullup: relay OFF",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1592,7 +1592,7 @@
       }
     ],
     "description": "Logic pullup only; not coil supply",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1615,7 +1615,7 @@
       }
     ],
     "description": "Reset pullup: relay OFF",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1638,7 +1638,7 @@
       }
     ],
     "description": "Logic pullup only; not coil supply",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1661,7 +1661,7 @@
       }
     ],
     "description": "Reset pullup: relay OFF",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1684,7 +1684,7 @@
       }
     ],
     "description": "Logic pullup only; not coil supply",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1707,7 +1707,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1730,7 +1730,7 @@
       }
     ],
     "description": "Identify actual JD-VCC and remove module VCC/JD jumper BEFORE closing",
-    "footprint": "",
+    "footprint": "BUSA:PinHeader_1x02_P2.54mm_Vertical",
     "datasheet": ""
   },
   {
@@ -1753,7 +1753,7 @@
       }
     ],
     "description": "New carrier connector; actual relay-board JD header pin order/return requires measurement",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B2B-XH-A_1x02_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -1783,7 +1783,7 @@
       }
     ],
     "description": "Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified.",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -1806,7 +1806,7 @@
       }
     ],
     "description": "Populate only after verifying sensor supply; collection model remains open",
-    "footprint": "",
+    "footprint": "BUSA:PinHeader_1x02_P2.54mm_Vertical",
     "datasheet": ""
   },
   {
@@ -1829,7 +1829,7 @@
       }
     ],
     "description": "Pullup supports open-collector sensor; inspect push-pull compatibility",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1852,7 +1852,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1882,7 +1882,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:SOT-23",
     "datasheet": "https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf"
   },
   {
@@ -1905,7 +1905,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1928,7 +1928,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1951,7 +1951,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -1974,7 +1974,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:1N4148W_SOD123_LOGICAL_A_K",
     "datasheet": ""
   },
   {
@@ -2004,7 +2004,7 @@
       }
     ],
     "description": "Carrier order 1=power,2=GND,3=pulse. Cooling: YF-S401. Collection model unspecified.",
-    "footprint": "",
+    "footprint": "BUSA:JST_XH_B3B-XH-A_1x03_P2.50mm_Vertical",
     "datasheet": ""
   },
   {
@@ -2027,7 +2027,7 @@
       }
     ],
     "description": "Populate only after verifying sensor supply; collection model remains open",
-    "footprint": "",
+    "footprint": "BUSA:PinHeader_1x02_P2.54mm_Vertical",
     "datasheet": ""
   },
   {
@@ -2050,7 +2050,7 @@
       }
     ],
     "description": "Pullup supports open-collector sensor; inspect push-pull compatibility",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -2073,7 +2073,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -2103,7 +2103,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:SOT-23",
     "datasheet": "https://assets.nexperia.com/documents/data-sheet/BC847X_SER.pdf"
   },
   {
@@ -2126,7 +2126,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -2149,7 +2149,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -2172,7 +2172,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -2195,7 +2195,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:1N4148W_SOD123_LOGICAL_A_K",
     "datasheet": ""
   },
   {
@@ -2246,7 +2246,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:SOT-23-6",
     "datasheet": "https://www.ti.com/lit/ds/symlink/sn74lvc2g14.pdf"
   },
   {
@@ -2269,7 +2269,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -2292,7 +2292,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:R_0805_2012Metric",
     "datasheet": ""
   },
   {
@@ -2315,7 +2315,7 @@
       }
     ],
     "description": "",
-    "footprint": "",
+    "footprint": "BUSA:C_0805_2012Metric",
     "datasheet": ""
   }
 ]

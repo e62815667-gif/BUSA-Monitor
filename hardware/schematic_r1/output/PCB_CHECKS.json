@@ -1,0 +1,33 @@
+{
+  "status": "PAD_NET_AUDIT_PASS_NOT_PRODUCTION_RELEASE",
+  "pcb_sha256": "307d357c0e4606d70afa948e206cc56b7a72f19057cdc156e8d1e04bf3a2c036",
+  "expected_connected_pads": 207,
+  "electrical_footprints": 67,
+  "mechanical_holes": 4,
+  "tracks": 702,
+  "vias": 35,
+  "track_length_mm": 3054.87,
+  "board_mm": [
+    120,
+    100,
+    1.6
+  ],
+  "esp_header_pitch_mm": 2.54,
+  "esp_row_spacing_mm": 25.5,
+  "checks": [
+    "Every connected physical pad matches exported schematic netlist",
+    "No extra net assigned to unused module pads",
+    "Diode cathode/anode logical names preserved in custom footprint mapping",
+    "Twelve carrier cable connectors top-side vertical entry",
+    "ESP row order, 2.54mm pitch and user-photo 25.50mm spacing",
+    "Two copper layers, closed 120x100mm outline, 1.6mm thickness"
+  ],
+  "unverified": [
+    "ESP body/USB/antenna envelope",
+    "PCF8575 3-row geometry/order",
+    "Relay JD-VCC interface and input levels",
+    "3.3V current/thermal margin",
+    "MPN procurement and manufacturer process",
+    "Bench operation"
+  ]
+}

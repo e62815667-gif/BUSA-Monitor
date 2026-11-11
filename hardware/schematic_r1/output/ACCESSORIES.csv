@@ -1,0 +1,11 @@
+﻿Item,Qty,Description,Notes
+U1 sockets,2,"1×22 female, 2.54mm",MPN/height TBD; user ESP module fits on top
+U3 sockets,2 + 1,1×8 female ×2; 1×5 female ×1; 2.54mm,MPN/height and relative geometry TBD
+Cable contacts,48,JST SXH-001T-P0.6 candidate,Wire gauge and contact/tool applicability to verify
+Mounting,4,M3 screws/standoffs,"Length according to enclosure, metal must clear copper"
+Module relay,1,Existing 4-channel 12V sound relay,External assembly; not soldered to carrier
+Display,1,Existing GMT028-05 V1.1,External; 3.3V confirmed
+Keypad,1,Existing light membrane 5×4,9 signal wires; current key map
+Temperature,4,Existing three-wire DS18B20 probes,New harness order VDD / DQ / GND
+Cooling flowmeter,1,Existing white YF-S401,Supply/output and calibration to verify
+Collection flowmeter,0,Future model not selected,"Reserved connector only, not a purchase item"

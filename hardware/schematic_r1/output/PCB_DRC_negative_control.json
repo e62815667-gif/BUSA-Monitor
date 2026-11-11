@@ -1,0 +1,103 @@
+{
+  "$schema": "https://schemas.kicad.org/drc.v1.json",
+  "coordinate_units": "mm",
+  "date": "2026-11-08T18:33:46+0000",
+  "kicad_version": "9.0.2",
+  "schematic_parity": [],
+  "source": "BUSA_R1.kicad_pcb",
+  "unconnected_items": [],
+  "violations": [
+    {
+      "description": "Tracks crossing",
+      "items": [
+        {
+          "description": "Track [/K2_GPIO6] on F.Cu, length 0.4600 mm",
+          "pos": {
+            "x": 125.04,
+            "y": 119.4133
+          },
+          "uuid": "853f517a-3a7e-44d2-bc4b-e8753f776c4f"
+        },
+        {
+          "description": "Track [/K1_GPIO7] on F.Cu, length 2.5400 mm",
+          "pos": {
+            "x": 125.5,
+            "y": 118.1
+          },
+          "uuid": "d9f74a78-cba7-45af-8086-d86ca64f45e4"
+        }
+      ],
+      "severity": "error",
+      "type": "tracks_crossing"
+    },
+    {
+      "description": "Items shorting two nets (nets /K2_GPIO6 and /K1_GPIO7)",
+      "items": [
+        {
+          "description": "Track [/K2_GPIO6] on F.Cu, length 1.2267 mm",
+          "pos": {
+            "x": 125.5,
+            "y": 120.64
+          },
+          "uuid": "61e203a2-021e-4379-af26-4f3ee9ad799a"
+        },
+        {
+          "description": "Track [/K1_GPIO7] on F.Cu, length 2.5400 mm",
+          "pos": {
+            "x": 125.5,
+            "y": 118.1
+          },
+          "uuid": "d9f74a78-cba7-45af-8086-d86ca64f45e4"
+        }
+      ],
+      "severity": "error",
+      "type": "shorting_items"
+    },
+    {
+      "description": "Clearance violation (netclass 'Default' clearance 0.2500 mm; actual 0.0850 mm)",
+      "items": [
+        {
+          "description": "Track [/K2_GPIO6] on F.Cu, length 1.1223 mm",
+          "pos": {
+            "x": 124.2464,
+            "y": 118.6197
+          },
+          "uuid": "be07a897-2cb4-4649-9c0c-849e2a3c6780"
+        },
+        {
+          "description": "Track [/K1_GPIO7] on F.Cu, length 2.5400 mm",
+          "pos": {
+            "x": 125.5,
+            "y": 118.1
+          },
+          "uuid": "d9f74a78-cba7-45af-8086-d86ca64f45e4"
+        }
+      ],
+      "severity": "error",
+      "type": "clearance"
+    },
+    {
+      "description": "Front solder mask aperture bridges items with different nets",
+      "items": [
+        {
+          "description": "Track [/K1_GPIO7] on F.Cu, length 2.5400 mm",
+          "pos": {
+            "x": 125.5,
+            "y": 118.1
+          },
+          "uuid": "d9f74a78-cba7-45af-8086-d86ca64f45e4"
+        },
+        {
+          "description": "PTH pad R17 [/K2_GPIO6] of U1",
+          "pos": {
+            "x": 125.5,
+            "y": 120.64
+          },
+          "uuid": "c09dfb29-4369-49dc-afbf-f27acb19f8f6"
+        }
+      ],
+      "severity": "error",
+      "type": "solder_mask_bridge"
+    }
+  ]
+}

@@ -26,7 +26,7 @@ for name,x0,y0,x1,y1 in regions:
 panels.save(out/'BUSA_R1_readable_sections.pdf');allpages=fitz.open(summary);allpages.insert_pdf(panels);allpages.save(out/'BUSA_R1_review.pdf');allpages[0].get_pixmap(matrix=fitz.Matrix(2,2)).save(out/'PINMAP_PREVIEW.png')
 d[0].get_pixmap(matrix=fitz.Matrix(1.5,1.5)).save(out/'SCHEMATIC_OVERVIEW.png')
 with (out/'BOM.csv').open('w') as f:
- w=csv.writer(f);w.writerow(['Ref','Value','Kind','Datasheet','Notes'])
+ w=csv.writer(f,lineterminator="\n");w.writerow(['Ref','Value','Kind','Datasheet','Notes'])
  for r in parts:
   if r['ref'].startswith('PF'):continue
   kind='Existing user module' if r['ref'] in ['U1','U3'] else 'Proposed carrier part/connector'
@@ -35,6 +35,6 @@ with (out/'BOM.csv').open('w') as f:
   w.writerow([r['ref'],r['value'],kind,r['datasheet'],r['description']])
 u1=next(r for r in parts if r['ref']=='U1')
 with (out/'HEADER_44.csv').open('w') as f:
- w=csv.writer(f);w.writerow(['Position USB-at-top','Silkscreen function','Net','Direction'])
+ w=csv.writer(f,lineterminator="\n");w.writerow(['Position USB-at-top','Silkscreen function','Net','Direction'])
  for r in u1['pins']:w.writerow([r['number'],r['name'],r['net'] or 'NC',r['type']])
 print('Built review PDF:',len(allpages),'pages; BOM, 44-pin header table and inline preview')

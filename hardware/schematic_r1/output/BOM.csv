@@ -1,7 +1,7 @@
 Ref,Value,Kind,Datasheet,Notes
 J1,DC INPUT / 12V ONLY,Proposed carrier part/connector,,
 F1,1A slow / 32V,Proposed carrier part/connector,,
-D1,SS34,Proposed carrier part/connector,,
+D1,B340A-13-F / SMA,Proposed carrier part/connector,https://www.diodes.com/datasheet/download/B340A.pdf,Exact SMA Schottky choice; do not substitute a vendor SS34 in SMC
 U2,R-78E5.0-1.0,Proposed carrier part/connector,https://recom-power.com/pdf/Innoline/R-78E-1.0.pdf,"New selected regulator option, not claimed existing user component"
 C1,10uF / 35V,Proposed carrier part/connector,,
 C2,100nF / 50V,Proposed carrier part/connector,,
