@@ -1,4 +1,4 @@
-name: BUSA N16R8 CALC4 WIFI1 UI12 audited interface build
+name: BUSA N16R8 CALC4 WIFI1 UI13 local interface corrections build
 on:
   push:
     branches: [feat/busa-calculator-20261105, feat/busa-ui7-local]
@@ -101,6 +101,8 @@ jobs:
           CI=1 python3 -m playwright install --with-deps chromium webkit
           python3 -B tests/test_calculator_browser.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_calculator_browser.py
+          python3 -B tests/test_ui13_browser.py
+          BUSA_TEST_BROWSER=webkit python3 -B tests/test_ui13_browser.py
           python3 -B tests/test_ui11_viewport.py
           python3 -B tests/test_ui11_style.py
           python3 -B tests/test_ui9_live.py
@@ -113,17 +115,17 @@ jobs:
           arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
       - name: Package and verify the two BIN and complete source snapshot
         run: |
-          python3 ci/package_ui12.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          python3 ci/package_ui13.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_UI12_20261108
+          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_UI13_20261114
           retention-days: 30
           path: |
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI12_APP_OTA.bin
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI12_USB_MERGED.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI13_APP_OTA.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI13_USB_MERGED.bin
             out/SHA256SUMS.txt
             out/OTA_IMAGE_INFO.txt
             out/PARTITIONS.csv
             out/SOURCE_COMMIT.txt
             out/SOURCE_SHA256SUMS.txt
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI12_SOURCE.zip
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI13_SOURCE.zip

@@ -13,6 +13,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
    if 'start=1' in self.path:state['starts']+=1
    data={'scanning':False,'networks':[],'error':'','diagnostic':{'start_result':0,'event_status':0}}
    if state['case']=='found':data['networks']=[{'ssid':'Тестовая сеть','rssi':-40},{'ssid':'Тестовая сеть','rssi':-50}]
+   elif state['case']=='invalid':data['networks']=[{'ssid':'я'*17,'rssi':-40}]
    elif state['case']=='error':data['error']='scan_start_failed';data['diagnostic']['start_result']=12294
    else:data['error']='no_networks'
    self.send_response(200);self.send_header('Content-Type','application/json');self.end_headers();self.wfile.write(json.dumps(data).encode());return
@@ -33,10 +34,12 @@ with sync_playwright() as p:
  page.goto(f'http://127.0.0.1:{server.server_address[1]}/local.html');page.locator('[data-page="5"]').click();page.locator('[data-stab-btn="1"]').click()
  page.wait_for_function("Array.from(document.getElementById('net').options).filter(x=>x.value==='Тестовая сеть').length===1")
  page.locator('#net').select_option(label='Тестовая сеть');page.locator('#pass').fill('example123');page.locator('#save').click();page.wait_for_function("document.getElementById('pass').value===''");assert state['posts'][-1]['ssid']==['Тестовая сеть']
- state['case']='error';page.locator('#wifiRetry').click();page.wait_for_function("document.getElementById('response').textContent.includes('12294')");assert page.locator('#manualSsid').is_visible();assert 'Ошибка' not in page.locator('#net').inner_text() # picker is usable, error is separate
- page.locator('#manualSsid').fill('Тестовая сеть');page.locator('#pass').fill('example123');page.locator('#save').click();page.wait_for_function("document.getElementById('pass').value===''");assert len(state['posts'])==2 and state['posts'][-1]['ssid']==['Тестовая сеть']
- page.locator('#manualSsid').fill('я'*17);page.locator('#pass').fill('example123');page.locator('#save').click();assert len(state['posts'])==2;assert '32' in page.locator('#response').inner_text()
- state['case']='empty';page.locator('#wifiRetry').click();page.wait_for_function("document.getElementById('response').textContent.includes('2,4')");assert page.locator('#manualSsid').is_visible();assert not page.locator('#wifiRetry').is_disabled();assert state['starts']==3
+ state['case']='error';page.locator('#wifiRetry').click();page.wait_for_function("document.getElementById('response').textContent.includes('Повторите поиск')");assert page.locator('#manualSsid').count()==0;assert 'Ошибка' not in page.locator('#net').inner_text()
+ page.locator('#save').click();assert len(state['posts'])==1;assert page.locator('#response').inner_text()=='Выберите сеть из списка.'
+ state['case']='invalid';page.locator('#wifiRetry').click();page.wait_for_function("document.getElementById('net').options.length===2");page.locator('#net').select_option('я'*17);page.locator('#pass').fill('example123');page.locator('#save').click();assert len(state['posts'])==1
+ state['case']='found';page.locator('#wifiRetry').click();page.wait_for_function("Array.from(document.getElementById('net').options).some(x=>x.value==='Тестовая сеть')");page.locator('#net').select_option('Тестовая сеть');page.locator('#save').click();page.wait_for_function("document.getElementById('pass').value===''");assert len(state['posts'])==2
+ state['case']='empty';page.locator('#wifiRetry').click();page.wait_for_function("document.getElementById('response').textContent.includes('Сети не найдены')");assert page.locator('#manualSsid').count()==0;assert not page.locator('#wifiRetry').is_disabled();assert state['starts']==5
+ assert page.locator('#net option[value="__manual__"],#wstatus').count()==0
  assert page.evaluate('document.documentElement.scrollWidth<=innerWidth');assert not errors,errors
  context.close();browser.close()
-server.shutdown();print('PASS '+engine+' Wi-Fi fixture: Cyrillic SSID/dedup, explicit retry, native error details, manual connection after scan failure, UTF-8 byte validation, no JS exception/overflow')
+server.shutdown();print('PASS '+engine+' Wi-Fi fixture: Cyrillic SSID/dedup, retry and recovery after failure, no manual SSID, UTF-8 validation, no duplicate status/JS exception/overflow')

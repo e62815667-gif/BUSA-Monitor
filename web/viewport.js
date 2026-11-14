@@ -57,7 +57,7 @@ function view(){
  if(id===5){
   const menu=$('#settingsMenu');if(visible(menu))return {section,id,host:menu,units:[...menu.children],key:'settings-menu'};
   const card=Array.from(section.querySelectorAll('.settingCard')).find(visible);if(!card)return null;
-  if(card.dataset.stab==='1')return {section,id,unchanged:true,key:'wifi'};
+  if(card.dataset.stab==='0'||card.dataset.stab==='1')return {section,id,host:card,single:true,key:'form-'+card.dataset.stab};
   if(card.dataset.stab==='6'){
    const host=Array.from(card.querySelectorAll('[data-diag-panel]')).find(visible);if(!host)return null;
    host.classList.add('vpDiagContent');
@@ -150,6 +150,12 @@ function fit(){
   if(v.id===0){currentHost=null;fitHome(v.section);return;}
   if(v.id===3){currentHost=null;fitGraph();return;}
   if(!v.host)return;
+  if(v.single){
+   currentHost=v.key;currentPage=0;
+   document.body.classList.toggle('shortFormViewport',main.clientHeight<280);
+   set(v.host,'height','auto');set(v.host,'flex','0 0 auto');
+   return;
+  }
   if(currentHost!==v.key){currentHost=v.key;currentPage=0;}
   pages=measure(v,0);
   if(pages.length>1){pager.hidden=false;clearUnits();pages=measure(view(),32);}
@@ -164,8 +170,16 @@ document.addEventListener('click',e=>{if(!e.target.closest('.vpPager'))request()
 document.addEventListener('toggle',e=>{focusUnit=e.target.closest('.approvedSensor')||e.target;request();},true);
 document.addEventListener('focusin',e=>{focusUnit=e.target;request();});
 document.addEventListener('focusout',request);
-if(typeof ResizeObserver!=='undefined')new ResizeObserver(request).observe(main);
-new MutationObserver(rows=>{if(rows.some(r=>!r.target.closest?.('.vpPager')))request();}).observe(main,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','open']});
+if(typeof ResizeObserver!=='undefined'){
+ const resize=new ResizeObserver(request);resize.observe(main);
+ const dashboard=main.querySelector('.approvedDashboard');if(dashboard)resize.observe(dashboard);
+}
+// Live values do not change the home drawing's geometry. Avoid a layout pass
+// on every temperature/threshold update; navigation and resize still fit it.
+new MutationObserver(rows=>{
+ const home=main.querySelector('[data-section="0"]'),homeActive=home&&!home.hidden;
+ if(rows.some(r=>!r.target.closest?.('.vpPager')&&(r.type==='attributes'||!homeActive)))request();
+}).observe(main,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','open']});
 window.addEventListener('resize',request);window.addEventListener('orientationchange',request);window.visualViewport?.addEventListener('resize',request);
 window.addEventListener('pageshow',request);
 request();

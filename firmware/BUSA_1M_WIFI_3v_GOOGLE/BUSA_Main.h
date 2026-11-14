@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI12-20261108";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI13-20261114";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -2125,7 +2125,7 @@ section[data-section="1"] .sensorEdit{border:0}
 section[data-section="0"] .approvedRig{min-height:0;overflow:visible;align-self:center}
 .rigArtStage{position:relative;isolation:isolate;width:100%;aspect-ratio:1024 / 1536;overflow:hidden}
 .approvedRigArt{display:block;width:100%;height:auto;object-fit:contain;background:transparent}
-.rigSheen{position:absolute;inset:0;pointer-events:none;background:linear-gradient(110deg,transparent 38%,#d6efff55 49%,transparent 60%);background-size:260% 100%;clip-path:polygon(31% 24%,50% 24%,50% 72%,68% 76%,68% 98%,18% 98%,18% 77%,31% 71%);animation:rigShine 3.5s ease-in-out infinite;opacity:.85}
+.rigSheen{display:none}
 .rigCoolantGlow{position:absolute;left:76%;top:47%;width:18%;height:25%;opacity:0;background:linear-gradient(0deg,transparent,#38bdf87a,transparent);border-radius:12px}
 .boilerBoil{position:absolute;left:31.5%;top:81.6%;width:19.5%;height:9.5%;overflow:hidden;border-radius:5% 5% 30% 30%;pointer-events:none}
 .boilerBoil i{position:absolute;bottom:-10%;left:var(--x);width:8%;aspect-ratio:1;border:1px solid #b8f5ffcc;border-radius:50%;background:radial-gradient(circle at 30% 25%,#e3ffffb3,transparent 65%);animation:busaBoil var(--d) linear infinite;animation-delay:calc(var(--i)*-.37s)}
@@ -2134,11 +2134,9 @@ section[data-section="0"] .approvedRig{min-height:0;overflow:visible;align-self:
 @keyframes busaSurface{from{transform:translateX(-3%) rotate(-2deg);opacity:.5}to{transform:translateX(3%) rotate(2deg);opacity:.9}}
 @media(prefers-reduced-motion:reduce){.boilerBoil i,.boilerSurface{animation:none!important}.boilerBoil i{bottom:40%;opacity:.7}}
 .rigUpperGlow{left:6%;top:6%;width:13%;height:12%}
-.hasCooling .rigCoolantGlow{opacity:.7;animation:coolantGlow 2.4s ease-in-out infinite}
+.hasCooling .rigCoolantGlow{opacity:.35}
 .rigDrop{position:absolute;left:86.5%;top:81%;width:5px;height:8px;background:#40ceff;border-radius:70% 70% 70% 5%;opacity:0;transform:rotate(-45deg)}
 .hasCollection .rigDrop{animation:rigDrop 2s linear infinite}.hasCollection .dropTwo{animation-delay:.65s}.hasCollection .dropThree{animation-delay:1.3s}
-@keyframes rigShine{0%,15%{background-position:140% 0}85%,100%{background-position:-40% 0}}
-@keyframes coolantGlow{50%{opacity:.2;transform:translateY(6px)}}
 @keyframes rigDrop{0%{opacity:0;transform:translateY(0) rotate(-45deg)}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translateY(50px) rotate(-45deg)}}
 @media(prefers-reduced-motion:reduce){.rigSheen,.rigCoolantGlow,.rigDrop{animation:none!important}}
 :root section[data-section="0"] .temp0 strong,:root section[data-section="1"] .temp0 .approvedSensorLive{color:var(--water)!important}
@@ -2384,6 +2382,38 @@ html.viewportFit{height:100%;overflow:hidden;overscroll-behavior:none}
 .viewportFit textarea[readonly]{pointer-events:none;white-space:pre-wrap!important;overflow-wrap:anywhere;word-break:break-word}
 .viewportFit .page pre{white-space:pre-wrap!important;overflow-wrap:anywhere;word-break:break-word;max-width:100%}
 .viewportFit .vpDiagContent{display:contents}
+.viewportFit .temperatureCalibration,.viewportFit .wifiSettings{padding:10px!important;margin:0!important}
+.viewportFit .temperatureCalibration h2,.viewportFit .wifiSettings h2{font-size:17px;line-height:1.25;margin:0 0 9px!important}
+.viewportFit .temperatureCalibration>.hint{margin:0 0 7px;font-size:11px;line-height:1.3}
+.viewportFit .calibrationFields{display:grid;gap:3px}
+.viewportFit .calibrationFields .row{display:grid;grid-template-columns:76px minmax(0,1fr);align-items:center;gap:10px;padding:1px 0;margin:0}
+.viewportFit .calibrationFields label{font-size:13px;line-height:1.2;margin:0;white-space:nowrap}
+.viewportFit .calibrationFields input{width:100%;min-width:0;box-sizing:border-box;margin:0;padding:5px 10px;min-height:34px;font-size:16px;line-height:1.25}
+.viewportFit .calibrationFields label[for="calOffset0"]{color:var(--water)}
+.viewportFit .calibrationFields label[for="calOffset2"]{color:var(--cube)}
+.viewportFit .calibrationFields label[for="calOffset1"]{color:var(--column)}
+.viewportFit .calibrationFields label[for="calOffset3"]{color:var(--alarm)}
+.viewportFit .temperatureCalibration #tempCalSave{margin:9px 0 0;min-height:38px;padding:8px;font-size:13px}
+.viewportFit #tempCalResult:empty,.viewportFit #response:empty{display:none}
+.viewportFit .temperatureCalibration #tempCalResult{margin:7px 0 0;font-size:11px;line-height:1.3}
+.viewportFit .wifiSettings .busaWifiMode{border:0;padding:0;display:grid;gap:9px}
+.viewportFit .wifiField{display:grid;gap:5px;min-width:0}
+.viewportFit .wifiField label{font-size:13px;line-height:1.2;margin:0}
+.viewportFit .wifiField input,.viewportFit .wifiField select{width:100%;box-sizing:border-box;min-width:0;margin:0;min-height:38px;padding:8px;font-size:16px;line-height:1.25}
+.viewportFit .wifiSettings button{min-height:36px;padding:8px;font-size:13px;margin:0}
+.viewportFit .wifiActions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.viewportFit .wifiSettings #response{font-size:12px;line-height:1.3;margin:0;overflow-wrap:anywhere}
+.viewportFit .shortFormViewport .calibrationFields{grid-template-columns:1fr 1fr;gap:4px 12px}
+.viewportFit .shortFormViewport .calibrationFields .row{grid-template-columns:64px minmax(0,1fr);gap:5px;padding:3px 0}
+.viewportFit .shortFormViewport .calibrationFields input{min-height:30px;padding:4px}
+.viewportFit .shortFormViewport .temperatureCalibration>.hint{display:none}
+.viewportFit .shortFormViewport .temperatureCalibration,.viewportFit .shortFormViewport .wifiSettings{padding:7px!important}
+.viewportFit .shortFormViewport .temperatureCalibration h2,.viewportFit .shortFormViewport .wifiSettings h2{margin-bottom:5px!important}
+.viewportFit .shortFormViewport .temperatureCalibration #tempCalSave{min-height:30px;margin-top:5px;padding:5px}
+.viewportFit .shortFormViewport .wifiSettings .busaWifiMode{grid-template-columns:1fr 1fr;gap:5px 9px}
+.viewportFit .shortFormViewport .wifiSettings #wifiRetry,.viewportFit .shortFormViewport .wifiSettings .wifiActions,.viewportFit .shortFormViewport .wifiSettings #response{grid-column:1/-1}
+.viewportFit .shortFormViewport .wifiField input,.viewportFit .shortFormViewport .wifiField select{min-height:30px;padding:4px}
+.viewportFit .shortFormViewport .wifiSettings button{min-height:28px;padding:5px}
 @media(max-height:500px){.viewportFit .approvedPageTitle{display:none}}
 /* BUSA_VIEWPORT_CSS_END */
 </style><link rel="stylesheet" href="/calculator.css?v=CALC1"></head><body>
@@ -2473,24 +2503,24 @@ html.viewportFit{height:100%;overflow:hidden;overscroll-behavior:none}
 <div class="card">
 <div id="events" class="approvedEvents">Ожидание...</div></div></div>
 
-<div class="card settingCard" data-stab="0"><h2>Калибровка температуры</h2>
-<p class="hint">Поправки показаний T1–T4, шаг 0,1 °C, от −10 до +10 °C. Это НЕ пороги звуковых сигналов.</p>
-<div class="row"><label for="calOffset0">T1 · Вода</label><input id="calOffset0" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
-<div class="row"><label for="calOffset2">T3 · Куб</label><input id="calOffset2" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
-<div class="row"><label for="calOffset1">T2 · Колонна</label><input id="calOffset1" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
-<div class="row"><label for="calOffset3">T4 · Авария</label><input id="calOffset3" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
+<div class="card settingCard temperatureCalibration" data-stab="0"><h2>Калибровка температуры</h2>
+<p class="hint">Поправка: −10…+10 °C · шаг 0,1 °C</p>
+<div class="calibrationFields">
+<div class="row"><label for="calOffset0">Вода</label><input id="calOffset0" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
+<div class="row"><label for="calOffset2">Куб</label><input id="calOffset2" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
+<div class="row"><label for="calOffset1">Колонна</label><input id="calOffset1" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
+<div class="row"><label for="calOffset3">Авария</label><input id="calOffset3" type="number" min="-10" max="10" step="0.1" value="0.0"></div>
+</div>
 <button id="tempCalSave" type="button" class="full">Сохранить поправки</button>
-<p id="tempCalResult" role="status" class="hint">—</p></div>
+<p id="tempCalResult" role="status" class="hint"></p></div>
 
-<div class="card settingCard" data-stab="1" hidden><h2>Wi-Fi</h2>
-<div class="busaWifiMode"><h3>Wi-Fi с интернетом</h3>
-<div id="wstatus">Проверка подключения...</div>
-<label for="net">Выберите сеть</label><select id="net"><option value="">Поиск сетей...</option></select>
-<div id="manualSsidRow" hidden><label for="manualSsid">SSID вручную</label><input id="manualSsid" type="text" autocomplete="off" placeholder="Точное имя сети"></div>
-<button type="button" id="wifiRetry" class="full">Повторить поиск</button>
-<label for="pass">Пароль Wi-Fi</label><input id="pass" type="password" minlength="8" maxlength="63" placeholder="Введите пароль">
-<button type="button" class="full" id="save">Сохранить и подключить</button>
-<button type="button" class="full" id="disconnectWifi">Отключить Wi-Fi</button>
+<div class="card settingCard wifiSettings" data-stab="1" hidden><h2>Wi-Fi</h2>
+<div class="busaWifiMode">
+<div class="wifiField"><label for="net">Выберите сеть</label><select id="net"><option value="">Поиск сетей...</option></select></div>
+<div class="wifiField"><label for="pass">Пароль</label><input id="pass" type="password" minlength="8" maxlength="63" autocomplete="current-password" placeholder="Введите пароль"></div>
+<button type="button" id="wifiRetry" class="full">Обновить список</button>
+<div class="wifiActions"><button type="button" class="full" id="save">Подключить</button>
+<button type="button" class="full" id="disconnectWifi">Отключить</button></div>
 <p id="response" role="status"></p></div></div>
 
 <div class="card settingCard" data-stab="2" hidden><h2>Экран</h2>
@@ -2747,8 +2777,12 @@ function updateLiquidPanels(s){
 }
 
 function renderHomeThresholds(i,on,off){
- const node=get('homeSet'+i);node.replaceChildren();
- for(const [label,value] of [['ВКЛ',on],['ОТКЛ',off]]){const line=document.createElement('span');line.textContent=label+' '+formatNumeric(value)+'°';node.append(line);}
+ const node=get('homeSet'+i);
+ if(node.children.length!==2)node.replaceChildren(document.createElement('span'),document.createElement('span'));
+ [['ВКЛ',on],['ОТКЛ',off]].forEach(([label,value],index)=>{
+  const text=label+' '+formatNumeric(value)+'°',line=node.children[index];
+  if(line.textContent!==text)line.textContent=text;
+ });
 }
 function initHomeDrawing(){
  const stage=get('rigArtStage'),threshold=get('homeSet2');threshold.classList.add('cubeSetBelow');stage.append(threshold);
@@ -2951,13 +2985,6 @@ if(Number.isFinite(currentPulse)){
  lastWaterPulse=currentPulse;waterPulseLog.push(delta);
  if(waterPulseLog.length>80)waterPulseLog.shift();
 }
-let ss=s.station.connected?'ПОДКЛЮЧЕНО: '+s.station.ssid+' · '+s.station.ip:
- s.station.last_error?'НЕ ПОДКЛЮЧЕНО: '+s.station.last_error:
- s.station.connecting?'Подключаю: '+(s.station.target_ssid||'выбранную сеть'):
- s.diagnostics?.wifi?.sta_disabled_by_user?'Внешняя сеть отключена':
- 'НЕТ СОЕДИНЕНИЯ'+(s.station.target_ssid?' · выбрана '+s.station.target_ssid:'');
-get('wstatus').textContent=ss;
-
 // The browser's SSID picker is never automatically populated with old iPhone.
 const cs=s.google;
 get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
@@ -3114,17 +3141,14 @@ get('manualUpdate').onclick=async function(){
 };
 let wifiListBusy=false,wifiRescanAfterDisconnect=false;
 // Single bounded radio scan per opening of the Wi-Fi page.
-function wifiManualVisibility(){get('manualSsidRow').hidden=get('net').value!=='__manual__';}
 function wifiScanMessage(j){
- const names={scan_start_failed:'Не удалось запустить сканер',scan_driver_failed:'Ошибка драйвера поиска',scan_results_unavailable:'Результаты сканера недоступны',scan_timeout:'Поиск превысил время ожидания',sta_unavailable:'Режим AP+STA недоступен',scan_event_unavailable:'Обработчик поиска не готов',scan_cancelled_ota:'Поиск остановлен на время OTA',busy:'Устройство занято',only_hidden_networks:'Обнаружены только скрытые сети'};
- if(!j.error||j.error==='no_networks')return 'Доступные сети 2,4 ГГц не найдены. Можно ввести SSID вручную.';
- const detail=j.diagnostic?(' · код '+j.diagnostic.start_result+', событие '+j.diagnostic.event_status):'';
- return (names[j.error]||'Ошибка поиска Wi-Fi: '+j.error)+detail;
+ if(!j.error||j.error==='no_networks'||j.error==='only_hidden_networks')return 'Сети не найдены. Обновите список.';
+ return j.error==='scan_cancelled_ota'?'Поиск недоступен во время обновления.':'Не удалось найти сети. Повторите поиск.';
 }
 async function wifiRefreshNetworks(fresh=false){
  if(wifiListBusy||settingsActive!==1)return;
  wifiListBusy=true;get('wifiRetry').disabled=true;
- const sel=get('net'),keepManual=sel.value==='__manual__';
+ const sel=get('net'),selected=sel.value;
  sel.replaceChildren(new Option('Поиск сетей...',''));
  get('response').textContent='Поиск сетей...';
  try{
@@ -3137,16 +3161,16 @@ async function wifiRefreshNetworks(fresh=false){
   if(settingsActive!==1)return;if(j.scanning)throw Error('Поиск превысил время ожидания');
   const unique=new Set();sel.replaceChildren(new Option('Выберите сеть',''));
   (j.networks||[]).forEach(item=>{if(item.ssid&&!unique.has(item.ssid)){unique.add(item.ssid);sel.add(new Option(item.ssid,item.ssid));}});
-  sel.add(new Option('Ввести SSID вручную','__manual__'));if(keepManual||!unique.size)sel.value='__manual__';wifiManualVisibility();
+   if(unique.has(selected))sel.value=selected;
   get('response').textContent=unique.size?'':wifiScanMessage(j);
  }catch(e){
-  if(settingsActive===1){sel.replaceChildren(new Option('Ввести SSID вручную','__manual__'));wifiManualVisibility();get('response').textContent='Ошибка поиска Wi-Fi: '+e.message;}
+  if(settingsActive===1){sel.replaceChildren(new Option('Выберите сеть',''));get('response').textContent='Не удалось найти сети. Повторите поиск.';}
  }finally{
   wifiListBusy=false;get('wifiRetry').disabled=false;
   if(wifiRescanAfterDisconnect&&settingsActive===1){wifiRescanAfterDisconnect=false;await new Promise(resolve=>setTimeout(resolve,650));if(settingsActive===1)wifiRefreshNetworks(true);}
  }
 }
-get('net').onchange=()=>{wifiManualVisibility();get('response').textContent='';};
+get('net').onchange=()=>{get('response').textContent='';};
 get('wifiRetry').onclick=()=>wifiRefreshNetworks(true);
 get('disconnectWifi').onclick=async function(){
   this.disabled=true;
@@ -3157,7 +3181,6 @@ get('disconnectWifi').onclick=async function(){
     const reply=await r.text();
     if(!r.ok)throw Error(reply||'HTTP '+r.status);
     get('response').textContent=reply;
-    get('wstatus').textContent='НЕТ СОЕДИНЕНИЯ';
     get('pass').value='';
     get('net').replaceChildren(new Option('Выберите сеть',''));
     // An in-flight scan finishes first; then one fresh scan runs on disconnected STA.
@@ -3170,11 +3193,10 @@ get('disconnectWifi').onclick=async function(){
   this.disabled=false;
 };
 get('save').onclick=async function(){
- let ssid=(get('net').value==='__manual__'?get('manualSsid').value:get('net').value).trim(),pass=get('pass').value;
+  let ssid=get('net').value,pass=get('pass').value;
  const encoder=new TextEncoder(),ssidBytes=encoder.encode(ssid).length,passBytes=encoder.encode(pass).length;
- if(!ssid||ssidBytes>32||passBytes<8||passBytes>63){
-  get('response').textContent='Выберите сеть или введите SSID (до 32 байт), пароль 8–63 байта.';return;
- }
+  if(!ssid||ssidBytes>32){get('response').textContent='Выберите сеть из списка.';return;}
+  if(passBytes<8||passBytes>63){get('response').textContent='Пароль не подходит по длине.';return;}
  this.disabled=true;get('response').textContent='Подключаю к '+ssid+'...';
  try{
   let r=await fetch('/api/wifi',{method:'POST',body:new URLSearchParams({ssid,pass}),signal:AbortSignal.timeout(12000)});
@@ -3256,7 +3278,7 @@ function view(){
  if(id===5){
   const menu=$('#settingsMenu');if(visible(menu))return {section,id,host:menu,units:[...menu.children],key:'settings-menu'};
   const card=Array.from(section.querySelectorAll('.settingCard')).find(visible);if(!card)return null;
-  if(card.dataset.stab==='1')return {section,id,unchanged:true,key:'wifi'};
+  if(card.dataset.stab==='0'||card.dataset.stab==='1')return {section,id,host:card,single:true,key:'form-'+card.dataset.stab};
   if(card.dataset.stab==='6'){
    const host=Array.from(card.querySelectorAll('[data-diag-panel]')).find(visible);if(!host)return null;
    host.classList.add('vpDiagContent');
@@ -3349,6 +3371,12 @@ function fit(){
   if(v.id===0){currentHost=null;fitHome(v.section);return;}
   if(v.id===3){currentHost=null;fitGraph();return;}
   if(!v.host)return;
+  if(v.single){
+   currentHost=v.key;currentPage=0;
+   document.body.classList.toggle('shortFormViewport',main.clientHeight<280);
+   set(v.host,'height','auto');set(v.host,'flex','0 0 auto');
+   return;
+  }
   if(currentHost!==v.key){currentHost=v.key;currentPage=0;}
   pages=measure(v,0);
   if(pages.length>1){pager.hidden=false;clearUnits();pages=measure(view(),32);}
@@ -3363,8 +3391,16 @@ document.addEventListener('click',e=>{if(!e.target.closest('.vpPager'))request()
 document.addEventListener('toggle',e=>{focusUnit=e.target.closest('.approvedSensor')||e.target;request();},true);
 document.addEventListener('focusin',e=>{focusUnit=e.target;request();});
 document.addEventListener('focusout',request);
-if(typeof ResizeObserver!=='undefined')new ResizeObserver(request).observe(main);
-new MutationObserver(rows=>{if(rows.some(r=>!r.target.closest?.('.vpPager')))request();}).observe(main,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','open']});
+if(typeof ResizeObserver!=='undefined'){
+ const resize=new ResizeObserver(request);resize.observe(main);
+ const dashboard=main.querySelector('.approvedDashboard');if(dashboard)resize.observe(dashboard);
+}
+// Live values do not change the home drawing's geometry. Avoid a layout pass
+// on every temperature/threshold update; navigation and resize still fit it.
+new MutationObserver(rows=>{
+ const home=main.querySelector('[data-section="0"]'),homeActive=home&&!home.hidden;
+ if(rows.some(r=>!r.target.closest?.('.vpPager')&&(r.type==='attributes'||!homeActive)))request();
+}).observe(main,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','open']});
 window.addEventListener('resize',request);window.addEventListener('orientationchange',request);window.visualViewport?.addEventListener('resize',request);
 window.addEventListener('pageshow',request);
 request();

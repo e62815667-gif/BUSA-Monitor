@@ -5,7 +5,7 @@ root=Path(__file__).resolve().parents[1];sketch=root/'firmware/BUSA_1M_WIFI_3v_G
 wifi_fix='#include "BUSA_WifiScan.h"' in (sketch/'BUSA_Main.h').read_text()
 calc='RM-CALC' in (sketch/'BUSA_Main.h').read_text()
 manifest=json.loads((root/'tests/fixtures/rm_fix3_preserved.json').read_text())
-audited=json.loads((root/'tests/fixtures/ui12_audited_changes.json').read_text()) if 'WIFI1-UI12-' in (sketch/'BUSA_Main.h').read_text() else {'files':{},'functions':{}}
+audited=json.loads((root/'tests/fixtures/ui12_audited_changes.json').read_text()) if any(v in (sketch/'BUSA_Main.h').read_text() for v in ['WIFI1-UI12-','WIFI1-UI13-']) else {'files':{},'functions':{}}
 manifest.update(audited['files'])
 for name,digest in manifest.items():
  if (wifi_fix and name.endswith('BUSA_KeypadTFT_UI.h')):continue

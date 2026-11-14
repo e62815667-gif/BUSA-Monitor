@@ -3,9 +3,11 @@ from pathlib import Path
 import re,json,urllib.parse,hashlib,shutil,subprocess
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1];html=(root/'firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text().split('R"HTMLBUSA(',1)[1].split(')HTMLBUSA"',1)[0];fixture=json.loads((root/'tests/fixtures/ui10-status.json').read_text());preserved=json.loads((root/'tests/fixtures/ui10_preserved.json').read_text())
+if 'WIFI1-UI13-' in (root/'firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text():
+ preserved.update(json.loads((root/'tests/fixtures/ui13_local_changes.json').read_text())['authorized'])
 sha=lambda s:hashlib.sha256(s.encode()).hexdigest()
 assert sha(re.search(r'<script>(.*?)</script>',html,re.S).group(1))==preserved['primary_browser_script']
-a=html.index('<div class="card settingCard" data-stab="1"');z=html.index('<div class="card settingCard" data-stab="2"',a);assert sha(html[a:z])==preserved['wifi_card_markup']
+a=re.search(r'<div class="card settingCard[^\"]*" data-stab="1"',html).start();z=html.index('<div class="card settingCard" data-stab="2"',a);assert sha(html[a:z])==preserved['wifi_card_markup']
 for name in ['calculator.js','calculator.css','calculator/ui.js','calculator/core.js']:assert hashlib.sha256((root/name).read_bytes()).hexdigest()==preserved[name],name
 for js in re.findall(r'<script>(.*?)</script>',html,re.S):subprocess.run(['node','--check'],input=js.encode(),check=True)
 out=root.parent/'ui11/screens';out.mkdir(parents=True,exist_ok=True)
@@ -60,7 +62,7 @@ with sync_playwright() as p:
   page.locator('[data-page="7"]').click();settle();assert page.evaluate('document.documentElement.dataset.viewportMode')=='unchanged'
   assert page.locator('.calcPanel .vpField,.calcPanel .vpLongWindow,.calcPanel .vpHidden').count()==0
   assert page.locator('#calc-0-v').evaluate('(e)=>getComputedStyle(e).fontSize')=='22px'
-  page.locator('[data-page="5"]').click();page.evaluate('settingsTab(1)');settle();assert page.evaluate('document.documentElement.dataset.viewportMode')=='unchanged'
+  page.locator('[data-page="5"]').click();page.evaluate('settingsTab(1)');settle();assert page.evaluate('document.documentElement.dataset.viewportMode')=='fit'
   assert page.locator('[data-stab="1"] .vpField,[data-stab="1"] .vpHidden').count()==0
   # Returning from an ordinary scrollable form restores the fitted frame at the top.
   page.evaluate('scrollTo(0,300)');page.locator('[data-page="0"]').click();audit('return home',extra)
@@ -80,4 +82,4 @@ with sync_playwright() as p:
 
   assert not errors,errors;page.close()
  browser.close()
-print('PASS UI11: six viewport/orientation sizes; all home readouts/relays visible together; no document scrolling; every paginated control reachable; long journal/report, resize/return; Calculator and Wi-Fi source and layout unchanged')
+print('PASS viewport: six sizes; home readouts and relays visible; remaining report pages reachable; full diagnostic copy; Calculator preserved; UI13 Wi-Fi changes explicitly pinned')

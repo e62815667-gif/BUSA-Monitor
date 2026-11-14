@@ -24,7 +24,7 @@ with sync_playwright() as pw:
    page.route('**/*',route);page.goto('http://busa.test/');page.wait_for_selector('#busaCalculator .calcPanel',state='attached');page.evaluate('(v)=>document.documentElement.dataset.theme=v',theme)
    assert page.locator('.appTabs button').evaluate_all('(a)=>a.map(e=>Number(e.dataset.page))')==[0,1,2,3,7,5]
    assert page.locator('.approvedRigArt').count()==1 and page.locator('.approvedRig .waterMotion').count()==1
-   assert page.locator('.rigSheen').evaluate('(e)=>getComputedStyle(e).animationName')=='rigShine'
+   assert page.locator('.rigSheen').evaluate('(e)=>getComputedStyle(e).animationName')=='none'
    assert page.locator('.approvedTemp strong[id]').evaluate_all('(a)=>a.map(e=>e.id)')==['t0','t2','t1','t3']
    assert page.locator('.approvedTempTitle > span:last-child').all_inner_texts()==['Вода','Куб','Колонна','Авария']
    assert page.locator('#homeSet2').evaluate('(e)=>e.parentElement.id')=='rigArtStage'
