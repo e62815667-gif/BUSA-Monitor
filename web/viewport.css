@@ -43,19 +43,31 @@ section[data-section="0"] .temp2 strong{font-size:clamp(10px,calc(var(--scene-w)
 /* Charts keep their approved aspect ratio; JS can only reduce their height. */
 .chartCard{flex:0 0 auto}
 #chartCanvas{flex:none}
-/* Presentation pages retain the original controls and their sizes. */
-section[data-section="1"] .approvedSensorList{display:contents}
-.vpHidden{display:none!important}
-.vpPager{flex:0 0 31px;display:flex;align-items:center;justify-content:space-between;gap:7px;padding:3px 0 0;min-height:31px;background:var(--paper);z-index:3}
-.vpPager button{min-height:27px;padding:4px 10px;font-size:11px;border-radius:6px}
-.vpPager span{font-size:10px;color:var(--muted)}
-.vpLongWindow{position:relative;overflow:hidden;flex-shrink:0;width:100%}
-.vpLongWindow>pre{margin:0!important;will-change:transform}
-.vpLongWindow>textarea{resize:none;scrollbar-width:none}
-textarea[readonly]{pointer-events:none;white-space:pre-wrap!important;overflow-wrap:anywhere;word-break:break-word}
+/* Finite menus fit as a whole. No presentation pages or hidden slices. */
+section[data-section="5"]{display:flex;flex-direction:column}
+section[data-section="5"]>.approvedPageTitle,section[data-section="5"]>#settingsBack{flex:0 0 auto}
+#settingsMenu{flex:0 0 auto;display:grid;grid-template-columns:repeat(var(--menu-columns,1),minmax(0,1fr));grid-auto-rows:var(--menu-row-height,53px);margin:0!important;padding:0!important}
+#settingsMenu>.approvedMenuItem{height:100%;min-height:0!important;box-sizing:border-box;padding-top:clamp(0px,calc((var(--menu-row-height,53px) - 32px)/2),9px);padding-bottom:clamp(0px,calc((var(--menu-row-height,53px) - 32px)/2),9px)}
+#settingsMenu .approvedMenuIcon{flex-shrink:0}
+#settingsMenu>.approvedMenuItem>span:nth-child(2){overflow-wrap:anywhere}
+.vpScroll{min-height:0;max-height:var(--content-room);overflow-y:auto!important;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;flex:0 1 auto}
+.vpScroll textarea[readonly]{pointer-events:auto;max-height:180px;overflow:auto;resize:none}
 .page pre{white-space:pre-wrap!important;overflow-wrap:anywhere;word-break:break-word;max-width:100%}
-
-.vpDiagContent{display:contents}
+section[data-section="1"]{display:flex;flex-direction:column}
+section[data-section="1"]>.approvedPageTitle,section[data-section="1"]>.temperatureSaveRow{flex:0 0 auto}
+section[data-section="1"] .approvedSensorList{display:flex;flex-direction:column;flex:1 1 0;min-height:0;overflow-y:auto;overscroll-behavior:contain;margin:4px 0 6px;gap:7px}
+section[data-section="1"] .approvedSensor{flex:0 0 auto;min-height:0}
+section[data-section="1"] .approvedSensorHead{min-height:var(--sensor-row-height,74px);height:var(--sensor-row-height,74px);box-sizing:border-box;padding-top:6px;padding-bottom:6px}
+section[data-section="1"] .sensorEdit>summary{height:var(--sensor-row-height,74px)}
+section[data-section="1"] .temperatureSaveRow{padding:4px 0;margin:0}
+section[data-section="1"].wideContent .approvedSensorList{display:grid;grid-template-columns:1fr 1fr;align-content:start}
+section[data-section="2"].compactContent .liquidPanel{padding:10px;margin:6px 0}
+section[data-section="2"].compactContent .liquidPanelHeading{margin-bottom:8px}
+section[data-section="2"].compactContent .liquidSummary{margin-top:8px;padding-top:7px;gap:6px}
+section[data-section="2"].compactContent .liquidSummary strong{font-size:20px}
+section[data-section="2"].wideContent{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
+section[data-section="2"].wideContent>.approvedPageTitle{grid-column:1/-1}
+section[data-section="2"].wideContent .liquidPanel{margin:0}
 /* All four offsets and Save share one screen; labels have one aligned column. */
 .temperatureCalibration,.wifiSettings{padding:10px!important;margin:0!important}
 .temperatureCalibration h2,.wifiSettings h2{font-size:17px;line-height:1.25;margin:0 0 9px!important}

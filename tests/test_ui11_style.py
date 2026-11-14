@@ -24,6 +24,9 @@ with sync_playwright() as p:
     else:r.fulfill(status=503,body='{}')
    page.route('**/*',route);page.goto('http://busa.style/');page.wait_for_timeout(200)
    styles=page.evaluate('''arg=>Object.fromEntries(arg.selectors.map(s=>{const e=document.querySelector(s),c=getComputedStyle(e);return [s,Object.fromEntries(arg.properties.map(p=>[p,c[p]]))]}))''',{'selectors':selectors,'properties':properties})
+   # UI14 permits the settings rows to shrink to fit all nine items. Every
+   # other menu property and all header/navigation/chart styles stay pinned.
+   styles['.approvedMenuItem'].pop('minHeight')
    shots.append(styles)
    if body==html:
     pills=page.locator('.netPill').evaluate_all('(es)=>es.map(e=>({height:e.getBoundingClientRect().height,line:parseFloat(getComputedStyle(e).lineHeight),padding:parseFloat(getComputedStyle(e).paddingTop)+parseFloat(getComputedStyle(e).paddingBottom)}))')
