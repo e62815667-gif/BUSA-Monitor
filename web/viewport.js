@@ -1,4 +1,4 @@
-/* UI14: one-screen navigation; long content scrolls within its own panel. */
+/* One-screen navigation; long content scrolls within its own panel. */
 (()=>{
 'use strict';
 const $=s=>document.querySelector(s),main=$('main'),nav=$('.appTabs'),header=$('.appHeader');
@@ -74,9 +74,9 @@ function fit(){
  try{
   const section=[...main.querySelectorAll(':scope>.page')].find(visible);if(!section)return;
   const id=Number(section.dataset.section);
-  if(id===7){document.documentElement.classList.remove('viewportFit');document.documentElement.dataset.viewportMode='unchanged';return;}
   document.documentElement.classList.add('viewportFit');document.documentElement.dataset.viewportMode='fit';
   size();if(scrollY!==0)scrollTo(0,0);
+  if(id===7){document.documentElement.dataset.viewportMode='calculator';fitScroll($('#busaCalculator'));focusInPanel();return;}
   if(id===0){fitHome(section);return;}
   if(id===3){fitGraph();return;}
   if(id===1){fitTemperatures(section);focusInPanel();return;}

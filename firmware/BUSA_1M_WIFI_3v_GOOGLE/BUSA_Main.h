@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI14-20261114";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI15-20261114";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1657,7 +1657,7 @@ void uploadOTA(){
 #include "BUSA_Google.h"
 #include "BUSA_CalculatorWeb.h"
 const char WEB_PAGE[] PROGMEM=R"HTMLBUSA(
-<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BUSA MONITOR</title>
+<!doctype html><html lang="ru" class="busaDesign"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BUSA MONITOR</title>
 <style>
 :root{color-scheme:light;--ink:#263d50;--muted:#667989;--paper:#faf9f5;--surface:#fff;--line:#dee4e7;--sea:#0b7da6;--orange:#e39952;--warn:#a84225}
 *{box-sizing:border-box}
@@ -2429,6 +2429,117 @@ html.viewportFit{height:100%;overflow:hidden;overscroll-behavior:none}
 .viewportFit .shortFormViewport .wifiSettings button{min-height:28px;padding:5px}
 @media(max-height:500px){.viewportFit .approvedPageTitle{display:none}}
 /* BUSA_VIEWPORT_CSS_END */
+/* BUSA_DESIGN_CSS_BEGIN */
+/* UI15: approved six-screen design, local application only. */
+html:root.busaDesign{color-scheme:dark;--ink:#e6f2f7;--muted:#9cb4c2;--paper:#061521;--surface:#0c2132;--line:#244253;--sea:#2087ed;--orange:#2087ed;--warn:#ff6473;--border:#36576c;--water:#38bdf8;--cube:#f4c84a;--column:#53d486;--alarm:#ff6473;--design-accent:#2087ed;--design-icon:#75d4f4;--design-selected:#fff;--design-green:#35d68c;--design-radius:14px;background:var(--paper);color:var(--ink)}
+html:root.busaDesign[data-theme="light"]{color-scheme:light;--ink:#19384b;--muted:#536e7f;--paper:#f3f7fa;--surface:#fff;--line:#c9dce6;--border:#87a8bb;--design-icon:#087fae}
+html:root.busaDesign body{background:var(--paper)!important;color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+html:root.busaDesign h1,html:root.busaDesign h2,html:root.busaDesign h3{color:var(--ink)}
+html:root.busaDesign button,html:root.busaDesign input,html:root.busaDesign select,html:root.busaDesign textarea{background:var(--surface)!important;color:var(--ink)!important;border:1px solid var(--border);border-radius:var(--design-radius);box-shadow:none!important}
+html:root.busaDesign input,html:root.busaDesign select,html:root.busaDesign textarea{font-size:16px}
+html:root.busaDesign button:focus-visible,html:root.busaDesign input:focus-visible,html:root.busaDesign select:focus-visible{outline:2px solid var(--design-accent);outline-offset:2px}
+html:root.busaDesign .appHeader{background:var(--paper)!important;border-bottom:1px solid var(--line)!important;box-shadow:none;padding:9px 12px 8px}
+html:root.busaDesign .headerRow{max-width:596px;margin:0 auto}
+html:root.busaDesign .appHeader h1{font-size:clamp(18px,5.1vw,22px);line-height:1.2;letter-spacing:.8px;font-weight:750;margin:0 0 5px}
+html:root.busaDesign #clockDisplay{max-width:596px;margin:0 auto;color:var(--muted)!important;font-size:12px!important;line-height:1.3}
+html:root.busaDesign .netIndicators{gap:8px;flex-wrap:nowrap;margin:7px auto 0;max-width:596px;font-size:12px;line-height:1.2}
+html:root.busaDesign .appHeader .netPill{position:relative;flex:0 1 auto;gap:8px;min-width:0;white-space:nowrap;padding:5px 11px;background:transparent!important;border:1px solid var(--border)!important;border-radius:10px;color:var(--ink)!important;font-size:12px;font-weight:650;line-height:1.2}
+html:root.busaDesign .netDot{width:9px;height:9px;flex-basis:9px;box-shadow:none}
+/* Keep the live connection words available to assistive technology. */
+html:root.busaDesign .netText{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;padding:0;margin:-1px}
+html:root.busaDesign .appTabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:3px;max-width:620px;background:var(--paper)!important;border-top:1px solid var(--line)!important;box-shadow:none!important;padding:6px 5px max(6px,env(safe-area-inset-bottom))!important;overflow:hidden}
+html:root.busaDesign .appTabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;min-height:58px;margin:0;padding:5px 1px!important;gap:3px;background:transparent!important;border:0!important;border-radius:14px!important;color:var(--muted)!important;font-size:clamp(7px,2.2vw,10px)!important;font-weight:500;white-space:normal;line-height:1.15}
+html:root.busaDesign .appTabs button.on{background:var(--design-accent)!important;color:var(--design-selected)!important;font-weight:700;border:0!important;box-shadow:none!important}
+html:root.busaDesign .appTabs button span{min-height:2.3em;display:flex;align-items:center;justify-content:center;line-height:1.15;max-width:100%}
+html:root.busaDesign .appTabs .uiIcon{width:23px;height:23px;color:var(--design-icon)}
+html:root.busaDesign .appTabs button.on .uiIcon{color:var(--design-selected)}
+html:root.busaDesign .approvedPageTitle{font-size:18px;line-height:1.3;letter-spacing:.3px;gap:9px;margin:13px 0 12px}
+html:root.busaDesign .approvedPageTitle .uiIcon{width:25px;height:25px;color:var(--design-icon)}
+html:root.busaDesign main .card,html:root.busaDesign .chartCard,html:root.busaDesign .liquidPanel{background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:var(--design-radius);box-shadow:none!important;color:var(--ink)}
+html:root.busaDesign .hint{color:var(--muted)}
+html:root.busaDesign .row{border-color:var(--line)}
+html:root.busaDesign .approvedBack{background:var(--surface)!important;border-color:var(--line)!important;color:var(--ink);min-height:38px;padding:8px 11px;margin:0 0 9px;font-size:13px;border-radius:12px}
+html:root.busaDesign #settingsMenu{background:transparent!important;border:0!important;border-radius:0;box-shadow:none!important}
+html:root.busaDesign #settingsMenu .approvedMenuItem{height:100%;min-height:0;background:transparent!important;border-radius:0!important;border:0!important;border-bottom:1px solid var(--line)!important;padding:0 8px;gap:13px;color:var(--ink)!important;font-size:15px;font-weight:500}
+html:root.busaDesign #settingsMenu .approvedMenuItem:last-child{border-bottom:0!important}
+html:root.busaDesign .approvedMenuIcon{width:28px;height:28px;color:var(--design-icon)}
+html:root.busaDesign .approvedMenuIcon .uiIcon{width:25px;height:25px}
+html:root.busaDesign .approvedArrow{font-size:27px;color:var(--design-icon)}
+html:root.busaDesign .settingsTabs button.on,html:root.busaDesign .chartTabs button.on,html:root.busaDesign .chartRanges button.on,html:root.busaDesign #temperatureSave,html:root.busaDesign #tempCalSave,html:root.busaDesign #save{background:var(--design-accent)!important;border-color:var(--design-accent)!important;color:var(--design-selected)!important;box-shadow:none!important}
+/* Reuse the approved apparatus and all of its separate live animation layers. */
+html:root.busaDesign section[data-section="0"]{--ink:inherit;--paper:inherit;--surface:inherit;--line:inherit;background:transparent!important;border:0!important;box-shadow:none!important}
+html:root.busaDesign section[data-section="0"] .relayIndicators{gap:5px;margin:6px 0 7px!important}
+html:root.busaDesign section[data-section="0"] .relayBadge{background:transparent;border:1px solid var(--line);border-radius:10px;padding:5px 4px;min-height:35px;font-size:clamp(8px,2.35vw,11px);line-height:1.2;box-shadow:none}
+html:root.busaDesign section[data-section="0"] .relayBadge small{color:var(--muted);font-size:8px}
+html:root.busaDesign section[data-section="0"] .relayBadge[data-state="on"]{background:#14382e;border-color:var(--design-green);color:#d0fbe7}
+html:root.busaDesign section[data-section="0"] #relayBadge3[data-state="on"]{background:#42232d;border-color:var(--alarm);color:#ffb3bd}
+html:root.busaDesign section[data-section="0"] .approvedTempTitle{font-weight:650}
+html:root.busaDesign section[data-section="0"] .temp1 strong,html:root.busaDesign section[data-section="0"] .temp3 strong{font-size:clamp(20px,5.8vw,25px);letter-spacing:-.4px}
+html:root.busaDesign section[data-section="0"] .approvedTemp small{color:var(--muted)!important}
+html:root.busaDesign section[data-section="0"] .temp2 .approvedTempTitle{color:#e6f2f7}
+html:root.busaDesign .cubeSetBelow,html:root.busaDesign .collectionRateLabel{color:var(--muted)}
+html:root.busaDesign .flowOnPipe span,html:root.busaDesign .waterUsedOnPipe span{color:var(--ink)}
+html:root.busaDesign section[data-section="1"] .approvedSensor{background:transparent!important;border:0!important;box-shadow:none!important}
+html:root.busaDesign section[data-section="1"] .approvedSensorList{gap:7px}
+html:root.busaDesign section[data-section="1"] .approvedSensorHead{gap:12px;padding:7px 25px 7px 6px}
+html:root.busaDesign section[data-section="1"] .approvedSensorText strong{font-size:15px}
+html:root.busaDesign section[data-section="1"] .approvedSensorText small{font-size:11px;color:var(--muted)}
+html:root.busaDesign section[data-section="1"] .approvedSensorLive{font-size:clamp(21px,6.4vw,29px);font-weight:700;letter-spacing:-.6px}
+html:root.busaDesign section[data-section="1"] .approvedSensorIcon{width:30px;flex-basis:30px}
+html:root.busaDesign section[data-section="1"] .temp0 .approvedSensorIcon{color:var(--water)}
+html:root.busaDesign section[data-section="1"] .temp2 .approvedSensorIcon{color:var(--cube)}
+html:root.busaDesign section[data-section="1"] .temp1 .approvedSensorIcon{color:var(--column)}
+html:root.busaDesign section[data-section="1"] .temp3 .approvedSensorIcon{color:var(--alarm)}
+html:root.busaDesign section[data-section="1"] .busaRefTempIcon{filter:none!important;width:29px;height:36px}
+html:root.busaDesign section[data-section="1"] .busaRefTempIcon path,html:root.busaDesign section[data-section="1"] .busaRefTempIcon rect,html:root.busaDesign section[data-section="1"] .busaRefTempIcon ellipse{fill:none;stroke:currentColor;stroke-width:2.5}
+html:root.busaDesign #temperatureSave{min-height:43px;font-size:15px;font-weight:600;margin:0 0 8px;border-radius:13px}
+html:root.busaDesign .liquidPanel{padding:16px;margin:0 0 12px}
+html:root.busaDesign .liquidPanelHeading{margin-bottom:13px}
+html:root.busaDesign .liquidPanelHeading h2{font-size:18px;color:var(--ink)}
+html:root.busaDesign .liquidPanelHeading>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+html:root.busaDesign .liquidRateLabel{font-size:13px;color:var(--muted);margin:0 0 9px}
+html:root.busaDesign .liquidRateGrid{gap:13px}
+html:root.busaDesign .liquidRateGrid>div{gap:5px}
+html:root.busaDesign .liquidRateGrid small{color:var(--muted);font-size:12px}
+html:root.busaDesign .liquidRateGrid strong{font-size:clamp(30px,8.4vw,39px);line-height:1.15;letter-spacing:-.5px}
+html:root.busaDesign .liquidSummary{border-color:var(--line);margin-top:15px;padding-top:12px;gap:12px}
+html:root.busaDesign .liquidSummary>div{font-size:13px;color:var(--muted)}
+html:root.busaDesign .liquidSummary strong{font-size:24px}
+html:root.busaDesign .chartCard{padding:12px;margin:0}
+html:root.busaDesign .chartTabs,html:root.busaDesign .chartRanges{gap:6px}
+html:root.busaDesign .chartTabs button,html:root.busaDesign .chartRanges button{min-width:0;min-height:38px;padding:7px 2px;font-size:12px;font-weight:500;border-radius:11px;box-shadow:none!important}
+html:root.busaDesign .chartRanges button{min-height:35px;font-size:11px}
+html:root.busaDesign .chartHeading{margin:12px 0 9px;font-size:13px;color:var(--ink)}
+html:root.busaDesign .chartHeading span{color:var(--muted)}
+html:root.busaDesign .chartLegend{gap:7px 12px;margin:9px 0 12px;color:var(--muted);font-size:11px}
+html:root.busaDesign .chartLegend>span{display:flex;align-items:center;gap:5px;min-width:0}
+html:root.busaDesign .chartLegend>span:before{flex:0 0 13px;margin:0}
+html:root.busaDesign .chartLegend b{margin-left:auto;color:var(--ink);font-weight:650;white-space:nowrap;font-variant-numeric:tabular-nums}
+html:root.busaDesign .chartCadence{margin:9px 0 0;text-align:center;font-size:11px;line-height:1.3;color:var(--muted)}
+/* The calculator arithmetic, inputs and storage are unchanged. */
+html:root.busaDesign section[data-section="7"]{display:flex;flex-direction:column}
+html:root.busaDesign #busaCalculator{width:100%;max-width:none;margin:0;min-height:0;flex:1 1 0;overflow:auto;overscroll-behavior:contain;padding-bottom:10px}
+html:root.busaDesign #busaCalculator>h2{font-size:18px;margin:13px 0 12px;letter-spacing:.3px}
+html:root.busaDesign #busaCalculator .calcTabs{gap:6px;margin:0 0 10px}
+html:root.busaDesign #busaCalculator .calcTabs button{min-height:47px;padding:7px 3px;font-size:11px;line-height:1.25;border-radius:12px}
+html:root.busaDesign #busaCalculator button[aria-selected="true"],html:root.busaDesign #busaCalculator button[type="submit"]{background:var(--design-accent)!important;color:var(--design-selected)!important;border-color:var(--design-accent)!important}
+html:root.busaDesign #busaCalculator .calcPanel{padding:16px;background:var(--surface)!important;border-color:var(--line)!important;border-radius:var(--design-radius)}
+html:root.busaDesign #busaCalculator .calcPanel h3{font-size:17px;margin:0 0 16px}
+html:root.busaDesign #busaCalculator .calcGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+html:root.busaDesign #busaCalculator .calcGrid>label:last-child:nth-child(odd){grid-column:1/-1}
+html:root.busaDesign #busaCalculator label{margin:0;font-size:12px;gap:8px;color:var(--ink)}
+html:root.busaDesign #busaCalculator input{min-height:45px;padding:9px 12px;background:var(--paper)!important;border-color:var(--border);border-radius:12px;font-size:22px}
+html:root.busaDesign #busaCalculator .calcActions{gap:9px;margin:18px 0 0}
+html:root.busaDesign #busaCalculator .calcActions button{min-height:42px;padding:9px;font-size:15px;border-radius:12px}
+html:root.busaDesign #busaCalculator .calcNote{margin-top:13px;color:var(--muted)}
+html:root.busaDesign #busaCalculator .calcNote summary{padding:6px 0}
+html:root.busaDesign #busaCalculator .calcResult{background:var(--paper);border:1px solid var(--line);color:var(--ink);border-radius:12px}
+html:root.busaDesign #busaCalculator .calcError:empty{display:none}
+@media(max-width:350px){html:root.busaDesign .netIndicators{gap:6px}html:root.busaDesign .netPill{padding:5px 9px;font-size:11px}html:root.busaDesign #settingsMenu .approvedMenuItem{font-size:13px}html:root.busaDesign section[data-section="1"] .approvedSensorHead{gap:8px;padding-left:1px;padding-right:22px}html:root.busaDesign section[data-section="1"] .approvedSensorText small{font-size:9px}html:root.busaDesign section[data-section="1"] .approvedSensorLive{font-size:20px}html:root.busaDesign .chartTabs button{font-size:10px}html:root.busaDesign .chartLegend{font-size:10px}html:root.busaDesign #busaCalculator .calcTabs button{font-size:10px}html:root.busaDesign #busaCalculator .calcPanel{padding:12px}}
+@media(max-height:650px){html:root.busaDesign .approvedPageTitle{margin:9px 0}html:root.busaDesign .liquidPanel{padding:11px;margin-bottom:8px}html:root.busaDesign .liquidPanelHeading{margin-bottom:9px}html:root.busaDesign .liquidSummary{margin-top:10px;padding-top:9px;gap:8px}html:root.busaDesign .liquidRateGrid strong{font-size:28px}html:root.busaDesign .liquidSummary strong{font-size:21px}html:root.busaDesign #busaCalculator .calcPanel{padding:12px}html:root.busaDesign #busaCalculator .calcPanel h3{margin-bottom:12px}html:root.busaDesign #busaCalculator .calcActions{margin-top:12px}}
+@media(max-height:500px){html:root.busaDesign .appHeader{padding-top:5px;padding-bottom:5px}html:root.busaDesign .appHeader h1{font-size:16px;margin-bottom:2px}html:root.busaDesign #clockDisplay{font-size:10px!important}html:root.busaDesign .netIndicators{margin-top:4px}html:root.busaDesign .netPill{font-size:10px;padding:3px 8px}html:root.busaDesign .appTabs button{min-height:44px;padding:3px 1px!important;gap:1px}html:root.busaDesign .appTabs .uiIcon{width:18px;height:18px}html:root.busaDesign .approvedPageTitle{display:none}html:root.busaDesign .chartCadence{margin-top:4px}html:root.busaDesign .chartHeading{margin:5px 0}html:root.busaDesign .chartLegend{margin:5px 0}html:root.busaDesign .chartTabs button,html:root.busaDesign .chartRanges button{min-height:28px;padding:4px 2px}}
+
+/* BUSA_DESIGN_CSS_END */
 </style><link rel="stylesheet" href="/calculator.css?v=CALC1"></head><body>
 <header class="appHeader"><div class="headerRow"><div>
 <h1>BUSA MONITOR</h1></div>
@@ -2442,10 +2553,10 @@ html.viewportFit{height:100%;overflow:hidden;overscroll-behavior:none}
 </div>
 <nav class="appTabs" aria-label="Шесть разделов БУСА"><button data-page="0" class="on"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3z"/><path d="M9 20v-7h6v7"/></svg><span>Главная</span></button>
 <button data-page="1"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg><span>Температуры</span></button>
-<button data-page="2"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><span>Вода и отбор</span></button>
+<button data-page="2"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><span>Вода и<br>отбор</span></button>
 <button data-page="3"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><span>Графики</span></button>
 <button data-page="7"><svg class="uiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M8 6h8M8 10h2m4 0h2M8 14h2m4 0h2M8 18h2m4 0h2"/></svg><span>Калькулятор</span></button>
-<button data-page="5"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><span>Настройки</span></button></nav></header><main><section class="page" data-section="0">
+<button data-page="5"><svg class="uiIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3 .6-1h4.8l.6 3 2 .9 2.6-1 2.4 4.2-2 2.1v1.6l2 2.1-2.4 4.2-2.6-1-2 .9-.6 3H9.6L9 19l-2-.9-2.6 1L2 14.9l2-2.1v-1.6L2 9.1l2.4-4.2 2.6 1L9 5z"/><circle cx="12" cy="12" r="3"/></svg><span>Настройки</span></button></nav></header><main><section class="page" data-section="0">
 
 <div class="relayIndicators" role="status" aria-label="Блок реле"><div class="relayBadge" id="relayBadge0" data-state="unknown"><span class="relayLamp"></span><span>ТЭН откл.</span><small id="soundStatus0">Нет связи</small></div><div class="relayBadge" id="relayBadge1" data-state="unknown"><span class="relayLamp"></span><span>Кран закрыт</span><small id="soundStatus1">Нет связи</small></div><div class="relayBadge" id="relayBadge2" data-state="unknown"><span class="relayLamp"></span><span>Кран открыт</span><small id="soundStatus2">Нет связи</small></div><div class="relayBadge" id="relayBadge3" data-state="unknown"><span class="relayLamp"></span><span>Авария</span><small id="soundStatus3">Нет связи</small></div></div>
 <div class="approvedDashboard">
@@ -2488,8 +2599,8 @@ html.viewportFit{height:100%;overflow:hidden;overscroll-behavior:none}
 <div class="temperatureSaveRow"><button id="temperatureSave" type="button" class="full">Сохранить пороги</button><p id="temperatureSaveResult" class="hint"></p></div></section>
 <section class="page" data-section="2" hidden><div class="approvedPageTitle"><svg class="uiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><strong>ВОДА И ОТБОР</strong></div>
 <article class="liquidPanel collectionPanel"><div class="liquidPanelHeading"><h2>Отбор жидкости</h2><span id="collectionAvailability">Нет датчика</span></div>
-<div class="liquidRateGrid"><div><small>Текущий отбор</small><strong id="collectionMlMin">—</strong><small>мл/мин</small></div><div><small>Текущий отбор</small><strong id="collectionLph">—</strong><small>л/ч</small></div></div>
-<div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора, ч:мин</span><strong id="collectionTime">—</strong></div></div></article>
+<p class="liquidRateLabel">Текущий отбор</p><div class="liquidRateGrid"><div><strong id="collectionMlMin">—</strong><small>мл/мин</small></div><div><strong id="collectionLph">—</strong><small>л/ч</small></div></div>
+<div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div></article>
 <article class="liquidPanel coolingPanel"><div class="liquidPanelHeading"><h2>Охлаждение</h2><span id="coolingAvailability">Нет данных</span></div>
 <div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Израсходовано воды</small><strong id="coolingTotal">—</strong><small>л</small></div></div></article>
 </section>
@@ -2497,11 +2608,11 @@ html.viewportFit{height:100%;overflow:hidden;overscroll-behavior:none}
 <div class="chartCard"><div class="chartTabs" role="tablist" aria-label="Вид графика">
 <button type="button" data-chart="0" class="on" aria-selected="true">Температура</button><button type="button" data-chart="1" aria-selected="false">Отбор</button><button type="button" data-chart="2" aria-selected="false">Охлаждение</button></div>
 <div class="chartHeading"><strong id="chartTitle">Температура, °C</strong><span id="chartState">Ожидание данных</span></div>
-<div id="chartLegend" class="chartLegend"><span style="--series:#38bdf8">Вода</span><span style="--series:#f4c84a">Куб</span><span style="--series:#53d486">Колонна</span><span style="--series:#ff6473">Авария</span></div>
+<div id="chartLegend" class="chartLegend"><span style="--series:#38bdf8">Вода<b data-legend-temp="0">Н/Д</b></span><span style="--series:#f4c84a">Куб<b data-legend-temp="2">Н/Д</b></span><span style="--series:#53d486">Колонна<b data-legend-temp="1">Н/Д</b></span><span style="--series:#ff6473">Авария<b data-legend-temp="3">Н/Д</b></span></div>
 <canvas id="chartCanvas" width="640" height="440" role="img" aria-label="График реальных измерений"></canvas>
-<div class="chartRanges" aria-label="Период"><button type="button" data-minutes="5" class="on" aria-pressed="true">5 мин</button><button type="button" data-minutes="10" aria-pressed="false">10 мин</button><button type="button" data-minutes="15" aria-pressed="false">15 мин</button><button type="button" data-minutes="30" aria-pressed="false">30 мин</button><button type="button" data-minutes="60" aria-pressed="false">1 ч</button></div>
+<div class="chartRanges" aria-label="Период"><button type="button" data-minutes="5" class="on" aria-pressed="true">5 мин</button><button type="button" data-minutes="10" aria-pressed="false">10 мин</button><button type="button" data-minutes="15" aria-pressed="false">15 мин</button><button type="button" data-minutes="30" aria-pressed="false">30 мин</button><button type="button" data-minutes="60" aria-pressed="false">1 ч</button></div><p class="chartCadence">Обновление 2 с</p>
 </div></section>
-<section class="page" data-section="5" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg><strong>НАСТРОЙКИ</strong></div>
+<section class="page" data-section="5" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 3 .6-1h4.8l.6 3 2 .9 2.6-1 2.4 4.2-2 2.1v1.6l2 2.1-2.4 4.2-2.6-1-2 .9-.6 3H9.6L9 19l-2-.9-2.6 1L2 14.9l2-2.1v-1.6L2 9.1l2.4-4.2 2.6 1L9 5z"/><circle cx="12" cy="12" r="3"/></svg><strong>НАСТРОЙКИ</strong></div>
 <div class="card approvedSettingsMain" id="settingsMenu"><button type="button" data-stab-btn="0" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M9 14V5a3 3 0 0 1 6 0v9a5 5 0 1 1-6 0z"/><path d="M12 10v8"/></svg></span><span>Температура</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="1" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M2 8c6-5 14-5 20 0M5 12c4-4 10-4 14 0M8 16c2-2 6-2 8 0"/><circle cx="12" cy="20" r="1" fill="currentColor"/></svg></span><span>Wi-Fi</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="2" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.2 2.2m9.8 9.8 2.2 2.2M4.9 19.1l2.2-2.2m9.8-9.8 2.2-2.2"/></svg></span><span>Экран</span><span class="approvedArrow">›</span></button>
@@ -3232,7 +3343,7 @@ setInterval(()=>{if(active===3&&!document.hidden)refreshGraphHistory();},CHART_R
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&active===3)refreshGraphHistory(true);});
 </script><script src="/calculator.js?v=CALC1"></script><script>
 /* BUSA_VIEWPORT_JS_BEGIN */
-/* UI14: one-screen navigation; long content scrolls within its own panel. */
+/* One-screen navigation; long content scrolls within its own panel. */
 (()=>{
 'use strict';
 const $=s=>document.querySelector(s),main=$('main'),nav=$('.appTabs'),header=$('.appHeader');
@@ -3308,9 +3419,9 @@ function fit(){
  try{
   const section=[...main.querySelectorAll(':scope>.page')].find(visible);if(!section)return;
   const id=Number(section.dataset.section);
-  if(id===7){document.documentElement.classList.remove('viewportFit');document.documentElement.dataset.viewportMode='unchanged';return;}
   document.documentElement.classList.add('viewportFit');document.documentElement.dataset.viewportMode='fit';
   size();if(scrollY!==0)scrollTo(0,0);
+  if(id===7){document.documentElement.dataset.viewportMode='calculator';fitScroll($('#busaCalculator'));focusInPanel();return;}
   if(id===0){fitHome(section);return;}
   if(id===3){fitGraph();return;}
   if(id===1){fitTemperatures(section);focusInPanel();return;}
@@ -3341,6 +3452,19 @@ request();
 })();
 
 /* BUSA_VIEWPORT_JS_END */
+</script><script>
+/* BUSA_DESIGN_JS_BEGIN */
+/* Read-only presentation bindings; controller API and calculator stay separate. */
+(()=>{
+ 'use strict';
+ const pairs=[0,2,1,3].map(i=>[document.getElementById('t'+i),document.querySelector('[data-legend-temp="'+i+'"]')]);
+ const sync=()=>{for(const [source,target] of pairs)if(source&&target&&target.textContent!==source.textContent)target.textContent=source.textContent;};
+ const observer=new MutationObserver(sync);
+ for(const [source] of pairs)if(source)observer.observe(source,{childList:true,characterData:true,subtree:true});
+ sync();
+})();
+
+/* BUSA_DESIGN_JS_END */
 </script></body></html>
 )HTMLBUSA";
 

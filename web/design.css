@@ -1,0 +1,108 @@
+/* UI15: approved six-screen design, local application only. */
+html:root.busaDesign{color-scheme:dark;--ink:#e6f2f7;--muted:#9cb4c2;--paper:#061521;--surface:#0c2132;--line:#244253;--sea:#2087ed;--orange:#2087ed;--warn:#ff6473;--border:#36576c;--water:#38bdf8;--cube:#f4c84a;--column:#53d486;--alarm:#ff6473;--design-accent:#2087ed;--design-icon:#75d4f4;--design-selected:#fff;--design-green:#35d68c;--design-radius:14px;background:var(--paper);color:var(--ink)}
+html:root.busaDesign[data-theme="light"]{color-scheme:light;--ink:#19384b;--muted:#536e7f;--paper:#f3f7fa;--surface:#fff;--line:#c9dce6;--border:#87a8bb;--design-icon:#087fae}
+html:root.busaDesign body{background:var(--paper)!important;color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+html:root.busaDesign h1,html:root.busaDesign h2,html:root.busaDesign h3{color:var(--ink)}
+html:root.busaDesign button,html:root.busaDesign input,html:root.busaDesign select,html:root.busaDesign textarea{background:var(--surface)!important;color:var(--ink)!important;border:1px solid var(--border);border-radius:var(--design-radius);box-shadow:none!important}
+html:root.busaDesign input,html:root.busaDesign select,html:root.busaDesign textarea{font-size:16px}
+html:root.busaDesign button:focus-visible,html:root.busaDesign input:focus-visible,html:root.busaDesign select:focus-visible{outline:2px solid var(--design-accent);outline-offset:2px}
+html:root.busaDesign .appHeader{background:var(--paper)!important;border-bottom:1px solid var(--line)!important;box-shadow:none;padding:9px 12px 8px}
+html:root.busaDesign .headerRow{max-width:596px;margin:0 auto}
+html:root.busaDesign .appHeader h1{font-size:clamp(18px,5.1vw,22px);line-height:1.2;letter-spacing:.8px;font-weight:750;margin:0 0 5px}
+html:root.busaDesign #clockDisplay{max-width:596px;margin:0 auto;color:var(--muted)!important;font-size:12px!important;line-height:1.3}
+html:root.busaDesign .netIndicators{gap:8px;flex-wrap:nowrap;margin:7px auto 0;max-width:596px;font-size:12px;line-height:1.2}
+html:root.busaDesign .appHeader .netPill{position:relative;flex:0 1 auto;gap:8px;min-width:0;white-space:nowrap;padding:5px 11px;background:transparent!important;border:1px solid var(--border)!important;border-radius:10px;color:var(--ink)!important;font-size:12px;font-weight:650;line-height:1.2}
+html:root.busaDesign .netDot{width:9px;height:9px;flex-basis:9px;box-shadow:none}
+/* Keep the live connection words available to assistive technology. */
+html:root.busaDesign .netText{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;padding:0;margin:-1px}
+html:root.busaDesign .appTabs{display:grid;grid-template-columns:repeat(6,minmax(0,1fr))!important;gap:3px;max-width:620px;background:var(--paper)!important;border-top:1px solid var(--line)!important;box-shadow:none!important;padding:6px 5px max(6px,env(safe-area-inset-bottom))!important;overflow:hidden}
+html:root.busaDesign .appTabs button{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:0;min-height:58px;margin:0;padding:5px 1px!important;gap:3px;background:transparent!important;border:0!important;border-radius:14px!important;color:var(--muted)!important;font-size:clamp(7px,2.2vw,10px)!important;font-weight:500;white-space:normal;line-height:1.15}
+html:root.busaDesign .appTabs button.on{background:var(--design-accent)!important;color:var(--design-selected)!important;font-weight:700;border:0!important;box-shadow:none!important}
+html:root.busaDesign .appTabs button span{min-height:2.3em;display:flex;align-items:center;justify-content:center;line-height:1.15;max-width:100%}
+html:root.busaDesign .appTabs .uiIcon{width:23px;height:23px;color:var(--design-icon)}
+html:root.busaDesign .appTabs button.on .uiIcon{color:var(--design-selected)}
+html:root.busaDesign .approvedPageTitle{font-size:18px;line-height:1.3;letter-spacing:.3px;gap:9px;margin:13px 0 12px}
+html:root.busaDesign .approvedPageTitle .uiIcon{width:25px;height:25px;color:var(--design-icon)}
+html:root.busaDesign main .card,html:root.busaDesign .chartCard,html:root.busaDesign .liquidPanel{background:var(--surface)!important;border:1px solid var(--line)!important;border-radius:var(--design-radius);box-shadow:none!important;color:var(--ink)}
+html:root.busaDesign .hint{color:var(--muted)}
+html:root.busaDesign .row{border-color:var(--line)}
+html:root.busaDesign .approvedBack{background:var(--surface)!important;border-color:var(--line)!important;color:var(--ink);min-height:38px;padding:8px 11px;margin:0 0 9px;font-size:13px;border-radius:12px}
+html:root.busaDesign #settingsMenu{background:transparent!important;border:0!important;border-radius:0;box-shadow:none!important}
+html:root.busaDesign #settingsMenu .approvedMenuItem{height:100%;min-height:0;background:transparent!important;border-radius:0!important;border:0!important;border-bottom:1px solid var(--line)!important;padding:0 8px;gap:13px;color:var(--ink)!important;font-size:15px;font-weight:500}
+html:root.busaDesign #settingsMenu .approvedMenuItem:last-child{border-bottom:0!important}
+html:root.busaDesign .approvedMenuIcon{width:28px;height:28px;color:var(--design-icon)}
+html:root.busaDesign .approvedMenuIcon .uiIcon{width:25px;height:25px}
+html:root.busaDesign .approvedArrow{font-size:27px;color:var(--design-icon)}
+html:root.busaDesign .settingsTabs button.on,html:root.busaDesign .chartTabs button.on,html:root.busaDesign .chartRanges button.on,html:root.busaDesign #temperatureSave,html:root.busaDesign #tempCalSave,html:root.busaDesign #save{background:var(--design-accent)!important;border-color:var(--design-accent)!important;color:var(--design-selected)!important;box-shadow:none!important}
+/* Reuse the approved apparatus and all of its separate live animation layers. */
+html:root.busaDesign section[data-section="0"]{--ink:inherit;--paper:inherit;--surface:inherit;--line:inherit;background:transparent!important;border:0!important;box-shadow:none!important}
+html:root.busaDesign section[data-section="0"] .relayIndicators{gap:5px;margin:6px 0 7px!important}
+html:root.busaDesign section[data-section="0"] .relayBadge{background:transparent;border:1px solid var(--line);border-radius:10px;padding:5px 4px;min-height:35px;font-size:clamp(8px,2.35vw,11px);line-height:1.2;box-shadow:none}
+html:root.busaDesign section[data-section="0"] .relayBadge small{color:var(--muted);font-size:8px}
+html:root.busaDesign section[data-section="0"] .relayBadge[data-state="on"]{background:#14382e;border-color:var(--design-green);color:#d0fbe7}
+html:root.busaDesign section[data-section="0"] #relayBadge3[data-state="on"]{background:#42232d;border-color:var(--alarm);color:#ffb3bd}
+html:root.busaDesign section[data-section="0"] .approvedTempTitle{font-weight:650}
+html:root.busaDesign section[data-section="0"] .temp1 strong,html:root.busaDesign section[data-section="0"] .temp3 strong{font-size:clamp(20px,5.8vw,25px);letter-spacing:-.4px}
+html:root.busaDesign section[data-section="0"] .approvedTemp small{color:var(--muted)!important}
+html:root.busaDesign section[data-section="0"] .temp2 .approvedTempTitle{color:#e6f2f7}
+html:root.busaDesign .cubeSetBelow,html:root.busaDesign .collectionRateLabel{color:var(--muted)}
+html:root.busaDesign .flowOnPipe span,html:root.busaDesign .waterUsedOnPipe span{color:var(--ink)}
+html:root.busaDesign section[data-section="1"] .approvedSensor{background:transparent!important;border:0!important;box-shadow:none!important}
+html:root.busaDesign section[data-section="1"] .approvedSensorList{gap:7px}
+html:root.busaDesign section[data-section="1"] .approvedSensorHead{gap:12px;padding:7px 25px 7px 6px}
+html:root.busaDesign section[data-section="1"] .approvedSensorText strong{font-size:15px}
+html:root.busaDesign section[data-section="1"] .approvedSensorText small{font-size:11px;color:var(--muted)}
+html:root.busaDesign section[data-section="1"] .approvedSensorLive{font-size:clamp(21px,6.4vw,29px);font-weight:700;letter-spacing:-.6px}
+html:root.busaDesign section[data-section="1"] .approvedSensorIcon{width:30px;flex-basis:30px}
+html:root.busaDesign section[data-section="1"] .temp0 .approvedSensorIcon{color:var(--water)}
+html:root.busaDesign section[data-section="1"] .temp2 .approvedSensorIcon{color:var(--cube)}
+html:root.busaDesign section[data-section="1"] .temp1 .approvedSensorIcon{color:var(--column)}
+html:root.busaDesign section[data-section="1"] .temp3 .approvedSensorIcon{color:var(--alarm)}
+html:root.busaDesign section[data-section="1"] .busaRefTempIcon{filter:none!important;width:29px;height:36px}
+html:root.busaDesign section[data-section="1"] .busaRefTempIcon path,html:root.busaDesign section[data-section="1"] .busaRefTempIcon rect,html:root.busaDesign section[data-section="1"] .busaRefTempIcon ellipse{fill:none;stroke:currentColor;stroke-width:2.5}
+html:root.busaDesign #temperatureSave{min-height:43px;font-size:15px;font-weight:600;margin:0 0 8px;border-radius:13px}
+html:root.busaDesign .liquidPanel{padding:16px;margin:0 0 12px}
+html:root.busaDesign .liquidPanelHeading{margin-bottom:13px}
+html:root.busaDesign .liquidPanelHeading h2{font-size:18px;color:var(--ink)}
+html:root.busaDesign .liquidPanelHeading>span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+html:root.busaDesign .liquidRateLabel{font-size:13px;color:var(--muted);margin:0 0 9px}
+html:root.busaDesign .liquidRateGrid{gap:13px}
+html:root.busaDesign .liquidRateGrid>div{gap:5px}
+html:root.busaDesign .liquidRateGrid small{color:var(--muted);font-size:12px}
+html:root.busaDesign .liquidRateGrid strong{font-size:clamp(30px,8.4vw,39px);line-height:1.15;letter-spacing:-.5px}
+html:root.busaDesign .liquidSummary{border-color:var(--line);margin-top:15px;padding-top:12px;gap:12px}
+html:root.busaDesign .liquidSummary>div{font-size:13px;color:var(--muted)}
+html:root.busaDesign .liquidSummary strong{font-size:24px}
+html:root.busaDesign .chartCard{padding:12px;margin:0}
+html:root.busaDesign .chartTabs,html:root.busaDesign .chartRanges{gap:6px}
+html:root.busaDesign .chartTabs button,html:root.busaDesign .chartRanges button{min-width:0;min-height:38px;padding:7px 2px;font-size:12px;font-weight:500;border-radius:11px;box-shadow:none!important}
+html:root.busaDesign .chartRanges button{min-height:35px;font-size:11px}
+html:root.busaDesign .chartHeading{margin:12px 0 9px;font-size:13px;color:var(--ink)}
+html:root.busaDesign .chartHeading span{color:var(--muted)}
+html:root.busaDesign .chartLegend{gap:7px 12px;margin:9px 0 12px;color:var(--muted);font-size:11px}
+html:root.busaDesign .chartLegend>span{display:flex;align-items:center;gap:5px;min-width:0}
+html:root.busaDesign .chartLegend>span:before{flex:0 0 13px;margin:0}
+html:root.busaDesign .chartLegend b{margin-left:auto;color:var(--ink);font-weight:650;white-space:nowrap;font-variant-numeric:tabular-nums}
+html:root.busaDesign .chartCadence{margin:9px 0 0;text-align:center;font-size:11px;line-height:1.3;color:var(--muted)}
+/* The calculator arithmetic, inputs and storage are unchanged. */
+html:root.busaDesign section[data-section="7"]{display:flex;flex-direction:column}
+html:root.busaDesign #busaCalculator{width:100%;max-width:none;margin:0;min-height:0;flex:1 1 0;overflow:auto;overscroll-behavior:contain;padding-bottom:10px}
+html:root.busaDesign #busaCalculator>h2{font-size:18px;margin:13px 0 12px;letter-spacing:.3px}
+html:root.busaDesign #busaCalculator .calcTabs{gap:6px;margin:0 0 10px}
+html:root.busaDesign #busaCalculator .calcTabs button{min-height:47px;padding:7px 3px;font-size:11px;line-height:1.25;border-radius:12px}
+html:root.busaDesign #busaCalculator button[aria-selected="true"],html:root.busaDesign #busaCalculator button[type="submit"]{background:var(--design-accent)!important;color:var(--design-selected)!important;border-color:var(--design-accent)!important}
+html:root.busaDesign #busaCalculator .calcPanel{padding:16px;background:var(--surface)!important;border-color:var(--line)!important;border-radius:var(--design-radius)}
+html:root.busaDesign #busaCalculator .calcPanel h3{font-size:17px;margin:0 0 16px}
+html:root.busaDesign #busaCalculator .calcGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+html:root.busaDesign #busaCalculator .calcGrid>label:last-child:nth-child(odd){grid-column:1/-1}
+html:root.busaDesign #busaCalculator label{margin:0;font-size:12px;gap:8px;color:var(--ink)}
+html:root.busaDesign #busaCalculator input{min-height:45px;padding:9px 12px;background:var(--paper)!important;border-color:var(--border);border-radius:12px;font-size:22px}
+html:root.busaDesign #busaCalculator .calcActions{gap:9px;margin:18px 0 0}
+html:root.busaDesign #busaCalculator .calcActions button{min-height:42px;padding:9px;font-size:15px;border-radius:12px}
+html:root.busaDesign #busaCalculator .calcNote{margin-top:13px;color:var(--muted)}
+html:root.busaDesign #busaCalculator .calcNote summary{padding:6px 0}
+html:root.busaDesign #busaCalculator .calcResult{background:var(--paper);border:1px solid var(--line);color:var(--ink);border-radius:12px}
+html:root.busaDesign #busaCalculator .calcError:empty{display:none}
+@media(max-width:350px){html:root.busaDesign .netIndicators{gap:6px}html:root.busaDesign .netPill{padding:5px 9px;font-size:11px}html:root.busaDesign #settingsMenu .approvedMenuItem{font-size:13px}html:root.busaDesign section[data-section="1"] .approvedSensorHead{gap:8px;padding-left:1px;padding-right:22px}html:root.busaDesign section[data-section="1"] .approvedSensorText small{font-size:9px}html:root.busaDesign section[data-section="1"] .approvedSensorLive{font-size:20px}html:root.busaDesign .chartTabs button{font-size:10px}html:root.busaDesign .chartLegend{font-size:10px}html:root.busaDesign #busaCalculator .calcTabs button{font-size:10px}html:root.busaDesign #busaCalculator .calcPanel{padding:12px}}
+@media(max-height:650px){html:root.busaDesign .approvedPageTitle{margin:9px 0}html:root.busaDesign .liquidPanel{padding:11px;margin-bottom:8px}html:root.busaDesign .liquidPanelHeading{margin-bottom:9px}html:root.busaDesign .liquidSummary{margin-top:10px;padding-top:9px;gap:8px}html:root.busaDesign .liquidRateGrid strong{font-size:28px}html:root.busaDesign .liquidSummary strong{font-size:21px}html:root.busaDesign #busaCalculator .calcPanel{padding:12px}html:root.busaDesign #busaCalculator .calcPanel h3{margin-bottom:12px}html:root.busaDesign #busaCalculator .calcActions{margin-top:12px}}
+@media(max-height:500px){html:root.busaDesign .appHeader{padding-top:5px;padding-bottom:5px}html:root.busaDesign .appHeader h1{font-size:16px;margin-bottom:2px}html:root.busaDesign #clockDisplay{font-size:10px!important}html:root.busaDesign .netIndicators{margin-top:4px}html:root.busaDesign .netPill{font-size:10px;padding:3px 8px}html:root.busaDesign .appTabs button{min-height:44px;padding:3px 1px!important;gap:1px}html:root.busaDesign .appTabs .uiIcon{width:18px;height:18px}html:root.busaDesign .approvedPageTitle{display:none}html:root.busaDesign .chartCadence{margin-top:4px}html:root.busaDesign .chartHeading{margin:5px 0}html:root.busaDesign .chartLegend{margin:5px 0}html:root.busaDesign .chartTabs button,html:root.busaDesign .chartRanges button{min-height:28px;padding:4px 2px}}

@@ -97,7 +97,8 @@ with sync_playwright() as p:
         page.locator('#diagCopy').scroll_into_view_if_needed();page.locator('#diagCopy').click()
         page.wait_for_function("window.reportCopied&&window.reportCopied.endsWith('FULL_REPORT_LINE_99')");frame()
         page.locator('[data-page="7"]').click();settle()
-        assert page.evaluate('document.documentElement.dataset.viewportMode')=='unchanged'
+        mode=page.evaluate('document.documentElement.dataset.viewportMode')
+        assert mode==('calculator' if page.locator('html.busaDesign').count() else 'unchanged')
         assert page.locator('#calc-0-v').evaluate('(e)=>getComputedStyle(e).fontSize')=='22px'
         assert not errors,errors;page.close()
     browser.close()
