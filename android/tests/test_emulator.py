@@ -3,26 +3,37 @@
 Requires adb, a booted emulator, a DEBUG APK and Playwright. No real ESP32.
 """
 from pathlib import Path
-import copy, http.server, json, socketserver, subprocess, sys, threading, urllib.parse
+import copy, http.server, json, socketserver, subprocess, sys, threading, time, urllib.parse
 
 root=Path(__file__).resolve().parents[2]
 apk=Path(sys.argv[1]).resolve()
 out=root/'android/out/emulator';out.mkdir(parents=True,exist_ok=True)
 fixture=json.loads((root/'tests/fixtures/ui10-status.json').read_text())
 fixture['collection']={'sensor_present':True,'ml_per_min':24,'total_ml':1234,'duration_ms':3600000}
-state={'offline':False,'tick':0,'posts':[]}
+state={'offline':True,'tick':0,'posts':[],'gets':[]}
 html=(root/'android/app/src/main/assets/local/index.html').read_bytes()
+# Emulate a pre-Chromium-103 WebView on the device-served page. The APK
+# compatibility layer must restore bounded fetches, not invent API responses.
+assert b'<head>' in html
+html=html.replace(b'<head>', b'<head><script>delete AbortSignal.timeout;document.documentElement.dataset.fixtureDevicePage="1";</script>',1)
 def adb(*args,data=None):
     return subprocess.run(['adb',*args],input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self,*args):pass
     def do_GET(self):
         path=urllib.parse.urlsplit(self.path).path
+        state['gets'].append(self.path)
         body=b'{}';kind='application/json';code=200
         if path=='/__test/offline':state['offline']=True
+        elif path=='/__test/online':state['offline']=False
         elif path=='/__test/posts':body=json.dumps(state['posts']).encode()
+        elif path=='/__test/gets':body=json.dumps(state['gets']).encode()
         elif state['offline']:code=503
-        elif path=='/':body=html;kind='text/html; charset=utf-8'
+        elif path=='/':
+            time.sleep(6) # Old APK's 4.5-second root-page cutoff would fail here.
+            body=html;kind='text/html; charset=utf-8'
+        elif path=='/api/wifi/scan':
+            body=b'{"scanning":false,"networks":[{"ssid":"BUSA router"},{"ssid":"Phone hotspot"}]}'
         elif path in ['/calculator.js','/calculator.css']:
             body=(root/path[1:]).read_bytes();kind='application/javascript' if path.endswith('.js') else 'text/css'
         elif path=='/api/status':
@@ -42,10 +53,11 @@ class Server(socketserver.ThreadingTCPServer):
 server=Server(('127.0.0.1',18080),Handler)
 threading.Thread(target=server.serve_forever,daemon=True).start()
 try:
-    adb('wait-for-device');adb('install','-r',str(apk));adb('reverse','tcp:18080','tcp:18080')
+    adb('wait-for-device');adb('install','-r',str(apk))
     adb('shell','am','force-stop','ru.busa.monitor')
     adb('shell','run-as','ru.busa.monitor','mkdir','-p','shared_prefs')
-    prefs=b'<?xml version="1.0" encoding="utf-8"?><map><string name="address">http://127.0.0.1:18080</string></map>'
+    # The emulator's actual host route, not adb reverse / loopback forwarding.
+    prefs=b'<?xml version="1.0" encoding="utf-8"?><map><string name="address">http://10.0.2.2:18080</string></map>'
     adb('shell','run-as','ru.busa.monitor','tee','shared_prefs/connection.xml',data=prefs)
     adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity')
     subprocess.run(['node',str(root/'android/tests/emulator_ui.js')],cwd=root,check=True)

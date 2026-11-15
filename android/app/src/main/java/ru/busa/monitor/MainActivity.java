@@ -36,21 +36,15 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /** Native container; the ESP32 remains the source of UI and device behaviour. */
 public final class MainActivity extends Activity {
     private static final int FILE_REQUEST = 14;
     private static final int BACKGROUND = Color.rgb(6, 14, 21);
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private WebView web;
     private ProgressBar progress;
     private ConnectivityManager connectivity;
@@ -58,6 +52,9 @@ public final class MainActivity extends Activity {
     private volatile String address;
     private volatile boolean offlineShell;
     private volatile boolean destroyed;
+    private boolean resumed;
+    private boolean connecting;
+    private AlertDialog connectionError;
     private int connectionAttempt;
     private ValueCallback<Uri[]> fileResult;
     private SharedPreferences preferences;
@@ -67,6 +64,8 @@ public final class MainActivity extends Activity {
         preferences = getSharedPreferences("connection", MODE_PRIVATE);
         try { address = DeviceAddress.normalize(preferences.getString("address", DeviceAddress.DEFAULT)); }
         catch (IllegalArgumentException error) { address = DeviceAddress.DEFAULT; }
+        // Select local Wi-Fi before WebView creates its network stack.
+        bindWifi();
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(BACKGROUND);
         web = new WebView(this);
@@ -107,7 +106,6 @@ public final class MainActivity extends Activity {
         web.setDownloadListener((url, userAgent, disposition, type, length) -> {
             if (DeviceAddress.sameOrigin(address, url)) openExternal(url);
         });
-        bindWifi();
         connect();
     }
 
@@ -120,6 +118,9 @@ public final class MainActivity extends Activity {
                 if (!destroyed) {
                     try { connectivity.bindProcessToNetwork(network); }
                     catch (SecurityException ignored) { }
+                    main.post(() -> {
+                        if (!destroyed && web != null && resumed && offlineShell && !connecting) connect();
+                    });
                 }
             }
             @Override public void onLost(Network network) {
@@ -144,48 +145,37 @@ public final class MainActivity extends Activity {
     }
 
     private void connect() {
-        final String target = address;
+        if (destroyed) return;
         final int attempt = ++connectionAttempt;
+        if (connectionError != null) { connectionError.dismiss(); connectionError = null; }
+        web.stopLoading();
+        connecting = true;
+        offlineShell = false;
         progress.setVisibility(View.VISIBLE);
-        worker.execute(() -> {
-            boolean reachable = false;
-            HttpURLConnection connection = null;
-            try {
-                connection = (HttpURLConnection) new URL(target + "/api/status").openConnection();
-                connection.setInstanceFollowRedirects(false);
-                connection.setConnectTimeout(1500);
-                connection.setReadTimeout(1500);
-                connection.setUseCaches(false);
-                if (connection.getResponseCode() == 200) {
-                    String body = read(connection.getInputStream(), 65536);
-                    JSONObject status = new JSONObject(body);
-                    reachable = status.has("temperatures") && status.has("water");
-                }
-            } catch (Exception ignored) { }
-            finally { if (connection != null) connection.disconnect(); }
-            final boolean online = reachable;
-            main.post(() -> {
-                if (destroyed || attempt != connectionAttempt) return;
-                if (online) {
-                    offlineShell = false;
-                    web.loadUrl(target + "/");
-                    main.postDelayed(() -> {
-                        if (!destroyed && attempt == connectionAttempt && progress.getVisibility() == View.VISIBLE) {
-                            web.stopLoading(); showOffline();
-                        }
-                    }, 4500);
-                } else showOffline();
-            });
-        });
+        // Load the same page as the browser. A short API preflight used to
+        // silently replace a reachable, slow ESP32 with the bundled interface.
+        web.loadUrl(address + "/");
+        main.postDelayed(() -> {
+            if (!destroyed && attempt == connectionAttempt && connecting) {
+                web.stopLoading(); showOffline("Прибор не ответил за 30 секунд.");
+            }
+        }, 30000);
     }
 
-    private void showOffline() {
-        if (destroyed) return;
+    private void showOffline(String reason) {
+        if (destroyed || offlineShell) return;
+        connecting = false;
         offlineShell = true;
+        progress.setVisibility(View.GONE);
         try {
             String html = read(getAssets().open("local/index.html"), 2000000);
             web.loadDataWithBaseURL(address + "/", html, "text/html", "UTF-8", null);
-            Toast.makeText(this, "Для показаний подключи телефон к Wi-Fi БУСА. Меню подключения — кнопкой «Назад» на главной.", Toast.LENGTH_LONG).show();
+            connectionError = new AlertDialog.Builder(this).setTitle("Нет связи с БУСА")
+                    .setMessage(address + "\n" + reason + "\nТелефон и прибор должны быть в одной сети Wi-Fi. Если БУСА подключена к роутеру, укажи её адрес в этой сети.")
+                    .setPositiveButton("Повторить", (dialog, which) -> connect())
+                    .setNeutralButton("Адрес БУСА", (dialog, which) -> editAddress())
+                    .setNegativeButton("Открыть без связи", null).create();
+            connectionError.show();
         } catch (Exception error) {
             progress.setVisibility(View.GONE);
             new AlertDialog.Builder(this).setTitle("БУСА").setMessage("Не удалось открыть интерфейс")
@@ -226,12 +216,22 @@ public final class MainActivity extends Activity {
             }
             return null;
         }
+        @Override public void onPageCommitVisible(WebView view, String url) {
+            connecting = false;
+            progress.setVisibility(View.GONE);
+            // Android 6+ can have a WebView predating AbortSignal.timeout.
+            // Keep requests bounded there too; do not replace device responses.
+            view.evaluateJavascript("(function(){if(typeof AbortSignal!=='undefined'&&"
+                    + "typeof AbortSignal.timeout!=='function'&&typeof AbortController==='function'){"
+                    + "AbortSignal.timeout=function(ms){var c=new AbortController();"
+                    + "setTimeout(function(){c.abort();},ms);return c.signal;};}})()", null);
+        }
         @Override public void onPageFinished(WebView view, String url) { progress.setVisibility(View.GONE); }
         @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-            if (request.isForMainFrame() && !offlineShell) showOffline();
+            if (request.isForMainFrame() && !offlineShell) showOffline("Ошибка соединения (" + error.getErrorCode() + ").");
         }
         @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
-            if (request.isForMainFrame() && !offlineShell) showOffline();
+            if (request.isForMainFrame() && !offlineShell) showOffline("Ответ прибора: HTTP " + response.getStatusCode() + ".");
         }
     }
 
@@ -313,11 +313,18 @@ public final class MainActivity extends Activity {
         dialog.show();
     }
 
-    @Override protected void onResume() { super.onResume(); if (web != null) { web.onResume(); web.resumeTimers(); } }
-    @Override protected void onPause() { if (web != null) { web.onPause(); web.pauseTimers(); } super.onPause(); }
+    @Override protected void onResume() {
+        super.onResume(); resumed = true;
+        if (web != null) {
+            web.onResume(); web.resumeTimers();
+            if (offlineShell && !connecting) connect();
+        }
+    }
+    @Override protected void onPause() { resumed = false; if (web != null) { web.onPause(); web.pauseTimers(); } super.onPause(); }
     @Override protected void onDestroy() {
         destroyed = true; ++connectionAttempt;
-        main.removeCallbacksAndMessages(null); worker.shutdownNow();
+        main.removeCallbacksAndMessages(null);
+        if (connectionError != null) { connectionError.dismiss(); connectionError = null; }
         if (fileResult != null) { fileResult.onReceiveValue(null); fileResult = null; }
         if (connectivity != null && wifiCallback != null) {
             try { connectivity.unregisterNetworkCallback(wifiCallback); connectivity.bindProcessToNetwork(null); }

@@ -17,9 +17,8 @@ const back = () => adb('shell','input','keyevent','4');
   device=devices[0];
   const webview=await device.webView({pkg:'ru.busa.monitor'});page=await webview.page();
   try {
-   await page.waitForFunction('typeof connected!=="undefined"&&connected&&!pollBusy&&document.documentElement.dataset.viewportReady==="1"',null,{timeout:60000});
+   await page.waitForFunction('typeof connected!=="undefined"&&document.documentElement.dataset.viewportReady==="1"',null,{timeout:60000});
    await page.waitForTimeout(3000); // Let initial Android resource/configuration updates settle.
-   await page.waitForFunction('connected&&!pollBusy');
    break;
   } catch(error) {
    if(!String(error).includes('has been closed')||attempt===2)throw error;
@@ -29,6 +28,19 @@ const back = () => adb('shell','input','keyevent','4');
  }
  page.on('pageerror',e=>errors.push(String(e)));
  try {
+  // Real native fallback at startup must explain the failure, retain truthful
+  // values and recover when returning from Wi-Fi settings / another activity.
+  await device.wait({text:'Нет связи с БУСА'});
+  assert.equal(await page.evaluate('connected'),false);
+  assert.equal(await page.locator('#t0').innerText(),'Н/Д');
+  await device.tap({text:'Открыть без связи'});
+  await fetch('http://127.0.0.1:18080/__test/online');
+  adb('shell','input','keyevent','3');
+  adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity');
+  await page.waitForFunction('connected&&!pollBusy&&document.documentElement.dataset.fixtureDevicePage==="1"',null,{timeout:60000});
+  assert.equal(await page.evaluate('typeof AbortSignal.timeout'),'function');
+  const gets=await(await fetch('http://127.0.0.1:18080/__test/gets')).json();
+  assert.equal(gets[0],'/','A native API preflight must not gate loading the device page');
   assert.equal(await page.locator('#t0').innerText(),'26,4°C');
   assert(await page.locator('.approvedRigArt').evaluate(e=>e.complete&&e.naturalWidth>0));
   for (const [section,name] of [[0,'home'],[1,'temperatures'],[2,'water'],[3,'graphs'],[7,'calculator'],[5,'settings']]) {
@@ -38,6 +50,12 @@ const back = () => adb('shell','input','keyevent','4');
    fs.writeFileSync(path.join(out,name+'.png'),adb('exec-out','screencap','-p'));
   }
   assert.equal(await page.locator('#settingsMenu>.approvedMenuItem:visible').count(),9);
+  await page.locator('[data-stab-btn="1"]').click();
+  await page.waitForFunction('!wifiListBusy&&document.querySelector("#net").options.length===3');
+  assert.deepEqual(await page.locator('#net option').allTextContents(),['Выберите сеть','BUSA router','Phone hotspot']);
+  await page.locator('#net').selectOption('BUSA router');
+  assert.equal(await page.locator('#net').inputValue(),'BUSA router');
+  back();await page.waitForFunction('settingsActive===-1');
   await page.locator('[data-stab-btn="5"]').click();
   await page.locator('#firmwareFile').click();
   await page.waitForTimeout(2000);
@@ -60,7 +78,7 @@ const back = () => adb('shell','input','keyevent','4');
   const posts=await(await fetch('http://127.0.0.1:18080/__test/posts')).json();
   assert(posts.every(x=>x==='/api/time/sync'),JSON.stringify(posts));
   assert.deepEqual(errors,[]);
-  const result='PASS installed Android 15 APK: six screens, live UI, document picker/cancel, native Back, calculator, connection loss and no outer scroll; HTTP fixtures, no physical ESP32\n';
+  const result='PASS installed Android 15 APK: native offline startup/recovery, actual host network route (no adb reverse), slow 6-second device page, older AbortSignal compatibility, ESP32 Wi-Fi network list, six screens, document picker/cancel, native Back, calculator, connection loss and no outer scroll; HTTP fixtures, no physical ESP32\n';
   fs.writeFileSync(path.join(out,'RESULT.txt'),result);process.stdout.write(result);
  } finally {await device.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
