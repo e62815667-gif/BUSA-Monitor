@@ -1,193 +1,61 @@
-# Реестр веток GitHub — 15.11.2026
+# Актуальный реестр веток BUSA-Monitor — 15.11.2026
 
-Репозиторий: [BUSA-Monitor](https://github.com/e62815667-gif/BUSA-Monitor).
+**Активных веток: 22.** Было 140: первые 3 проверенные избыточные ветки удалены отдельно, затем ещё 115 архивных веток удалены после создания и проверки полного Git-архива.
 
-**Сейчас: 137 веток.** Начальное количество перед уборкой — 140; удалены три проверенные ветки.
+## Постоянный архив
 
-## Удалённые ветки и основания
+- [GitHub Release: полный архив 137 веток до массовой очистки](https://github.com/e62815667-gif/BUSA-Monitor/releases/tag/busa-git-backup-all-branches-20261115).
+- [Полный Git bundle (27,2 МБ)](https://github.com/e62815667-gif/BUSA-Monitor/releases/download/busa-git-backup-all-branches-20261115/BUSA_FULL_GIT_20261115.bundle).
+- В релизе сохранены `all-branches.txt` (SHA каждой из 137 веток), `archive-only.txt` (115 удалённых после архивирования), `keep.txt`, `SHA256SUMS.txt`, инструкция восстановления.
+- GitHub Actions создал архив, скачал его из GitHub Release, проверил контрольные суммы и **восстановил все 137 веток в новую чистую Git-базу** для подтверждения сохранности. Затем удалил только ветки, не входившие в список сохранения.
+- Первые 3 ветки были исключены до массового архива: одна была точным дубликатом сохраняемой ветки (один SHA), две имели уже объединённые PR [#8](https://github.com/e62815667-gif/BUSA-Monitor/pull/8) и [#10](https://github.com/e62815667-gif/BUSA-Monitor/pull/10).
+- [Успешный отчёт автоматической очистки](https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/43694280331). Временный workflow удалён после успешного завершения.
 
-| Ветка | Основание | Сохранность |
-|---|---|---|
-| `fix/busa-rainmaker-ble-rollback-audit-20261105` | Точный дубликат: тот же SHA, что у `fix/busa-rainmaker-live-telemetry-20261105` | Другая ветка с тем же коммитом сохранена |
-| `feature/online-approved-live-20261102` | [PR #8](https://github.com/e62815667-gif/BUSA-Monitor/pull/8) объединён в `main`; SHA ветки на момент удаления совпадал с SHA исходной ветки PR | История PR и изменения в `main` сохранены |
-| `feature/busa-pwa-remote-threshold-release-20261103` | [PR #10](https://github.com/e62815667-gif/BUSA-Monitor/pull/10) объединён в `main`; SHA ветки на момент удаления совпадал с SHA исходной ветки PR | История PR и изменения в `main` сохранены |
+## 22 активные ветки по назначению
 
-Проверка удаления: [Actions — точный дубликат](https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/43692683860), [Actions — две объединённые PR-ветки](https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/43692786705). Оба запуска завершились `success`, а сами три ссылки больше не присутствуют в списке refs.
+### Основная ветка (1)
 
-**Важно:** наличие старых версий в ветках не доказывает, что их можно удалить. Новые ветки без доказательства избыточности не удаляются. Рабочая UI16 сохранена на Google Диске; источники UI16 в GitHub ещё не сопоставлены с конкретной веткой.
+- [`main`](https://github.com/e62815667-gif/BUSA-Monitor/tree/main) — `e52b815b24780cef299871fc6b48fec9ad9b3166`
 
-## Полный актуальный список (137)
+### Основа CALC4/WIFI1 и ключевые направления (7)
 
-### architecture (1)
+- [`architecture/busa-v15-modular-monitor-20261027`](https://github.com/e62815667-gif/BUSA-Monitor/tree/architecture/busa-v15-modular-monitor-20261027) — `ac7dcfb16ad15062bcda3a6bb8934e78487050e2`
+- [`feat/busa-calculator-20261105`](https://github.com/e62815667-gif/BUSA-Monitor/tree/feat/busa-calculator-20261105) — `864a576f97c6793bfa241aaf81278821d73ca744`
+- [`fix/busa-ble-ota-stable-20261105`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-ble-ota-stable-20261105) — `2b7e8ceab88da06230efc77db4f1cfce14fb8cae`
+- [`fix/busa-official-rainmaker-ble-20261105`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-official-rainmaker-ble-20261105) — `07c00fb17382bc8dad61595b1ada25bcd907b63b`
+- [`fix/busa-rainmaker-live-telemetry-20261105`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-rainmaker-live-telemetry-20261105) — `46baec115f91e2637c2adf493e9449093700c9d1`
+- [`fix/busa-rainmaker-telemetry-20261105`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-rainmaker-telemetry-20261105) — `ee6e659eacc2fd917b7c5f11b3a756c4b67606fa`
+- [`fix/busa-wifi-single-scanner-driver-20261105`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-wifi-single-scanner-driver-20261105) — `82a6925c85f6e2a91bf4c84b4abe72d7f07180c5`
 
-- `architecture/busa-v15-modular-monitor-20261027`
+### Опорные старые версии (5)
 
-### feat (3)
+- [`fix/busa-v14-7-keypad-persist-backup-20261103`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-v14-7-keypad-persist-backup-20261103) — `349966c9e810021bd88079dd9921853bac6f3615`
+- [`fix/busa-v14-9-independent-ui-sta-switch-20261103`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-v14-9-independent-ui-sta-switch-20261103) — `2c2b7c39249b4446b0c1e50092d9a78f54033f1a`
+- [`release/busa-v14-7-original-n16r8-sound4-corrected-20261101`](https://github.com/e62815667-gif/BUSA-Monitor/tree/release/busa-v14-7-original-n16r8-sound4-corrected-20261101) — `0c45ecdc9282cff75792232682ad6ecd58014301`
+- [`release/busa-v14-7-smooth-google-ca-bundle-20261102`](https://github.com/e62815667-gif/BUSA-Monitor/tree/release/busa-v14-7-smooth-google-ca-bundle-20261102) — `79b2eb132d591a9f537a7fda56f4a8744f542ac8`
+- [`release/busa-v14-7-wifi-google-stable-20261103`](https://github.com/e62815667-gif/BUSA-Monitor/tree/release/busa-v14-7-wifi-google-stable-20261103) — `8f10dd931671439e20f737fdd435b649dea40677`
 
-- `feat/busa-ble-rainmaker-once-pair-20261105`
-- `feat/busa-calculator-20261105`
-- `feat/busa-rainmaker-bluetooth-pair-ui-20261105`
+### Ветки действующих Pull Request (9)
 
-### feature (13)
+- [`feature/busa-keyboard-14v8-nvs-20261103`](https://github.com/e62815667-gif/BUSA-Monitor/tree/feature/busa-keyboard-14v8-nvs-20261103) — `0efc09b72d3258b7afdb0c79412ae75e5d39d0ca`
+- [`feature/busa-rainmaker-full-settings-20261104`](https://github.com/e62815667-gif/BUSA-Monitor/tree/feature/busa-rainmaker-full-settings-20261104) — `9524cedda5c9788132815073febf4ea84b7c0221`
+- [`feature/busa-unified-tft-status-20261103`](https://github.com/e62815667-gif/BUSA-Monitor/tree/feature/busa-unified-tft-status-20261103) — `ce6445713e724b2909793db650f2f79b4e188f3f`
+- [`feature/busa-v14-9-tft-settings-20261103`](https://github.com/e62815667-gif/BUSA-Monitor/tree/feature/busa-v14-9-tft-settings-20261103) — `4c97082e5aaa83a8bd41e21d77b99ee26d482bf7`
+- [`feature/busa-v15-0-wifi-google-tft-20261103`](https://github.com/e62815667-gif/BUSA-Monitor/tree/feature/busa-v15-0-wifi-google-tft-20261103) — `005cc1fb57d5efbf25530acc9fe6455d12e3046b`
+- [`fix/busa-local-ui-crisp-temp-icons-20261103`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-local-ui-crisp-temp-icons-20261103) — `0628686bffbb2299b3b9535d0eb9c95a812da738`
+- [`fix/busa-rainmaker-core-stability-20261104`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-rainmaker-core-stability-20261104) — `a0b39afe7231a313ee0c5de2fb030e15712b463e`
+- [`fix/busa-v14-17-temperature-diagnostics-20261023`](https://github.com/e62815667-gif/BUSA-Monitor/tree/fix/busa-v14-17-temperature-diagnostics-20261023) — `d650470da7f741389ea9060495474075f3c8125c`
+- [`lab/busa-v14-14-google-readonly-audit-20261023`](https://github.com/e62815667-gif/BUSA-Monitor/tree/lab/busa-v14-14-google-readonly-audit-20261023) — `154a22afada9b4105da7cafbba34bd12c2ca904a`
 
-- `feature/busa-001-v074-ui-lab`
-- `feature/busa-keyboard-14v8-nvs-20261103`
-- `feature/busa-rainmaker-full-settings-20261104`
-- `feature/busa-unified-tft-status-20261103`
-- `feature/busa-v14-7-approved-reference-art-20261103`
-- `feature/busa-v14-9-rainmaker-full-20261104`
-- `feature/busa-v14-9-tft-settings-20261103`
-- `feature/busa-v15-0-wifi-google-tft-20261103`
-- `feature/busa-v15-1-thermostat-model-20261027`
-- `feature/busa-v15-2-n16r8-tft-pins-20261029`
-- `feature/busa-v15-3-n16r8-unified-app-20261101`
-- `feature/busa-v15-4-early-wifi-recovery-20261101`
-- `feature/direct-ds18b20-wifi-iphone16`
+## Восстановление одной старой ветки
 
-### fix (50)
+1. Скачать `BUSA_FULL_GIT_20261115.bundle` из архивного релиза.
+2. В локальной Git-копии выполнить:
 
-- `fix/busa-app-disconnect-switch-20261105`
-- `fix/busa-ble-ota-stable-20261105`
-- `fix/busa-local-ui-crisp-temp-icons-20261103`
-- `fix/busa-official-rainmaker-ble-20261105`
-- `fix/busa-rainmaker-ble-staged-start-20261105`
-- `fix/busa-rainmaker-core-stability-20261104`
-- `fix/busa-rainmaker-live-telemetry-20261105`
-- `fix/busa-rainmaker-pop123456789-safe-boot-20261104`
-- `fix/busa-rainmaker-telemetry-20261105`
-- `fix/busa-v14-13-keypad-idle-diagnostics`
-- `fix/busa-v14-13-onewire-probe-cycle`
-- `fix/busa-v14-17-temperature-diagnostics-20261023`
-- `fix/busa-v14-20-verified-sensors-keypad-wifi-20261023`
-- `fix/busa-v14-21-wifi-20261023`
-- `fix/busa-v14-22-wifi-v1414-20261023`
-- `fix/busa-v14-23-local-app-recovery-20261023`
-- `fix/busa-v14-24-iphone16-scan-reconnect-20261023`
-- `fix/busa-v14-25-local-wifi-priority-20261023`
-- `fix/busa-v14-26-temperature-binding-app-20261023`
-- `fix/busa-v14-27-final-memory-wifi-20261027`
-- `fix/busa-v14-27-simultaneous-ap-sta-20261023`
-- `fix/busa-v14-27-user-verified-patch1-20261027`
-- `fix/busa-v14-28-memory-tls-json-20261027`
-- `fix/busa-v14-7-final-staged-20261101`
-- `fix/busa-v14-7-i2c-sda-recovery-20261102-v2`
-- `fix/busa-v14-7-keypad-persist-backup-20261103`
-- `fix/busa-v14-7-n16r8-responsive-diagnostics-20261102`
-- `fix/busa-v14-7-n16r8-tft-gmt028-20261101`
-- `fix/busa-v14-7-sda-reset-build-20261102`
-- `fix/busa-v14-9-consistent-submenu-navigation-20261103`
-- `fix/busa-v14-9-home-expand-clean-20261103`
-- `fix/busa-v14-9-independent-ui-sta-switch-20261103`
-- `fix/busa-v14-9-layout-allpages-20261103`
-- `fix/busa-v14-9-temp-two-tab-sensor-order-20261103`
-- `fix/busa-v14-9-temp-vertical-no-flicker-20261103`
-- `fix/busa-v14-9-tft-footer-nav-20261103`
-- `fix/busa-v14-9-wifi-menu-radio-off-20261103`
-- `fix/busa-v14-9-wifi-scan-recovery-sta-only-20261103`
-- `fix/busa-v14-9-wifi-scan-sta-pause-passive-20261103`
-- `fix/busa-v15-0-ap-recovery-20261103`
-- `fix/busa-v15-0-wifi-scan-r2-20261103`
-- `fix/busa-v15-1-ap-123456789-20261027`
-- `fix/busa-v15-6-modules-boot-ui-20261101`
-- `fix/busa-wifi-abort-pending-sta-20261105`
-- `fix/busa-wifi-clean-autoscan-20261104`
-- `fix/busa-wifi-single-scanner-driver-20261105`
-- `fix/online-crisp-rig-20261103`
-- `fix/online-google-ui-20261103`
-- `fix/temperature-rom-observation-20261027`
-- `fix/v15-1-tfix-safe-startup-20261027`
+```bash
+git fetch /path/to/BUSA_FULL_GIT_20261115.bundle 'refs/heads/ИМЯ_ВЕТКИ:refs/heads/ИМЯ_ВЕТКИ'
+```
 
-### handoff (1)
+3. Проверить, что восстановленный SHA совпадает с записью в `all-branches.txt`. Полный список и SHA находятся в архивном релизе.
 
-- `handoff/codex-source-v15-1-tfix-20261027`
-
-### lab (39)
-
-- `lab/busa-14-11-monitor-ui`
-- `lab/busa-1m-v0.7.0`
-- `lab/busa-quality-gates-v1419-20261023`
-- `lab/busa-r03-recovery-monitor`
-- `lab/busa-v10-diag`
-- `lab/busa-v11-tft`
-- `lab/busa-v12-boot-status`
-- `lab/busa-v12-full-diagnostics`
-- `lab/busa-v13-approved-six-screens`
-- `lab/busa-v14-1-ui-water-fixes`
-- `lab/busa-v14-10-google-ack-fix`
-- `lab/busa-v14-10-unified-online-ui`
-- `lab/busa-v14-12-cloud-update-preflight`
-- `lab/busa-v14-13-google-catalog-activation`
-- `lab/busa-v14-13-n8r2-cloud-ota-diagnostics`
-- `lab/busa-v14-14-combined-display-keypad-relay-sim`
-- `lab/busa-v14-14-combined-pca9685-led-diagnostics`
-- `lab/busa-v14-14-ds18b20-gpio16-17-18-21`
-- `lab/busa-v14-14-dual-independent-themes`
-- `lab/busa-v14-14-google-readonly-audit-20261023`
-- `lab/busa-v14-14-iphone-approved-ui`
-- `lab/busa-v14-14-iphone-web-qa`
-- `lab/busa-v14-14-led-test-preflight-safe`
-- `lab/busa-v14-14-n8r2-onewire-fix-wifi-ota`
-- `lab/busa-v14-14-pca9685-led-test`
-- `lab/busa-v14-17-wifi-scan-20261023`
-- `lab/busa-v14-18-wifi-driver-scan-20261023`
-- `lab/busa-v14-19-v149-wifi-temperature-20261023`
-- `lab/busa-v14-2-font-readable`
-- `lab/busa-v14-3-final-display-google`
-- `lab/busa-v14-4-manual-display`
-- `lab/busa-v14-5-iphone-layout-repair`
-- `lab/busa-v14-6-tft-no-flicker-https-diag`
-- `lab/busa-v14-7-dual-network-indicators`
-- `lab/busa-v14-8-calibration-readiness`
-- `lab/busa-v14-9-google-tls-trust-fix`
-- `lab/busa-v14-approved-hq-graphics`
-- `lab/busa-v14-landscape-ui-ota`
-- `lab/esp32s3-usb-nopsram`
-
-### main (1)
-
-- `main`
-
-### other (1)
-
-- `busa-firmware-v0.7.2-build`
-
-### package (1)
-
-- `package/busa-v14-27-arduino-ino-20261027`
-
-### release (27)
-
-- `release/busa-v14-7-approved-iphone-20261102`
-- `release/busa-v14-7-clean-temperature-thresholds-20261102`
-- `release/busa-v14-7-cloud-command-20261103`
-- `release/busa-v14-7-display-io-smooth-20261102`
-- `release/busa-v14-7-esp32s3-240mhz-psram-20261102`
-- `release/busa-v14-7-google-i2c-persistent-slow-20261102`
-- `release/busa-v14-7-google-softi2c-diagnostic-20261102`
-- `release/busa-v14-7-graphs-lanes-20261102`
-- `release/busa-v14-7-i2c-direct-gpio-20261102`
-- `release/busa-v14-7-i2c-gpio-ack-selftest-20261102`
-- `release/busa-v14-7-i2c-recovery-20261102`
-- `release/busa-v14-7-i2c-responsive-20261102`
-- `release/busa-v14-7-i2c-verification-20261102`
-- `release/busa-v14-7-keypad-gpio40-41-no-pca-20261102`
-- `release/busa-v14-7-local-web-stable-20261103`
-- `release/busa-v14-7-n16r8-sound4-password-123456789`
-- `release/busa-v14-7-netstable-cleanwifi-20261103`
-- `release/busa-v14-7-online-design-20261102`
-- `release/busa-v14-7-original-n16r8-sound4-corrected-20261101`
-- `release/busa-v14-7-smooth-google-ca-bundle-20261102`
-- `release/busa-v14-7-smooth-google-i2c-bounded-20261102`
-- `release/busa-v14-7-sound-roles-90sec-20261102`
-- `release/busa-v14-7-sound-t3-t4-bindings-20261102`
-- `release/busa-v14-7-sync-temps-tft-20261102`
-- `release/busa-v14-7-tft-flicker-ui-keypad-20261102`
-- `release/busa-v14-7-wifi-google-stable-20261103`
-- `release/busa-v15-5-n16r8-stable-local-20261101`
-
-## Правила последующего сокращения
-
-- Сверить историю каждого кандидата с реальным исходным кодом и испытаниями.
-- Для подтверждённых рабочих выпусков хранить оба BIN: USB MERGED и APP OTA.
-- Прежде чем удалять уникальную ветку, проверить, сохранены ли её исходники и возможность повторной сборки.
-- Не трогать ветки с открытыми PR.
+**Важно:** архив включает только Git-исходники и историю, присутствовавшие в репозитории на момент архивирования. Он **не является исходным кодом UI16**. Два подтверждённых BIN UI16 находятся в папке Google Диска «успех буса». Подробности: [паспорт UI16](UI16_VERIFIED_2026-11-15.md).
