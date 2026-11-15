@@ -63,7 +63,8 @@ with sync_playwright() as p:
             active=page.locator('.appTabs button.on')
             assert active.evaluate('e=>getComputedStyle(e).backgroundImage')!='none'
             assert page.locator('.appTabs button').count()==6
-            assert page.locator('.appTabs button').evaluate_all('(es)=>es.every(e=>e.scrollWidth<=e.clientWidth+1)')
+            nav=page.locator('.appTabs button').evaluate_all('(es)=>es.map(e=>({label:e.innerText,width:e.clientWidth,scroll:e.scrollWidth,font:getComputedStyle(e).font}))')
+            assert all(e['scroll']<=e['width']+1 for e in nav),(width,height,nav)
             if section==0:
                 assert page.locator('#relayBadge1').get_attribute('data-state')=='on'
                 assert page.locator('#relayBadge1').evaluate('e=>getComputedStyle(e).backgroundImage')!=page.locator('#relayBadge0').evaluate('e=>getComputedStyle(e).backgroundImage')

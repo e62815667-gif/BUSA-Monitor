@@ -9,7 +9,7 @@ html:root.busaDesign #clockDisplay{font-size:11px!important;color:var(--muted)!i
 html:root.busaDesign .netIndicators{margin-top:7px;gap:8px}
 html:root.busaDesign .appHeader .netPill{padding:5px 11px;border-color:var(--glass-edge)!important;border-radius:18px;background:linear-gradient(135deg,#153b4b66,#08182444)!important;box-shadow:inset 0 1px 0 #c5fbff12!important}
 html:root.busaDesign .appTabs{width:calc(100% - 14px)!important;margin:0 auto max(5px,env(safe-area-inset-bottom))!important;padding:6px 4px!important;gap:2px;border:1px solid var(--glass-edge)!important;border-radius:21px!important;background:var(--glass)!important;box-shadow:var(--glass-shadow)!important}
-html:root.busaDesign .appTabs button{min-height:56px;padding:4px 1px!important;border:1px solid transparent!important;border-radius:15px!important;font-size:clamp(7px,2.15vw,10px)!important;gap:3px}
+html:root.busaDesign .appTabs button{min-height:56px;padding:4px 1px!important;border:1px solid transparent!important;border-radius:15px!important;font-family:Arial,sans-serif!important;font-size:clamp(7px,2.15vw,10px)!important;gap:3px}
 html:root.busaDesign .appTabs button.on{background:linear-gradient(150deg,#00b8f659,#0782b855)!important;border:1px solid #4dd6ff66!important;box-shadow:inset 0 1px 0 #b5faff33!important}
 html:root.busaDesign .appTabs .uiIcon{width:24px;height:24px}
 html:root.busaDesign .appTabs button span{min-height:2.3em}

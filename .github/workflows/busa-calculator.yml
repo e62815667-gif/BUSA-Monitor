@@ -102,14 +102,14 @@ jobs:
           trap 'code=$?; python3 ci/report_browser_failure.py /tmp/busa-browser-tests.log "$code"; exit "$code"' EXIT
           python3 -m pip install playwright==1.56.0
           CI=1 python3 -m playwright install --with-deps chromium webkit
+          python3 -B tests/test_ui16_design.py
+          BUSA_TEST_BROWSER=webkit python3 -B tests/test_ui16_design.py
           python3 -B tests/test_calculator_browser.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_calculator_browser.py
           python3 -B tests/test_ui13_browser.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_ui13_browser.py
           python3 -B tests/test_ui14_viewport.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_ui14_viewport.py
-          python3 -B tests/test_ui16_design.py
-          BUSA_TEST_BROWSER=webkit python3 -B tests/test_ui16_design.py
           python3 -B tests/test_ui11_style.py
           python3 -B tests/test_ui9_live.py
           python3 -B tests/test_wifi_browser.py
