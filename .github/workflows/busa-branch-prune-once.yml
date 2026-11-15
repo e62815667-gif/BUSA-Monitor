@@ -1,0 +1,30 @@
+name: BUSA one-time exact-duplicate branch cleanup
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/busa-branch-prune-once.yml
+permissions:
+  contents: write
+jobs:
+  remove-exact-duplicate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify both refs and remove only redundant branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: fix/busa-rainmaker-live-telemetry-20261105
+          REMOVE: fix/busa-rainmaker-ble-rollback-audit-20261105
+          EXPECTED_SHA: 46baec115f91e2637c2adf493e9449093700c9d1
+        shell: bash
+        run: |
+          set -euo pipefail
+          keep_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${KEEP}" --jq '.object.sha')
+          delete_sha=$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${REMOVE}" --jq '.object.sha')
+          if [[ "${keep_sha}" != "${EXPECTED_SHA}" || "${delete_sha}" != "${EXPECTED_SHA}" ]]; then
+            echo "Branch heads changed; refusing to remove any ref"
+            exit 1
+          fi
+          gh api --method DELETE "repos/${GITHUB_REPOSITORY}/git/refs/heads/${REMOVE}"
+          echo "Removed duplicate ${REMOVE}; preserved ${KEEP} at ${keep_sha}"
