@@ -1,2 +1,5 @@
 firmware/**/*.ino.zip
 __pycache__/
+android/out/
+*.jks
+*.keystore
