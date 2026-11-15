@@ -8,14 +8,25 @@ const out = path.resolve('android/out/emulator');
 const adb = (...args) => execFileSync('adb', args);
 const back = () => adb('shell','input','keyevent','4');
 (async () => {
- const devices = await _android.devices();
- assert(devices.length, 'No Android emulator');
- const device = devices[0];
- const webview = await device.webView({pkg:'ru.busa.monitor'});
- const page = await webview.page();
- const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ let device,page;
+ const errors=[];
+ // Android can relaunch the first Activity while finishing initial package
+ // optimisation. Reattach only to a replaced WebView, never retry assertions.
+ for(let attempt=0;attempt<3;attempt++) {
+  const devices=await _android.devices();assert(devices.length,'No Android emulator');
+  device=devices[0];
+  const webview=await device.webView({pkg:'ru.busa.monitor'});page=await webview.page();
+  try {
+   await page.waitForFunction('typeof connected!=="undefined"&&connected&&!pollBusy&&document.documentElement.dataset.viewportReady==="1"',null,{timeout:60000});
+   break;
+  } catch(error) {
+   if(!String(error).includes('has been closed')||attempt===2)throw error;
+   console.log('Android recreated its initial Activity; reattaching to the new WebView.');
+   await device.close();
+  }
+ }
+ page.on('pageerror',e=>errors.push(String(e)));
  try {
-  await page.waitForFunction('typeof connected!=="undefined"&&connected&&!pollBusy&&document.documentElement.dataset.viewportReady==="1"',null,{timeout:60000});
   assert.equal(await page.locator('#t0').innerText(),'26,4°C');
   assert(await page.locator('.approvedRigArt').evaluate(e=>e.complete&&e.naturalWidth>0));
   for (const [section,name] of [[0,'home'],[1,'temperatures'],[2,'water'],[3,'graphs'],[7,'calculator'],[5,'settings']]) {
