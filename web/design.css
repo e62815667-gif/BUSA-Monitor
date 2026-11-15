@@ -1,4 +1,4 @@
-/* UI15: approved six-screen design, local application only. */
+/* UI15 foundation; UI16 holographic presentation is scoped below. */
 html:root.busaDesign{color-scheme:dark;--ink:#e6f2f7;--muted:#9cb4c2;--paper:#061521;--surface:#0c2132;--line:#244253;--sea:#2087ed;--orange:#2087ed;--warn:#ff6473;--border:#36576c;--water:#38bdf8;--cube:#f4c84a;--column:#53d486;--alarm:#ff6473;--design-accent:#2087ed;--design-icon:#75d4f4;--design-selected:#fff;--design-green:#35d68c;--design-radius:14px;background:var(--paper);color:var(--ink)}
 html:root.busaDesign[data-theme="light"]{color-scheme:light;--ink:#19384b;--muted:#536e7f;--paper:#f3f7fa;--surface:#fff;--line:#c9dce6;--border:#87a8bb;--design-icon:#087fae}
 html:root.busaDesign body{background:var(--paper)!important;color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}

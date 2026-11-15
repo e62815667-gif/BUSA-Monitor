@@ -83,7 +83,9 @@ with sync_playwright() as p:
             inside('#settingsMenu>.approvedMenuItem');frame()
         for section in [0,1,2,3]:
             page.locator(f'[data-page="{section}"]').click();settle();frame()
-            if section==0:inside('.approvedTempTitle,.approvedTemp strong[id],.relayBadge,.collectionRateLabel')
+            if section==0:
+                inside('.approvedTempTitle,.approvedTemp strong[id],.relayBadge')
+                inside('.holoMetrics' if page.locator('.holoHome').count() else '.collectionRateLabel')
             if section==1:inside('.approvedSensorHead,#temperatureSave')
             if section==2:inside('.liquidPanel')
         page.locator('[data-page="5"]').click();page.evaluate('settingsTab(8)')

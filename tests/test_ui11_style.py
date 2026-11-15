@@ -35,7 +35,9 @@ with sync_playwright() as p:
     canvas=page.locator('#chartCanvas').bounding_box();assert canvas['height']<=canvas['width']*440/640+2,canvas
     page.locator('[data-page="5"]').click();page.wait_for_timeout(100)
     menu=page.locator('#settingsMenu').bounding_box();items=page.locator('#settingsMenu>.approvedMenuItem').evaluate_all('(es)=>es.filter(e=>e.getBoundingClientRect().height>0).reduce((s,e)=>s+e.getBoundingClientRect().height,0)')
-    if page.locator('.vpPager').is_hidden():assert abs(menu['height']-items)<5,(menu,items)
+    # UI16 adds a 1px glass border and 2px inset on each side of the menu.
+    inset=page.locator('#settingsMenu').evaluate('e=>{const s=getComputedStyle(e);return parseFloat(s.paddingTop)+parseFloat(s.paddingBottom)+parseFloat(s.borderTopWidth)+parseFloat(s.borderBottomWidth)}')
+    if page.locator('.vpPager').is_hidden():assert abs(menu['height']-items-inset)<2,(menu,items,inset)
    page.close()
   assert shots[0]==shots[1],(w,[(k,shots[0][k],shots[1][k]) for k in selectors if shots[0][k]!=shots[1][k]])
  b.close()

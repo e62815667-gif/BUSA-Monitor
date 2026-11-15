@@ -27,6 +27,13 @@ function size(){
 }
 function fitHome(section){
  const panel=section.querySelector('.approvedDashboard'),w=panel.clientWidth,H=panel.clientHeight;
+ if(section.classList.contains('holoHome')){
+  const h=Math.max(65,Math.min(H-5,w*1.48)),sw=h*2/3;
+  const left=(w-sw)/2+Math.min(12,w*.03),top=Math.max(0,H-h);
+  const label=Math.max(65,Math.min(w*.45,left+sw*.17-5));
+  for(const [n,v] of Object.entries({'--scene-w':sw+'px','--scene-h':h+'px','--scene-left':left+'px','--scene-top':top+'px','--panel-w':w+'px','--temp-label-width':label+'px','--home-temp-size':Math.max(16,Math.min(24,label/3.6))+'px'}))set(panel,n,v);
+  section.classList.toggle('smallScene',sw<220);return;
+ }
  let top=Math.min(61,Math.max(45,H*.14));const bottom=25;
  let h=Math.max(70,H-top-bottom),sw=h*1024/1536;
  if(sw>w*1.02){sw=w*1.02;h=sw*1536/1024;}
@@ -56,7 +63,7 @@ function fitMenu(menu){
 function fitTemperatures(section){
  const list=section.querySelector('.approvedSensorList'),wide=section.clientWidth>=560&&main.clientHeight<320;
  section.classList.toggle('wideContent',wide);
- const count=wide?2:4,head=Math.max(48,Math.min(74,Math.floor((list.clientHeight-7*(count-1))/count)-2));
+ const count=wide?2:4,head=Math.max(48,Math.min(90,Math.floor((list.clientHeight-11*(count-1))/count)-2));
  set(section,'--sensor-row-height',head+'px');
 }
 function fitScroll(host){

@@ -1,7 +1,7 @@
-name: BUSA N16R8 CALC4 WIFI1 UI15 approved six-screen design build
+name: BUSA N16R8 CALC4 WIFI1 UI16 approved six-screen design build
 on:
   push:
-    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local]
+    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local, feat/busa-ui16-holographic]
     paths:
       - 'ci/ble_official_provisioning.py'
       - 'ci/busa_ble_ota_stability.py'
@@ -67,6 +67,7 @@ jobs:
           python3 -B tests/test_rm_tracker.py
           python3 -B tests/test_rm_telemetry.py
           python3 -B tests/test_rm_preservation.py
+          python3 -B tests/test_ui16_preservation.py
           python3 -B ci/generate_calculator.py --check
           python3 -B ci/generate_viewport.py --check
           python3 -B ci/generate_design.py --check
@@ -107,8 +108,8 @@ jobs:
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_ui13_browser.py
           python3 -B tests/test_ui14_viewport.py
           BUSA_TEST_BROWSER=webkit python3 -B tests/test_ui14_viewport.py
-          python3 -B tests/test_ui15_design.py
-          BUSA_TEST_BROWSER=webkit python3 -B tests/test_ui15_design.py
+          python3 -B tests/test_ui16_design.py
+          BUSA_TEST_BROWSER=webkit python3 -B tests/test_ui16_design.py
           python3 -B tests/test_ui11_style.py
           python3 -B tests/test_ui9_live.py
           python3 -B tests/test_wifi_browser.py
@@ -120,17 +121,17 @@ jobs:
           arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
       - name: Package and verify the two BIN and complete source snapshot
         run: |
-          python3 ci/package_ui15.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          python3 ci/package_ui16.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_UI15_20261114
+          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_UI16_20261115
           retention-days: 30
           path: |
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI15_APP_OTA.bin
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI15_USB_MERGED.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_APP_OTA.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_USB_MERGED.bin
             out/SHA256SUMS.txt
             out/OTA_IMAGE_INFO.txt
             out/PARTITIONS.csv
             out/SOURCE_COMMIT.txt
             out/SOURCE_SHA256SUMS.txt
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI15_SOURCE.zip
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_SOURCE.zip
