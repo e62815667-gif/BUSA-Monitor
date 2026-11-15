@@ -30,6 +30,8 @@ jobs:
           python3 android/tests/test_source.py
           python3 -m pip install playwright==1.56.0
           python3 -m playwright install --with-deps chromium
+          npm install --prefix /tmp/busa-playwright --no-save --package-lock=false --ignore-scripts playwright@1.56.0
+          echo 'NODE_PATH=/tmp/busa-playwright/node_modules' >> "$GITHUB_ENV"
           BUSA_CHROMIUM="$(python3 -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')" python3 android/tests/test_offline_browser.py
       - name: Build APK (persistent release key when configured)
         env:
