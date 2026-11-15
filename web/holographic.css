@@ -82,7 +82,7 @@ html:root.busaDesign section.holoHome #relayBadge3[data-state="on"]{background:l
 html:root.busaDesign section.holoHome .relayBadge small{font-size:9px;line-height:1.15}
 html:root.busaDesign section.holoHome .approvedTemp small,html:root.busaDesign section.holoHome .cubeSetBelow{display:none!important}
 html:root.busaDesign section.holoHome .approvedTempTitle{font-size:12px!important;font-weight:650}
-html:root.busaDesign section.holoHome .approvedTemp strong{font-weight:750;text-shadow:0 1px 2px #0003;white-space:nowrap}
+html:root.busaDesign section.holoHome .approvedTemp strong{font-family:Arial,sans-serif!important;font-weight:750;text-shadow:0 1px 2px #0003;white-space:nowrap}
 html:root.busaDesign section.holoHome .temp1,html:root.busaDesign section.holoHome .temp3{top:8%;width:var(--temp-label-width)!important}
 html:root.busaDesign section.holoHome .temp1{left:calc(3px - var(--scene-left))}
 html:root.busaDesign section.holoHome .temp3{right:calc(var(--scene-left) + var(--scene-w) - var(--panel-w) + 3px)}
@@ -94,13 +94,13 @@ html:root.busaDesign section.holoHome .temp2 .approvedTempTitle{font-size:clamp(
 html:root.busaDesign section.holoHome .temp2 strong{font-size:clamp(11px,calc(var(--scene-w)*.068),22px)!important;margin-top:3px;letter-spacing:-.6px}
 html:root.busaDesign section.holoHome .collectedOnGlass{left:67%;top:85.5%;width:19.5%;color:#fff}
 html:root.busaDesign section.holoHome .collectedOnGlass span{color:var(--cube)!important;font-size:clamp(8px,calc(var(--scene-w)*.032),11px);font-weight:650}
-html:root.busaDesign section.holoHome .collectedOnGlass b{font-size:clamp(11px,calc(var(--scene-w)*.056),19px);color:#fff!important}
+html:root.busaDesign section.holoHome .collectedOnGlass b{font-family:Arial,sans-serif;font-size:clamp(11px,calc(var(--scene-w)*.056),19px);color:#fff!important}
 html:root.busaDesign section.holoHome .flowOnPipe,html:root.busaDesign section.holoHome .waterUsedOnPipe,html:root.busaDesign section.holoHome .collectionRateLabel{display:none!important}
 .holoMetrics{order:2;display:grid;grid-template-columns:1fr 1fr 1.12fr;gap:0;flex:0 0 auto;min-height:49px;margin:5px 0 0;border:1px solid var(--glass-edge);border-radius:15px;background:var(--glass);box-shadow:var(--glass-shadow);padding:9px 6px}
 .holoMetric{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 7px;border-right:1px solid var(--line)}
 .holoMetric:last-child{border-right:0}
 .holoMetric>span{font-size:9px;color:var(--ink);white-space:nowrap}
-.holoMetric b{font-size:clamp(13px,4.1vw,18px);line-height:1.2;white-space:nowrap;color:#7de9f4;font-variant-numeric:tabular-nums}
+.holoMetric b{font-family:Arial,sans-serif;font-size:clamp(13px,4.1vw,18px);line-height:1.2;white-space:nowrap;color:#7de9f4;font-variant-numeric:tabular-nums}
 .holoMetric .holoRate{font-size:clamp(12px,3.8vw,17px)}
 .holoMetric .holoRate>span{font:inherit}
 .holoMetric .holoRate strong{font:inherit}

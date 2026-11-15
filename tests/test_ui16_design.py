@@ -77,7 +77,8 @@ with sync_playwright() as p:
                 assert metrics['y']+metrics['height']<=relays['y']+1
                 assert relays['y']+relays['height']<=page.locator('.appTabs').bounding_box()['y']+1
                 for sel in ['.approvedTempTitle','.approvedTemp strong[id]','.collectedOnGlass','.holoMetric','.relayBadge']:
-                    assert page.locator(sel).evaluate_all('(es)=>es.every(e=>{const r=e.getBoundingClientRect();return r.left>=-1&&r.right<=innerWidth+1&&e.scrollWidth<=e.clientWidth+1;})'),(width,height,sel)
+                    bounds=page.locator(sel).evaluate_all('(es)=>es.map(e=>{const r=e.getBoundingClientRect();return {id:e.id,text:e.innerText,left:r.left,right:r.right,width:e.clientWidth,scroll:e.scrollWidth,font:getComputedStyle(e).font};})')
+                    assert all(e['left']>=-1 and e['right']<=width+1 and e['scroll']<=e['width']+1 for e in bounds),(width,height,sel,bounds)
                 assert page.locator('.rigSheen:visible,.rigCoolantGlow:visible,.jacketTrace:visible').count()==0
                 assert page.locator('#rigArtStage').evaluate('e=>e.classList.contains("hasCooling")&&e.classList.contains("hasCollection")')
                 page.evaluate('window.savedHoloRig=document.querySelector(".approvedRigArt");window.rigMutations=[];window.rigObserver=new MutationObserver(rs=>rigMutations.push(...rs.map(r=>r.type)));rigObserver.observe(savedHoloRig,{attributes:true,childList:true,subtree:true});')
