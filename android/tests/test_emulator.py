@@ -83,4 +83,5 @@ try:
 
 finally:
     server.shutdown()
+    (out/'last-screen.png').write_bytes(adb('exec-out','screencap','-p'))
     (out/'logcat.txt').write_bytes(adb('logcat','-d','-t','2500'))

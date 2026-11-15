@@ -92,7 +92,7 @@ final class CloudClient {
     }
 
     static JSONObject chart(JSONObject packet, int minutes, long now) throws Exception {
-        telemetry(packet, now); // Never draw an old archive as current data.
+        JSONObject current = telemetry(packet, now); // Never draw an old archive as current data.
         JSONArray rows = packet.optJSONArray("history");
         int bins = Math.min(minutes * 30, 160);
         JSONArray[] temperatures = {new JSONArray(), new JSONArray(), new JSONArray(), new JSONArray()};
@@ -115,6 +115,9 @@ final class CloudClient {
         }
         return new JSONObject().put("ok", true).put("minutes", minutes)
                 .put("temperature", new JSONArray().put(temperatures[0]).put(temperatures[1]).put(temperatures[2]).put(temperatures[3]))
-                .put("cooling_lph", water).put("collection_ml_min", collection);
+                .put("cooling_lph", water).put("collection_ml_min", collection)
+                .put("cooling_calibrated", current.getJSONObject("water").optBoolean("calibrated"))
+                .put("collection_sensor", current.optJSONObject("collection") != null
+                        && current.getJSONObject("collection").optBoolean("sensor_present"));
     }
 }
