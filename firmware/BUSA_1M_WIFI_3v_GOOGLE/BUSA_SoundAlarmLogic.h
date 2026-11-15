@@ -107,7 +107,7 @@ inline void evaluateRouted(Routed& r,const bool enable[4],
     if(r.t3OffEvent)r.k1Hold=true;
     r.k2.running=false;r.k2.sounding=false;
     if(enable[2])startPulse(r.k3,now);
-  }else if(closingEvent && enable[1] && !r.k3.running){
+  }else if(closingEvent && enable[1]){
     startPulse(r.k2,now);
   }
   r.k[0]=enable[0]&&valid3&&active3&&!r.k1Hold;
