@@ -80,7 +80,9 @@ try:
         page.locator('[data-page="7"]').click()
         for key,value in [('v','1'),('from','96'),('to','40')]:page.locator('#calc-0-'+key).fill(value)
         assert '1,47' in page.locator('#calc-panel-0 [data-value="water"]').inner_text()
-        adb('shell','input','keyevent','4');page.wait_for_function('active===0')
+        adb('shell','input','keyevent','4');page.wait_for_timeout(300)
+        if page.evaluate('active')!=0:adb('shell','input','keyevent','4') # First Back can dismiss Android's keyboard.
+        page.wait_for_function('active===0')
         state['offline']=True
         for _ in range(3):page.evaluate('update()');page.wait_for_timeout(100)
         page.wait_for_function('!connected&&!pollBusy')

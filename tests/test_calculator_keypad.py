@@ -11,6 +11,7 @@ code=r'''
 using std::isfinite;
 class String:public std::string{
  public:using std::string::string;using std::string::operator=;
+ String()=default;String(const String&)=default;
  String& operator=(const String&)=default;
  String(const std::string& s):std::string(s){}String(int n):std::string(std::to_string(n)){}
  void trim(){auto a=find_first_not_of(" \r\n\t");auto b=find_last_not_of(" \r\n\t");assign(a==npos?"":substr(a,b-a+1));}
