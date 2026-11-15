@@ -127,3 +127,51 @@ Wi-Fi browser и calculator browser пройдены в Chromium с HTTP fixture
 использовать временные bearer download_url в качестве постоянных ссылок.
 Исходный ZIP создан локально, на Диск не загружался. Подробности:
 README_UI16.md и docs/AUDIT_UI16.md.
+
+15.11.2026 пользователь поручил делать Android-приложение и прошивку
+через GitHub Actions. Репозиторий `e62815667-gif/BUSA-Monitor`, новая
+ветка `feat/busa-android-ui16`; main и старые ветки не заменялись.
+Основная выдача этого выпуска — два архива Actions, не повторная загрузка
+APK на Drive. Ранее загрузка APK на Drive была отклонена автоматической
+проверкой; её не обходить и без нового разрешения не повторять.
+
+Обе окончательные сборки Actions успешны:
+- Прошивка: run `43705174764`, commit `1be07ee8915bb0c3088def28db1a03cf7ac409da`,
+  artifact `14157913919`.
+  https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/43705174764/artifacts/14157913919
+- Android: run `43705307623`, commit `51ab3400990131e58a31c413631051ac01e0b697`,
+  artifact `14157938714`.
+  https://github.com/e62815667-gif/BUSA-Monitor/actions/runs/43705307623/artifacts/14157938714
+
+Выполнены полные исходные/нативные проверки, Chromium и WebKit для UI16,
+калькуляторов, калибровки, Wi-Fi и отсутствия пагинации. В эмуляторе
+Android 15 установлен настоящий APK и проверены шесть экранов, данные
+из HTTP fixtures, нативная кнопка Back, открытие/отмена системного выбора
+BIN, калькулятор и потеря связи. Эмулятор не заменяет проверку с физическим
+ESP32: передача настоящего BIN и Wi-Fi без интернета на телефоне ещё
+не подтверждены. Никаких демонстрационных значений в APK нет.
+
+Файлы извлечены из скачанных артефактов в `/workspace/delivery/BUSA_ACTIONS_UI16/`:
+- `firmware/BUSA_N16R8_RM_CALC4_WIFI1_UI16_APP_OTA.bin`: 2 300 848 байт,
+  SHA-256 `b3244d6cc41a4fc86f4592130b1e5b3273fbb811db361ed352b716b80ddb88c9`.
+- `firmware/BUSA_N16R8_RM_CALC4_WIFI1_UI16_USB_MERGED.bin`: 2 366 384 байта,
+  SHA-256 `f4de08033f8f798644de2dd87d49e2832060800dd43fa392f1be578ca9a5dd16`.
+- `android/BUSA_Android_1.0.0_UI16_DEBUG.apk`: 209 645 байт,
+  SHA-256 `9bafe7a349152918672fdd744d42fb8619ddd72ebf0437f3061385bed507a446`.
+
+Подтверждены SHA-256 исходных ZIP из метаданных GitHub, контрольные суммы
+файлов, checksum/hash APP ESP32-S3, идентичность APP в USB с 0x10000,
+границы разделов и подписи APK v1/v2/v3. HTML в APP побайтно совпадает
+с `assets/local/index.html` внутри APK и текущим WEB_PAGE. Его SHA-256:
+`ae206825e74daa95cdc784cb4ee071c6d4a924a23000b4df14ba5e49f7858cc5`.
+Отчёт: `/workspace/delivery/BUSA_ACTIONS_UI16/VERIFICATION.json`.
+
+Подлинные скачанные ссылки на архивы:
+- Firmware: `sediment://file_000000002c8c8243846ff402e9e37164`.
+- Android: `sediment://file_00000000dcd082468c7bda2d36c499a1`.
+
+APK Actions пока тестовый, с временной подписью: установка новой тестовой
+сборки поверх предыдущей может потребовать удаления старой. Постоянная
+подпись предусмотрена через Secrets `BUSA_ANDROID_KEYSTORE_B64` и
+`BUSA_ANDROID_KEYSTORE_PASSWORD`, но не настроена. Ключи/пароли никогда
+не публиковались в репозитории или артефактах. Подробности — android/README.md.
