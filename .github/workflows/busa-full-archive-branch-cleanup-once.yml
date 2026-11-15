@@ -23,7 +23,7 @@ jobs:
           git clone --mirror "https://github.com/$GITHUB_REPOSITORY.git" mirror.git
           git -C mirror.git for-each-ref --format='%(objectname) %(refname)' refs/heads | LC_ALL=C sort > all-branches.txt
           test "$(wc -l < all-branches.txt)" -eq 137
-          git -C mirror.git bundle create "$BUNDLE" --all
+          git -C mirror.git bundle create "$PWD/$BUNDLE" --all
           git bundle list-heads "$BUNDLE" | grep ' refs/heads/' | LC_ALL=C sort > bundle-branches.txt
           diff -u all-branches.txt bundle-branches.txt
           git init -q --bare verify.git
