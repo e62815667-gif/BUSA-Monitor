@@ -56,6 +56,7 @@ jobs:
             echo 'Test APK: configure signing secrets for a persistent release signature.' >> "$GITHUB_STEP_SUMMARY"
           fi
           rm -f /tmp/busa-signing.jks
+          python3 android/build.py --unsigned --out android/out/release
       - name: Enable KVM for Android tests
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -78,6 +79,10 @@ jobs:
             android/out/APK_SIGNATURE.txt
             android/out/APK_MANIFEST.txt
             android/out/SHA256SUMS.txt
+            android/out/release/*.apk
+            android/out/release/APK_MANIFEST.txt
+            android/out/release/BUILD.json
+            android/out/release/SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:

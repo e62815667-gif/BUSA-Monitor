@@ -11,13 +11,16 @@ import xml.etree.ElementTree as ET
 root=Path(__file__).resolve().parents[1]
 parser=argparse.ArgumentParser()
 parser.add_argument('--sdk',default=os.environ.get('ANDROID_HOME') or os.environ.get('ANDROID_SDK_ROOT'))
-parser.add_argument('--keystore',required=True)
+parser.add_argument('--keystore')
+parser.add_argument('--unsigned',action='store_true',help='Build release APK for signing in a private workspace')
 parser.add_argument('--alias',default='busa')
 parser.add_argument('--out',default=str(root/'android/out'))
 parser.add_argument('--debug',action='store_true')
 args=parser.parse_args()
 assert args.sdk,'Pass --sdk or set ANDROID_HOME'
-assert os.environ.get('BUSA_KEYSTORE_PASS'),'BUSA_KEYSTORE_PASS must be set (never printed)'
+assert args.unsigned or args.keystore,'Supply --keystore or --unsigned'
+assert not(args.unsigned and args.debug),'Unsigned artifacts are release only'
+assert args.unsigned or os.environ.get('BUSA_KEYSTORE_PASS'),'BUSA_KEYSTORE_PASS must be set (never printed)'
 sdk=Path(args.sdk).resolve();tools=sdk/'build-tools/35.0.0';android=sdk/'platforms/android-35/android.jar'
 out=Path(args.out).resolve();out.mkdir(parents=True,exist_ok=True)
 work=out/'intermediate';shutil.rmtree(work,ignore_errors=True);work.mkdir()
@@ -46,15 +49,18 @@ unsigned=work/'unsigned.apk';shutil.copyfile(work/'resources.apk',unsigned)
 with zipfile.ZipFile(unsigned,'a',zipfile.ZIP_DEFLATED) as archive:
     for path in sorted(dex.glob('*.dex')):archive.write(path,path.name)
 run(tool('zipalign'),'-p','-f','4',unsigned,work/'aligned.apk')
-name='BUSA_Android_'+version.replace('-','_')+('_DEBUG' if args.debug else '')+'.apk'
+name='BUSA_Android_'+version.replace('-','_')+('_UNSIGNED' if args.unsigned else '_DEBUG' if args.debug else '')+'.apk'
 apk=out/name
 signer=['java','-jar',str(tools/'lib/apksigner.jar')]
-run(*signer,'sign','--ks',Path(args.keystore).resolve(),'--ks-key-alias',args.alias,
-    '--ks-pass','env:BUSA_KEYSTORE_PASS','--key-pass','env:BUSA_KEYSTORE_PASS',
-    '--out',apk,work/'aligned.apk')
-verify=subprocess.check_output(signer+['verify','--verbose','--print-certs',str(apk)],text=True)
-(out/'APK_SIGNATURE.txt').write_text(verify)
-assert 'Verified using v2 scheme (APK Signature Scheme v2): true' in verify
+if args.unsigned:
+    shutil.copyfile(work/'aligned.apk',apk)
+else:
+    run(*signer,'sign','--ks',Path(args.keystore).resolve(),'--ks-key-alias',args.alias,
+        '--ks-pass','env:BUSA_KEYSTORE_PASS','--key-pass','env:BUSA_KEYSTORE_PASS',
+        '--out',apk,work/'aligned.apk')
+    verify=subprocess.check_output(signer+['verify','--verbose','--print-certs',str(apk)],text=True)
+    (out/'APK_SIGNATURE.txt').write_text(verify)
+    assert 'Verified using v2 scheme (APK Signature Scheme v2): true' in verify
 badging=subprocess.check_output([str(tool('aapt2')),'dump','badging',str(apk)],text=True)
 (out/'APK_MANIFEST.txt').write_text(badging)
 assert "package: name='ru.busa.monitor'" in badging
@@ -66,6 +72,6 @@ with zipfile.ZipFile(apk) as archive:
 digest=hashlib.sha256(apk.read_bytes()).hexdigest()
 (out/'SHA256SUMS.txt').write_text(digest+'  '+name+'\n')
 (out/'BUILD.json').write_text(json.dumps({'package':'ru.busa.monitor','version':version,
-    'debug':args.debug,'apk':name,'bytes':apk.stat().st_size,'sha256':digest,
+    'debug':args.debug,'unsigned':args.unsigned,'apk':name,'bytes':apk.stat().st_size,'sha256':digest,
     'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()},indent=2)+'\n')
-print('PASS signed APK, SDK versions, embedded UI bytes and signature\n'+str(apk)+'\nSHA256 '+digest)
+print('PASS '+('unsigned release APK for private signing' if args.unsigned else 'signed APK and signature')+', SDK versions and embedded UI bytes\n'+str(apk)+'\nSHA256 '+digest)

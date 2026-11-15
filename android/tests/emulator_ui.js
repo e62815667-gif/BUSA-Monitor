@@ -30,10 +30,14 @@ const back = () => adb('shell','input','keyevent','4');
  try {
   // Real native fallback at startup must explain the failure, retain truthful
   // values and recover when returning from Wi-Fi settings / another activity.
-  await device.wait({text:'Нет связи с БУСА'});
+  let nativeUi=adb('shell','uiautomator','dump','/sdcard/busa-ui.xml').toString();
+  nativeUi=adb('shell','cat','/sdcard/busa-ui.xml').toString();
+  assert(nativeUi.includes('Нет связи с БУСА'));
   assert.equal(await page.evaluate('connected'),false);
   assert.equal(await page.locator('#t0').innerText(),'Н/Д');
-  await device.tap({text:'Открыть без связи'});
+  const cancel=nativeUi.match(/text="Открыть без связи"[^>]*bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"/);
+  assert(cancel,'No offline dialog action');
+  adb('shell','input','tap',String((+cancel[1]+ +cancel[3])/2),String((+cancel[2]+ +cancel[4])/2));
   await fetch('http://127.0.0.1:18080/__test/online');
   adb('shell','input','keyevent','3');
   adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity');

@@ -39,12 +39,18 @@ import android.widget.Toast;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import org.json.JSONObject;
+import java.util.Collections;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Native container; the ESP32 remains the source of UI and device behaviour. */
 public final class MainActivity extends Activity {
     private static final int FILE_REQUEST = 14;
     private static final int BACKGROUND = Color.rgb(6, 14, 21);
+    private static final String CLOUD_ORIGIN = "https://busa.invalid";
     private final Handler main = new Handler(Looper.getMainLooper());
+    private final ExecutorService cloudWorker = Executors.newSingleThreadExecutor();
     private WebView web;
     private ProgressBar progress;
     private ConnectivityManager connectivity;
@@ -58,10 +64,20 @@ public final class MainActivity extends Activity {
     private int connectionAttempt;
     private ValueCallback<Uri[]> fileResult;
     private SharedPreferences preferences;
+    private TextView cloudStatus;
+    private volatile boolean remoteMode;
+    private volatile JSONObject cloudPacket;
+    private volatile CloudClient cloud;
+    private volatile boolean cloudBusy;
+    private volatile int cloudGeneration;
+    private final Runnable cloudTick = new Runnable() {
+        @Override public void run() { if (!destroyed && remoteMode) { refreshCloud(); main.postDelayed(this, 30000); } }
+    };
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         preferences = getSharedPreferences("connection", MODE_PRIVATE);
+        remoteMode = !"local".equals(preferences.getString("mode", "cloud"));
         try { address = DeviceAddress.normalize(preferences.getString("address", DeviceAddress.DEFAULT)); }
         catch (IllegalArgumentException error) { address = DeviceAddress.DEFAULT; }
         // Select local Wi-Fi before WebView creates its network stack.
@@ -70,7 +86,13 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(BACKGROUND);
         web = new WebView(this);
         web.setBackgroundColor(BACKGROUND);
-        root.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout content = new LinearLayout(this); content.setOrientation(LinearLayout.VERTICAL);
+        cloudStatus = new TextView(this); cloudStatus.setTextColor(Color.rgb(110, 229, 222));
+        cloudStatus.setTextSize(12); cloudStatus.setPadding(dp(10), dp(6), dp(10), dp(6));
+        cloudStatus.setOnClickListener(view -> showConnectionMenu());
+        content.addView(cloudStatus, new LinearLayout.LayoutParams(-1, -2));
+        content.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
+        root.addView(content, new FrameLayout.LayoutParams(-1, -1));
         progress = new ProgressBar(this);
         FrameLayout.LayoutParams spinner = new FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER);
         root.addView(progress, spinner);
@@ -110,16 +132,18 @@ public final class MainActivity extends Activity {
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+    private String uiOrigin() { return remoteMode ? CLOUD_ORIGIN : address; }
+    private boolean isDebug() { return (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0; }
 
     private void bindWifi() {
         connectivity = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         wifiCallback = new ConnectivityManager.NetworkCallback() {
             @Override public void onAvailable(Network network) {
-                if (!destroyed) {
+                if (!destroyed && !remoteMode) {
                     try { connectivity.bindProcessToNetwork(network); }
                     catch (SecurityException ignored) { }
                     main.post(() -> {
-                        if (!destroyed && web != null && resumed && offlineShell && !connecting) connect();
+                        if (!destroyed && !remoteMode && web != null && resumed && offlineShell && !connecting) connect();
                     });
                 }
             }
@@ -134,7 +158,7 @@ public final class MainActivity extends Activity {
             // A local AP without internet must still win over mobile data.
             for (Network network : connectivity.getAllNetworks()) {
                 NetworkCapabilities caps = connectivity.getNetworkCapabilities(network);
-                if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                if (!remoteMode && caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
                     connectivity.bindProcessToNetwork(network); break;
                 }
             }
@@ -146,6 +170,9 @@ public final class MainActivity extends Activity {
 
     private void connect() {
         if (destroyed) return;
+        cloudStatus.setVisibility(remoteMode ? View.VISIBLE : View.GONE);
+        if (remoteMode) { connectCloud(); return; }
+        main.removeCallbacks(cloudTick); ++cloudGeneration;
         final int attempt = ++connectionAttempt;
         if (connectionError != null) { connectionError.dismiss(); connectionError = null; }
         web.stopLoading();
@@ -160,6 +187,71 @@ public final class MainActivity extends Activity {
                 web.stopLoading(); showOffline("Прибор не ответил за 30 секунд.");
             }
         }, 30000);
+    }
+
+    private void connectCloud() {
+        ++connectionAttempt; ++cloudGeneration; cloudPacket = null; cloudBusy = false;
+        if (connectionError != null) { connectionError.dismiss(); connectionError = null; }
+        connecting = false; offlineShell = false; progress.setVisibility(View.GONE);
+        // Mobile data / the system's internet route must remain available.
+        try { connectivity.bindProcessToNetwork(null); } catch (SecurityException ignored) { }
+        main.removeCallbacks(cloudTick);
+        try { cloud = new CloudClient(preferences.getString("cloud_url", ""), preferences.getString("view_token", ""), isDebug()); }
+        catch (IllegalArgumentException error) { cloud = null; }
+        try {
+            web.stopLoading();
+            web.loadDataWithBaseURL(CLOUD_ORIGIN + "/", read(getAssets().open("local/index.html"), 2000000), "text/html", "UTF-8", null);
+        } catch (Exception error) { cloudStatus.setText("Не удалось открыть интерфейс БУСА"); return; }
+        if (cloud == null) {
+            cloudStatus.setText("Интернет · подключить БУСА — нажмите здесь");
+            main.postDelayed(() -> { if (!destroyed && remoteMode && cloud == null) editCloud(); }, 700);
+        } else { cloudStatus.setText("Интернет · запрашиваю данные Google…"); main.post(cloudTick); }
+    }
+
+    private void refreshCloud() {
+        final CloudClient client = cloud; final int generation = cloudGeneration;
+        if (client == null || cloudBusy || destroyed || !remoteMode) return;
+        cloudBusy = true;
+        cloudWorker.execute(() -> {
+            JSONObject packet = null; String message;
+            try {
+                packet = client.latest(); CloudClient.telemetry(packet, System.currentTimeMillis());
+                long at = packet.getJSONObject("latest").getLong("at");
+                message = "Google · данные " + new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date(at));
+            } catch (Exception error) {
+                message = error instanceof java.net.SocketTimeoutException ? "Google не отвечает. Повторю подключение"
+                        : error instanceof java.io.IOException ? "Нет соединения с Google. Проверь интернет телефона"
+                        : error.getMessage();
+                packet = null;
+            }
+            final JSONObject result = packet; final String text = message;
+            main.post(() -> {
+                if (destroyed || generation != cloudGeneration || !remoteMode) return;
+                cloudBusy = false; cloudPacket = result; cloudStatus.setText(text);
+            });
+        });
+    }
+
+    private static WebResourceResponse response(int code, String type, String body) {
+        return new WebResourceResponse(type, "UTF-8", code, code == 200 ? "OK" : "Unavailable",
+                Collections.singletonMap("Cache-Control", "no-store"),
+                new java.io.ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private WebResourceResponse cloudApi(WebResourceRequest request) {
+        String path = request.getUrl().getPath();
+        if (!"GET".equals(request.getMethod()))
+            return response(409, "text/plain", "Для изменения настроек прибора подключитесь к Wi-Fi БУСА");
+        try {
+            JSONObject packet = cloudPacket;
+            if ("/api/status".equals(path)) return response(200, "application/json", CloudClient.telemetry(packet, System.currentTimeMillis()).toString());
+            if ("/api/chart-history".equals(path)) {
+                int minutes = Integer.parseInt(request.getUrl().getQueryParameter("minutes"));
+                if (minutes != 5 && minutes != 10 && minutes != 15 && minutes != 30 && minutes != 60) minutes = 5;
+                return response(200, "application/json", CloudClient.chart(packet, minutes, System.currentTimeMillis()).toString());
+            }
+        } catch (Exception ignored) { return response(503, "application/json", "{\"error\":\"no_fresh_cloud_telemetry\"}"); }
+        return response(409, "application/json", "{\"error\":\"direct_connection_required\"}");
     }
 
     private void showOffline(String reason) {
@@ -202,10 +294,11 @@ public final class MainActivity extends Activity {
         @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
             String url = request.getUrl().toString();
             if (url.startsWith("data:image/")) return null; // Embedded apparatus and SVG icons.
-            if (!DeviceAddress.sameOrigin(address, url)) {
+            if (!DeviceAddress.sameOrigin(uiOrigin(), url)) {
                 return new WebResourceResponse("text/plain", "UTF-8", new java.io.ByteArrayInputStream(new byte[0]));
             }
-            if (offlineShell && request.getMethod().equals("GET")) {
+            if (remoteMode && request.getUrl().getPath().startsWith("/api/")) return cloudApi(request);
+            if ((offlineShell || remoteMode) && request.getMethod().equals("GET")) {
                 String path = request.getUrl().getPath();
                 if ("/calculator.js".equals(path) || "/calculator.css".equals(path)) {
                     try {
@@ -226,7 +319,14 @@ public final class MainActivity extends Activity {
                     + "AbortSignal.timeout=function(ms){var c=new AbortController();"
                     + "setTimeout(function(){c.abort();},ms);return c.signal;};}})()", null);
         }
-        @Override public void onPageFinished(WebView view, String url) { progress.setVisibility(View.GONE); }
+        @Override public void onPageFinished(WebView view, String url) {
+            progress.setVisibility(View.GONE);
+            onPageCommitVisible(view, url);
+            if (remoteMode) {
+                try { view.evaluateJavascript(read(getAssets().open("cloud.js"), 30000), null); }
+                catch (Exception ignored) { cloudStatus.setText("Не удалось открыть облачный интерфейс"); }
+            }
+        }
         @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
             if (request.isForMainFrame() && !offlineShell) showOffline("Ошибка соединения (" + error.getErrorCode() + ").");
         }
@@ -236,7 +336,8 @@ public final class MainActivity extends Activity {
     }
 
     private boolean navigate(String url, boolean userGesture) {
-        if (DeviceAddress.sameOrigin(address, url)) return false;
+        if (remoteMode && userGesture && "busa://connection".equals(url)) { showConnectionMenu(); return true; }
+        if (DeviceAddress.sameOrigin(uiOrigin(), url)) return false;
         if (userGesture && url.startsWith("https://")) openExternal(url);
         return true;
     }
@@ -282,15 +383,47 @@ public final class MainActivity extends Activity {
 
     private void showConnectionMenu() {
         new AlertDialog.Builder(this).setTitle("БУСА · подключение")
-                .setItems(new String[]{"Повторить подключение", "Сеть Wi-Fi", "Адрес БУСА", "Закрыть приложение"}, (dialog, which) -> {
+                .setItems(new String[]{"Повторить подключение", "Доступ через интернет", "Подключение по Wi-Fi", "Адрес БУСА", "Закрыть приложение"}, (dialog, which) -> {
                     if (which == 0) connect();
-                    if (which == 1) {
+                    if (which == 1) editCloud();
+                    if (which == 2) {
+                        remoteMode = false; preferences.edit().putString("mode", "local").apply();
+                        for (Network network : connectivity.getAllNetworks()) {
+                            NetworkCapabilities caps = connectivity.getNetworkCapabilities(network);
+                            if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                                connectivity.bindProcessToNetwork(network); break;
+                            }
+                        }
+                        connect();
                         try { startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)); }
                         catch (ActivityNotFoundException error) { Toast.makeText(this, "Открой Wi-Fi в настройках телефона", Toast.LENGTH_SHORT).show(); }
                     }
-                    if (which == 2) editAddress();
-                    if (which == 3) finish();
+                    if (which == 3) editAddress();
+                    if (which == 4) finish();
                 }).setNegativeButton("Отмена", null).show();
+    }
+
+    private void editCloud() {
+        LinearLayout form = new LinearLayout(this); form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(6), dp(20), 0);
+        TextView hint = new TextView(this);
+        hint.setText("ESP32 отправляет показания в Google, телефон получает их через интернет. Один раз укажите ссылку Apps Script и отдельный ключ просмотра BUSA_VIEW_TOKEN. Ключ ESP32 сюда не вводите.");
+        EditText url = new EditText(this); url.setSingleLine(true); url.setHint("https://script.google.com/macros/s/…/exec");
+        url.setText(preferences.getString("cloud_url", ""));
+        url.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        EditText token = new EditText(this); token.setSingleLine(true); token.setHint("Ключ просмотра BUSA_VIEW_TOKEN");
+        token.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        token.setText(preferences.getString("view_token", ""));
+        form.addView(hint); form.addView(url); form.addView(token);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("БУСА через интернет").setView(form)
+                .setPositiveButton("Подключить", null).setNegativeButton("Отмена", null).create();
+        dialog.setOnShowListener(unused -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            try {
+                CloudClient client = new CloudClient(url.getText().toString(), token.getText().toString(), isDebug());
+                preferences.edit().putString("cloud_url", client.endpoint).putString("view_token", client.token).putString("mode", "cloud").apply();
+                remoteMode = true; dialog.dismiss(); connect();
+            } catch (IllegalArgumentException error) { token.setError(error.getMessage()); }
+        })); dialog.show();
     }
 
     private void editAddress() {
@@ -305,8 +438,8 @@ public final class MainActivity extends Activity {
         dialog.setOnShowListener(unused -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
             try {
                 String next = DeviceAddress.normalize(input.getText().toString());
-                web.stopLoading(); address = next;
-                preferences.edit().putString("address", next).apply();
+                web.stopLoading(); address = next; remoteMode = false;
+                preferences.edit().putString("address", next).putString("mode", "local").apply();
                 dialog.dismiss(); connect();
             } catch (IllegalArgumentException error) { input.setError(error.getMessage()); }
         }));
@@ -317,13 +450,15 @@ public final class MainActivity extends Activity {
         super.onResume(); resumed = true;
         if (web != null) {
             web.onResume(); web.resumeTimers();
-            if (offlineShell && !connecting) connect();
+            if (remoteMode) refreshCloud();
+            else if (offlineShell && !connecting) connect();
         }
     }
     @Override protected void onPause() { resumed = false; if (web != null) { web.onPause(); web.pauseTimers(); } super.onPause(); }
     @Override protected void onDestroy() {
         destroyed = true; ++connectionAttempt;
         main.removeCallbacksAndMessages(null);
+        ++cloudGeneration; cloudWorker.shutdownNow();
         if (connectionError != null) { connectionError.dismiss(); connectionError = null; }
         if (fileResult != null) { fileResult.onReceiveValue(null); fileResult = null; }
         if (connectivity != null && wifiCallback != null) {
