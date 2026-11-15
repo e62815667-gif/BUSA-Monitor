@@ -7,7 +7,7 @@
 | Раздел | Состояние |
 |---|---|
 | Ветки | 140; [полный список](BRANCH_INVENTORY_2026-11-15.md) |
-| Основная ветка | `main`, [последний коммит 03.11.2026](https://github.com/e62815667-gif/BUSA-Monitor/commit/01fa534bba30c80222d3d141cb149716e21dbe66) |
+| Основная ветка до начала уборки | `main`, [последний коммит на 03.11.2026](https://github.com/e62815667-gif/BUSA-Monitor/commit/01fa534bba30c80222d3d141cb149716e21dbe66) |
 | Защита `main` | Не включена |
 | Pull requests | 7 открытых |
 | Issues | 6 открытых |
