@@ -18,6 +18,8 @@ const back = () => adb('shell','input','keyevent','4');
   const webview=await device.webView({pkg:'ru.busa.monitor'});page=await webview.page();
   try {
    await page.waitForFunction('typeof connected!=="undefined"&&connected&&!pollBusy&&document.documentElement.dataset.viewportReady==="1"',null,{timeout:60000});
+   await page.waitForTimeout(3000); // Let initial Android resource/configuration updates settle.
+   await page.waitForFunction('connected&&!pollBusy');
    break;
   } catch(error) {
    if(!String(error).includes('has been closed')||attempt===2)throw error;
