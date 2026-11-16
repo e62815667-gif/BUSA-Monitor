@@ -1,0 +1,33 @@
+name: BUSA sound routing regression
+
+on:
+  push:
+    branches: [main, fix/ui16-k2-overlap-20261115]
+    paths:
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarmLogic.h'
+      - 'tests/test_sound_route_overlap.cpp'
+      - '.github/workflows/busa-sound-regression.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarmLogic.h'
+      - 'tests/test_sound_route_overlap.cpp'
+      - '.github/workflows/busa-sound-regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sound-routing-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile independent sound routing test
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -pedantic -O1 \
+            -fsanitize=undefined -fno-sanitize-recover=undefined \
+            -I firmware/BUSA_1M_WIFI_3v_GOOGLE \
+            tests/test_sound_route_overlap.cpp -o /tmp/busa-sound-route-test
+      - name: Test overlapping signals and 90-second durations
+        run: /tmp/busa-sound-route-test
