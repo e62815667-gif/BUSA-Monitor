@@ -1,7 +1,7 @@
 name: BUSA N16R8 CALC4 WIFI1 UI16 approved six-screen design build
 on:
   push:
-    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local, feat/busa-ui16-holographic, feat/busa-android-ui16]
+    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local, feat/busa-ui16-holographic, feat/busa-android-ui16, fix/ui16-k2fix-build-20261116]
     paths:
       - 'ci/ble_official_provisioning.py'
       - 'ci/busa_ble_ota_stability.py'
@@ -56,6 +56,13 @@ jobs:
           retry arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
       - name: Generate verified Google trust bundle
         run: python3 ci/generate_google_ca.py --output firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h
+      - name: Verify approved independent K2/K3 sound routing
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -pedantic -O1 \
+            -fsanitize=undefined -fno-sanitize-recover=undefined \
+            -I firmware/BUSA_1M_WIFI_3v_GOOGLE \
+            tests/test_sound_route_overlap.cpp -o /tmp/busa-sound-route-test
+          /tmp/busa-sound-route-test
       - name: Validate canonical source and run regressions (no patching)
         run: |
           set -euo pipefail
@@ -122,11 +129,20 @@ jobs:
       - name: Package and verify the two BIN and complete source snapshot
         run: |
           python3 ci/package_ui16.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+      - name: Name the new K2FIX release images
+        working-directory: out
+        run: |
+          cp BUSA_N16R8_RM_CALC4_WIFI1_UI16_APP_OTA.bin BUSA_UI16_K2FIX_APP_OTA.bin
+          cp BUSA_N16R8_RM_CALC4_WIFI1_UI16_USB_MERGED.bin BUSA_UI16_K2FIX_USB_MERGED.bin
+          sha256sum BUSA_UI16_K2FIX_APP_OTA.bin BUSA_UI16_K2FIX_USB_MERGED.bin > K2FIX_SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_UI16_20261115
+          name: BUSA_UI16_K2FIX_20261116
           retention-days: 30
           path: |
+            out/BUSA_UI16_K2FIX_APP_OTA.bin
+            out/BUSA_UI16_K2FIX_USB_MERGED.bin
+            out/K2FIX_SHA256SUMS.txt
             out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_APP_OTA.bin
             out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_USB_MERGED.bin
             out/SHA256SUMS.txt
