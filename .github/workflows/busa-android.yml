@@ -28,6 +28,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 android/tests/test_source.py
+          python3 android/tests/test_network_binding.py
+          node android/tests/test_cloud_view.js
           python3 -m pip install playwright==1.56.0
           python3 -m playwright install --with-deps chromium
           npm install --prefix /tmp/busa-playwright --no-save --package-lock=false --ignore-scripts playwright@1.56.0

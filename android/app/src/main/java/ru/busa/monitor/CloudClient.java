@@ -84,11 +84,31 @@ final class CloudClient {
                 || raw.optJSONArray("temperatures") == null || raw.optJSONArray("temperatures").length() != 4
                 || raw.optJSONObject("water") == null)
             throw new Exception("Неполная телеметрия БУСА в Google");
+        JSONArray temperatures=raw.getJSONArray("temperatures");
+        for (int i=0;i<4;i++) {
+            JSONObject sensor=temperatures.optJSONObject(i);
+            if (sensor==null || !sensor.has("c") || !sensor.isNull("c") && !finiteNumber(sensor.opt("c")))
+                throw new Exception("Некорректная температура в ответе Google");
+        }
+        JSONObject station=raw.optJSONObject("station"), google=raw.optJSONObject("google"), ota=raw.optJSONObject("ota");
+        if (station==null || !(station.opt("connected") instanceof Boolean)
+                || google==null || !(google.opt("configured") instanceof Boolean)
+                || ota==null || !(ota.opt("message") instanceof String)
+                || raw.optJSONObject("modules")==null || !(raw.opt("firmware") instanceof String)
+                || raw.optString("firmware").isEmpty() || !finiteNumber(raw.opt("uptime_ms"))
+                || raw.optDouble("uptime_ms")<0)
+            throw new Exception("Неполная телеметрия БУСА в Google");
         JSONObject result = new JSONObject(raw.toString());
         JSONObject indicators = result.optJSONObject("network_indicators");
         if (indicators == null) { indicators = new JSONObject(); result.put("network_indicators", indicators); }
         indicators.put("cloud_fresh", true);
         return result;
+    }
+
+    private static boolean finiteNumber(Object value) {
+        if (!(value instanceof Number)) return false;
+        double n=((Number)value).doubleValue();
+        return !Double.isNaN(n) && !Double.isInfinite(n);
     }
 
     static JSONObject chart(JSONObject packet, int minutes, long now) throws Exception {

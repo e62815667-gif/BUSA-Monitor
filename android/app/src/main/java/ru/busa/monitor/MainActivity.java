@@ -34,6 +34,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.ByteArrayOutputStream;
@@ -139,39 +140,47 @@ public final class MainActivity extends Activity {
         connectivity = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         wifiCallback = new ConnectivityManager.NetworkCallback() {
             @Override public void onAvailable(Network network) {
-                if (!destroyed && !remoteMode) {
-                    try { connectivity.bindProcessToNetwork(network); }
-                    catch (SecurityException ignored) { }
-                    main.post(() -> {
-                        if (!destroyed && !remoteMode && web != null && resumed && offlineShell && !connecting) connect();
-                    });
-                }
+                main.post(() -> {
+                    if (destroyed || remoteMode) return;
+                    bindExistingWifi();
+                    if (web != null && resumed && offlineShell && !connecting) connect();
+                });
             }
             @Override public void onLost(Network network) {
-                if (network.equals(connectivity.getBoundNetworkForProcess())) {
-                    try { connectivity.bindProcessToNetwork(null); }
-                    catch (SecurityException ignored) { }
-                }
+                main.post(() -> {
+                    if (!destroyed && network.equals(connectivity.getBoundNetworkForProcess())) {
+                        try { connectivity.bindProcessToNetwork(null); }
+                        catch (SecurityException error) { android.util.Log.w("BUSA","Cannot release local Wi-Fi route",error); }
+                    }
+                });
             }
         };
         try {
             // A local AP without internet must still win over mobile data.
-            for (Network network : connectivity.getAllNetworks()) {
-                NetworkCapabilities caps = connectivity.getNetworkCapabilities(network);
-                if (!remoteMode && caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                    connectivity.bindProcessToNetwork(network); break;
-                }
-            }
+            if (!remoteMode) bindExistingWifi();
             connectivity.registerNetworkCallback(new NetworkRequest.Builder()
                     .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                     .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build(), wifiCallback);
         } catch (SecurityException ignored) { }
     }
 
+    private boolean bindExistingWifi() {
+        try {
+            for (Network network : connectivity.getAllNetworks()) {
+                NetworkCapabilities caps=connectivity.getNetworkCapabilities(network);
+                if (caps!=null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
+                    return network.equals(connectivity.getBoundNetworkForProcess()) || connectivity.bindProcessToNetwork(network);
+                }
+            }
+        } catch (SecurityException error) { android.util.Log.w("BUSA","Cannot select local Wi-Fi route",error); }
+        return false;
+    }
+
     private void connect() {
         if (destroyed) return;
         cloudStatus.setVisibility(remoteMode ? View.VISIBLE : View.GONE);
         if (remoteMode) { connectCloud(); return; }
+        bindExistingWifi();
         main.removeCallbacks(cloudTick); ++cloudGeneration;
         final int attempt = ++connectionAttempt;
         if (connectionError != null) { connectionError.dismiss(); connectionError = null; }
@@ -328,10 +337,12 @@ public final class MainActivity extends Activity {
             }
         }
         @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-            if (request.isForMainFrame() && !offlineShell) showOffline("Ошибка соединения (" + error.getErrorCode() + ").");
+            if (!remoteMode && request.isForMainFrame() && !offlineShell && DeviceAddress.sameOrigin(address,request.getUrl().toString()))
+                showOffline("Ошибка соединения (" + error.getErrorCode() + ").");
         }
         @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
-            if (request.isForMainFrame() && !offlineShell) showOffline("Ответ прибора: HTTP " + response.getStatusCode() + ".");
+            if (!remoteMode && request.isForMainFrame() && !offlineShell && DeviceAddress.sameOrigin(address,request.getUrl().toString()))
+                showOffline("Ответ прибора: HTTP " + response.getStatusCode() + ".");
         }
     }
 
@@ -388,12 +399,6 @@ public final class MainActivity extends Activity {
                     if (which == 1) editCloud();
                     if (which == 2) {
                         remoteMode = false; preferences.edit().putString("mode", "local").apply();
-                        for (Network network : connectivity.getAllNetworks()) {
-                            NetworkCapabilities caps = connectivity.getNetworkCapabilities(network);
-                            if (caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) {
-                                connectivity.bindProcessToNetwork(network); break;
-                            }
-                        }
                         connect();
                         try { startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS)); }
                         catch (ActivityNotFoundException error) { Toast.makeText(this, "Открой Wi-Fi в настройках телефона", Toast.LENGTH_SHORT).show(); }
@@ -415,7 +420,8 @@ public final class MainActivity extends Activity {
         token.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
         token.setText(preferences.getString("view_token", ""));
         form.addView(hint); form.addView(url); form.addView(token);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("БУСА через интернет").setView(form)
+        ScrollView scroll=new ScrollView(this);scroll.addView(form);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("БУСА через интернет").setView(scroll)
                 .setPositiveButton("Подключить", null).setNegativeButton("Отмена", null).create();
         dialog.setOnShowListener(unused -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
             try {

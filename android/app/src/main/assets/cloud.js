@@ -1,6 +1,24 @@
 /* Remote presentation uses the same UI and real telemetry; no credentials in JS. */
 (function(){
  if(window.busaCloudInstalled)return;window.busaCloudInstalled=true;
+ const localLiquidPanels=updateLiquidPanels;
+ let waterSample=null,waterRate=null;
+ updateLiquidPanels=function(s){
+  localLiquidPanels(s);
+  const w=s?.water,at=s?.uptime_ms;
+  if(w?.seen_pulses!==true||!measured(w?.total_l_estimate)||!measured(at)){
+   waterSample=null;waterRate=null;return;
+  }
+  if(!waterSample)waterRate=null;
+  else if(at!==waterSample.at||w.total_l_estimate!==waterSample.total){
+   waterRate=at>waterSample.at&&w.total_l_estimate>=waterSample.total?
+    (w.total_l_estimate-waterSample.total)*3600000/(at-waterSample.at):null;
+  }
+  waterSample={at,total:w.total_l_estimate};
+  setMeasured('coolingLph',waterRate);
+  get('homeCoolingRate').textContent=(measured(waterRate)?decimal1.format(waterRate):'—')+' л/ч';
+  get('rigArtStage').classList.toggle('hasCooling',measured(waterRate)&&waterRate>0);
+ };
  const localMessage=message;
  message=function(text,kind){
   if(text==='Нет ответа ESP32: проверь локальный Wi-Fi')text='Нет свежих данных Google. Проверь интернет и отправку БУСА.';

@@ -3,14 +3,14 @@
 Requires adb, a booted emulator, a DEBUG APK and Playwright. No real ESP32.
 """
 from pathlib import Path
-import copy, http.server, json, socketserver, subprocess, sys, threading, time, urllib.parse
+import copy, http.server, json, os, socketserver, subprocess, sys, threading, time, urllib.parse, zipfile
 
 root=Path(__file__).resolve().parents[2]
 apk=Path(sys.argv[1]).resolve()
 out=root/'android/out/emulator';out.mkdir(parents=True,exist_ok=True)
 fixture=json.loads((root/'tests/fixtures/ui10-status.json').read_text())
 fixture['collection']={'sensor_present':True,'ml_per_min':24,'total_ml':1234,'duration_ms':3600000}
-state={'offline':True,'tick':0,'posts':[],'gets':[],'cloud':'fresh'}
+state={'offline':True,'tick':0,'posts':[],'gets':[],'cloud':'fresh','cloud_tick':0}
 html=(root/'android/app/src/main/assets/local/index.html').read_bytes()
 # Emulate a pre-Chromium-103 WebView on the device-served page. The APK
 # compatibility layer must restore bounded fetches, not invent API responses.
@@ -25,6 +25,22 @@ def collect(name,*args):
         if result.returncode:(out/(name+'.error.txt')).write_bytes(result.stderr)
     except (subprocess.TimeoutExpired,OSError) as error:
         (out/(name+'.error.txt')).write_text(str(error))
+def cloud_contract():
+    sdk=Path(os.environ['ANDROID_HOME']);platform=sdk/'platforms/android-35/android.jar'
+    work=out/'cloud-contract';work.mkdir(exist_ok=True);classes=work/'classes';classes.mkdir(exist_ok=True)
+    java=root/'android/app/src/main/java/ru/busa/monitor'
+    subprocess.run(['java','com.sun.tools.javac.Main','-source','8','-target','8','-cp',str(platform),'-d',str(classes),
+        str(java/'DeviceAddress.java'),str(java/'CloudClient.java'),str(root/'android/tests/CloudClientDataTest.java')],check=True)
+    dex=work/'dex';dex.mkdir(exist_ok=True)
+    subprocess.run(['java','-cp',str(sdk/'build-tools/35.0.0/lib/d8.jar'),'com.android.tools.r8.D8','--min-api','35',
+        '--lib',str(platform),'--output',str(dex),*[str(p) for p in classes.rglob('*.class')]],check=True)
+    archive=work/'contract.jar'
+    with zipfile.ZipFile(archive,'w') as z:z.write(dex/'classes.dex','classes.dex')
+    adb('push',str(archive),'/data/local/tmp/busa-cloud-contract.jar')
+    adb('push',str(root/'tests/fixtures/ui10-status.json'),'/data/local/tmp/busa-status.json')
+    result=adb('shell','CLASSPATH=/data/local/tmp/busa-cloud-contract.jar','app_process','/',
+        'ru.busa.monitor.CloudClientDataTest','/data/local/tmp/busa-status.json')
+    (out/'CLOUD_CONTRACT.txt').write_bytes(result);print(result.decode(),flush=True)
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self,*args):pass
     def do_GET(self):
@@ -39,10 +55,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif path=='/__test/gets':body=json.dumps(state['gets']).encode()
         elif path=='/exec':
             q=urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-            if q.get('readToken')!=['a'*64] or state['cloud']=='denied':packet={'ok':False,'error':'Unauthorized'}
+            if state['cloud']=='http_error':code=503;packet={'ok':False}
+            elif q.get('readToken')!=['a'*64] or state['cloud']=='denied':packet={'ok':False,'error':'Unauthorized'}
             elif state['cloud']=='empty':packet={'ok':True,'latest':None,'history':[]}
             else:
                 f=copy.deepcopy(fixture);f['device']='BUSA-1M-001'
+                state['cloud_tick']+=1;f['uptime_ms']=10000+state['cloud_tick']*30000
+                f['water']['total_l_estimate']=12+state['cloud_tick']
+                if state['cloud']=='malformed':f['temperatures']=[None]*4
                 at=int(time.time()*1000)-(180000 if state['cloud']=='stale' else 0)
                 packet={'ok':True,'latest':{'at':at,'telemetry':f},'history':[
                     {'at':at-i*30000,'temperatures':[26.4,78.6,96.2,80]} for i in [2,1,0]]}
@@ -72,7 +92,7 @@ class Server(socketserver.ThreadingTCPServer):
 server=Server(('127.0.0.1',18080),Handler)
 threading.Thread(target=server.serve_forever,daemon=True).start()
 try:
-    adb('wait-for-device');adb('install','-r',str(apk),timeout=90)
+    adb('wait-for-device');cloud_contract();adb('install','-r',str(apk),timeout=90)
     adb('shell','am','force-stop','ru.busa.monitor')
     adb('shell','run-as','ru.busa.monitor','mkdir','-p','shared_prefs')
     # The emulator's actual host route, not adb reverse / loopback forwarding.
@@ -86,7 +106,7 @@ try:
     subprocess.run(['node',str(root/'android/tests/emulator_ui.js')],cwd=root,check=True,timeout=240)
     # Mobile-only internet route, with no Wi-Fi connection or local ESP32 API.
     adb('shell','am','force-stop','ru.busa.monitor')
-    prefs=b'<?xml version="1.0" encoding="utf-8"?><map><string name="mode">cloud</string><string name="cloud_url">http://10.0.2.2:18080/exec</string><string name="view_token">'+b'a'*64+b'</string></map>'
+    prefs=b'<?xml version="1.0" encoding="utf-8"?><map><string name="mode">cloud</string></map>'
     adb('shell','run-as','ru.busa.monitor','tee','shared_prefs/connection.xml',data=prefs)
     adb('shell','svc','wifi','disable');adb('shell','svc','data','enable')
     (out/'cloud-start.txt').write_bytes(adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity'))

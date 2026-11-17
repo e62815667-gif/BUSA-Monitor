@@ -42,7 +42,7 @@ const back = () => adb('shell','input','keyevent','4');
   await fetch('http://127.0.0.1:18080/__test/online');
   adb('shell','input','keyevent','3');
   adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity');
-  await page.waitForFunction('connected&&!pollBusy&&document.documentElement.dataset.fixtureDevicePage==="1"',null,{timeout:60000});
+  await page.waitForFunction('typeof connected!=="undefined"&&connected&&!pollBusy&&document.documentElement.dataset.fixtureDevicePage==="1"',null,{timeout:60000});
   assert.equal(await page.evaluate('typeof AbortSignal.timeout'),'function');
   const gets=await(await fetch('http://127.0.0.1:18080/__test/gets')).json();
   assert.equal(gets[0],'/','A native API preflight must not gate loading the device page');
