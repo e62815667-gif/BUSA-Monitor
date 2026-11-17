@@ -10,13 +10,14 @@ const back = () => adb('shell','input','keyevent','4');
 (async () => {
  let device,page;
  const errors=[];
+ try {
  // Android can relaunch the first Activity while finishing initial package
  // optimisation. Reattach only to a replaced WebView, never retry assertions.
  for(let attempt=0;attempt<3;attempt++) {
   const devices=await _android.devices();assert(devices.length,'No Android emulator');
   device=devices[0];
-  const webview=await device.webView({pkg:'ru.busa.monitor'});page=await webview.page();
   try {
+   const webview=await device.webView({pkg:'ru.busa.monitor'});page=await webview.page();
    await page.waitForFunction('typeof connected!=="undefined"&&document.documentElement.dataset.viewportReady==="1"',null,{timeout:60000});
    await page.waitForTimeout(3000); // Let initial Android resource/configuration updates settle.
    break;
@@ -27,7 +28,6 @@ const back = () => adb('shell','input','keyevent','4');
   }
  }
  page.on('pageerror',e=>errors.push(String(e)));
- try {
   // Real native fallback at startup must explain the failure, retain truthful
   // values and recover when returning from Wi-Fi settings / another activity.
   let nativeUi=adb('shell','uiautomator','dump','/sdcard/busa-ui.xml').toString();
@@ -85,5 +85,5 @@ const back = () => adb('shell','input','keyevent','4');
   assert.deepEqual(errors,[]);
   const result='PASS installed Android 15 APK: native offline startup/recovery, actual host network route (no adb reverse), slow 6-second device page, older AbortSignal compatibility, ESP32 Wi-Fi network list, six screens, document picker/cancel, native Back, calculator, connection loss and no outer scroll; HTTP fixtures, no physical ESP32\n';
   fs.writeFileSync(path.join(out,'RESULT.txt'),result);process.stdout.write(result);
- } finally {await device.close();}
+ } finally {if(device)await device.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

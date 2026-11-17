@@ -16,8 +16,15 @@ html=(root/'android/app/src/main/assets/local/index.html').read_bytes()
 # compatibility layer must restore bounded fetches, not invent API responses.
 assert b'<head>' in html
 html=html.replace(b'<head>', b'<head><script>delete AbortSignal.timeout;document.documentElement.dataset.fixtureDevicePage="1";</script>',1)
-def adb(*args,data=None):
-    return subprocess.run(['adb',*args],input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True).stdout
+def adb(*args,data=None,timeout=30):
+    return subprocess.run(['adb',*args],input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=True,timeout=timeout).stdout
+def collect(name,*args):
+    try:
+        result=subprocess.run(['adb',*args],stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20)
+        (out/name).write_bytes(result.stdout)
+        if result.returncode:(out/(name+'.error.txt')).write_bytes(result.stderr)
+    except (subprocess.TimeoutExpired,OSError) as error:
+        (out/(name+'.error.txt')).write_text(str(error))
 class Handler(http.server.BaseHTTPRequestHandler):
     def log_message(self,*args):pass
     def do_GET(self):
@@ -65,23 +72,28 @@ class Server(socketserver.ThreadingTCPServer):
 server=Server(('127.0.0.1',18080),Handler)
 threading.Thread(target=server.serve_forever,daemon=True).start()
 try:
-    adb('wait-for-device');adb('install','-r',str(apk))
+    adb('wait-for-device');adb('install','-r',str(apk),timeout=90)
     adb('shell','am','force-stop','ru.busa.monitor')
     adb('shell','run-as','ru.busa.monitor','mkdir','-p','shared_prefs')
     # The emulator's actual host route, not adb reverse / loopback forwarding.
     prefs=b'<?xml version="1.0" encoding="utf-8"?><map><string name="mode">local</string><string name="address">http://10.0.2.2:18080</string></map>'
     adb('shell','run-as','ru.busa.monitor','tee','shared_prefs/connection.xml',data=prefs)
-    adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity')
-    subprocess.run(['node',str(root/'android/tests/emulator_ui.js')],cwd=root,check=True)
+    (out/'local-start.txt').write_bytes(adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity'))
+    collect('local-start-screen.png','exec-out','screencap','-p')
+    collect('local-start-activity.txt','shell','dumpsys','activity','activities')
+    collect('webview-provider.txt','shell','dumpsys','webviewupdate')
+    collect('startup-logcat.txt','logcat','-d','-t','1000')
+    subprocess.run(['node',str(root/'android/tests/emulator_ui.js')],cwd=root,check=True,timeout=240)
     # Mobile-only internet route, with no Wi-Fi connection or local ESP32 API.
     adb('shell','am','force-stop','ru.busa.monitor')
     prefs=b'<?xml version="1.0" encoding="utf-8"?><map><string name="mode">cloud</string><string name="cloud_url">http://10.0.2.2:18080/exec</string><string name="view_token">'+b'a'*64+b'</string></map>'
     adb('shell','run-as','ru.busa.monitor','tee','shared_prefs/connection.xml',data=prefs)
     adb('shell','svc','wifi','disable');adb('shell','svc','data','enable')
-    adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity')
-    subprocess.run(['node',str(root/'android/tests/emulator_cloud.js')],cwd=root,check=True)
+    (out/'cloud-start.txt').write_bytes(adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity'))
+    subprocess.run(['node',str(root/'android/tests/emulator_cloud.js')],cwd=root,check=True,timeout=300)
 
 finally:
     server.shutdown()
-    (out/'last-screen.png').write_bytes(adb('exec-out','screencap','-p'))
-    (out/'logcat.txt').write_bytes(adb('logcat','-d','-t','2500'))
+    collect('last-screen.png','exec-out','screencap','-p')
+    collect('last-activity.txt','shell','dumpsys','activity','activities')
+    collect('logcat.txt','logcat','-d','-t','2500')

@@ -18,8 +18,8 @@ const out='android/out/emulator/';
   await device.close();adb('shell','am','force-stop','ru.busa.monitor');
   adb('shell','am','start','-W','-n','ru.busa.monitor/.MainActivity');await attach();
  }
- await attach();
  try{
+  await attach();
   assert(adb('shell','settings','get','global','wifi_on').toString().trim()==='0','Wi-Fi is not disabled');
   await page.waitForFunction('connected&&!pollBusy',null,{timeout:60000});
   assert.equal(await page.locator('#t0').innerText(),'26,4°C');
@@ -50,5 +50,5 @@ const out='android/out/emulator/';
   assert.equal(await page.locator('#t0').innerText(),'26,4°C');
   const result='PASS Android mobile-only cloud mode: Wi-Fi disabled, real host cellular route, authenticated JSONP reader, six shared screens, calculator, view key kept out of WebView, stale/empty/unauthorized data remain N/D and disconnected, recovery; mocked Google endpoint, no physical ESP32 or user deployment\n';
   fs.writeFileSync(out+'CLOUD_RESULT.txt',result);process.stdout.write(result);
- }finally{await device.close();}
+ }finally{if(device)await device.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
