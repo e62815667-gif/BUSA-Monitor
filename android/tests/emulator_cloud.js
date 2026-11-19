@@ -83,6 +83,9 @@ function positive(){tapNode(nativeNodes().find(n=>n.includes('resource-id="andro
   await fetch('http://127.0.0.1:18080/__test/cloud?state=fresh');
   await page.waitForFunction('connected&&!pollBusy',null,{timeout:60000});
   // Re-enter local mode via the address form with Wi-Fi already available.
+  // The preceding local test deliberately left this server offline to verify
+  // loss of connection. Restore the device fixture before testing reconnection.
+  await fetch('http://127.0.0.1:18080/__test/online');
   adb('shell','svc','wifi','enable');
   let wifi=false;
   for(const until=Date.now()+20000;Date.now()<until;){
