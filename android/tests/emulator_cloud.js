@@ -20,10 +20,10 @@ function fillNative(index,value){
 function positive(){tapNode(nativeNodes().find(n=>n.includes('resource-id="android:id/button1"')));}
 (async()=>{
  let device,page;
- async function attach(){
+ async function attach(ready='window.busaCloudInstalled===true'){
   for(let n=0;n<3;n++){
    device=(await _android.devices())[0];page=await(await device.webView({pkg:'ru.busa.monitor'})).page();
-   try{await page.waitForFunction('window.busaCloudInstalled===true',null,{timeout:60000});return;}
+   try{await page.waitForFunction(ready,null,{timeout:60000});return;}
    catch(e){if(!String(e).includes('has been closed')||n===2)throw e;await device.close();}
   }
  }
@@ -91,10 +91,21 @@ function positive(){tapNode(nativeNodes().find(n=>n.includes('resource-id="andro
   assert(wifi,'Wi-Fi network did not become available');
   adb('shell','input','keyevent','4');
   tapNode(nativeNodes().find(n=>/text="Адрес БУСА"/i.test(n)));
-  fillNative(0,'http://10.0.2.2:18080');positive();
-  await page.waitForFunction('typeof connected!=="undefined"&&connected&&!pollBusy&&document.documentElement.dataset.fixtureDevicePage==="1"',null,{timeout:60000});
+  fillNative(0,'http://10.0.2.2:18080');
+  const localReady='typeof connected!=="undefined"&&connected&&!pollBusy&&document.documentElement.dataset.fixtureDevicePage==="1"';
+  const pidBefore=adb('shell','pidof','ru.busa.monitor').toString().trim();
+  assert(pidBefore,'App process missing before local transition');
+  // This operation changes both origin (bundled HTTPS -> device HTTP) and
+  // process network binding. Android can close the old DevTools transport.
+  // Detach the driver at this explicit boundary, not after a failed assertion.
+  // The app itself must stay alive and the new device page must really connect.
+  await device.close();device=null;positive();
+  await attach(localReady);
+  assert.equal(adb('shell','pidof','ru.busa.monitor').toString().trim(),pidBefore,'App restarted during cloud-to-local transition');
   assert.equal(await page.locator('#t0').innerText(),'26,4°C');
   assert.equal(await page.locator('#temperatureSave').isDisabled(),false);
+  fs.writeFileSync(out+'cloud-to-local.png',adb('exec-out','screencap','-p'));
+  fs.writeFileSync(out+'cloud-to-local-activity.txt',adb('shell','dumpsys','activity','activities'));
   const result='PASS Android mobile-only cloud mode: real first-launch setup/invalid key, Wi-Fi disabled, cellular host route, authenticated JSONP reader, six screens/calculator, stable cached cooling, key kept out of WebView, stale/empty/unauthorized/malformed cleared, automatic network failure/recovery, cloud-to-local address switch with existing Wi-Fi; mocked Google, no physical ESP32 or user deployment\n';
   fs.writeFileSync(out+'CLOUD_RESULT.txt',result);process.stdout.write(result);
  }finally{if(device)await device.close();}
