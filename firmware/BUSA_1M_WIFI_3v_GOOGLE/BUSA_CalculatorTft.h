@@ -9,7 +9,7 @@ static void busaCalcDraw(){
  screen->fillRect(0,27,w,bottom-27,bg);
  busaCalcText("КАЛЬКУЛЯТОР",8,38,fg);
  if(!tftView){
-  for(int i=0;i<3;i++){int y=62+i*31;if(i==busaCalcMode)screen->fillRoundRect(5,y-13,w-10,24,3,V14_BADGE);
+  for(int i=0;i<4;i++){int y=62+i*31;if(i==busaCalcMode)screen->fillRoundRect(5,y-13,w-10,24,3,V14_BADGE);
    busaCalcText(String(i==busaCalcMode?"> ":"  ")+busaCalcNames[i],10,y,fg);
   }
   busaCalcText("Вверх/вниз: выбрать; ENT: открыть",8,bottom-22,accent);
@@ -29,7 +29,10 @@ static void busaCalcDraw(){
   else if(!busaCalcResult.ok)busaCalcText("Проверьте диапазоны/доли",8,y,accent);
   else if(busaCalcMode==0){busaCalcText("Долить воды: "+busaCalcNumber(busaCalcResult.water)+" л",8,y,accent);busaCalcText("Объём: "+busaCalcNumber(busaCalcResult.total)+" л",8,y+13,fg);}
   else if(busaCalcMode==1)busaCalcText("При 20 °C: "+busaCalcNumber(busaCalcResult.strength)+" % об.",8,y,accent);
-  else{
+  else if(busaCalcMode==3){
+   busaCalcText("Объём: "+busaCalcNumber(busaCalcResult.capacity)+" л",8,y,fg);
+   if(busaCalcResult.levelKnown)busaCalcText("Жидкость: "+busaCalcNumber(busaCalcResult.liquid)+" л",8,y+13,accent);
+  }else{
    busaCalcText("АС: "+busaCalcNumber(busaCalcResult.absolute)+" л",8,y,fg);
    busaCalcText("Головы: "+busaCalcNumber(busaCalcResult.heads)+" л АС",8,y+13,fg);
    busaCalcText("Хвосты: "+busaCalcNumber(busaCalcResult.tails)+" л АС",8,y+26,fg);
