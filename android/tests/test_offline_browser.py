@@ -29,6 +29,17 @@ with sync_playwright() as p:
     page.locator('[data-page="7"]').click()
     for name,value in [('v','1'),('from','96'),('to','40')]:page.locator('#calc-0-'+name).fill(value)
     assert '1,47' in page.locator('#calc-panel-0 [data-value="water"]').inner_text()
+    page.locator('#calc-tab-3').click()
+    page.locator('#calc-3-diameter').fill('40')
+    page.locator('#calc-3-height').fill('50')
+    assert '62,83' in page.locator('#calc-panel-3 [data-value="capacity"]').inner_text()
+    assert page.locator('#calc-panel-3 [data-value="liquid"]').count()==0
+    page.locator('#calc-3-level').fill('25')
+    assert '31,42' in page.locator('#calc-panel-3 [data-value="liquid"]').inner_text()
+    page.locator('#calc-3-level').fill('51')
+    assert page.locator('#calc-panel-3 .calcError').inner_text()
+    page.locator('#calc-3-level').fill('0')
+    assert '0,00' in page.locator('#calc-panel-3 [data-value="liquid"]').inner_text()
     page.locator('[data-page="5"]').click();page.wait_for_timeout(80)
     assert page.locator('#settingsMenu>.approvedMenuItem:visible').count()==9
     assert page.locator('.vpPager').count()==0
@@ -41,4 +52,4 @@ with sync_playwright() as p:
     assert not page.evaluate('scrollY||document.documentElement.scrollWidth>innerWidth+1||document.documentElement.scrollHeight>innerHeight+1')
     assert not errors,errors
     browser.close()
-print('PASS packaged offline UI: real apparatus, Н/Д without ESP, calculator works, 9 settings, polling recovery, existing clock sync only, no invented values')
+print('PASS packaged offline UI: real apparatus, Н/Д without ESP, four calculator modes, 9 settings, polling recovery, existing clock sync only, no invented values')
