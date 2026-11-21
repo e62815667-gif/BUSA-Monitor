@@ -1,8 +1,8 @@
 {
   "primary_browser_script": "781452dd32b26d0f271c08e1ffe150f43d7e7e8be312566db4539507ae53d735",
   "wifi_card_markup": "9ed2cb120e29153743d2f22b106183fc3a10c368abdf42a3fbbecfebd2c339ef",
-  "calculator.js": "c39dedc9ad23037f3fb37cee638a06b5ee3a3381eac1f594e17d0929684d5b56",
+  "calculator.js": "8f3b48f5acb191cb28b48fedcfb6439452eda8f1fc368a252daf14cbedebef8d",
   "calculator.css": "ea855724475d649c472a388af7b3b99b6bcd15cdf6db0f5424446bdfa2e08d9e",
-  "calculator/ui.js": "17e9e62ec91a4d4bba2751312d4e39d564158738695c7156bdcb963e9406e8d4",
+  "calculator/ui.js": "c4e7ab61b00e52ece788ad5e19d988fd2c3ca7e96709b5bb5874836104cb22a0",
   "calculator/core.js": "7eba86b2f0b99d97b46fc569a83a7d16a5702bdb4d40646a231115f0f6affb81"
 }
