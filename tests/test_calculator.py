@@ -61,7 +61,11 @@ with tempfile.TemporaryDirectory() as d:
 # No controller writes/credentials/network calls in calculator code.
 for name in ['BUSA_Calculator.h','BUSA_CalculatorUI.h','BUSA_CalculatorTft.h']:
  s=(sketch/name).read_text()
- for forbidden in ['digitalWrite(', 'analogWrite(', 'ledcWrite(', 'prefs.', 'WiFi.', 'HTTPClient','server.']:
+ for forbidden in ['digitalWrite(', 'analogWrite(', 'ledcWrite(', 'WiFi.', 'HTTPClient','server.']:
   assert forbidden not in s,(name,forbidden)
+ if name=='BUSA_CalculatorUI.h':
+  assert s.count('prefs.getString(')==1 and s.count('prefs.putString(')==1
+  assert 'prefs.getString("cubeDims","")' in s and 'prefs.putString("cubeDims",record)' in s
+ else:assert 'prefs.' not in s,name
 s=(root/'calculator.js').read_text();assert 'fetch(' not in s and 'XMLHttpRequest' not in s
-print('PASS calculator isolation: no GPIO/NVS/network writes')
+print('PASS calculator isolation: no GPIO/network writes; only single geometry NVS key authorized')

@@ -1,10 +1,11 @@
-"""Execute the shipping RAM-only calculator keyboard controller against String stubs."""
+"""Execute actual calculator keypad and NVS geometry persistence with native stubs."""
 from pathlib import Path
 import subprocess,tempfile
 root=Path(__file__).resolve().parents[1];sketch=root/'firmware/BUSA_1M_WIFI_3v_GOOGLE'
 code=r'''
 #include <string>
 #include <algorithm>
+#include <map>
 #include <cstdlib>
 #include <cmath>
 #include <cassert>
@@ -19,6 +20,15 @@ class String:public std::string{
  int indexOf(char c)const{auto p=find(c);return p==npos?-1:int(p);}
  String substring(size_t a,size_t b=std::string::npos)const{return substr(a,b==std::string::npos?b:b-a);}
 };
+struct Preferences{
+ std::map<std::string,String> values;
+ String getString(const char* key,const char* fallback)const{
+  auto it=values.find(key);return it==values.end()?String(fallback):it->second;
+ }
+ size_t putString(const char* key,const String& value){values[key]=value;return value.length();}
+};
+Preferences prefs;
+static bool busaNvsReady=true;
 int currentPage=7,tftView=0;bool tftDirty=false;String keyMessage;
 #include "BUSA_CalculatorUI.h"
 void enter(int digit){int keys[10]={17,4,5,6,8,9,10,12,13,14};assert(busaCalcKey(keys[digit]));}
@@ -42,10 +52,30 @@ int main(){
  busaCalcKey(11);editNumber("25");
  assert(busaCalcResult.ok&&busaCalcResult.levelKnown);
  assert(fabs(busaCalcResult.liquid-31.41592653589793)<1e-8);
+ assert(prefs.getString("cubeDims","")=="40;50");
+ // F1 clears only the level and must not erase either saved dimension.
+ busaCalcKey(0);
+ assert(busaCalcInputs[3][0]=="40"&&busaCalcInputs[3][1]=="50"&&busaCalcInputs[3][2]=="");
+ assert(prefs.getString("cubeDims","")=="40;50");
+ // Reboot: only fixed geometry returns; the new measurement starts empty.
+ for(auto& field:busaCalcInputs[3])field="";
+ busaCalcLoadGeometry();
+ assert(busaCalcInputs[3][0]=="40"&&busaCalcInputs[3][1]=="50"&&busaCalcInputs[3][2]=="");
+ tftView=0;busaCalcKey(19);assert(tftView==1&&busaCalcField==2);
+ editNumber("30");assert(fabs(busaCalcResult.liquid-37.6991118430775)<1e-8);
+ // Users may intentionally change dimensions. One NVS record is updated.
+ busaCalcKey(7);assert(busaCalcField==1);busaCalcKey(19);busaCalcKey(0);enter(6);enter(0);busaCalcKey(19);
+ assert(prefs.getString("cubeDims","")=="40;60");
+ for(auto& field:busaCalcInputs[3])field="";
+ busaCalcLoadGeometry();
+ assert(busaCalcInputs[3][0]=="40"&&busaCalcInputs[3][1]=="60"&&busaCalcInputs[3][2]=="");
+ // Invalid persisted geometry must never be used for a calculation.
+ prefs.putString("cubeDims",String("0;10"));
+ busaCalcLoadGeometry();assert(busaCalcInputs[3][0]==""&&busaCalcInputs[3][1]=="");
  currentPage=0;assert(!busaCalcKey(19));
 }
 '''
 with tempfile.TemporaryDirectory() as d:
  p=Path(d)/'key.cpp';p.write_text(code);exe=Path(d)/'key'
  subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-I'+str(sketch),str(p),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)
-print('PASS actual calculator keypad: menu/fields, digits, long-zero comma, save/cancel/clear, invalid input, global navigation/F2 retained; no ESP32 tested')
+print('PASS calculator keypad and geometry persistence: NVS save/reboot/change, level-only clear, original 3 calculators; no ESP32 tested')

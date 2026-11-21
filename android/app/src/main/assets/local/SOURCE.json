@@ -1,8 +1,8 @@
 {
-  "firmware": "БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121",
+  "firmware": "БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1",
   "sha256": {
     "index.html": "ae206825e74daa95cdc784cb4ee071c6d4a924a23000b4df14ba5e49f7858cc5",
-    "calculator.js": "c39dedc9ad23037f3fb37cee638a06b5ee3a3381eac1f594e17d0929684d5b56",
+    "calculator.js": "8f3b48f5acb191cb28b48fedcfb6439452eda8f1fc368a252daf14cbedebef8d",
     "calculator.css": "ea855724475d649c472a388af7b3b99b6bcd15cdf6db0f5424446bdfa2e08d9e"
   }
 }

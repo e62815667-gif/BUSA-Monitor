@@ -38,6 +38,7 @@ with sync_playwright() as p:
    assert '4,00' in page.locator('#calc-panel-2 [data-value=product]').inner_text()
    assert '0,40' in page.locator('#calc-panel-2 [data-value=heads]').inner_text()
    page.locator('#calc-tab-3').click()
+   assert page.locator('#calc-panel-3 details.calcNote').first.get_attribute('open') is not None
    page.locator('#calc-3-diameter').fill('40')
    page.locator('#calc-3-height').fill('50')
    assert '62,83' in page.locator('#calc-panel-3 [data-value=capacity]').inner_text()
@@ -52,6 +53,28 @@ with sync_playwright() as p:
    page.screenshot(path=str(artifacts/f'{"local" if local_app else "online"}-{width}.png'),full_page=True)
    page.reload();page.wait_for_selector('#busaCalculator .calcPanel',state='attached')
    assert page.locator('#calc-0-from').input_value()=='96'
+   page.locator('[data-page="7"]' if local_app else '[data-tab="calculator"]').click()
+   page.locator('#calc-tab-3').click()
+   assert page.locator('#calc-3-diameter').input_value()=='40'
+   assert page.locator('#calc-3-height').input_value()=='50'
+   assert page.locator('#calc-panel-3 details.calcNote').first.get_attribute('open') is None
+   assert page.locator('#calc-3-level').input_value()=='0'
+   assert '62,83' in page.locator('#calc-panel-3 [data-value=capacity]').inner_text()
+   assert page.locator('#calc-panel-3 button[type=reset]').inner_text()=='Очистить уровень'
+   page.locator('#calc-panel-3 button[type=reset]').click()
+   assert page.locator('#calc-3-level').input_value()==''
+   assert page.locator('#calc-3-diameter').input_value()=='40'
+   assert page.locator('#calc-3-height').input_value()=='50'
+   assert '62,83' in page.locator('#calc-panel-3 [data-value=capacity]').inner_text()
+   # Browser UI: explicit geometry change and reboot-equivalent reload.
+   page.locator('#calc-panel-3 details.calcNote').first.locator('summary').click()
+   page.locator('#calc-3-height').fill('60')
+   page.reload();page.wait_for_selector('#busaCalculator .calcPanel',state='attached')
+   page.locator('[data-page="7"]' if local_app else '[data-tab="calculator"]').click()
+   page.locator('#calc-tab-3').click()
+   assert page.locator('#calc-3-height').input_value()=='60'
+   assert '75,40' in page.locator('#calc-panel-3 [data-value=capacity]').inner_text()
+   assert page.locator('#calc-panel-3 details.calcNote').first.get_attribute('open') is None
    page.locator('[data-page="7"]' if local_app else '[data-tab="calculator"]').click();page.locator('#calc-panel-0 button[type=reset]').click();page.wait_for_function("document.getElementById('calc-0-v').value===''")
    page.evaluate("document.documentElement.dataset.theme='dark'");assert page.locator('#calc-panel-0 button[type=submit]').is_visible()
    if not local_app:

@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -450,6 +450,7 @@ uint16_t pcfIdleMask=65535,pcfObservedLow=0;
 uint8_t pcfPairCount=0,pcfScanError=0;
 uint32_t pcfLastScanAt=0;
 Preferences prefs;
+static bool busaNvsReady=false;
 Preferences keypadBackupPrefs;
 bool keypadBackupOpen=false;
 // Wall clock: phone supplies UTC epoch and local UTC offset via protected AP;
@@ -3675,7 +3676,6 @@ static bool busaRmBleBootError=false;
 #include "BUSA_OtaBoot.h"
 #include "BUSA_BleBootRecovery.h"
 static bool busaRmPairDeferred=false;
-static bool busaNvsReady=false;
 // The local app has its own Wi-Fi Preferences. Sync only a successful explicit
 // provisioning result, on the main task, without printing credentials.
 static bool busaSaveProvisionedStation(){
@@ -3721,6 +3721,7 @@ void setup(){
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   busaNvsReady=prefs.begin("busa-r04",false);
+  busaCalcLoadGeometry();
   // A pending OTA must first pass the normal local boot self-test. Keep the
   // request in NVS; confirm below, then reboot into the existing isolated BLE mode.
   busaRmPairDeferred=busaNvsReady&&prefs.getBool("rmPairNext",false)&&busaOtaPendingVerification();

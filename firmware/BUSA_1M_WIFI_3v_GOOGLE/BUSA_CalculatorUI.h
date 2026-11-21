@@ -2,7 +2,7 @@
 #include "BUSA_Calculator.h"
 #include <cstdint>
 #include <cstdlib>
-// Calculator state is RAM-only and independent from sensor/threshold/Wi-Fi settings.
+// Calculator values stay in RAM; only cylindrical vessel geometry is stored in NVS.
 static uint8_t busaCalcMode=0,busaCalcField=0;
 static bool busaCalcEditing=false,busaCalcComplete=false;
 static String busaCalcInputs[4][5],busaCalcEdit="";
@@ -23,6 +23,27 @@ static bool busaCalcParse(String text,double& out){
  }
  if(!digit)return false;
  char* end=nullptr;out=strtod(text.c_str(),&end);return end&&!*end&&isfinite(out);
+}
+// Geometry is a single NVS record; level is deliberately session-only.
+static bool busaCalcGeometryValid(){
+ double diameter=0,height=0;
+ return busaCalcParse(busaCalcInputs[3][0],diameter)&&busaCalcParse(busaCalcInputs[3][1],height)
+   &&BusaCalc::cylinder(diameter,height).ok;
+}
+static inline void busaCalcLoadGeometry(){
+ if(!busaNvsReady)return;
+ const String record=prefs.getString("cubeDims","");
+ if(record.length()>25)return;
+ const int split=record.indexOf(';');
+ if(split<=0||split>=int(record.length())-1)return;
+ busaCalcInputs[3][0]=record.substring(0,split);
+ busaCalcInputs[3][1]=record.substring(split+1);
+ if(!busaCalcGeometryValid()){busaCalcInputs[3][0]="";busaCalcInputs[3][1]="";}
+}
+static bool busaCalcStoreGeometry(){
+ if(!busaCalcGeometryValid()||!busaNvsReady)return false;
+ const String record=busaCalcInputs[3][0]+";"+busaCalcInputs[3][1];
+ return prefs.putString("cubeDims",record)==record.length();
 }
 static void busaCalcRecalculate(){
  double v[5]={};busaCalcComplete=false;busaCalcResult=BusaCalc::Result();
@@ -53,9 +74,12 @@ static bool busaCalcKey(int k){
   else if(k==18){if(busaCalcCursor<busaCalcEdit.length())++busaCalcCursor;}
   else if(k==7)busaCalcCursor=0;
   else if(k==11)busaCalcCursor=busaCalcEdit.length();
-  else if(k==19){double value=0;if(busaCalcParse(busaCalcEdit,value)){
+  else if(k==19){double value=0;if(busaCalcParse(busaCalcEdit,value)
+    &&(busaCalcMode!=3||busaCalcField==2||value>0)){
     busaCalcInputs[busaCalcMode][busaCalcField]=busaCalcEdit;busaCalcEditing=false;busaCalcRecalculate();
-  }else keyMessage="Введите число или ESC";}
+    if(busaCalcMode==3&&busaCalcField<2&&busaCalcGeometryValid()&&!busaCalcStoreGeometry())
+      keyMessage="Ошибка сохранения размеров";
+  }else keyMessage="Введите корректное число или ESC";}
   else {const int digitKeys[10]={17,4,5,6,8,9,10,12,13,14};for(int d=0;d<10;d++)if(k==digitKeys[d]&&busaCalcEdit.length()<12){
     busaCalcEdit=busaCalcEdit.substring(0,busaCalcCursor)+String(d)+busaCalcEdit.substring(busaCalcCursor);++busaCalcCursor;break;
   }}
@@ -64,10 +88,10 @@ static bool busaCalcKey(int k){
   else busaCalcField=(busaCalcField+(k==7?busaCalcCounts[busaCalcMode]-1:1))%busaCalcCounts[busaCalcMode];
   busaCalcRecalculate();
  }else if(k==19){
-  if(!tftView){tftView=1;busaCalcField=0;busaCalcRecalculate();}
+  if(!tftView){tftView=1;busaCalcField=(busaCalcMode==3&&busaCalcGeometryValid())?2:0;busaCalcRecalculate();}
   else{busaCalcEditing=true;busaCalcEdit=busaCalcInputs[busaCalcMode][busaCalcField];busaCalcCursor=busaCalcEdit.length();}
  }else if(k==15&&tftView)tftView=0;
- else if(k==0&&tftView){for(auto& s:busaCalcInputs[busaCalcMode])s="";busaCalcRecalculate();}
+ else if(k==0&&tftView){if(busaCalcMode==3)busaCalcInputs[3][2]="";else for(auto& s:busaCalcInputs[busaCalcMode])s="";busaCalcRecalculate();}
  else return false; // Global LEFT/RIGHT, ESC/back and F2 keep existing behavior.
  tftDirty=true;return true;
 }

@@ -38,7 +38,7 @@ static void busaCalcDraw(){
    busaCalcText("Хвосты: "+busaCalcNumber(busaCalcResult.tails)+" л АС",8,y+26,fg);
    busaCalcText("Выход: "+busaCalcNumber(busaCalcResult.product)+" л",8,y+39,accent);
   }
-  busaCalcText(busaCalcEditing?"F1 очистить; 0 удерж.: ,":"ENT изменить; ESC назад",6,bottom-4,fg);
+  busaCalcText(busaCalcEditing?"F1 очистить; 0 удерж.: ,":(busaCalcMode==3?"ENT ввод; F1 очистить уровень":"ENT изменить; ESC назад"),6,bottom-4,fg);
  }
  ru.setFont(u8g2_font_6x13_t_cyrillic);
 }
