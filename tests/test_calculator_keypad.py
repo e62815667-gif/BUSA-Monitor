@@ -28,7 +28,7 @@ struct Preferences{
  size_t putString(const char* key,const String& value){values[key]=value;return value.length();}
 };
 Preferences prefs;
-static bool busaNvsReady=true;
+bool busaNvsReady=true;
 int currentPage=7,tftView=0;bool tftDirty=false;String keyMessage;
 #include "BUSA_CalculatorUI.h"
 void enter(int digit){int keys[10]={17,4,5,6,8,9,10,12,13,14};assert(busaCalcKey(keys[digit]));}
