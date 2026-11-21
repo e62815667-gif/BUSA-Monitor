@@ -2,7 +2,7 @@
 #include <cmath>
 #include "BUSA_CalcCoefficients.h"
 namespace BusaCalc {
-struct Result {bool ok=false;double water=0,total=0,strength=0,absolute=0,heads=0,tails=0,product=0;};
+struct Result {bool ok=false,levelKnown=false;double water=0,total=0,strength=0,absolute=0,heads=0,tails=0,product=0,capacity=0,liquid=0;};
 inline double density(double p,double t){double r=0;for(const auto& row:BUSA_CALC_COEFFICIENTS){double v=0;for(double c:row)v=v*(t-20)+c;r=r*p+v;}return r;}
 inline double abvFromMass(double p){return 100*p*density(p,20)/density(1,20);}
 inline double massFromAbv(double a){double lo=0,hi=1;for(int k=0;k<48;k++){double p=(lo+hi)/2;if(abvFromMass(p)<a)lo=p;else hi=p;}return (lo+hi)/2;}
@@ -23,5 +23,16 @@ inline Result correct(double t,double reading){
 inline Result fraction(double v,double strength,double out,double head,double tail){
  Result r;if(!std::isfinite(v)||!std::isfinite(strength)||!std::isfinite(out)||!std::isfinite(head)||!std::isfinite(tail)||v<=0||v>100000||strength<=0||strength>100||out<=0||out>100||head<0||tail<0||head+tail>=100)return r;
  r.ok=true;r.absolute=v*strength/100;r.heads=r.absolute*head/100;r.tails=r.absolute*tail/100;r.product=(r.absolute-r.heads-r.tails)*100/out;return r;
+}
+inline Result cylinder(double diameter,double height){
+ Result r;if(!std::isfinite(diameter)||!std::isfinite(height)||diameter<=0||height<=0)return r;
+ const double area=3.14159265358979323846*diameter*diameter/4000;
+ r.capacity=area*height;r.ok=std::isfinite(r.capacity)&&r.capacity>0;return r;
+}
+inline Result cylinder(double diameter,double height,double level){
+ Result r=cylinder(diameter,height);
+ if(!r.ok||!std::isfinite(level)||level<0||level>height){r.ok=false;return r;}
+ r.liquid=(3.14159265358979323846*diameter*diameter/4000)*level;
+ r.levelKnown=std::isfinite(r.liquid);r.ok=r.levelKnown;return r;
 }
 }
