@@ -35,6 +35,13 @@ int main(){
  busaCalcKey(0);assert(!busaCalcComplete&&!busaCalcResult.ok);
  busaCalcKey(15);assert(tftView==0);busaCalcKey(11);assert(busaCalcMode==1);
  busaCalcKey(19);editNumber("20");busaCalcKey(11);editNumber("40");assert(busaCalcResult.ok&&busaCalcResult.strength==40);
+ busaCalcKey(15);busaCalcKey(11);busaCalcKey(11);assert(busaCalcMode==3);
+ busaCalcKey(19);editNumber("40");busaCalcKey(11);editNumber("50");
+ assert(busaCalcResult.ok&&!busaCalcResult.levelKnown);
+ assert(fabs(busaCalcResult.capacity-62.8318530717959)<1e-8);
+ busaCalcKey(11);editNumber("25");
+ assert(busaCalcResult.ok&&busaCalcResult.levelKnown);
+ assert(fabs(busaCalcResult.liquid-31.41592653589793)<1e-8);
  currentPage=0;assert(!busaCalcKey(19));
 }
 '''
