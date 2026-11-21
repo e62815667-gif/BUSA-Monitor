@@ -3,7 +3,7 @@
   "files": {
     "firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Google.h": "e0dc40408c1ce9566eb2d88a19e6a02a278d00811ccfd90e24fc89171b1c02e0",
     "firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_RemoteAlarm.h": "45bb0f1b3cb2492ecd5df1c60c9955a0214752d3455cf31a73ff277ad1dacd7e",
-    "firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarmLogic.h": "82d436e1d1ab18331b85cd0b82d68d5baa17069fc84a210f88183fd074605cdd"
+    "firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_SoundAlarmLogic.h": "d3940e54d9a3cd0b182effe14fc43cb80280dafbc6545e5d52306c7737e10164"
   },
   "functions": {
     "void sampleTemperatures(uint32_t now)": "7d0e09a1267b48ae9a1e96a222b88ae5681dd79e2d756bec41ce6cfaa00327d6"
