@@ -26,7 +26,7 @@ static void busaCalcDraw(){
   }
   y+=3;
   if(!busaCalcComplete)busaCalcText("Введите все поля; ENT: ввод",8,y,fg);
-  else if(!busaCalcResult.ok)busaCalcText("Проверьте диапазоны/доли",8,y,accent);
+  else if(!busaCalcResult.ok)busaCalcText(busaCalcMode==3?"Проверьте размеры и уровень":"Проверьте диапазоны/доли",8,y,accent);
   else if(busaCalcMode==0){busaCalcText("Долить воды: "+busaCalcNumber(busaCalcResult.water)+" л",8,y,accent);busaCalcText("Объём: "+busaCalcNumber(busaCalcResult.total)+" л",8,y+13,fg);}
   else if(busaCalcMode==1)busaCalcText("При 20 °C: "+busaCalcNumber(busaCalcResult.strength)+" % об.",8,y,accent);
   else if(busaCalcMode==3){
