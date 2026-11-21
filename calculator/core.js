@@ -24,7 +24,18 @@ const BusaCalc=(()=>{
   const absolute=v*strength/100,heads=absolute*head/100,tails=absolute*tail/100;
   return {absolute,heads,tails,product:(absolute-heads-tails)*100/out};
  }
+ function cylinder(diameter,height,level){
+  if(!finite(diameter,height)||diameter<=0||height<=0)throw Error('Внутренний диаметр и высота должны быть больше нуля.');
+  const area=Math.PI*diameter*diameter/4000;
+  const capacity=area*height;
+  if(!Number.isFinite(capacity)||capacity<=0)throw Error('Размеры вне диапазона расчёта.');
+  if(level===undefined)return {capacity};
+  if(!finite(level)||level<0||level>height)throw Error('Уровень жидкости должен быть от 0 до внутренней высоты.');
+  const liquid=area*level;
+  if(!Number.isFinite(liquid))throw Error('Размеры вне диапазона расчёта.');
+  return {capacity,liquid};
+ }
  function parse(text){const s=String(text).trim();if(!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(s))throw Error('Введите число; дробную часть можно вводить через запятую.');const n=Number(s.replace(',','.'));if(!Number.isFinite(n))throw Error('Недопустимое число.');return n;}
- return {density,abvFromMass,massFromAbv,dilute,correct,fraction,parse};
+ return {density,abvFromMass,massFromAbv,dilute,correct,fraction,cylinder,parse};
 })();
 if(typeof module!=='undefined')module.exports=BusaCalc;
