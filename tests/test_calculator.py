@@ -9,7 +9,9 @@ for _ in range(100):
  vectors.append(['dilute',[v,a,b]])
  vectors.append(['correct',[rng.uniform(1,39),rng.uniform(20,85)]])
  vectors.append(['fraction',[v,a,rng.uniform(10,96),rng.uniform(0,20),rng.uniform(0,20)]])
-vectors.extend([['dilute',[1,96,40]],['correct',[20,40]],['correct',[30,40]],['correct',[10,40]],['fraction',[10,40,80,10,10]],['dilute',[1,40,40]]])
+ diameter=rng.uniform(1,150);height=rng.uniform(1,150)
+ vectors.append(['cylinder',[diameter,height,rng.uniform(0,height)]])
+vectors.extend([['cylinder',[40,50]],['cylinder',[40,50,0]],['cylinder',[40,50,50]],['dilute',[1,96,40]],['correct',[20,40]],['correct',[30,40]],['correct',[10,40]],['fraction',[10,40,80,10,10]],['dilute',[1,40,40]]])
 script='''const c=require(process.argv[1]);const vectors=JSON.parse(process.argv[2]);
 const assert=require('assert');assert(Math.abs(c.density(.31,13)-956.42)<.005);assert(Math.abs(c.density(.88,-10)-848.57)<.005);
 assert(Math.abs(c.density(0,20)-998.20123)<1e-8);assert(Math.abs(c.density(1,20)-789.2391233)<.01);
@@ -21,6 +23,13 @@ for(const a of [[10,40,0,10,10],[10,40,80,60,40],[0,40,80,10,10],[10,40,80,-1,10
 const d=c.dilute(1,96,40);assert(d.water>1.4&&d.water<1.5);assert(Math.abs(d.total-2.4)<1e-9);assert(1+d.water>d.total);
 assert(c.correct(30,40).strength<40);assert(c.correct(10,40).strength>40);
 const f=c.fraction(10,40,80,10,10);assert.deepStrictEqual(f,{absolute:4,heads:.4,tails:.4,product:4});
+const full=Math.PI*40*40*50/4000;
+assert(Math.abs(c.cylinder(40,50).capacity-full)<1e-12);
+assert(!('liquid' in c.cylinder(40,50)));
+assert(Math.abs(c.cylinder(40,50,25).liquid-full/2)<1e-12);
+assert(c.cylinder(40,50,0).liquid===0);
+assert(Math.abs(c.cylinder(40,50,50).liquid-full)<1e-12);
+for(const a of [[0,50,10],[-1,50,10],[40,0,1],[40,50,-1],[40,50,51],[NaN,50,20],[40,50,NaN],[1e250,50,10]])assert.throws(()=>c.cylinder(...a));
 console.log(JSON.stringify(vectors.map(([fn,args])=>{try{return c[fn](...args);}catch(e){return null;}})));
 '''
 expected=json.loads(subprocess.check_output(['node','-e',script,str(root/'calculator.js'),json.dumps(vectors)],text=True))
@@ -31,6 +40,11 @@ int main(){
 assert(!BusaCalc::dilute(0,40,20).ok);assert(!BusaCalc::dilute(1,40,0).ok);
 assert(!BusaCalc::correct(41,40).ok);assert(!BusaCalc::correct(20,101).ok);
 assert(!BusaCalc::fraction(10,40,0,10,10).ok);assert(!BusaCalc::fraction(10,40,80,60,40).ok);
+assert(!BusaCalc::cylinder(0,50).ok);assert(!BusaCalc::cylinder(40,50,51).ok);
+assert(!BusaCalc::cylinder(40,50,-1).ok);
+assert(BusaCalc::cylinder(40,50).ok&&!BusaCalc::cylinder(40,50).levelKnown);
+assert(BusaCalc::cylinder(40,50,0).ok&&BusaCalc::cylinder(40,50,0).liquid==0);
+assert(std::fabs(BusaCalc::cylinder(40,50,25).liquid-BusaCalc::cylinder(40,50).capacity/2)<1e-10);
 '''
 for (fn,args),result in zip(vectors,expected):
  call='BusaCalc::'+fn+'('+','.join(format(x,'.17g') for x in args)+')'
@@ -40,7 +54,7 @@ for (fn,args),result in zip(vectors,expected):
   code+='assert(r.ok);'
   for key,value in result.items():code+=f'assert(std::fabs(r.{key}-({value:.17g}))<1e-7);'
  code+='}\n'
-code+='puts("PASS calculator: 306 C++/JS scenarios, OIML reference points, contraction, AS balance, ranges and parsing");}\n'
+code+='puts("PASS calculator: cylinder geometry + legacy parity, reference points, ranges and parsing");}\n'
 with tempfile.TemporaryDirectory() as d:
  p=Path(d)/'calc.cpp';p.write_text(code);exe=Path(d)/'calc'
  subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-Werror','-I'+str(sketch),str(p),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)
