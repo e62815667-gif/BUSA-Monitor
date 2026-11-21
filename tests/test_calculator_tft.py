@@ -28,7 +28,7 @@ int currentPage=7,tftView=0;bool tftDirty=false;String keyMessage;
 #include "BUSA_CalculatorUI.h"
 #include "BUSA_CalculatorTft.h"
 int main(){
- for(int portrait=0;portrait<2;portrait++)for(tftThemeMode=0;tftThemeMode<3;tftThemeMode++)for(int mode=0;mode<3;mode++){
+ for(int portrait=0;portrait<2;portrait++)for(tftThemeMode=0;tftThemeMode<3;tftThemeMode++)for(int mode=0;mode<4;mode++){
   display.w=portrait?240:320;display.h=portrait?320:240;busaCalcMode=mode;
   for(tftView=0;tftView<2;tftView++)for(int state=0;state<4;state++){
    busaCalcComplete=state>=1;busaCalcResult.ok=state>=2;busaCalcEditing=state==3;
@@ -43,4 +43,4 @@ int main(){
 with tempfile.TemporaryDirectory() as d:
  p=Path(d)/'tft.cpp';p.write_text(code);exe=Path(d)/'tft'
  subprocess.run(['g++','-std=c++11','-I'+str(s),str(p),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)
-print('PASS actual TFT drawing: 144 menu/form/error/result/editor layouts, 320x240/240x320, all three real palettes; 6x13 text bounds. No hardware/optical test.')
+print('PASS actual TFT drawing: 192 menu/form/error/result/editor layouts, 320x240/240x320, all three real palettes; 6x13 text bounds. No hardware/optical test.')
