@@ -1,7 +1,7 @@
-name: BUSA N16R8 CALC4 WIFI1 UI16 approved six-screen design build
+name: BUSA UI16 CUBE1 cylinder calculator build
 on:
   push:
-    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local, feat/busa-ui16-holographic, feat/busa-android-ui16]
+    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local, feat/busa-ui16-holographic, feat/busa-android-ui16, feat/busa-cylinder-calculator-20261121]
     paths:
       - 'ci/ble_official_provisioning.py'
       - 'ci/busa_ble_ota_stability.py'
@@ -124,14 +124,14 @@ jobs:
           python3 ci/package_ui16.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_N16R8_RAINMAKER_RM_CALC4_WIFI1_UI16_20261115
+          name: BUSA_UI16_CUBE1_20261121
           retention-days: 30
           path: |
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_APP_OTA.bin
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_USB_MERGED.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_CUBE1_APP_OTA.bin
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_CUBE1_USB_MERGED.bin
             out/SHA256SUMS.txt
             out/OTA_IMAGE_INFO.txt
             out/PARTITIONS.csv
             out/SOURCE_COMMIT.txt
             out/SOURCE_SHA256SUMS.txt
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_SOURCE.zip
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_CUBE1_SOURCE.zip
