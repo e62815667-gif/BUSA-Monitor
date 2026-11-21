@@ -1,7 +1,7 @@
 name: BUSA UI16 CUBE1 cylinder calculator build
 on:
   push:
-    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local, feat/busa-ui16-holographic, feat/busa-android-ui16, feat/busa-cylinder-calculator-20261121]
+    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local, feat/busa-ui16-holographic, feat/busa-android-ui16, feat/busa-cylinder-calculator-20261121, feat/busa-cylinder-geometry-persist-20261121]
     paths:
       - 'ci/ble_official_provisioning.py'
       - 'ci/busa_ble_ota_stability.py'

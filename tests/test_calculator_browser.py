@@ -75,7 +75,7 @@ with sync_playwright() as p:
    assert page.locator('#calc-3-height').input_value()=='60'
    assert '75,40' in page.locator('#calc-panel-3 [data-value=capacity]').inner_text()
    assert page.locator('#calc-panel-3 details.calcNote').first.get_attribute('open') is None
-   page.locator('[data-page="7"]' if local_app else '[data-tab="calculator"]').click();page.locator('#calc-panel-0 button[type=reset]').click();page.wait_for_function("document.getElementById('calc-0-v').value===''")
+   page.locator('[data-page="7"]' if local_app else '[data-tab="calculator"]').click();page.locator('#calc-tab-0').click();page.locator('#calc-panel-0 button[type=reset]').click();page.wait_for_function("document.getElementById('calc-0-v').value===''")
    page.evaluate("document.documentElement.dataset.theme='dark'");assert page.locator('#calc-panel-0 button[type=submit]').is_visible()
    if not local_app:
     page.evaluate('navigator.serviceWorker.ready.then(()=>true)');page.reload();page.wait_for_function('!!navigator.serviceWorker.controller')
