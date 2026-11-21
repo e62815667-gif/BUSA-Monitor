@@ -6,8 +6,8 @@ import argparse,hashlib,struct,subprocess,sys,zipfile
 def package(build,core,esptool,sketch_dir=None):
     build=Path(build).resolve();core=Path(core).resolve()
     base=build/'BUSA_1M_WIFI_3v_GOOGLE.ino'
-    app=build/'BUSA_N16R8_RM_CALC4_WIFI1_UI16_APP_OTA.bin'
-    usb=build/'BUSA_N16R8_RM_CALC4_WIFI1_UI16_USB_MERGED.bin'
+    app=build/'BUSA_N16R8_RM_CALC4_WIFI1_UI16_CUBE1_APP_OTA.bin'
+    usb=build/'BUSA_N16R8_RM_CALC4_WIFI1_UI16_CUBE1_USB_MERGED.bin'
     app.write_bytes(base.with_suffix('.ino.bin').read_bytes())
     # Preserve the official Arduino bootloader header (QIO menu uses DIO for ROM boot).
     # Keep the compact USB layout; do NOT fill/erase RainMaker fctry.
@@ -19,7 +19,7 @@ def package(build,core,esptool,sketch_dir=None):
     assert 60000<len(data)<=0x300000
     assert data[0]==0xe9 and struct.unpack_from('<H',data,12)[0]==9
     assert struct.unpack_from('<I',data,32)[0]==0xabcd5432
-    assert b'14v9-N16R8-RM-CALC4-WIFI1-UI16-20261115' in data
+    assert b'14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121' in data
     assert merged[0x10000:]==data and len(merged)<=0x310000
     for offset,path in [(0,Path(str(base)+'.bootloader.bin')),(0x8000,Path(str(base)+'.partitions.bin')),(0xe000,core/'tools/partitions/boot_app0.bin')]:
         blob=path.read_bytes();assert merged[offset:offset+len(blob)]==blob
@@ -44,7 +44,7 @@ def package(build,core,esptool,sketch_dir=None):
     source_suffixes={'.ino','.h','.hpp','.c','.cpp','.s','.S','.csv'}
     files=sorted(p for p in sketch.iterdir() if p.is_file() and p.suffix in source_suffixes)
     (build/'SOURCE_SHA256SUMS.txt').write_text(''.join(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n' for p in files))
-    with zipfile.ZipFile(build/'BUSA_N16R8_RM_CALC4_WIFI1_UI16_SOURCE.zip','w',zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(build/'BUSA_N16R8_RM_CALC4_WIFI1_UI16_CUBE1_SOURCE.zip','w',zipfile.ZIP_DEFLATED) as archive:
         for path in files:archive.write(path,'firmware/'+sketch.name+'/'+path.name)
         for path in sorted((root/'ci').glob('*.py')):archive.write(path,'ci/'+path.name)
         archive.write(root/'.github/workflows/busa-calculator.yml','.github/workflows/busa-calculator.yml')
