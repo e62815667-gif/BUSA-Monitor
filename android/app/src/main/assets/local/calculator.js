@@ -47,8 +47,19 @@ const BusaCalc=(()=>{
   const absolute=v*strength/100,heads=absolute*head/100,tails=absolute*tail/100;
   return {absolute,heads,tails,product:(absolute-heads-tails)*100/out};
  }
+ function cylinder(diameter,height,level){
+  if(!finite(diameter,height)||diameter<=0||height<=0)throw Error('Внутренний диаметр и высота должны быть больше нуля.');
+  const area=Math.PI*diameter*diameter/4000;
+  const capacity=area*height;
+  if(!Number.isFinite(capacity)||capacity<=0)throw Error('Размеры вне диапазона расчёта.');
+  if(level===undefined)return {capacity};
+  if(!finite(level)||level<0||level>height)throw Error('Уровень жидкости должен быть от 0 до внутренней высоты.');
+  const liquid=area*level;
+  if(!Number.isFinite(liquid))throw Error('Размеры вне диапазона расчёта.');
+  return {capacity,liquid};
+ }
  function parse(text){const s=String(text).trim();if(!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(s))throw Error('Введите число; дробную часть можно вводить через запятую.');const n=Number(s.replace(',','.'));if(!Number.isFinite(n))throw Error('Недопустимое число.');return n;}
- return {density,abvFromMass,massFromAbv,dilute,correct,fraction,parse};
+ return {density,abvFromMass,massFromAbv,dilute,correct,fraction,cylinder,parse};
 })();
 if(typeof module!=='undefined')module.exports=BusaCalc;
 
@@ -58,7 +69,8 @@ if(typeof document!=='undefined')(()=>{
  const specs=[
  {name:'Разбавление водой',fields:[['Объём спирта, л','v'],['Начальная крепость, %','from'],['Требуемая крепость, %','to']],note:'Все объёмы и крепость — при 20 °C. Учтено сжатие смеси.',run:a=>BusaCalc.dilute(...a),results:[['Необходимо долить воды','water','л'],['Итоговый объём','total','л']]},
  {name:'Коррекция ареометра',fields:[['Температура спирта, °C','t'],['Показание ареометра, %','reading']],note:'Для водно-спиртового раствора без сахара, 0…40 °C. Стеклянный спиртомер, калибровка 20 °C; номинальное расширение стекла. Оценка, не поверка прибора.',run:a=>BusaCalc.correct(...a),results:[['Крепость при 20 °C','strength','% об.']]},
- {name:'Вторая перегонка',fields:[['Объём спирта-сырца, л','v'],['Крепость спирта-сырца, %','strength'],['Крепость на выходе, %','out'],['Доля голов от АС, %','head'],['Доля хвостов от АС, %','tail']],note:'Доли голов и хвостов — от абсолютного спирта (АС). Литры АС не равны фактическим объёмам фракций. Выход — расчётная оценка без дополнительных потерь.',run:a=>BusaCalc.fraction(...a),results:[['Абсолютный спирт','absolute','л АС'],['Головы','heads','л АС'],['Хвосты','tails','л АС'],['Выход продукта','product','л']]}
+ {name:'Вторая перегонка',fields:[['Объём спирта-сырца, л','v'],['Крепость спирта-сырца, %','strength'],['Крепость на выходе, %','out'],['Доля голов от АС, %','head'],['Доля хвостов от АС, %','tail']],note:'Доли голов и хвостов — от абсолютного спирта (АС). Литры АС не равны фактическим объёмам фракций. Выход — расчётная оценка без дополнительных потерь.',run:a=>BusaCalc.fraction(...a),results:[['Абсолютный спирт','absolute','л АС'],['Головы','heads','л АС'],['Хвосты','tails','л АС'],['Выход продукта','product','л']]},
+ {name:'Объём куба',fields:[['Внутренний диаметр, см','diameter'],['Внутренняя высота, см','height'],['Уровень жидкости, см','level']],note:'Вертикальный цилиндр с плоским дном. Все размеры внутренние; уровень измеряется от дна. Полный объём доступен после ввода первых двух размеров.',optionalLast:true,run:a=>BusaCalc.cylinder(...a),results:[['Полный объём','capacity','л'],['Объём жидкости','liquid','л']]}
  ];
  const title=document.createElement('h2');title.textContent='Калькулятор';host.append(title);
  const tabs=document.createElement('div');tabs.className='calcTabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Вид расчёта');host.append(tabs);
@@ -84,11 +96,11 @@ if(typeof document!=='undefined')(()=>{
   function persist(){try{localStorage.setItem('busa-calculator-v1-'+i,JSON.stringify(Object.fromEntries(inputs.map(x=>[x.name,x.value]))));}catch(e){}}
   function update(explicit=false){
    error.textContent='';result.replaceChildren();inputs.forEach(x=>x.removeAttribute('aria-invalid'));
-   if(!explicit&&inputs.some(x=>!x.value.trim()))return;
+   if(!explicit&&inputs.some((x,n)=>!x.value.trim()&&(!spec.optionalLast||n!==inputs.length-1)))return;
    try{
-    const args=inputs.map(input=>{try{return BusaCalc.parse(input.value);}catch(e){input.setAttribute('aria-invalid','true');throw e;}});
+    const args=inputs.map((input,n)=>{if(spec.optionalLast&&n===inputs.length-1&&!input.value.trim())return undefined;try{return BusaCalc.parse(input.value);}catch(e){input.setAttribute('aria-invalid','true');throw e;}});
     const values=spec.run(args);
-    for(const [label,key,unit] of spec.results){const row=document.createElement('div');const text=document.createElement('span');text.textContent=label;const strong=document.createElement('strong');strong.textContent=fmt(values[key])+' '+unit;strong.dataset.value=key;row.append(text,strong);result.append(row);}
+    for(const [label,key,unit] of spec.results){if(values[key]===undefined)continue;const row=document.createElement('div');const text=document.createElement('span');text.textContent=label;const strong=document.createElement('strong');strong.textContent=fmt(values[key])+' '+unit;strong.dataset.value=key;row.append(text,strong);result.append(row);}
    }catch(e){error.textContent=e.message;}
   }
   panel.addEventListener('submit',e=>{e.preventDefault();persist();update(true);});
