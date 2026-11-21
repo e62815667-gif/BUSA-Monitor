@@ -103,7 +103,7 @@ int main(){
 google=(fw/'BUSA_Google.h').read_text();worker=google[google.index('void googleWorker('):google.index('void addGoogleRoutes()')]
 assert 'statusJSON(' not in worker and 'snapshot->json' in worker
 assert 'busaGoogleSnapshotPoll();' in main[main.index('void loop(){'):]
-# Actual sound state machine: hysteresis, priority, expiry/new transition, rollover.
+# Actual sound state machine: hysteresis, independent pulses, expiry, rollover.
 run(common+r'''
 #include "BUSA_SoundAlarmLogic.h"
 int main(){
@@ -120,11 +120,13 @@ int main(){
   auto tick=[&](float t3,float t4,uint32_t at){BusaSound::evaluateRouted(r,en,true,t3,96,94,true,t4,85,80,at);};
   tick(96,70,start);assert(r.k[0]&&r.k[1]&&!r.k[2]&&!r.k[3]);
   tick(95,70,start+1);assert(r.k[0]&&r.k[1]&&!r.t3OnEvent);
-  tick(94,70,start+100);assert(!r.k[0]&&!r.k[1]&&r.k[2]);
+  tick(94,70,start+100);assert(!r.k[0]&&r.k[1]&&r.k[2]);
   // Expired K3 cannot suppress a fresh K2 event during the same poll.
   tick(96,70,start+90100);assert(r.t3OnEvent&&r.k[0]&&r.k[1]&&!r.k[2]);
   tick(96,85,start+90200);assert(r.k[3]&&r.t4OnEvent);
-  tick(96,80,start+90300);assert(r.k[0]&&!r.k[3]&&r.k[2]&&!r.k[1]);
+  tick(96,80,start+90300);assert(r.k[0]&&!r.k[3]&&r.k[2]&&r.k[1]);
+  tick(96,80,start+180199);assert(r.k[0]&&!r.k[3]&&r.k[2]&&r.k[1]);
+  tick(96,80,start+180200);assert(r.k[0]&&!r.k[3]&&r.k[2]&&!r.k[1]);
   tick(96,80,start+180300);assert(!r.k[2]);
   en[0]=en[1]=en[2]=en[3]=false;tick(96,90,start+180301);
   for(bool on:r.k)assert(!on);
