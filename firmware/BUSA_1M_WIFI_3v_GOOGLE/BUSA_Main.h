@@ -3830,7 +3830,7 @@ void setup(){
   busaNvsReady=prefs.begin("busa-r04",false);
    const float savedWaterPpl=busaNvsReady?prefs.getFloat("waterPpl",BusaWater::kPassportPulsesPerLitre):BusaWater::kPassportPulsesPerLitre;
    waterPulsesPerLitre=BusaWater::validPulsesPerLitre(savedWaterPpl)?savedWaterPpl:BusaWater::kPassportPulsesPerLitre;
-   waterCoefficientManual=busaNvsReady && prefs.isKey("waterPpl") && BusaWater::validPulsesPerLitre(savedWaterPpl);
+   waterCoefficientManual=busaNvsReady && prefs.isKey("waterPpl") && BusaWater::validPulsesPerLitre(savedWaterPpl) && fabsf(savedWaterPpl-BusaWater::kPassportPulsesPerLitre)>0.05f;
    busaCalcLoadGeometry();
   // A pending OTA must first pass the normal local boot self-test. Keep the
   // request in NVS; confirm below, then reboot into the existing isolated BLE mode.
@@ -3976,7 +3976,7 @@ void setup(){
        server.send(500,"text/plain; charset=utf-8","Ошибка сохранения NVS");return;
      }
      waterPulsesPerLitre=requested;
-     waterCoefficientManual=true;
+     waterCoefficientManual=fabsf(requested-BusaWater::kPassportPulsesPerLitre)>0.05f;
      flowReady=false;
      server.send(200,"application/json; charset=utf-8",
        String("{\"ok\":true,\"pulses_per_litre\":")+String(waterPulsesPerLitre,1)+"}");
