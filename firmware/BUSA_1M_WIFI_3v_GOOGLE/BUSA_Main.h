@@ -1474,7 +1474,7 @@ String statusJSON(){
   s+=",\"pulses_window\":"+String(waterPulseDelta);
   s+=",\"rejected_edges_window\":"+String(waterRejectDelta);
   s+=",\"sample_window_ms\":"+String(waterSampleDurationMs);
-  s+=",\"sample_ready\":"+(waterSampleReady?"true":"false")+"}";
+  s+=",\"sample_ready\":";s+=(waterSampleReady?"true":"false");s+="}";
   s+=",\"collection\":{\"sensor_present\":false,\"ml_per_min\":null,\"total_ml\":null}";
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
   s+=",\"pca9685_ack_only\":false,\"pca9685_enabled\":false";
