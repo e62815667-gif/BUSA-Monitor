@@ -32,6 +32,7 @@
 #include <Adafruit_ILI9341.h>
 #include <U8g2_for_Adafruit_GFX.h>
 #include <math.h>
+#include "BUSA_WaterFlowMath.h"
 
 constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
@@ -193,10 +194,12 @@ bool hasTemp(int n,uint32_t now){
 // this individual sensor. Range and pulse format depend on sensor revision.
 // Never interpret 0 pulses as proof of cooling water or as a safety interlock.
 portMUX_TYPE flowMux=portMUX_INITIALIZER_UNLOCKED;
-volatile uint32_t pulseCounter=0;
+volatile uint32_t pulseCounter=0,flowRejectedCounter=0,flowLastAcceptedUs=0;
 void IRAM_ATTR flowISR(){
+  const uint32_t at=micros();
   portENTER_CRITICAL_ISR(&flowMux);
-  ++pulseCounter;
+  if(!BusaWater::acceptEdge(flowLastAcceptedUs,at))++flowRejectedCounter;
+  else{flowLastAcceptedUs=at;++pulseCounter;}
   portEXIT_CRITICAL_ISR(&flowMux);
 }
 uint32_t flowPulses(){
@@ -204,30 +207,40 @@ uint32_t flowPulses(){
   portENTER_CRITICAL(&flowMux);n=pulseCounter;portEXIT_CRITICAL(&flowMux);
   return n;
 }
-constexpr float FLOW_HZ_PER_LPM=98.0f; // must be calibrated by water-volume test
-uint32_t flowCycle=0,flowLastCount=0;
+uint32_t flowRejectedEdges(){
+  uint32_t n;
+  portENTER_CRITICAL(&flowMux);n=flowRejectedCounter;portEXIT_CRITICAL(&flowMux);
+  return n;
+}
+constexpr float FLOW_HZ_PER_LPM=BusaWater::kHzPerLpm; // provisional until volume calibration
+uint32_t flowCycle=0,flowLastCount=0,flowLastRejected=0;
 float flowLpm=0.0f,flowTrace[40]={};
-uint32_t waterPulseHistory[40]={}; // raw pulses only, not calibrated
+uint32_t waterPulseHistory[40]={}; // filtered pulse counts, not calibrated
 uint32_t waterPulseDelta=0;
-bool flowReady=false,flowSeen=false;
+bool flowReady=false,flowSeen=false,flowVolumeValid=true;
 uint8_t flowTraceHead=0,waterSamplesRecorded=0;
 void sampleFlow(uint32_t now){
   if(!flowCycle){flowCycle=now;return;}
-  uint32_t dt=now-flowCycle;
+  const uint32_t dt=now-flowCycle;
   if(dt<2000)return;
-  uint32_t count=flowPulses();
-  uint32_t diff=count-flowLastCount;
-  flowLastCount=count;flowCycle=now;
-  flowLpm=(float)diff*60000.0f/(dt*FLOW_HZ_PER_LPM);
+  uint32_t count,rejected;
+  portENTER_CRITICAL(&flowMux);
+  count=pulseCounter;rejected=flowRejectedCounter;
+  portEXIT_CRITICAL(&flowMux);
+  const uint32_t diff=count-flowLastCount,rejectedDiff=rejected-flowLastRejected;
+  flowLastCount=count;flowLastRejected=rejected;flowCycle=now;
+  const float candidate=BusaWater::lpm(diff,dt);
+  flowReady=BusaWater::credible(diff,dt,rejectedDiff);
+  if(!flowReady)flowVolumeValid=false;
+  flowLpm=flowReady?candidate:0.0f;
   if(diff)flowSeen=true;
-  flowReady=true;
   waterPulseDelta=diff;
   waterPulseHistory[flowTraceHead]=diff;
-  flowTrace[flowTraceHead]=flowLpm;
+  flowTrace[flowTraceHead]=flowReady?flowLpm:NAN;
   flowTraceHead=(flowTraceHead+1)%40;
   if(waterSamplesRecorded<40)waterSamplesRecorded++;
 }
-float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
+float totalWaterLitres(){return BusaWater::litres(flowPulses());}
 
 // Isolated 3.3V I2C keypad PCF8575/PCF8575A only; PCA9685 LED board detached.
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
@@ -1239,8 +1252,8 @@ static void busaCaptureChart(uint32_t now){
  static uint32_t lastAt=0,lastPulses=0;
  const uint32_t pulses=flowPulses(),dt=now-lastAt;
  float cooling=NAN;
- if(lastAt&&dt&&flowSeen&&pulses>=lastPulses)
-  cooling=(float)(pulses-lastPulses)*3600000.0f/(dt*FLOW_HZ_PER_LPM*60.0f);
+ if(lastAt&&dt&&flowReady&&pulses>=lastPulses)
+  cooling=BusaWater::lpm(pulses-lastPulses,dt);
  lastAt=now;lastPulses=pulses;
  busaChartHistory.capture(now,values,cooling);
 }
@@ -1448,8 +1461,10 @@ String statusJSON(){
   }
   s+="],\"water\":{\"gpio\":15,\"pulses\":"+String(flowPulses());
   s+=",\"lpm\":"+(flowReady?String(flowLpm,3):String("null"));
-  s+=",\"total_l_estimate\":"+String(totalWaterLitres(),3);
-  s+=",\"calibrated\":false,\"seen_pulses\":"+(flowSeen?String("true"):String("false"))+"}";
+  s+=",\"total_l_estimate\":"+(flowVolumeValid?String(totalWaterLitres(),3):String("null"));
+  s+=",\"calibrated\":false,\"seen_pulses\":"+(flowSeen?String("true"):String("false"));
+  s+=",\"credible\":"+(flowReady?String("true"):String("false"));
+  s+=",\"rejected_edges\":"+String(flowRejectedEdges())+"}";
   s+=",\"collection\":{\"sensor_present\":false,\"ml_per_min\":null,\"total_ml\":null}";
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
   s+=",\"pca9685_ack_only\":false,\"pca9685_enabled\":false";
@@ -1565,8 +1580,9 @@ String statusJSON(){
   s+=",\"boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
   s+=",\"pixel_feedback_available\":false}";
   s+=",\"water_flow\":{\"gpio\":15,\"input_level\":"+String(digitalRead(FLOW_GPIO));
-  s+=",\"pulses\":"+String(flowPulses())+",\"pulse_seen\":"+(flowSeen?String("true"):String("false"));
-  s+=",\"frequency_calibrated\":false,\"status\":"+quoteJson(flowSeen?"PULSES_SEEN":"WAITING_FOR_PULSES")+"}";
+  s+=",\"pulses\":"+String(flowPulses())+",\"rejected_edges\":"+String(flowRejectedEdges());
+  s+=",\"pulse_seen\":"+(flowSeen?String("true"):String("false"));
+  s+=",\"frequency_calibrated\":false,\"status\":"+quoteJson(!flowVolumeValid?"UNRELIABLE_PULSES":flowSeen?"PULSES_SEEN":"WAITING_FOR_PULSES")+"}";
   s+=",\"esp32\":{\"chip\":"+quoteJson(ESP.getChipModel());
   s+=",\"free_heap_bytes\":"+String(ESP.getFreeHeap());
   s+=",\"min_free_heap_bytes\":"+String(ESP.getMinFreeHeap());
@@ -3056,7 +3072,7 @@ function updateLiquidPanels(s){
  setMeasured('coolingLph',lph);setMeasured('coolingTotal',ready?w.total_l_estimate:null);
  get('homeCoolingRate').textContent=(measured(lph)?decimal1.format(lph):'—')+' л/ч';
  get('homeWaterUsed').textContent=(ready?decimal1.format(w.total_l_estimate):'—')+' л';
- get('coolingAvailability').textContent=!s?'Нет связи':ready?(w.calibrated?'Данные датчика':'Расчётно · без калибровки'):'Нет импульсов';
+ get('coolingAvailability').textContent=!s?'Нет связи':w?.credible===false?'Недостоверные импульсы':ready?(w.calibrated?'Данные датчика':'Расчётно · без калибровки'):'Нет импульсов';
  get('rigArtStage').classList.toggle('hasCollection',measured(mlMin)&&mlMin>0);
  get('rigArtStage').classList.toggle('hasCooling',measured(lph)&&lph>0);
 }
@@ -3322,8 +3338,10 @@ if(s.keypad){
      '\nЗуммер T1/T2: '+(s.sound_alerts?.buzzer?.sound_on?'ЗВУК':'ОЖИДАНИЕ');
    get('diagFlow').textContent='GPIO15 · '+d.water_flow?.status+
      '\nИмпульсы: '+d.water_flow?.pulses+
+     '\nОтброшенные фронты: '+d.water_flow?.rejected_edges+
      '\nКалибровка: отсутствует'+
-     '\nРасход (оценка): '+formatNumeric(s.water?.lpm)+' л/мин';
+     '\nРасход (оценка): '+formatNumeric(s.water?.lpm)+' л/мин'+
+     (s.water?.credible===false?'\nИЗМЕРЕНИЕ НЕДОСТОВЕРНО':'');
    get('diagOther').textContent=
      'TFT: '+d.tft?.profile+' rotation='+d.tft?.rotation+
        ' init='+d.tft?.init_sent+' (pixels not verified by software)'+
