@@ -1,6 +1,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include "../firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_WaterFlowMath.h"
 int main(){
   using namespace BusaWater;
@@ -26,5 +27,10 @@ int main(){
   assert(!acceptEdge(100000,100030));
   assert(!acceptEdge(100000,101100));
   assert(acceptEdge(UINT32_MAX-200,1100));
+  assert(std::strcmp(diagnosticStatus(false,false,0),"WAITING_FOR_PULSES")==0);
+  assert(std::strcmp(diagnosticStatus(true,false,250),"UNRELIABLE_PULSES")==0);
+  assert(std::strcmp(diagnosticStatus(true,true,250),"PULSES_SEEN")==0);
+  // A clean sample must recover current status after a noisy sample.
+  assert(std::strcmp(diagnosticStatus(true,true,0),"NO_RECENT_PULSES")==0);
   return 0;
 }

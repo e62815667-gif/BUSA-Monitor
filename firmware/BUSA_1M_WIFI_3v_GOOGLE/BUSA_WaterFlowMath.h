@@ -23,4 +23,10 @@ inline bool credible(uint32_t pulses,uint32_t dtMs,uint32_t rejectedEdges,float 
   return dtMs && validPulsesPerLitre(pulsesPerLitre) && rejectedEdges==0U &&
     lpm(pulses,dtMs,pulsesPerLitre)<=kMaxPlausibleLpm;
 }
+// Current observation, independent of the session-wide volume validity.
+inline const char* diagnosticStatus(bool sampleReady,bool credibleSample,uint32_t windowPulses){
+  if(!sampleReady)return "WAITING_FOR_PULSES";
+  if(!credibleSample)return "UNRELIABLE_PULSES";
+  return windowPulses?"PULSES_SEEN":"NO_RECENT_PULSES";
+}
 }

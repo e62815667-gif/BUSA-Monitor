@@ -49,7 +49,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -218,7 +218,8 @@ bool waterCoefficientManual=false; // manual value is not a verified volume cali
 uint32_t flowCycle=0,flowLastCount=0,flowLastRejected=0;
 float flowLpm=0.0f,flowTrace[40]={};
 uint32_t waterPulseHistory[40]={}; // filtered pulse counts, not calibrated
-uint32_t waterPulseDelta=0;
+uint32_t waterPulseDelta=0,waterRejectDelta=0,waterSampleDurationMs=0;
+bool waterSampleReady=false;
 bool flowReady=false,flowSeen=false,flowVolumeValid=true;
 uint8_t flowTraceHead=0,waterSamplesRecorded=0;
 void sampleFlow(uint32_t now){
@@ -231,6 +232,7 @@ void sampleFlow(uint32_t now){
   portEXIT_CRITICAL(&flowMux);
   const uint32_t diff=count-flowLastCount,rejectedDiff=rejected-flowLastRejected;
   flowLastCount=count;flowLastRejected=rejected;flowCycle=now;
+  waterRejectDelta=rejectedDiff;waterSampleDurationMs=dt;waterSampleReady=true;
   const float candidate=BusaWater::lpm(diff,dt,waterPulsesPerLitre);
   flowReady=BusaWater::credible(diff,dt,rejectedDiff,waterPulsesPerLitre);
   if(!flowReady)flowVolumeValid=false;
@@ -1468,7 +1470,11 @@ String statusJSON(){
    s+=",\"pulses_per_litre\":"+String(waterPulsesPerLitre,1);
    s+=",\"coefficient_source\":"+quoteJson(waterCoefficientManual?"manual":"passport");
   s+=",\"credible\":"+(flowReady?String("true"):String("false"));
-  s+=",\"rejected_edges\":"+String(flowRejectedEdges())+"}";
+  s+=",\"rejected_edges\":"+String(flowRejectedEdges());
+  s+=",\"pulses_window\":"+String(waterPulseDelta);
+  s+=",\"rejected_edges_window\":"+String(waterRejectDelta);
+  s+=",\"sample_window_ms\":"+String(waterSampleDurationMs);
+  s+=",\"sample_ready\":"+(waterSampleReady?"true":"false")+"}";
   s+=",\"collection\":{\"sensor_present\":false,\"ml_per_min\":null,\"total_ml\":null}";
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
   s+=",\"pca9685_ack_only\":false,\"pca9685_enabled\":false";
@@ -1587,7 +1593,7 @@ String statusJSON(){
   s+=",\"pulses\":"+String(flowPulses())+",\"rejected_edges\":"+String(flowRejectedEdges());
   s+=",\"pulse_seen\":"+(flowSeen?String("true"):String("false"));
   s+=",\"pulses_per_litre\":"+String(waterPulsesPerLitre,1);
-  s+=",\"frequency_calibrated\":false,\"status\":"+quoteJson(!flowVolumeValid?"UNRELIABLE_PULSES":flowSeen?"PULSES_SEEN":"WAITING_FOR_PULSES")+"}";
+  s+=",\"frequency_calibrated\":false,\"status\":"+quoteJson(BusaWater::diagnosticStatus(waterSampleReady,flowReady,waterPulseDelta))+"}";
   s+=",\"esp32\":{\"chip\":"+quoteJson(ESP.getChipModel());
   s+=",\"free_heap_bytes\":"+String(ESP.getFreeHeap());
   s+=",\"min_free_heap_bytes\":"+String(ESP.getMinFreeHeap());
@@ -3310,7 +3316,7 @@ if(!waterPplInitialized && Number.isFinite(s.water?.pulses_per_litre)){
  get('waterPplInput').value=Number(s.water.pulses_per_litre).toFixed(1);
  waterPplInitialized=true;
 }
-let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'НЕТ ДАННЫХ':formatNumeric(f);get('pulses').textContent=s.water.pulses;updateLiquidPanels(s);
+let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?(s.water.sample_ready?'НЕДОСТОВЕРНО':'НЕТ ДАННЫХ'):formatNumeric(f);get('pulses').textContent=s.water.pulses;updateLiquidPanels(s);
 flog.push(f);if(flog.length>80)flog.shift();
 const currentPulse=Number(s.water.pulses);
 if(Number.isFinite(currentPulse)){
@@ -3371,6 +3377,7 @@ if(s.keypad){
    get('diagFlow').textContent='GPIO15 · '+d.water_flow?.status+
      '\nИмпульсы: '+d.water_flow?.pulses+
      '\nОтброшенные фронты: '+d.water_flow?.rejected_edges+
+     '\nПоследние '+(s.water?.sample_window_ms??0)+' мс: '+(s.water?.pulses_window??0)+' имп / '+(s.water?.rejected_edges_window??0)+' отброшено'+
      '\nКоэффициент: '+(s.water?.pulses_per_litre??5880)+' имп/л ('+(s.water?.coefficient_source==='manual'?'ручной':'паспортный')+')'+
       '\nКалибровка по мерной ёмкости: не выполнена'+
      '\nРасход (оценка): '+formatNumeric(s.water?.lpm)+' л/мин'+

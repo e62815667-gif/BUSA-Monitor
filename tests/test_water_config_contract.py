@@ -19,6 +19,10 @@ def test_contract():
     assert 'id="waterPplInput"' in main
     assert 'MOTION1-20261122-YFS401-PPL1-20261123' in main
     assert re.search(r'if\(!flowReady\)flowVolumeValid=false;',main)
+    assert 'BusaWater::diagnosticStatus(waterSampleReady,flowReady,waterPulseDelta)' in main
+    assert 'quoteJson(!flowVolumeValid?' not in main
+    assert 'rejected_edges_window' in main and 'sample_window_ms' in main
+    assert 'FLOWSTATE1-20261124' in main
 
 if __name__=='__main__':
     test_contract()
