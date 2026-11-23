@@ -47,7 +47,7 @@ jobs:
             printf '%s' "$RELEASE_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/busa-release.jks"
             export BUSA_KEYSTORE_PASS="$RELEASE_PASSWORD"
             python3 android/build.py --keystore "$RUNNER_TEMP/busa-release.jks"
-            python3 -c 'from pathlib import Path; s=Path("android/out/APK_SIGNATURE.txt").read_text(); assert "Signer #1 certificate SHA-256 digest: 3e63affe2693ecb7c62cb96c2aa5d17c507f28ef1db3eeb030fe1674ee3e815b" in s, "Release signing certificate differs from the installed release"'
+            python3 -c 'from pathlib import Path; s=Path("android/out/APK_SIGNATURE.txt").read_text(); assert "Signer #1 certificate SHA-256 digest: 180c6831a261b8f19d1f6c13710a811ab5859986438e84ed2afd7720c71887b3" in s, "Release signing certificate differs from the installed release"'
           elif [ -n "$RELEASE_KEYSTORE" ] || [ -n "$RELEASE_PASSWORD" ]; then
             echo 'Both Android signing secrets must be configured.' >&2
             exit 1

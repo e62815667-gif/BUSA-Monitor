@@ -6,5 +6,13 @@
     "BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin": "d853dc50853fa9086d7c0373d2099bd6c3e667e48066c357fa24c865aac7b8ce",
     "BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin": "57cb2348dcaea0a1b1ce9b80dde72ae71620cb93c92de50c0124a24479275ffe"
   },
-  "apk": null
+  "apk": {
+    "path": "delivery/BUSA_Android_1.1.3_MOTION1.apk",
+    "sha256": "474b950b9e23fb82a87fb9fd81f783e6310bc529881ecff66ef7e8951272d788",
+    "bytes": 312106,
+    "source_commit": "e21476d76f06abc5508e501b13fdc3d5fa5d091a",
+    "debug": false,
+    "unsigned": false,
+    "signer_sha256": "180c6831a261b8f19d1f6c13710a811ab5859986438e84ed2afd7720c71887b3"
+  }
 }
