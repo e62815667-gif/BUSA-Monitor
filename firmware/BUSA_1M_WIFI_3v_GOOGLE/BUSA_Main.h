@@ -49,7 +49,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -212,7 +212,9 @@ uint32_t flowRejectedEdges(){
   portENTER_CRITICAL(&flowMux);n=flowRejectedCounter;portEXIT_CRITICAL(&flowMux);
   return n;
 }
-constexpr float FLOW_HZ_PER_LPM=BusaWater::kHzPerLpm; // provisional until volume calibration
+// Passport default: 98 Hz at 1 L/min = 5880 pulses/L; manual value stored in NVS.
+float waterPulsesPerLitre=BusaWater::kPassportPulsesPerLitre;
+bool waterCoefficientManual=false; // manual value is not a verified volume calibration
 uint32_t flowCycle=0,flowLastCount=0,flowLastRejected=0;
 float flowLpm=0.0f,flowTrace[40]={};
 uint32_t waterPulseHistory[40]={}; // filtered pulse counts, not calibrated
@@ -229,8 +231,8 @@ void sampleFlow(uint32_t now){
   portEXIT_CRITICAL(&flowMux);
   const uint32_t diff=count-flowLastCount,rejectedDiff=rejected-flowLastRejected;
   flowLastCount=count;flowLastRejected=rejected;flowCycle=now;
-  const float candidate=BusaWater::lpm(diff,dt);
-  flowReady=BusaWater::credible(diff,dt,rejectedDiff);
+  const float candidate=BusaWater::lpm(diff,dt,waterPulsesPerLitre);
+  flowReady=BusaWater::credible(diff,dt,rejectedDiff,waterPulsesPerLitre);
   if(!flowReady)flowVolumeValid=false;
   flowLpm=flowReady?candidate:0.0f;
   if(diff)flowSeen=true;
@@ -240,7 +242,7 @@ void sampleFlow(uint32_t now){
   flowTraceHead=(flowTraceHead+1)%40;
   if(waterSamplesRecorded<40)waterSamplesRecorded++;
 }
-float totalWaterLitres(){return BusaWater::litres(flowPulses());}
+float totalWaterLitres(){return BusaWater::litres(flowPulses(),waterPulsesPerLitre);}
 
 // Isolated 3.3V I2C keypad PCF8575/PCF8575A only; PCA9685 LED board detached.
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
@@ -1253,7 +1255,7 @@ static void busaCaptureChart(uint32_t now){
  const uint32_t pulses=flowPulses(),dt=now-lastAt;
  float cooling=NAN;
  if(lastAt&&dt&&flowReady&&pulses>=lastPulses)
-  cooling=BusaWater::lpm(pulses-lastPulses,dt);
+  cooling=BusaWater::lpm(pulses-lastPulses,dt,waterPulsesPerLitre);
  lastAt=now;lastPulses=pulses;
  busaChartHistory.capture(now,values,cooling);
 }
@@ -1463,6 +1465,8 @@ String statusJSON(){
   s+=",\"lpm\":"+(flowReady?String(flowLpm,3):String("null"));
   s+=",\"total_l_estimate\":"+(flowVolumeValid?String(totalWaterLitres(),3):String("null"));
   s+=",\"calibrated\":false,\"seen_pulses\":"+(flowSeen?String("true"):String("false"));
+   s+=",\"pulses_per_litre\":"+String(waterPulsesPerLitre,1);
+   s+=",\"coefficient_source\":"+quoteJson(waterCoefficientManual?"manual":"passport");
   s+=",\"credible\":"+(flowReady?String("true"):String("false"));
   s+=",\"rejected_edges\":"+String(flowRejectedEdges())+"}";
   s+=",\"collection\":{\"sensor_present\":false,\"ml_per_min\":null,\"total_ml\":null}";
@@ -1582,6 +1586,7 @@ String statusJSON(){
   s+=",\"water_flow\":{\"gpio\":15,\"input_level\":"+String(digitalRead(FLOW_GPIO));
   s+=",\"pulses\":"+String(flowPulses())+",\"rejected_edges\":"+String(flowRejectedEdges());
   s+=",\"pulse_seen\":"+(flowSeen?String("true"):String("false"));
+  s+=",\"pulses_per_litre\":"+String(waterPulsesPerLitre,1);
   s+=",\"frequency_calibrated\":false,\"status\":"+quoteJson(!flowVolumeValid?"UNRELIABLE_PULSES":flowSeen?"PULSES_SEEN":"WAITING_FOR_PULSES")+"}";
   s+=",\"esp32\":{\"chip\":"+quoteJson(ESP.getChipModel());
   s+=",\"free_heap_bytes\":"+String(ESP.getFreeHeap());
@@ -2919,7 +2924,11 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 </div>
 <div class="card" data-diag-panel="flow" hidden><h2>Расходомер охлаждающей воды</h2>
 <pre id="diagFlow" style="white-space:pre-wrap;word-break:break-word">Ожидание импульсов...</pre>
-<p class="hint">Пока не откалиброван; значения расхода и объёма оценочные.</p></div>
+<p class="hint">Паспорт YF-S401: 5880 имп/л (98 Гц при 1 л/мин). Изменённый коэффициент не устраняет ошибки сигнала.</p>
+ <div class="wifiField"><label for="waterPplInput">Импульсов на 1 литр</label><input id="waterPplInput" type="number" min="1" max="100000" step="0.1" value="5880" inputmode="decimal"></div>
+ <button id="waterPplSave" type="button" class="full">Сохранить коэффициент</button>
+ <button id="waterPplPassport" type="button" class="full">Вернуть паспортные 5880</button>
+ <p id="waterPplResult" role="status" class="hint"></p></div>
 </div>
 </section>
 <section class="page" data-section="7" hidden><div id="busaCalculator"></div></section></main>
@@ -2999,7 +3008,7 @@ async function refreshWebEvents(){
 const nativeWebFetch=window.fetch.bind(window);
 window.fetch=async function(input,options){
  const url=typeof input==='string'?input:input.url,method=(options?.method||input?.method||'GET').toUpperCase();
- const names={'/api/time/sync':'Синхронизация времени','/api/wifi':'Настройки Wi-Fi','/api/wifi/disconnect':'Отключение Wi-Fi','/api/temperature-alarms':'Пороги сигнализации','/api/temperature/calibration':'Поправки датчиков','/api/display/power':'Экран','/api/theme':'Тема экрана'};
+ const names={'/api/water/coefficient':'Коэффициент расходомера','/api/time/sync':'Синхронизация времени','/api/wifi':'Настройки Wi-Fi','/api/wifi/disconnect':'Отключение Wi-Fi','/api/temperature-alarms':'Пороги сигнализации','/api/temperature/calibration':'Поправки датчиков','/api/display/power':'Экран','/api/theme':'Тема экрана'};
  const label=names[url.split('?')[0]]||'Действие';
  try{const r=await nativeWebFetch(input,options);if(method==='POST')message(label+(r.ok?': выполнено':': ошибка'),r.ok?'system':'warn');return r;}
  catch(e){if(method==='POST')message(label+': нет связи','warn');throw e;}
@@ -3048,7 +3057,7 @@ const DISPLAY_ORDER=[0,2,1,3];
 const SENSOR_NAMES=['Вода','Колонна','Куб','Авария'];
 const SENSOR_COLORS=['#38bdf8','#53d486','#f4c84a','#ff6473'];
 const decimal1=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
-let previousWater=null;
+let previousWater=null,waterPplInitialized=false;
 function measured(v){return typeof v==='number'&&Number.isFinite(v)&&v>=0;}
 function formatVolumeMl(v){if(!measured(v))return '—';return v<1000?decimal1.format(v)+' мл':decimal1.format(v/1000)+' л';}
 function formatNumeric(v){return typeof v==='number'&&Number.isFinite(v)?decimal1.format(v):'—';}
@@ -3200,6 +3209,25 @@ get('rmStop').onclick=async function(){
  await rainmakerRefreshStatus();
 };
 get('rmCheck').onclick=()=>rainmakerRefreshStatus();
+async function saveWaterPpl(value){
+  const status=get('waterPplResult'),button=get('waterPplSave'),reset=get('waterPplPassport');
+  const numeric=Number(value);
+  if(!String(value).trim()||!Number.isFinite(numeric)||numeric<1||numeric>100000){
+    status.textContent='Укажите от 1 до 100000 имп/л';return;
+  }
+  button.disabled=true;reset.disabled=true;
+  try{
+    const response=await fetch('/api/water/coefficient',{method:'POST',body:new URLSearchParams({confirm:'YES',pulses_per_litre:String(numeric)})});
+    if(!response.ok)throw Error(await response.text());
+    const data=await response.json();
+    get('waterPplInput').value=Number(data.pulses_per_litre).toFixed(1);
+    status.textContent='Сохранено: '+data.pulses_per_litre+' имп/л';
+    waterPplInitialized=true;
+  }catch(err){status.textContent='Ошибка: '+err.message;}
+  finally{button.disabled=false;reset.disabled=false;}
+}
+get('waterPplSave').onclick=()=>saveWaterPpl(get('waterPplInput').value);
+get('waterPplPassport').onclick=()=>saveWaterPpl('5880');
 get('tempCalSave').onclick=async()=>{
  const button=get('tempCalSave'),data=new URLSearchParams({confirm:'YES'});
  for(let i=0;i<4;i++){
@@ -3278,6 +3306,10 @@ if(s.sound_alerts?.channels?.length===4 && s.sound_alerts?.buzzer?.sensors?.leng
  temperatureThresholdsInitialized=true;
 }
 updateRelayBadges(s.sound_alerts?.channels);
+if(!waterPplInitialized && Number.isFinite(s.water?.pulses_per_litre)){
+ get('waterPplInput').value=Number(s.water.pulses_per_litre).toFixed(1);
+ waterPplInitialized=true;
+}
 let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'НЕТ ДАННЫХ':formatNumeric(f);get('pulses').textContent=s.water.pulses;updateLiquidPanels(s);
 flog.push(f);if(flog.length>80)flog.shift();
 const currentPulse=Number(s.water.pulses);
@@ -3339,7 +3371,8 @@ if(s.keypad){
    get('diagFlow').textContent='GPIO15 · '+d.water_flow?.status+
      '\nИмпульсы: '+d.water_flow?.pulses+
      '\nОтброшенные фронты: '+d.water_flow?.rejected_edges+
-     '\nКалибровка: отсутствует'+
+     '\nКоэффициент: '+(s.water?.pulses_per_litre??5880)+' имп/л ('+(s.water?.coefficient_source==='manual'?'ручной':'паспортный')+')'+
+      '\nКалибровка по мерной ёмкости: не выполнена'+
      '\nРасход (оценка): '+formatNumeric(s.water?.lpm)+' л/мин'+
      (s.water?.credible===false?'\nИЗМЕРЕНИЕ НЕДОСТОВЕРНО':'');
    get('diagOther').textContent=
@@ -3795,7 +3828,10 @@ void setup(){
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
   busaNvsReady=prefs.begin("busa-r04",false);
-  busaCalcLoadGeometry();
+   const float savedWaterPpl=busaNvsReady?prefs.getFloat("waterPpl",BusaWater::kPassportPulsesPerLitre):BusaWater::kPassportPulsesPerLitre;
+   waterPulsesPerLitre=BusaWater::validPulsesPerLitre(savedWaterPpl)?savedWaterPpl:BusaWater::kPassportPulsesPerLitre;
+   waterCoefficientManual=busaNvsReady && prefs.isKey("waterPpl") && BusaWater::validPulsesPerLitre(savedWaterPpl);
+   busaCalcLoadGeometry();
   // A pending OTA must first pass the normal local boot self-test. Keep the
   // request in NVS; confirm below, then reboot into the existing isolated BLE mode.
   busaRmPairDeferred=busaNvsReady&&prefs.getBool("rmPairNext",false)&&busaOtaPendingVerification();
@@ -3922,8 +3958,31 @@ void setup(){
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json; charset=utf-8",statusJSON());
   });
-  // Local AP only: T3/T4 sound relay configuration; no process actuation.
-  server.on("/api/sound/config",HTTP_POST,[]{
+   // Local AP only. Manual coefficient does not override pulse credibility checks.
+   server.on("/api/water/coefficient",HTTP_POST,[]{
+     if(!apClient()||server.arg("confirm")!="YES"){
+       server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;
+     }
+     if(!server.hasArg("pulses_per_litre")){
+       server.send(400,"text/plain; charset=utf-8","Нет коэффициента");return;
+     }
+     String raw=server.arg("pulses_per_litre");raw.trim();
+     char *end=nullptr;
+     const float requested=strtof(raw.c_str(),&end);
+     if(raw.isEmpty()||*end!='\0'||!isfinite(requested)||!BusaWater::validPulsesPerLitre(requested)){
+       server.send(400,"text/plain; charset=utf-8","Коэффициент: 1–100000 имп/л");return;
+     }
+     if(!busaNvsReady||prefs.putFloat("waterPpl",requested)!=sizeof(float)){
+       server.send(500,"text/plain; charset=utf-8","Ошибка сохранения NVS");return;
+     }
+     waterPulsesPerLitre=requested;
+     waterCoefficientManual=true;
+     flowReady=false;
+     server.send(200,"application/json; charset=utf-8",
+       String("{\"ok\":true,\"pulses_per_litre\":")+String(waterPulsesPerLitre,1)+"}");
+   });
+   // Local AP only: T3/T4 sound relay configuration; no process actuation.
+   server.on("/api/sound/config",HTTP_POST,[]{
     if(!apClient()){server.send(403,"text/plain","BUSA local AP only");return;}
     bool requestedEnabled[4]={};
     for(int i=0;i<4;i++){
