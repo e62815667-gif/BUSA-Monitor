@@ -1,0 +1,75 @@
+name: BUSA GPIO15 isolated firmware verification
+on:
+  push:
+    branches: [fix/busa-gpio15-pulse-20261123]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  firmware:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+        with:
+          version: 1.3.1
+      - name: Verify GPIO15 mathematics and telemetry contract
+        run: |
+          set -euo pipefail
+          g++ -std=c++11 -Wall -Wextra -Werror tests/test_water_flow_math.cpp -o /tmp/busa-water-flow-test
+          /tmp/busa-water-flow-test
+          python3 -B -m unittest discover -s tests -p test_firmware_contract.py -v
+          python3 -B ci/generate_calculator.py --check
+          python3 -B ci/generate_viewport.py --check
+          python3 -B ci/generate_design.py --check
+      - name: Install pinned Arduino toolchain and libraries
+        run: |
+          set -euo pipefail
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@2.0.17
+          arduino-cli lib install "Adafruit BusIO@1.17.4"
+          arduino-cli lib install "OneWire@2.3.8"
+          arduino-cli lib install "DallasTemperature@4.0.6"
+          arduino-cli lib install "Adafruit GFX Library@1.13.0"
+          arduino-cli lib install "Adafruit ST7735 and ST7789 Library@1.12.0"
+          arduino-cli lib install "Adafruit ILI9341@1.7.0"
+          arduino-cli lib install "U8g2_for_Adafruit_GFX@1.8.0"
+      - name: Generate Google trust bundle
+        run: python3 ci/generate_google_ca.py --output firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h
+      - name: Compile firmware for ESP32-S3 N16R8
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
+      - name: Package and verify USB and OTA images
+        run: |
+          set -euo pipefail
+          python3 ci/package_ui16.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          out=Path('out')
+          data=(out/'BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin').read_bytes()
+          usb=(out/'BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin').read_bytes()
+          assert usb[0x10000:]==data
+          assert b'UNRELIABLE_PULSES' in data
+          for p in [out/'BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin',out/'BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin']:
+              print(p.name,p.stat().st_size,hashlib.sha256(p.read_bytes()).hexdigest())
+          PY
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: BUSA_GPIO15_FIX_N16R8_USB_OTA
+          retention-days: 30
+          path: |
+            out/BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin
+            out/BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin
+            out/SHA256SUMS.txt
+            out/OTA_IMAGE_INFO.txt
+            out/PARTITIONS.csv
+            out/SOURCE_COMMIT.txt
+            out/SOURCE_SHA256SUMS.txt
+            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_CUBE1_SOURCE.zip
