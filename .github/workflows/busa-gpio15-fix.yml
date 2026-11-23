@@ -1,7 +1,7 @@
 name: BUSA GPIO15 isolated firmware verification
 on:
   push:
-    branches: [fix/busa-gpio15-pulse-20261123]
+    branches: [fix/busa-gpio15-pulse-20261123, fix/busa-yfs401-passport-setting-20261123]
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,6 +19,7 @@ jobs:
           set -euo pipefail
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_water_flow_math.cpp -o /tmp/busa-water-flow-test
           /tmp/busa-water-flow-test
+          python3 -B tests/test_water_config_contract.py
           python3 -B -m unittest discover -s tests -p test_firmware_contract.py -v
           python3 -B ci/generate_calculator.py --check
           python3 -B ci/generate_viewport.py --check
@@ -56,13 +57,14 @@ jobs:
           usb=(out/'BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin').read_bytes()
           assert usb[0x10000:]==data
           assert b'UNRELIABLE_PULSES' in data
+          assert b'YFS401-PPL1-20261123' in data
           for p in [out/'BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin',out/'BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin']:
               print(p.name,p.stat().st_size,hashlib.sha256(p.read_bytes()).hexdigest())
           PY
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: BUSA_GPIO15_FIX_N16R8_USB_OTA
+          name: BUSA_YFS401_PASSPORT_N16R8_USB_OTA
           retention-days: 30
           path: |
             out/BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin
