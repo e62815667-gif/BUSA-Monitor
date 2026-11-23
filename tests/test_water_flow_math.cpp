@@ -32,5 +32,20 @@ int main(){
   assert(std::strcmp(diagnosticStatus(true,true,250),"PULSES_SEEN")==0);
   // A clean sample must recover current status after a noisy sample.
   assert(std::strcmp(diagnosticStatus(true,true,0),"NO_RECENT_PULSES")==0);
+  assert(verifiedBusa001Calibration(4710.0f));
+  assert(!verifiedBusa001Calibration(5880.0f));
+  assert(!verifiedBusa001Calibration(4709.0f));
+  VolumeAccumulator volume;
+  volume.record(150,0,true,4710.0f);
+  assert(std::fabs(volume.countedLitres-150.0/4710.0)<0.00001);
+  assert(volume.complete());
+  volume.record(900,258534,false,4710.0f);
+  assert(std::fabs(volume.countedLitres-150.0/4710.0)<0.00001);
+  assert(!volume.complete());
+  assert(volume.excludedIntervals==1);
+  volume.record(155,0,true,4710.0f);
+  assert(std::fabs(volume.countedLitres-305.0/4710.0)<0.00001);
+  volume.record(0,0,true,4710.0f);
+  assert(volume.excludedIntervals==1);
   return 0;
 }

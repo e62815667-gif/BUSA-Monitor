@@ -49,7 +49,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -214,13 +214,17 @@ uint32_t flowRejectedEdges(){
 }
 // Passport default: 98 Hz at 1 L/min = 5880 pulses/L; manual value stored in NVS.
 float waterPulsesPerLitre=BusaWater::kPassportPulsesPerLitre;
-bool waterCoefficientManual=false; // manual value is not a verified volume calibration
+bool waterCoefficientManual=false;
+bool waterCalibrationVerified(){
+  return waterCoefficientManual && BusaWater::verifiedBusa001Calibration(waterPulsesPerLitre);
+}
 uint32_t flowCycle=0,flowLastCount=0,flowLastRejected=0;
 float flowLpm=0.0f,flowTrace[40]={};
 uint32_t waterPulseHistory[40]={}; // filtered pulse counts, not calibrated
 uint32_t waterPulseDelta=0,waterRejectDelta=0,waterSampleDurationMs=0;
 bool waterSampleReady=false;
-bool flowReady=false,flowSeen=false,flowVolumeValid=true;
+bool flowReady=false,flowSeen=false;
+BusaWater::VolumeAccumulator waterVolume;
 uint8_t flowTraceHead=0,waterSamplesRecorded=0;
 void sampleFlow(uint32_t now){
   if(!flowCycle){flowCycle=now;return;}
@@ -235,7 +239,7 @@ void sampleFlow(uint32_t now){
   waterRejectDelta=rejectedDiff;waterSampleDurationMs=dt;waterSampleReady=true;
   const float candidate=BusaWater::lpm(diff,dt,waterPulsesPerLitre);
   flowReady=BusaWater::credible(diff,dt,rejectedDiff,waterPulsesPerLitre);
-  if(!flowReady)flowVolumeValid=false;
+  waterVolume.record(diff,rejectedDiff,flowReady,waterPulsesPerLitre);
   flowLpm=flowReady?candidate:0.0f;
   if(diff)flowSeen=true;
   waterPulseDelta=diff;
@@ -244,7 +248,7 @@ void sampleFlow(uint32_t now){
   flowTraceHead=(flowTraceHead+1)%40;
   if(waterSamplesRecorded<40)waterSamplesRecorded++;
 }
-float totalWaterLitres(){return BusaWater::litres(flowPulses(),waterPulsesPerLitre);}
+float totalWaterLitres(){return (float)waterVolume.countedLitres;}
 
 // Isolated 3.3V I2C keypad PCF8575/PCF8575A only; PCA9685 LED board detached.
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
@@ -1253,12 +1257,8 @@ static void busaCaptureChart(uint32_t now){
  }
  if(!busaChartReady)return;
  float values[4];for(int k=0;k<4;k++)values[k]=hasTemp(k,now)?temperature[k]:NAN;
- static uint32_t lastAt=0,lastPulses=0;
- const uint32_t pulses=flowPulses(),dt=now-lastAt;
- float cooling=NAN;
- if(lastAt&&dt&&flowReady&&pulses>=lastPulses)
-  cooling=BusaWater::lpm(pulses-lastPulses,dt,waterPulsesPerLitre);
- lastAt=now;lastPulses=pulses;
+ // Use the vetted two-second sample, not independent raw pulse differences.
+ const float cooling=flowReady?flowLpm*60.0f:NAN;
  busaChartHistory.capture(now,values,cooling);
 }
 #include "BUSA_ChartTFT.h"
@@ -1465,8 +1465,11 @@ String statusJSON(){
   }
   s+="],\"water\":{\"gpio\":15,\"pulses\":"+String(flowPulses());
   s+=",\"lpm\":"+(flowReady?String(flowLpm,3):String("null"));
-  s+=",\"total_l_estimate\":"+(flowVolumeValid?String(totalWaterLitres(),3):String("null"));
-  s+=",\"calibrated\":false,\"seen_pulses\":"+(flowSeen?String("true"):String("false"));
+  s+=",\"total_l_estimate\":"+String(totalWaterLitres(),3);
+  s+=",\"volume_complete\":";s+=(waterVolume.complete()?"true":"false");
+  s+=",\"volume_excluded_intervals\":"+String(waterVolume.excludedIntervals);
+  s+=",\"calibrated\":";s+=(waterCalibrationVerified()?"true":"false");
+  s+=",\"seen_pulses\":"+(flowSeen?String("true"):String("false"));
    s+=",\"pulses_per_litre\":"+String(waterPulsesPerLitre,1);
    s+=",\"coefficient_source\":"+quoteJson(waterCoefficientManual?"manual":"passport");
   s+=",\"credible\":"+(flowReady?String("true"):String("false"));
@@ -1593,7 +1596,8 @@ String statusJSON(){
   s+=",\"pulses\":"+String(flowPulses())+",\"rejected_edges\":"+String(flowRejectedEdges());
   s+=",\"pulse_seen\":"+(flowSeen?String("true"):String("false"));
   s+=",\"pulses_per_litre\":"+String(waterPulsesPerLitre,1);
-  s+=",\"frequency_calibrated\":false,\"status\":"+quoteJson(BusaWater::diagnosticStatus(waterSampleReady,flowReady,waterPulseDelta))+"}";
+  s+=",\"frequency_calibrated\":";s+=(waterCalibrationVerified()?"true":"false");
+  s+=",\"status\":"+quoteJson(BusaWater::diagnosticStatus(waterSampleReady,flowReady,waterPulseDelta))+"}";
   s+=",\"esp32\":{\"chip\":"+quoteJson(ESP.getChipModel());
   s+=",\"free_heap_bytes\":"+String(ESP.getFreeHeap());
   s+=",\"min_free_heap_bytes\":"+String(ESP.getMinFreeHeap());
@@ -2757,8 +2761,8 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 </div>
 <details class="card approvedAdditional"><summary>Охлаждающая вода</summary>
   <div class="row">YF-S401 <b>GPIO15</b></div><div class="row">Импульсы <b id="pulses">—</b></div>
-  <div class="row">Расход воды (не калиброван) <b id="flow">—</b></div>
-  <p class="hint">Датчик на линии охлаждающей воды, а не на линии отбора. Его расчётный расход не подтверждён калибровкой.</p>
+  <div class="row">Расход воды <b id="flow">—</b></div>
+  <p class="hint" id="waterCalibrationHint">Ожидание показаний расходомера</p>
   
   
 </details></section>
@@ -2790,7 +2794,7 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <p class="liquidRateLabel">Текущий отбор</p><div class="liquidRateGrid"><div><strong id="collectionMlMin">—</strong><small>мл/мин</small></div><div><strong id="collectionLph">—</strong><small>л/ч</small></div></div>
 <div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div></article>
 <article class="liquidPanel coolingPanel"><div class="liquidPanelHeading"><h2>Охлаждение</h2><span id="coolingAvailability">Нет данных</span></div>
-<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Израсходовано воды</small><strong id="coolingTotal">—</strong><small>л</small></div></div></article>
+<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Учтено воды</small><strong id="coolingTotal">—</strong><small>л</small></div></div></article>
 </section>
 <section class="page" data-section="3" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><strong>ГРАФИКИ</strong></div>
 <div class="chartCard"><div class="chartTabs" role="tablist" aria-label="Вид графика">
@@ -3079,7 +3083,8 @@ function updateLiquidPanels(s){
  setMeasured('homeCollectionRate',mlMin);
  const volume=formatVolumeMl(total),split=volume.lastIndexOf(' ');
  get('homeCollectionTotal').textContent=split<0?volume:volume.slice(0,split);get('homeCollectionUnit').textContent=split<0?'мл':volume.slice(split+1);
- const w=s?.water,ready=w?.seen_pulses===true&&measured(w?.total_l_estimate),uptime=s?.uptime_ms;
+ const w=s?.water,ready=w?.credible===true&&w?.seen_pulses===true&&measured(w?.total_l_estimate),uptime=s?.uptime_ms;
+ get('waterCalibrationHint').textContent=!s?'Нет связи':w?.calibrated?'Калибровка по мерной ёмкости подтверждена':'Коэффициент не подтверждён мерной ёмкостью';
  let lph=null;
  if(ready&&previousWater&&measured(uptime)&&uptime>previousWater.at&&w.total_l_estimate>=previousWater.total)
   lph=(w.total_l_estimate-previousWater.total)*3600000/(uptime-previousWater.at);
@@ -3087,7 +3092,7 @@ function updateLiquidPanels(s){
  setMeasured('coolingLph',lph);setMeasured('coolingTotal',ready?w.total_l_estimate:null);
  get('homeCoolingRate').textContent=(measured(lph)?decimal1.format(lph):'—')+' л/ч';
  get('homeWaterUsed').textContent=(ready?decimal1.format(w.total_l_estimate):'—')+' л';
- get('coolingAvailability').textContent=!s?'Нет связи':w?.credible===false?'Недостоверные импульсы':ready?(w.calibrated?'Данные датчика':'Расчётно · без калибровки'):'Нет импульсов';
+ get('coolingAvailability').textContent=!s?'Нет связи':w?.credible===false?'Недостоверные импульсы':ready?(w.volume_complete===false?'Учтено частично · были помехи':w.calibrated?'Данные датчика':'Расчётно · без калибровки'):'Нет импульсов';
  get('rigArtStage').classList.toggle('hasCollection',measured(mlMin)&&mlMin>0);
  get('rigArtStage').classList.toggle('hasCooling',measured(lph)&&lph>0);
 }
@@ -3379,7 +3384,9 @@ if(s.keypad){
      '\nОтброшенные фронты: '+d.water_flow?.rejected_edges+
      '\nПоследние '+(s.water?.sample_window_ms??0)+' мс: '+(s.water?.pulses_window??0)+' имп / '+(s.water?.rejected_edges_window??0)+' отброшено'+
      '\nКоэффициент: '+(s.water?.pulses_per_litre??5880)+' имп/л ('+(s.water?.coefficient_source==='manual'?'ручной':'паспортный')+')'+
-      '\nКалибровка по мерной ёмкости: не выполнена'+
+      '\nКалибровка по мерной ёмкости: '+(s.water?.calibrated?'подтверждена':'не подтверждена')+
+      '\nУчтённый объём: '+formatNumeric(s.water?.total_l_estimate)+' л'+
+      (s.water?.volume_complete===false?' (неполный, были помехи)':'')+
      '\nРасход (оценка): '+formatNumeric(s.water?.lpm)+' л/мин'+
      (s.water?.credible===false?'\nИЗМЕРЕНИЕ НЕДОСТОВЕРНО':'');
    get('diagOther').textContent=
@@ -4386,7 +4393,8 @@ void setup(){
     }
     j+="],\"cooling_lph\":[";
     for(int i=0;i<bins;i++){if(i)j+=",";float value=busaChartHistory.coolingValue(selected[i]);j+=isfinite(value)?String(value,2):String("null");}
-    j+="],\"cooling_calibrated\":false,\"collection_sensor\":false,\"history_ready\":"+String(busaChartReady?"true":"false")+"}";
+    j+="],\"cooling_calibrated\":";j+=(waterCalibrationVerified()?"true":"false");
+    j+=",\"collection_sensor\":false,\"history_ready\":"+String(busaChartReady?"true":"false")+"}";
     server.send(200,"application/json; charset=utf-8",j);
   });
   server.on("/api/graph-history",HTTP_GET,[]{
@@ -4410,7 +4418,7 @@ void setup(){
       const int idx=(flowTraceHead+40-waterCount+i)%40;
       j+=String(waterPulseHistory[idx]);
     }
-    j+="],\"water_interval_ms\":2000,\"water_calibrated\":false,";
+    j+="],\"water_interval_ms\":2000,\"water_calibrated\":";j+=(waterCalibrationVerified()?"true":"false");j+=",";
     j+="\"collection_sensor\":false,\"time_ms\":"+String(now)+",";
     j+="\"temperature_samples\":"+String(v13HistoryCount)+"}";
     server.send(200,"application/json; charset=utf-8",j);

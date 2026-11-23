@@ -1,7 +1,7 @@
 name: BUSA GPIO15 isolated firmware verification
 on:
   push:
-    branches: [fix/busa-gpio15-pulse-20261123, fix/busa-yfs401-passport-setting-20261123]
+    branches: [fix/busa-gpio15-pulse-20261123, fix/busa-yfs401-passport-setting-20261123, fix/busa-water-operational-20261124]
   workflow_dispatch:
 permissions:
   contents: read

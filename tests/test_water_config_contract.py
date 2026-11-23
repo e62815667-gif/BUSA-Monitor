@@ -13,16 +13,20 @@ def test_contract():
     assert 'server.on("/api/water/coefficient",HTTP_POST' in main
     assert 'BusaWater::lpm(diff,dt,waterPulsesPerLitre)' in main
     assert 'BusaWater::credible(diff,dt,rejectedDiff,waterPulsesPerLitre)' in main
-    assert 'BusaWater::litres(flowPulses(),waterPulsesPerLitre)' in main
+    assert 'waterVolume.record(diff,rejectedDiff,flowReady,waterPulsesPerLitre)' in main
+    assert 'float totalWaterLitres(){return (float)waterVolume.countedLitres;}' in main
     assert 'id="waterPplPassport"' in main
     assert 'id="waterPplSave"' in main
     assert 'id="waterPplInput"' in main
     assert 'MOTION1-20261122-YFS401-PPL1-20261123' in main
-    assert re.search(r'if\(!flowReady\)flowVolumeValid=false;',main)
+    assert 'flowVolumeValid' not in main
+    assert 'verifiedBusa001Calibration(waterPulsesPerLitre)' in main
+    assert 'waterCalibrationVerified()?"true":"false"' in main
+    assert 'volume_excluded_intervals' in main and 'volume_complete' in main
     assert 'BusaWater::diagnosticStatus(waterSampleReady,flowReady,waterPulseDelta)' in main
     assert 'quoteJson(!flowVolumeValid?' not in main
     assert 'rejected_edges_window' in main and 'sample_window_ms' in main
-    assert 'FLOWSTATE1-20261124' in main
+    assert 'FLOWSTATE1-20261124-WATERLIVE1' in main
 
 if __name__=='__main__':
     test_contract()
