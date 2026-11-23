@@ -1,0 +1,34 @@
+/* MOTION1 coordinates refer to the 1024 x 1536 approved equipment asset. */
+@media(max-width:599px),(min-height:501px){
+html:root.busaDesign section.holoHome .temp2{left:28%;top:76.5%;width:23.5%}
+html:root.busaDesign section.holoHome .collectedOnGlass{left:64.5%;top:83.3%;width:19.5%}
+}
+html:root.busaDesign section.holoHome .boilerBoil{left:25.1%;top:85.6%;width:29.3%;height:7.4%;clip-path:polygon(0 0,100% 0,100% 73%,90% 100%,10% 100%,0 73%)}
+html:root.busaDesign section.holoHome .collectionLiquid{left:66.4%;top:82%;width:15.9%;height:11.5%}
+html:root.busaDesign section.holoHome .waterTrace{stroke-width:3;stroke-dasharray:14 100;animation:homeFluidRun 3s linear infinite paused}
+html:root.busaDesign section.holoHome .coilTrace{stroke-width:2.5;stroke-dasharray:12 90;animation:homeCoilRun 2.8s linear infinite paused}
+html:root.busaDesign section.holoHome .productTrace{animation:homeProductRun 1.5s linear infinite paused}
+html:root.busaDesign section.holoHome .hasCooling .waterMotion .waterTrace,html:root.busaDesign section.holoHome .hasCooling .waterMotion .coilTrace{opacity:.85;animation-play-state:running}
+html:root.busaDesign section.holoHome .hasCollection .waterMotion .productTrace{opacity:.85;animation-play-state:running}
+.holoHome .waterMotion .columnFilm,.holoHome .waterMotion .capillaryDrop,.holoHome .waterMotion .cubeConvection,.holoHome .waterMotion .cubeSurfaceMotion{fill:none;stroke:#c5fffa;stroke-linecap:round;opacity:0;animation-play-state:paused}
+.holoHome .waterMotion .columnFilm{stroke-width:1.4;stroke-dasharray:6 27;animation:homeFilmRun 2.4s linear infinite paused}
+.holoHome .waterMotion .capillaryDrop{stroke-width:3;stroke-dasharray:4 23;animation:homeDropRun 1.4s linear infinite paused}
+.holoHome .waterMotion .cubeConvection{stroke-width:2;stroke-dasharray:24 180;animation:homeConvectionRun 3.2s linear infinite paused}
+.holoHome .waterMotion .cubeSurfaceMotion{stroke-width:1.6;animation:homeSurfaceRun 2s ease-in-out infinite alternate paused;transform-box:fill-box;transform-origin:center}
+.holoHome .hasCollection .columnFilm,.holoHome .hasCollection .capillaryDrop{opacity:.7;animation-play-state:running}
+.holoHome .hasTemperature .cubeConvection{opacity:.42;animation-play-state:running}
+.holoHome .hasTemperature .cubeSurfaceMotion{opacity:.7;animation-play-state:running}
+@keyframes homeFluidRun{to{stroke-dashoffset:-228}}
+@keyframes homeCoilRun{to{stroke-dashoffset:-204}}
+@keyframes homeProductRun{to{stroke-dashoffset:-148}}
+@keyframes homeFilmRun{to{stroke-dashoffset:-66}}
+@keyframes homeDropRun{to{stroke-dashoffset:-54}}
+@keyframes homeConvectionRun{to{stroke-dashoffset:-204}}
+@keyframes homeSurfaceRun{to{transform:scaleY(.65) translateY(2px)}}
+html:root.busaDesign section.holoHome[hidden] .waterMotion path,html:root.busaDesign section.holoHome[hidden] .boilerBoil i,html:root.busaDesign section.holoHome[hidden] .collectionLiquid *{animation-play-state:paused!important}
+html:root.busaDesign section.holoHome .boilerBoil,html:root.busaDesign section.holoHome .collectionLiquid{opacity:0}
+html:root.busaDesign section.holoHome .hasTemperature .boilerBoil,html:root.busaDesign section.holoHome .hasCollection .collectionLiquid{opacity:1}
+html:root.busaDesign section.holoHome .boilerBoil>*,html:root.busaDesign section.holoHome .collectionLiquid>*{animation-play-state:paused}
+html:root.busaDesign section.holoHome .hasTemperature .boilerBoil>*,html:root.busaDesign section.holoHome .hasCollection .collectionLiquid>*{animation-play-state:running}
+html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:root.busaDesign section.holoHome .homeMotionPaused .boilerBoil>*,html:root.busaDesign section.holoHome .homeMotionPaused .collectionLiquid>*{animation-play-state:paused!important}
+@media(prefers-reduced-motion:reduce){html:root.busaDesign section.holoHome .waterMotion path{animation:none!important}}

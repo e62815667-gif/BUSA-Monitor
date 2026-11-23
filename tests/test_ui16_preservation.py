@@ -6,7 +6,8 @@ root=Path(__file__).resolve().parents[1]
 source=(root/'firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
 baseline=json.loads((root/'tests/fixtures/ui16_preservation.json').read_text())
 backend=re.sub(r'R"HTMLBUSA\(.*?\)HTMLBUSA"','<WEB_PAGE>',source,flags=re.S)
-backend=backend.replace('UI16-CUBE1-20261121-GEOM1','<UI_RELEASE>')
+for release in ['UI16-CUBE1-20261121-GEOM1-MOTION1-20261122','UI16-CUBE1-20261121-GEOM1']:
+    backend=backend.replace(release,'<UI_RELEASE>')
 # The only authorized Main change is one NVS load immediately after prefs.begin.
 assert backend.count('  busaCalcLoadGeometry();\n')==1
 backend=backend.replace('  busaCalcLoadGeometry();\n','',1)

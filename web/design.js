@@ -21,18 +21,6 @@
  glass.innerHTML='<svg viewBox="0 0 110 180" fill="none"><defs><linearGradient id="holoGlass" x1="4" y1="0" x2="109" y2="0" gradientUnits="userSpaceOnUse"><stop stop-color="#d7fbff" stop-opacity=".38"/><stop offset=".16" stop-color="#8bebff" stop-opacity=".04"/><stop offset=".8" stop-color="#8bebff" stop-opacity=".03"/><stop offset="1" stop-color="#d7fbff" stop-opacity=".4"/></linearGradient><linearGradient id="holoLiquid" x1="0" y1="70" x2="0" y2="176" gradientUnits="userSpaceOnUse"><stop stop-color="#00ddff" stop-opacity=".48"/><stop offset="1" stop-color="#0083bc" stop-opacity=".13"/></linearGradient><clipPath id="holoGlassClip"><path d="M8 72H102V158Q102 174 55 174Q8 174 8 158Z"/></clipPath></defs><path d="M5 13V158C5 180 105 180 105 158V13" fill="url(#holoGlass)" stroke="#b9f6ff" stroke-opacity=".7" stroke-width="2"/><g class="liquidFill"><path d="M8 75H102V157C102 177 8 177 8 157Z" fill="url(#holoLiquid)"/><ellipse cx="55" cy="75" rx="47" ry="8" fill="#06c9ed" fill-opacity=".3" stroke="#8cfaff" stroke-opacity=".8"/><g clip-path="url(#holoGlassClip)" stroke="#c4fcff" stroke-width="1.1"><circle class="glassBubble" cx="24" cy="152" r="3"/><circle class="glassBubble" cx="47" cy="151" r="2.1" style="animation-delay:-1.2s"/><circle class="glassBubble" cx="75" cy="154" r="3.6" style="animation-delay:-.7s"/><circle class="glassBubble" cx="87" cy="148" r="2.2" style="animation-delay:-2.1s"/></g></g><ellipse cx="55" cy="13" rx="50" ry="10" fill="#08212c" fill-opacity=".15" stroke="#d1fbff" stroke-opacity=".8" stroke-width="2"/><ellipse cx="55" cy="162" rx="47" ry="10" stroke="#82ecff" stroke-opacity=".6"/></svg>';
  waterSection.querySelector('.collectionPanel').append(glass);
  const pipe=document.createElement('div');pipe.className='coolingPipe';pipe.setAttribute('aria-hidden','true');waterSection.querySelector('.coolingPanel').append(pipe);
- const motion=stage.querySelector('.waterMotion');
- const path=(selector,d)=>{const node=motion.querySelector(selector);if(node)node.setAttribute('d',d);};
- path('.inlet','M805 851H780');
- path('.transfer','M788 671C760 426 577 281 375 289');
- path('.drain','M195 122V1337Q195 1383 156 1383H106');
- const coil=(left,right,bottom,turns,step)=>{
-  let d='M'+left+' '+bottom;
-  for(let i=0;i<turns;i++){const y=bottom-i*step;d+='C'+(right+20)+' '+(y-4)+' '+(right+20)+' '+(y-step*.65)+' '+left+' '+(y-step*.8)+'C'+(left-12)+' '+(y-step*.84)+' '+(left-12)+' '+(y-step*.95)+' '+left+' '+(y-step);}
-  return d;
- };
- const coils=motion.querySelectorAll('.coilTrace');if(coils[0])coils[0].setAttribute('d',coil(668,750,844,7,23));if(coils[1])coils[1].setAttribute('d',coil(240,315,303,8,25));
- path('.productTrace','M716 930C716 1043 721 1205 725 1278');
  const numberFrom=id=>{const m=byId(id)?.textContent.match(/[-+]?\d+(?:[.,]\d+)?/);return m?Number(m[0].replace(',','.')):null;};
  const sync=()=>{
   for(const [source,target] of pairs)if(source&&target&&target.textContent!==source.textContent)target.textContent=source.textContent;

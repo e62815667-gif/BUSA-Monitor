@@ -2,8 +2,8 @@ name: BUSA Android UI parity and APK build
 on:
   workflow_dispatch:
   push:
-    branches: [feat/busa-android-ui16, fix/busa-android-release-20261116, feat/busa-cylinder-calculator-20261121, feat/busa-cylinder-geometry-persist-20261121]
-    paths: ['android/**', 'ci/generate_android_assets.py', '.github/workflows/busa-android.yml', 'firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h', 'calculator.js', 'calculator.css']
+    branches: [feat/busa-android-ui16, fix/busa-android-release-20261116, feat/busa-cylinder-calculator-20261121, feat/busa-cylinder-geometry-persist-20261121, feat/busa-approved-home-motion-20261122]
+    paths: ['android/**', 'ci/generate_android_assets.py', 'ci/generate_design.py', '.github/workflows/busa-android.yml', 'firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h', 'calculator.js', 'calculator.css']
 permissions:
   contents: read
 concurrency:
@@ -35,29 +35,29 @@ jobs:
           npm install --prefix /tmp/busa-playwright --no-save --package-lock=false --ignore-scripts playwright@1.56.0
           echo 'NODE_PATH=/tmp/busa-playwright/node_modules' >> "$GITHUB_ENV"
           BUSA_CHROMIUM="$(python3 -c 'from playwright.sync_api import sync_playwright; p=sync_playwright().start(); print(p.chromium.executable_path); p.stop()')" python3 android/tests/test_offline_browser.py
-      - name: Build APK (persistent release key when configured)
+      - name: Build release APK and separate emulator APK
         env:
           RELEASE_KEYSTORE: ${{ secrets.BUSA_ANDROID_KEYSTORE_B64 }}
           RELEASE_PASSWORD: ${{ secrets.BUSA_ANDROID_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
+          umask 077
+          trap 'rm -f "$RUNNER_TEMP/busa-release.jks" "$RUNNER_TEMP/busa-test.jks"' EXIT
           if [ -n "$RELEASE_KEYSTORE" ] && [ -n "$RELEASE_PASSWORD" ]; then
-            printf '%s' "$RELEASE_KEYSTORE" | base64 --decode > /tmp/busa-signing.jks
+            printf '%s' "$RELEASE_KEYSTORE" | base64 --decode > "$RUNNER_TEMP/busa-release.jks"
             export BUSA_KEYSTORE_PASS="$RELEASE_PASSWORD"
-            python3 android/build.py --keystore /tmp/busa-signing.jks
-            export BUSA_KEYSTORE_PASS=android-ci-test-only
-            keytool -genkeypair -keystore /tmp/busa-test.jks -storetype PKCS12 -storepass:env BUSA_KEYSTORE_PASS -keypass:env BUSA_KEYSTORE_PASS -alias busa -keyalg RSA -keysize 3072 -validity 365 -dname 'CN=BUSA CI TEST'
-            python3 android/build.py --keystore /tmp/busa-test.jks --debug --out /tmp/busa-native-test
-            python3 -c 'import json; p="/tmp/busa-native-test/"; print("BUSA_TEST_APK="+p+json.load(open(p+"BUILD.json"))["apk"])' >> "$GITHUB_ENV"
-            rm -f /tmp/busa-test.jks
+            python3 android/build.py --keystore "$RUNNER_TEMP/busa-release.jks"
+            python3 -c 'from pathlib import Path; s=Path("android/out/APK_SIGNATURE.txt").read_text(); assert "Signer #1 certificate SHA-256 digest: 3e63affe2693ecb7c62cb96c2aa5d17c507f28ef1db3eeb030fe1674ee3e815b" in s, "Release signing certificate differs from the installed release"'
+          elif [ -n "$RELEASE_KEYSTORE" ] || [ -n "$RELEASE_PASSWORD" ]; then
+            echo 'Both Android signing secrets must be configured.' >&2
+            exit 1
           else
-            export BUSA_KEYSTORE_PASS=android-ci-test-only
-            keytool -genkeypair -keystore /tmp/busa-signing.jks -storetype PKCS12 -storepass:env BUSA_KEYSTORE_PASS -keypass:env BUSA_KEYSTORE_PASS -alias busa -keyalg RSA -keysize 3072 -validity 365 -dname 'CN=BUSA CI TEST'
-            python3 android/build.py --keystore /tmp/busa-signing.jks --debug
-            python3 -c 'import json; p="android/out/"; print("BUSA_TEST_APK="+p+json.load(open(p+"BUILD.json"))["apk"])' >> "$GITHUB_ENV"
-            echo 'Test APK: configure signing secrets for a persistent release signature.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'Unsigned release only: sign with the existing permanent key before installation.' >> "$GITHUB_STEP_SUMMARY"
           fi
-          rm -f /tmp/busa-signing.jks
+          export BUSA_KEYSTORE_PASS=android-ci-test-only
+          keytool -genkeypair -keystore "$RUNNER_TEMP/busa-test.jks" -storetype PKCS12 -storepass:env BUSA_KEYSTORE_PASS -keypass:env BUSA_KEYSTORE_PASS -alias busa -keyalg RSA -keysize 3072 -validity 365 -dname 'CN=BUSA CI TEST'
+          python3 android/build.py --keystore "$RUNNER_TEMP/busa-test.jks" --debug --out "$RUNNER_TEMP/busa-native-test"
+          python3 -c 'import json, os; from pathlib import Path; p=Path(os.environ["RUNNER_TEMP"])/"busa-native-test"; print("BUSA_TEST_APK="+str(p/json.loads((p/"BUILD.json").read_text())["apk"]))' >> "$GITHUB_ENV"
           python3 android/build.py --unsigned --out android/out/release
       - name: Enable KVM for Android tests
         run: |
@@ -80,6 +80,7 @@ jobs:
             android/out/*.apk
             android/out/APK_SIGNATURE.txt
             android/out/APK_MANIFEST.txt
+            android/out/BUILD.json
             android/out/SHA256SUMS.txt
             android/out/release/*.apk
             android/out/release/APK_MANIFEST.txt
