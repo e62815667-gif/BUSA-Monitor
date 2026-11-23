@@ -1,0 +1,88 @@
+name: Publish verified BUSA MOTION1 downloads
+on:
+  push:
+    branches: [feat/busa-approved-home-motion-20261122]
+    paths: ['delivery/motion1.json', 'delivery/*.apk', '.github/workflows/busa-motion1-publish.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: busa-motion1-downloads
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: BUSA_UI16_CUBE1_MOTION1_20261122
+          run-id: 45152441318
+          github-token: ${{ github.token }}
+          path: verified-firmware
+      - name: Verify source, hashes and transport before publishing new assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, json, shutil, subprocess
+          def gh(*args):
+              return subprocess.check_output(['gh',*args],text=True).strip()
+          manifest=json.loads(Path('delivery/motion1.json').read_text())
+          source=manifest['source_commit'];tag=manifest['tag']
+          run=json.loads(gh('api','repos/'+__import__('os').environ['GH_REPO']+'/actions/runs/'+str(manifest['firmware_run'])))
+          assert run['head_sha']==source and run['conclusion']=='success'
+          folder=Path('verified-firmware')
+          assert (folder/'SOURCE_COMMIT.txt').read_text().strip()==source
+          payload=Path('publish');payload.mkdir()
+          expected=dict(manifest['files'])
+          for name,digest in expected.items():
+              assert Path(name).name==name and name.endswith('.bin')
+              data=(folder/name).read_bytes();assert hashlib.sha256(data).hexdigest()==digest
+              (payload/name).write_bytes(data)
+          app=(payload/'BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin').read_bytes()
+          merged=(payload/'BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin').read_bytes()
+          assert merged[0x10000:]==app
+          apk=manifest['apk']
+          if apk:
+              file=Path(apk['path']);assert file.suffix=='.apk' and file.parent==Path('delivery')
+              assert apk['debug'] is False and apk['unsigned'] is False
+              assert hashlib.sha256(file.read_bytes()).hexdigest()==apk['sha256']
+              shutil.copyfile(file,payload/file.name);expected[file.name]=apk['sha256']
+              sums=payload/'APK_SHA256SUMS.txt';sums.write_text(apk['sha256']+'  '+file.name+'\n')
+              expected[sums.name]=hashlib.sha256(sums.read_bytes()).hexdigest()
+          (payload/'SHA256SUMS.txt').write_text(''.join(d+'  '+n+'\n' for n,d in expected.items()))
+          expected['SHA256SUMS.txt']=hashlib.sha256((payload/'SHA256SUMS.txt').read_bytes()).hexdigest()
+          notes=Path('release-notes.txt')
+          notes.write_text('BUSA UI16 CUBE1 MOTION1\n\nBase: 8a643b9a771d01f02133bc812f8f6df094c63e41\nSource: '+source+'\n\nESP32-S3 N16R8. Existing behavior preserved. Approved home artwork and fluid motion.\nHardware flashing was not performed. SHA256SUMS.txt verifies all downloads.\n')
+          probe=subprocess.run(['gh','release','view',tag,'--json','assets,url'],capture_output=True,text=True)
+          created=probe.returncode!=0
+          if created:
+              gh('release','create',tag,'--target',source,'--draft','--latest=false','--title','BUSA UI16 CUBE1 MOTION1','--notes-file',str(notes))
+              existing=set()
+          else:
+              ref=json.loads(gh('api','repos/'+__import__('os').environ['GH_REPO']+'/git/ref/tags/'+tag))
+              assert ref['object']['sha']==source,'Existing tag has another source; refusing changes'
+              existing={x['name'] for x in json.loads(probe.stdout)['assets']}
+          # Existing binaries are immutable; a later APK may be added without replacing them.
+          for name,digest in expected.items():
+              if name in existing:
+                  if name=='SHA256SUMS.txt':continue
+                  old=Path('prior')/name;old.parent.mkdir(exist_ok=True)
+                  gh('release','download',tag,'--pattern',name,'--dir',str(old.parent))
+                  assert hashlib.sha256(old.read_bytes()).hexdigest()==digest,'Existing asset differs; refusing overwrite'
+              else:
+                  gh('release','upload',tag,str(payload/name))
+          check=Path('transport-check');check.mkdir()
+          for name,digest in expected.items():
+              if name=='SHA256SUMS.txt' and name in existing:continue
+              gh('release','download',tag,'--pattern',name,'--dir',str(check))
+              assert hashlib.sha256((check/name).read_bytes()).hexdigest()==digest
+          if created:gh('release','edit',tag,'--draft=false','--latest=false')
+          print(gh('release','view',tag,'--json','url,assets'))
+          PY
