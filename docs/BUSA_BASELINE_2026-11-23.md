@@ -9,6 +9,10 @@
 - Оригинал решений и подробный журнал: [паспорт в Google Документах](https://docs.google.com/document/d/1_C1sLNuwxBttS-qsC3X6X4GqDmYKM6V9xpUfAntSGks/edit).
 - [Утверждённая распиновка в Google Документах](https://docs.google.com/document/d/16D1DHAYCUSrObx84E9fcn0kV0py3cvS36N4qSJ-JyJY/edit).
 - [Папка проекта «успех буса 1м»](https://drive.google.com/drive/folders/1KFBiYLCwre2y-CvqGqD807yK0yiitaI5).
+- **[Архив успешной прошивки MOTION1, от 23.11.2026: USB/OTA + материалы сборки (Google Диск)](https://drive.google.com/file/d/1579vy8AfWrRjGVjevK5sddN4uAbFblwW/view?usp=drivesdk)**. Загружен из артефакта GitHub Actions; перед физической перепрошивкой проверить нужный BIN и контрольную сумму.
+- [Папка «агент» (в ней архив прошивки и история настройки)](https://drive.google.com/drive/folders/1hjpaRSaFMLR4jCpwJl1iyTt4wXNs_PRm).
+- [Паспорт настройки OpenCode/Codex](https://docs.google.com/document/d/1_gc4v5HFGExHmNmKp8TGBJiNLP7VZh2inV4vLDdD_ic/edit).
+- [Хронология настройки агента](https://docs.google.com/document/d/15xORJ4PSI9KkCczOT9Zvz2wK6oGlr700RRO2aupjclU/edit).
 - [Телеметрия](https://docs.google.com/spreadsheets/d/1Y8Bb9D7JhvMa6Sfy4Xi0BJZzzDRTp7_F9AWak9dFhWk/edit), вкладка `BUSA_telemetry`. Доступ к документам Google у конкретной сессии Codex **не гарантирован** и требует отдельного подтверждения.
 - Копия ключевых утверждений ниже включена в GitHub, чтобы Codex мог работать, даже если Google Drive не подключён.
 
