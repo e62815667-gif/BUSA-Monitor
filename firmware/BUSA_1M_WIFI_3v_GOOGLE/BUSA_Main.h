@@ -3853,7 +3853,9 @@ request();
   if(uploading||polling||document.hidden||screenPanel.hidden||screenPanel.closest('[data-stab]').hidden||(typeof pollBusy!=='undefined'&&pollBusy))return;
   polling=true;document.busaOtaStatusPolling=true;
   try{
-   const response=await fetch('/api/display-ota/status',{cache:'no-store'});
+   const options={cache:'no-store'};
+   if(typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout==='function')options.signal=AbortSignal.timeout(6000);
+   const response=await fetch('/api/display-ota/status',options);
    if(!response.ok)throw Error('HTTP '+response.status);
    const data=await response.json();
    document.busaOtaTransfer=active.has(data.state);
@@ -4825,7 +4827,7 @@ void loop(){
   uint32_t now=millis();
   const uint32_t tickStart=now;
   soundPoll(now);
-  busa_display_link::poll(); // Fill UART TX before potentially slow HTTP work.
+  if(!otaActive)busa_display_link::poll(); // Fill UART TX before potentially slow HTTP work.
   {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
   // One nonblocking driver scan serves both TFT and web UI. Every scan ends.
   busaWebEventsPoll(now); // Passive local journal; no temperature readings or output writes.
