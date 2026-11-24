@@ -23,6 +23,8 @@ jobs:
           /tmp/busa-uart-test
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_protocol.cpp -o /tmp/busa-display-protocol-test
           /tmp/busa-display-protocol-test
+          g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_api.cpp -o /tmp/busa-display-api-test
+          /tmp/busa-display-api-test
           node tests/test_display_receiver.cjs
           python3 -B tests/test_water_config_contract.py
           python3 -B -m unittest discover -s tests -p test_firmware_contract.py -v

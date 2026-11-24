@@ -1,5 +1,6 @@
 #pragma once
 #include "BUSA_UartFrame.h"
+#include "BUSA_DisplayApi.h"
 namespace busa_uart {
 // Versioned link messages. Read-only snapshot requests are idempotent.
 constexpr uint8_t requestStatus=1, status=2;

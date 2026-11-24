@@ -34,6 +34,7 @@
 #include <math.h>
 #include "BUSA_WaterFlowMath.h"
 #include "BUSA_DisplayLink.h"
+#include "BUSA_LocalRequest.h"
 
 constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
@@ -50,7 +51,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -3819,6 +3820,313 @@ static bool busaSaveProvisionedStation(){
 }
 
 
+static void busaApi_waterCoefficient(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+     if(!apClient()||server.arg("confirm")!="YES"){
+       server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;
+     }
+     if(!server.hasArg("pulses_per_litre")){
+       server.send(400,"text/plain; charset=utf-8","Нет коэффициента");return;
+     }
+     String raw=server.arg("pulses_per_litre");raw.trim();
+     char *end=nullptr;
+     const float requested=strtof(raw.c_str(),&end);
+     if(raw.isEmpty()||*end!='\0'||!isfinite(requested)||!BusaWater::validPulsesPerLitre(requested)){
+       server.send(400,"text/plain; charset=utf-8","Коэффициент: 1–100000 имп/л");return;
+     }
+     if(!busaNvsReady||prefs.putFloat("waterPpl",requested)!=sizeof(float)){
+       server.send(500,"text/plain; charset=utf-8","Ошибка сохранения NVS");return;
+     }
+     waterPulsesPerLitre=requested;
+     waterCoefficientManual=fabsf(requested-BusaWater::kPassportPulsesPerLitre)>0.05f;
+     flowReady=false;
+     server.send(200,"application/json; charset=utf-8",
+       String("{\"ok\":true,\"pulses_per_litre\":")+String(waterPulsesPerLitre,1)+"}");
+}
+
+static void busaApi_temperatureAlarms(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient()){server.send(403,"text/plain","BUSA local AP only");return;}
+    float requestedOn[4]={NAN,NAN,NAN,NAN},requestedOff[4]={NAN,NAN,NAN,NAN};
+    bool present[4]={false,false,false,false};
+    for(int i=0;i<4;i++){
+      const String onKey=String("on")+i,offKey=String("off")+i;
+      if(!server.hasArg(onKey)||!server.hasArg(offKey)){
+        server.send(400,"text/plain","Missing T1-T4 fields");return;
+      }
+      const String on=server.arg(onKey),off=server.arg(offKey);
+      if(on.isEmpty()&&off.isEmpty())continue; // no threshold: no sound
+      char *endOn=nullptr,*endOff=nullptr;
+      requestedOn[i]=strtof(on.c_str(),&endOn);
+      requestedOff[i]=strtof(off.c_str(),&endOff);
+      if(on.isEmpty()||off.isEmpty()||!endOn||*endOn||!endOff||*endOff||
+         !BusaSound::valid(requestedOn[i],requestedOff[i])){
+        server.send(400,"text/plain","Invalid ON/OFF temperatures 0..125 C, delta >=0.1 C");return;
+      }
+      present[i]=true;
+    }
+    // Do not alter any hardware output until the full submitted form is valid.
+    soundOutputsOff();soundResetState();
+    const char* onKeys[4]={"buzOn0","buzOn1","sndT3On","sndT4On"};
+    const char* offKeys[4]={"buzOff0","buzOff1","sndT3Off","sndT4Off"};
+    bool saved=true;
+    for(int i=0;i<4;i++){
+      if(present[i]){
+        if(!prefs.putFloat(onKeys[i],requestedOn[i]))saved=false;
+        if(!prefs.putFloat(offKeys[i],requestedOff[i]))saved=false;
+      }else{
+        if(prefs.isKey(onKeys[i])&&!prefs.remove(onKeys[i]))saved=false;
+        if(prefs.isKey(offKeys[i])&&!prefs.remove(offKeys[i]))saved=false;
+      }
+    }
+    for(int i=0;i<2;i++){
+      if(!prefs.putBool((String("buzE")+i).c_str(),true))saved=false;
+    }
+    for(int i=0;i<4;i++){
+      if(!prefs.putBool((String("sndRoleEnable")+i).c_str(),true))saved=false;
+    }
+    if(!saved){
+      for(int i=0;i<4;i++){soundEnabled[i]=false;prefs.putBool((String("sndRoleEnable")+i).c_str(),false);}
+      for(int i=0;i<2;i++){buzzerEnabled[i]=false;prefs.putBool((String("buzE")+i).c_str(),false);}
+      soundOutputsOff();
+      server.send(500,"text/plain","Temperature settings save failed");return;
+    }
+    for(int i=0;i<2;i++){
+      buzzerOnC[i]=requestedOn[i];buzzerOffC[i]=requestedOff[i];buzzerEnabled[i]=true;
+    }
+    soundOnC[0]=soundOnC[1]=soundOnC[2]=requestedOn[2];
+    soundOffC[0]=soundOffC[1]=soundOffC[2]=requestedOff[2];
+    soundOnC[3]=requestedOn[3];soundOffC[3]=requestedOff[3];
+    for(int i=0;i<4;i++){
+      refTemp[i]=requestedOn[i];noticeTemp[i]=requestedOff[i];
+      soundEnabled[i]=true;
+    }
+    for(int i=0;i<2;i++)buzzerTempChannels[i]=BusaSound::Channel();
+    tftDirty=true;lastRender=0;
+    server.send(200,"application/json",soundJSON(millis()));
+}
+
+static void busaApi_wifiScan(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient()){
+      server.send(403,"application/json","{\"error\":\"local_only\"}");return;
+    }
+    // HTTP is read-only except for requesting a single async scan.
+    // Never manipulate the radio inside the browser request.
+    if(server.arg("start")=="1" && !busaWifiRequestSharedScan(false,server.arg("fresh")=="1")){
+      server.send(409,"application/json",
+        "{\"scanning\":false,\"networks\":[],\"error\":\"busy\"}");return;
+    }
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json; charset=utf-8",busaWifiScanJSON());
+}
+
+static void busaApi_wifiDisconnect(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient()){
+      server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА.");return;
+    }
+    if(otaActive){
+      server.send(409,"text/plain; charset=utf-8","Дождитесь завершения обновления.");return;
+    }
+    if(!prefs.putBool("staOff",true) || !prefs.getBool("staOff",false)){
+      server.send(500,"text/plain; charset=utf-8","Ошибка сохранения отключения Wi-Fi.");return;
+    }
+    wifiUiStaDisabled=true;wifiUiDisablePending=true;
+    wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
+    wifiUiResumeStation=false;wifiUiLastConnectError="";
+    WiFi.setAutoReconnect(false);
+    // Don't reuse a cached scan that ran on the previous router's channel.
+    if(busaSharedScanState==BUSA_SCAN_READY ||
+       busaSharedScanState==BUSA_SCAN_EMPTY ||
+       busaSharedScanState==BUSA_SCAN_ERROR)
+      busaSharedScanState=BUSA_SCAN_IDLE;
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"text/plain; charset=utf-8",
+      "Внешний Wi-Fi отключён. Локальная сеть БУСА работает.");
+}
+
+static void busaApi_wifiConnect(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    // Credentials may only be provisioned while connected to the protected local AP.
+    if(!apClient()){
+      server.send(403,"text/plain; charset=utf-8","Настройка Wi-Fi доступна только через сеть БУСА.");return;
+    }
+    if(busaWifiScanRunning || wifiUiOwnsScan || otaActive){
+      server.send(409,"text/plain; charset=utf-8",
+        "Поиск сети или обновление выполняется. Повтори после завершения.");return;
+    }
+    String ssid=server.arg("ssid"),pass=server.arg("pass");
+    ssid.trim();
+    if(ssid.isEmpty()||ssid.length()>32||pass.length()<8||pass.length()>63){
+      server.send(400,"text/plain; charset=utf-8","Недопустимое имя сети или длина пароля (8–63).");return;
+    }
+    // NVS is encrypted only if board flash encryption is enabled; keep local AP secure.
+    // Local app uses the same NVS flag as TFT. A saved network re-enables
+    // only the external STA; the local AP never stops during provisioning.
+    const String prevSsid=prefs.getString("ssid","");
+    const String prevPass=prefs.getString("pass","");
+    const bool prevOff=prefs.getBool("staOff",false);
+    const bool ok=(prefs.putString("pass",pass)==pass.length() &&
+      prefs.putString("ssid",ssid)==ssid.length() &&
+      prefs.putBool("staOff",false));
+    if(!ok){
+      prefs.putString("ssid",prevSsid);prefs.putString("pass",prevPass);
+      prefs.putBool("staOff",prevOff);
+      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;
+    }
+    wifiUiResetReconnectBackoff();
+    stationSsid=ssid;stationPass=pass;wifiUiStaDisabled=false;wifiUiDisablePending=false;
+    wifiUiLastConnectError="";wifiUiResumeStation=false;
+    wifiUiStage=WIFIUI_CONNECTING; // shared network state, NOT navigation state
+    wifiUiConnectPending=true;wifiUiAssociationDueAt=0;
+    wifiUiConnectAt=0;lastStationCheck=millis();
+    server.send(200,"text/plain; charset=utf-8","Выбрана сеть: "+ssid+". Подключение запускается.");
+}
+
+static void busaApi_theme(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
+    if(!server.hasArg("mode")){server.send(400,"text/plain","Выбери тему");return;}
+    int m=server.arg("mode").toInt();
+    if(m<0||m>2||!saveThemeMode((uint8_t)m)){server.send(400,"text/plain","Тема не сохранена");return;}
+    server.send(200,"text/plain; charset=utf-8",m==0?"Светлая тема":m==1?"Тёмная тема":"Системная тема");
+}
+
+static void busaApi_calibration(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
+    float values[4];
+    for(int i=0;i<4;i++){
+      String name="offset"+String(i);
+      if(!server.hasArg(name)){server.send(400,"text/plain","Нет поправки");return;}
+      String v=server.arg(name);v.trim();char* stop=nullptr;
+      float x=strtof(v.c_str(),&stop);
+      if(v.isEmpty()||*stop!='\0'||!isfinite(x)||x< -10||x>10||
+         fabsf(x*10-roundf(x*10))>0.02f){
+        server.send(400,"text/plain; charset=utf-8","Поправка от -10 до +10, шаг 0,1");return;
+      }
+      values[i]=x;
+    }
+    for(int i=0;i<4;i++)if(!saveTempOffset(i,values[i])){
+      server.send(500,"text/plain; charset=utf-8","Ошибка сохранения поправок");return;
+    }
+    server.send(200,"text/plain; charset=utf-8","Калибровка T1–T4 сохранена");
+}
+
+static void busaApi_events(BusaLocalRequest& server){
+   const uint32_t after=(uint32_t)strtoul(server.arg("after").c_str(),nullptr,10);
+   String result="{\"boot_id\":"+String(busaWebBootId)+",\"uptime_ms\":"+String(millis())+",\"events\":[";bool comma=false;
+   for(uint16_t i=0;i<busaWebJournal.size();i++){
+    const auto* e=busaWebJournal.latest(i);if(!e||e->seq<=after)continue;
+    if(comma)result+=",";comma=true;
+    result+="{\"id\":"+String(e->seq)+",\"uptime_ms\":"+String(e->uptime)+",\"epoch\":"+String(e->epoch)+",\"kind\":"+String(e->kind)+",\"text\":"+quoteJson(String(e->text))+"}";
+   }
+   result+="]}";server.send(200,"application/json; charset=utf-8",result);
+}
+
+static void busaApi_chartHistory(BusaLocalRequest& server){
+    const uint32_t now=millis();int minutes=server.arg("minutes").toInt();
+    if(minutes!=5&&minutes!=10&&minutes!=15&&minutes!=30&&minutes!=60){server.send(400,"application/json","{\"error\":\"minutes\"}");return;}
+    const int bins=min(minutes*30,160);int16_t selected[160];
+    busaChartHistory.selectMs(now,(uint32_t)minutes*60000u,selected,bins);
+    String j="{\"ok\":true,\"minutes\":"+String(minutes)+",\"temperature\":[";
+    for(int k=0;k<4;k++){
+      if(k)j+=",";j+="[";
+      for(int b=0;b<bins;b++){if(b)j+=",";float v=busaChartHistory.value(selected[b],k);j+=isfinite(v)?String(v,2):String("null");}
+      j+="]";
+    }
+    j+="],\"cooling_lph\":[";
+    for(int i=0;i<bins;i++){if(i)j+=",";float value=busaChartHistory.coolingValue(selected[i]);j+=isfinite(value)?String(value,2):String("null");}
+    j+="],\"cooling_calibrated\":";j+=(waterCalibrationVerified()?"true":"false");
+    j+=",\"collection_sensor\":false,\"history_ready\":"+String(busaChartReady?"true":"false")+"}";
+    server.send(200,"application/json; charset=utf-8",j);
+}
+
+static void busaApi_rainmakerEnable(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient() || server.arg("confirm")!="YES"){
+      server.send(403,"application/json","{\"error\":\"local AP confirmation required\"}");return;
+    }
+    if(busaOtaPendingVerification()){
+      server.send(409,"application/json","{\"error\":\"running image is not confirmed\"}");return;
+    }
+    if(otaActive||busaWifiScanRunning){
+      server.send(409,"application/json","{\"error\":\"OTA or Wi-Fi scan busy\"}");return;
+    }
+    if(busaRmBleSessionStarted||busaRmStartRequested){
+      server.send(200,"application/json","{\"bluetooth\":\"already_requested\"}");return;
+    }
+    if(busaRmBleEverCompleted){
+      server.send(409,"application/json","{\"error\":\"already paired; reboot device for a new BLE session\"}");return;
+    }
+    if(!prefs.putBool("rmPairNext",true)){
+      server.send(500,"application/json","{\"error\":\"pairing request was not saved\"}");return;
+    }
+    prefs.putString("rmStage","BLE_REQUESTED");
+    busaRmStartRequested=true;
+    busaRmBleSessionRequested=true;
+    busaRmBleFeedback="Запуск BLE по запросу из локального приложения";
+    server.sendHeader("Cache-Control","no-store");
+    server.send(202,"application/json","{\"bluetooth\":\"starting\",\"pop\":\"123456789\",\"duration_sec\":180}");
+}
+
+static void busaApi_rainmakerDisable(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient() || server.arg("confirm")!="YES"){
+      server.send(403,"application/json","{\"error\":\"local AP confirmation required\"}");return;
+    }
+    // The AP can be temporarily absent during BLE pairing, so the timeout
+    // also stops BLE when a stop request cannot be submitted over Wi-Fi.
+    if(!busaRmBleSessionStarted){
+      busaRmStartRequested=false;busaRmBleSessionRequested=false;
+      busaRmBleFeedback="Bluetooth выключен";
+      server.send(200,"application/json","{\"bluetooth\":\"off\"}");return;
+    }
+    busaRmBleTimeoutPending=true;
+    server.send(202,"application/json","{\"bluetooth\":\"stopping\"}");
+}
+
+static void busaApi_rainmakerStatus(BusaLocalRequest& server){
+    const String ble=busaRmBleSessionStarted?
+      (busaRmBleEnded||busaRmBleTimeoutPending?"stopping":
+       (busaRmBleAdvertising?"advertising":"starting")):
+      (busaRmBleEverCompleted?"done":"off");
+    const String state=busaRmStarted?"running":(busaRmStartRequested?"requested":"stopped");
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json",String("{\"rainmaker\":")+quoteJson(state)+
+       ",\"ble\":"+quoteJson(ble)+
+       ",\"feedback\":"+quoteJson(busaRmBleFeedback)+
+       ",\"last_stage\":"+quoteJson(prefs.getString("rmStage","IDLE"))+
+       ",\"telemetry\":"+busaRainMakerTelemetryJSON()+
+       ",\"automatic_start\":false,\"service\":"+quoteJson(busaRmService)+
+       ",\"pop\":\"123456789\"}");
+}
+
+static void busaDispatchDisplayApi(const busa_uart::ApiRequest& request,int& code,String& body){
+    BusaLocalRequest local(request);
+    if(!busaNvsReady||otaActive){code=409;body="Device busy";return;}
+    switch(request.route){
+      case busa_uart::ApiRoute::waterCoefficient:busaApi_waterCoefficient(local);break;
+      case busa_uart::ApiRoute::temperatureAlarms:busaApi_temperatureAlarms(local);break;
+      case busa_uart::ApiRoute::wifiScan:busaApi_wifiScan(local);break;
+      case busa_uart::ApiRoute::wifiDisconnect:busaApi_wifiDisconnect(local);break;
+      case busa_uart::ApiRoute::wifiConnect:busaApi_wifiConnect(local);break;
+      case busa_uart::ApiRoute::theme:busaApi_theme(local);break;
+      case busa_uart::ApiRoute::calibration:busaApi_calibration(local);break;
+      case busa_uart::ApiRoute::events:busaApi_events(local);break;
+      case busa_uart::ApiRoute::chartHistory:busaApi_chartHistory(local);break;
+      case busa_uart::ApiRoute::rainmakerEnable:busaApi_rainmakerEnable(local);break;
+      case busa_uart::ApiRoute::rainmakerDisable:busaApi_rainmakerDisable(local);break;
+      case busa_uart::ApiRoute::rainmakerStatus:busaApi_rainmakerStatus(local);break;
+      case busa_uart::ApiRoute::googleConfig:busaApi_googleConfig(local);break;
+      case busa_uart::ApiRoute::googleTest:busaApi_googleTest(local);break;
+      case busa_uart::ApiRoute::googleOff:busaApi_googleOff(local);break;
+      default:code=404;body="Unknown request";return;
+    }
+    code=local.code();body=local.body();
+}
+
 void setup(){
   Serial0.begin(115200);
   Serial.begin(115200);
@@ -3975,27 +4283,7 @@ void setup(){
     server.send(200,"application/json; charset=utf-8",statusJSON());
   });
    // Local AP only. Manual coefficient does not override pulse credibility checks.
-   server.on("/api/water/coefficient",HTTP_POST,[]{
-     if(!apClient()||server.arg("confirm")!="YES"){
-       server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;
-     }
-     if(!server.hasArg("pulses_per_litre")){
-       server.send(400,"text/plain; charset=utf-8","Нет коэффициента");return;
-     }
-     String raw=server.arg("pulses_per_litre");raw.trim();
-     char *end=nullptr;
-     const float requested=strtof(raw.c_str(),&end);
-     if(raw.isEmpty()||*end!='\0'||!isfinite(requested)||!BusaWater::validPulsesPerLitre(requested)){
-       server.send(400,"text/plain; charset=utf-8","Коэффициент: 1–100000 имп/л");return;
-     }
-     if(!busaNvsReady||prefs.putFloat("waterPpl",requested)!=sizeof(float)){
-       server.send(500,"text/plain; charset=utf-8","Ошибка сохранения NVS");return;
-     }
-     waterPulsesPerLitre=requested;
-     waterCoefficientManual=fabsf(requested-BusaWater::kPassportPulsesPerLitre)>0.05f;
-     flowReady=false;
-     server.send(200,"application/json; charset=utf-8",
-       String("{\"ok\":true,\"pulses_per_litre\":")+String(waterPulsesPerLitre,1)+"}");
+   server.on("/api/water/coefficient",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_waterCoefficient(request);
    });
    // Local AP only: T3/T4 sound relay configuration; no process actuation.
    server.on("/api/sound/config",HTTP_POST,[]{
@@ -4103,65 +4391,7 @@ void setup(){
     server.send(200,"application/json",soundJSON(millis()));
   });
   // Single minimalist T1-T4 alarm-threshold form. Monitoring and sound only.
-  server.on("/api/temperature-alarms",HTTP_POST,[]{
-    if(!apClient()){server.send(403,"text/plain","BUSA local AP only");return;}
-    float requestedOn[4]={NAN,NAN,NAN,NAN},requestedOff[4]={NAN,NAN,NAN,NAN};
-    bool present[4]={false,false,false,false};
-    for(int i=0;i<4;i++){
-      const String onKey=String("on")+i,offKey=String("off")+i;
-      if(!server.hasArg(onKey)||!server.hasArg(offKey)){
-        server.send(400,"text/plain","Missing T1-T4 fields");return;
-      }
-      const String on=server.arg(onKey),off=server.arg(offKey);
-      if(on.isEmpty()&&off.isEmpty())continue; // no threshold: no sound
-      char *endOn=nullptr,*endOff=nullptr;
-      requestedOn[i]=strtof(on.c_str(),&endOn);
-      requestedOff[i]=strtof(off.c_str(),&endOff);
-      if(on.isEmpty()||off.isEmpty()||!endOn||*endOn||!endOff||*endOff||
-         !BusaSound::valid(requestedOn[i],requestedOff[i])){
-        server.send(400,"text/plain","Invalid ON/OFF temperatures 0..125 C, delta >=0.1 C");return;
-      }
-      present[i]=true;
-    }
-    // Do not alter any hardware output until the full submitted form is valid.
-    soundOutputsOff();soundResetState();
-    const char* onKeys[4]={"buzOn0","buzOn1","sndT3On","sndT4On"};
-    const char* offKeys[4]={"buzOff0","buzOff1","sndT3Off","sndT4Off"};
-    bool saved=true;
-    for(int i=0;i<4;i++){
-      if(present[i]){
-        if(!prefs.putFloat(onKeys[i],requestedOn[i]))saved=false;
-        if(!prefs.putFloat(offKeys[i],requestedOff[i]))saved=false;
-      }else{
-        if(prefs.isKey(onKeys[i])&&!prefs.remove(onKeys[i]))saved=false;
-        if(prefs.isKey(offKeys[i])&&!prefs.remove(offKeys[i]))saved=false;
-      }
-    }
-    for(int i=0;i<2;i++){
-      if(!prefs.putBool((String("buzE")+i).c_str(),true))saved=false;
-    }
-    for(int i=0;i<4;i++){
-      if(!prefs.putBool((String("sndRoleEnable")+i).c_str(),true))saved=false;
-    }
-    if(!saved){
-      for(int i=0;i<4;i++){soundEnabled[i]=false;prefs.putBool((String("sndRoleEnable")+i).c_str(),false);}
-      for(int i=0;i<2;i++){buzzerEnabled[i]=false;prefs.putBool((String("buzE")+i).c_str(),false);}
-      soundOutputsOff();
-      server.send(500,"text/plain","Temperature settings save failed");return;
-    }
-    for(int i=0;i<2;i++){
-      buzzerOnC[i]=requestedOn[i];buzzerOffC[i]=requestedOff[i];buzzerEnabled[i]=true;
-    }
-    soundOnC[0]=soundOnC[1]=soundOnC[2]=requestedOn[2];
-    soundOffC[0]=soundOffC[1]=soundOffC[2]=requestedOff[2];
-    soundOnC[3]=requestedOn[3];soundOffC[3]=requestedOff[3];
-    for(int i=0;i<4;i++){
-      refTemp[i]=requestedOn[i];noticeTemp[i]=requestedOff[i];
-      soundEnabled[i]=true;
-    }
-    for(int i=0;i<2;i++)buzzerTempChannels[i]=BusaSound::Channel();
-    tftDirty=true;lastRender=0;
-    server.send(200,"application/json",soundJSON(millis()));
+  server.on("/api/temperature-alarms",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_temperatureAlarms(request);
   });
 
   addGoogleRoutes();
@@ -4184,79 +4414,13 @@ void setup(){
     server.sendHeader("Cache-Control","no-store");
     server.send(otaSuccess?200:400,"application/json",otaJSON());
   },uploadOTA);
-  server.on("/api/wifi/scan",HTTP_GET,[]{
-    if(!apClient()){
-      server.send(403,"application/json","{\"error\":\"local_only\"}");return;
-    }
-    // HTTP is read-only except for requesting a single async scan.
-    // Never manipulate the radio inside the browser request.
-    if(server.arg("start")=="1" && !busaWifiRequestSharedScan(false,server.arg("fresh")=="1")){
-      server.send(409,"application/json",
-        "{\"scanning\":false,\"networks\":[],\"error\":\"busy\"}");return;
-    }
-    server.sendHeader("Cache-Control","no-store");
-    server.send(200,"application/json; charset=utf-8",busaWifiScanJSON());
+  server.on("/api/wifi/scan",HTTP_GET,[]{BusaLocalRequest request(server);busaApi_wifiScan(request);
   });
   // Phone-local Wi-Fi disconnect: never disable the BUSA access point.
   // The same saved 'staOff' flag is used by the existing physical disconnect.
-  server.on("/api/wifi/disconnect",HTTP_POST,[]{
-    if(!apClient()){
-      server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА.");return;
-    }
-    if(otaActive){
-      server.send(409,"text/plain; charset=utf-8","Дождитесь завершения обновления.");return;
-    }
-    if(!prefs.putBool("staOff",true) || !prefs.getBool("staOff",false)){
-      server.send(500,"text/plain; charset=utf-8","Ошибка сохранения отключения Wi-Fi.");return;
-    }
-    wifiUiStaDisabled=true;wifiUiDisablePending=true;
-    wifiUiConnectPending=false;wifiUiAssociationDueAt=0;wifiUiConnectAt=0;
-    wifiUiResumeStation=false;wifiUiLastConnectError="";
-    WiFi.setAutoReconnect(false);
-    // Don't reuse a cached scan that ran on the previous router's channel.
-    if(busaSharedScanState==BUSA_SCAN_READY ||
-       busaSharedScanState==BUSA_SCAN_EMPTY ||
-       busaSharedScanState==BUSA_SCAN_ERROR)
-      busaSharedScanState=BUSA_SCAN_IDLE;
-    server.sendHeader("Cache-Control","no-store");
-    server.send(200,"text/plain; charset=utf-8",
-      "Внешний Wi-Fi отключён. Локальная сеть БУСА работает.");
+  server.on("/api/wifi/disconnect",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_wifiDisconnect(request);
   });
-  server.on("/api/wifi",HTTP_POST,[]{
-    // Credentials may only be provisioned while connected to the protected local AP.
-    if(server.client().localIP()!=WiFi.softAPIP()){
-      server.send(403,"text/plain; charset=utf-8","Настройка Wi-Fi доступна только через сеть БУСА.");return;
-    }
-    if(busaWifiScanRunning || wifiUiOwnsScan || otaActive){
-      server.send(409,"text/plain; charset=utf-8",
-        "Поиск сети или обновление выполняется. Повтори после завершения.");return;
-    }
-    String ssid=server.arg("ssid"),pass=server.arg("pass");
-    ssid.trim();
-    if(ssid.isEmpty()||ssid.length()>32||pass.length()<8||pass.length()>63){
-      server.send(400,"text/plain; charset=utf-8","Недопустимое имя сети или длина пароля (8–63).");return;
-    }
-    // NVS is encrypted only if board flash encryption is enabled; keep local AP secure.
-    // Local app uses the same NVS flag as TFT. A saved network re-enables
-    // only the external STA; the local AP never stops during provisioning.
-    const String prevSsid=prefs.getString("ssid","");
-    const String prevPass=prefs.getString("pass","");
-    const bool prevOff=prefs.getBool("staOff",false);
-    const bool ok=(prefs.putString("pass",pass)==pass.length() &&
-      prefs.putString("ssid",ssid)==ssid.length() &&
-      prefs.putBool("staOff",false));
-    if(!ok){
-      prefs.putString("ssid",prevSsid);prefs.putString("pass",prevPass);
-      prefs.putBool("staOff",prevOff);
-      server.send(500,"text/plain; charset=utf-8","Не удалось сохранить Wi-Fi настройки");return;
-    }
-    wifiUiResetReconnectBackoff();
-    stationSsid=ssid;stationPass=pass;wifiUiStaDisabled=false;wifiUiDisablePending=false;
-    wifiUiLastConnectError="";wifiUiResumeStation=false;
-    wifiUiStage=WIFIUI_CONNECTING; // shared network state, NOT navigation state
-    wifiUiConnectPending=true;wifiUiAssociationDueAt=0;
-    wifiUiConnectAt=0;lastStationCheck=millis();
-    server.send(200,"text/plain; charset=utf-8","Выбрана сеть: "+ssid+". Подключение запускается.");
+  server.on("/api/wifi",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_wifiConnect(request);
   });
   server.on("/api/page",HTTP_GET,[]{
     int n=server.arg("n").toInt();
@@ -4297,31 +4461,9 @@ void setup(){
     server.send(200,"text/plain; charset=utf-8",
       "Тест отправлен: 5 секунд чёрного фона и белой надписи BUSA 1M AI.");
   });
-  server.on("/api/tft/theme",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
-    if(!server.hasArg("mode")){server.send(400,"text/plain","Выбери тему");return;}
-    int m=server.arg("mode").toInt();
-    if(m<0||m>2||!saveThemeMode((uint8_t)m)){server.send(400,"text/plain","Тема не сохранена");return;}
-    server.send(200,"text/plain; charset=utf-8",m==0?"Светлая тема":m==1?"Тёмная тема":"Системная тема");
+  server.on("/api/tft/theme",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_theme(request);
   });
-  server.on("/api/temperature/calibration",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
-    float values[4];
-    for(int i=0;i<4;i++){
-      String name="offset"+String(i);
-      if(!server.hasArg(name)){server.send(400,"text/plain","Нет поправки");return;}
-      String v=server.arg(name);v.trim();char* stop=nullptr;
-      float x=strtof(v.c_str(),&stop);
-      if(v.isEmpty()||*stop!='\0'||!isfinite(x)||x< -10||x>10||
-         fabsf(x*10-roundf(x*10))>0.02f){
-        server.send(400,"text/plain; charset=utf-8","Поправка от -10 до +10, шаг 0,1");return;
-      }
-      values[i]=x;
-    }
-    for(int i=0;i<4;i++)if(!saveTempOffset(i,values[i])){
-      server.send(500,"text/plain; charset=utf-8","Ошибка сохранения поправок");return;
-    }
-    server.send(200,"text/plain; charset=utf-8","Калибровка T1–T4 сохранена");
+  server.on("/api/temperature/calibration",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_calibration(request);
   });
   server.on("/api/keypad/start",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
@@ -4372,32 +4514,9 @@ void setup(){
   });
   // One shared history source for the physical TFT and local iPhone.
   // No invented collection values: only cooling-water pulse counts are sampled.
-  server.on("/api/web-events",HTTP_GET,[]{
-   const uint32_t after=(uint32_t)strtoul(server.arg("after").c_str(),nullptr,10);
-   String result="{\"boot_id\":"+String(busaWebBootId)+",\"uptime_ms\":"+String(millis())+",\"events\":[";bool comma=false;
-   for(uint16_t i=0;i<busaWebJournal.size();i++){
-    const auto* e=busaWebJournal.latest(i);if(!e||e->seq<=after)continue;
-    if(comma)result+=",";comma=true;
-    result+="{\"id\":"+String(e->seq)+",\"uptime_ms\":"+String(e->uptime)+",\"epoch\":"+String(e->epoch)+",\"kind\":"+String(e->kind)+",\"text\":"+quoteJson(String(e->text))+"}";
-   }
-   result+="]}";server.send(200,"application/json; charset=utf-8",result);
+  server.on("/api/web-events",HTTP_GET,[]{BusaLocalRequest request(server);busaApi_events(request);
   });
-  server.on("/api/chart-history",HTTP_GET,[]{
-    const uint32_t now=millis();int minutes=server.arg("minutes").toInt();
-    if(minutes!=5&&minutes!=10&&minutes!=15&&minutes!=30&&minutes!=60){server.send(400,"application/json","{\"error\":\"minutes\"}");return;}
-    const int bins=min(minutes*30,160);int16_t selected[160];
-    busaChartHistory.selectMs(now,(uint32_t)minutes*60000u,selected,bins);
-    String j="{\"ok\":true,\"minutes\":"+String(minutes)+",\"temperature\":[";
-    for(int k=0;k<4;k++){
-      if(k)j+=",";j+="[";
-      for(int b=0;b<bins;b++){if(b)j+=",";float v=busaChartHistory.value(selected[b],k);j+=isfinite(v)?String(v,2):String("null");}
-      j+="]";
-    }
-    j+="],\"cooling_lph\":[";
-    for(int i=0;i<bins;i++){if(i)j+=",";float value=busaChartHistory.coolingValue(selected[i]);j+=isfinite(value)?String(value,2):String("null");}
-    j+="],\"cooling_calibrated\":";j+=(waterCalibrationVerified()?"true":"false");
-    j+=",\"collection_sensor\":false,\"history_ready\":"+String(busaChartReady?"true":"false")+"}";
-    server.send(200,"application/json; charset=utf-8",j);
+  server.on("/api/chart-history",HTTP_GET,[]{BusaLocalRequest request(server);busaApi_chartHistory(request);
   });
   server.on("/api/graph-history",HTTP_GET,[]{
     uint32_t now=millis();
@@ -4430,60 +4549,11 @@ void setup(){
     if(n<0||n>2){server.send(400,"text/plain","Bad graph");return;}
     server.send(200,"application/json","{\"ok\":true,\"scope\":\"browser_only\"}");
   });
-  server.on("/api/rainmaker/enable",HTTP_POST,[]{
-    if(!apClient() || server.arg("confirm")!="YES"){
-      server.send(403,"application/json","{\"error\":\"local AP confirmation required\"}");return;
-    }
-    if(busaOtaPendingVerification()){
-      server.send(409,"application/json","{\"error\":\"running image is not confirmed\"}");return;
-    }
-    if(otaActive||busaWifiScanRunning){
-      server.send(409,"application/json","{\"error\":\"OTA or Wi-Fi scan busy\"}");return;
-    }
-    if(busaRmBleSessionStarted||busaRmStartRequested){
-      server.send(200,"application/json","{\"bluetooth\":\"already_requested\"}");return;
-    }
-    if(busaRmBleEverCompleted){
-      server.send(409,"application/json","{\"error\":\"already paired; reboot device for a new BLE session\"}");return;
-    }
-    if(!prefs.putBool("rmPairNext",true)){
-      server.send(500,"application/json","{\"error\":\"pairing request was not saved\"}");return;
-    }
-    prefs.putString("rmStage","BLE_REQUESTED");
-    busaRmStartRequested=true;
-    busaRmBleSessionRequested=true;
-    busaRmBleFeedback="Запуск BLE по запросу из локального приложения";
-    server.sendHeader("Cache-Control","no-store");
-    server.send(202,"application/json","{\"bluetooth\":\"starting\",\"pop\":\"123456789\",\"duration_sec\":180}");
+  server.on("/api/rainmaker/enable",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_rainmakerEnable(request);
   });
-  server.on("/api/rainmaker/disable",HTTP_POST,[]{
-    if(!apClient() || server.arg("confirm")!="YES"){
-      server.send(403,"application/json","{\"error\":\"local AP confirmation required\"}");return;
-    }
-    // The AP can be temporarily absent during BLE pairing, so the timeout
-    // also stops BLE when a stop request cannot be submitted over Wi-Fi.
-    if(!busaRmBleSessionStarted){
-      busaRmStartRequested=false;busaRmBleSessionRequested=false;
-      busaRmBleFeedback="Bluetooth выключен";
-      server.send(200,"application/json","{\"bluetooth\":\"off\"}");return;
-    }
-    busaRmBleTimeoutPending=true;
-    server.send(202,"application/json","{\"bluetooth\":\"stopping\"}");
+  server.on("/api/rainmaker/disable",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_rainmakerDisable(request);
   });
-  server.on("/api/rainmaker/status",HTTP_GET,[]{
-    const String ble=busaRmBleSessionStarted?
-      (busaRmBleEnded||busaRmBleTimeoutPending?"stopping":
-       (busaRmBleAdvertising?"advertising":"starting")):
-      (busaRmBleEverCompleted?"done":"off");
-    const String state=busaRmStarted?"running":(busaRmStartRequested?"requested":"stopped");
-    server.sendHeader("Cache-Control","no-store");
-    server.send(200,"application/json",String("{\"rainmaker\":")+quoteJson(state)+
-       ",\"ble\":"+quoteJson(ble)+
-       ",\"feedback\":"+quoteJson(busaRmBleFeedback)+
-       ",\"last_stage\":"+quoteJson(prefs.getString("rmStage","IDLE"))+
-       ",\"telemetry\":"+busaRainMakerTelemetryJSON()+
-       ",\"automatic_start\":false,\"service\":"+quoteJson(busaRmService)+
-       ",\"pop\":\"123456789\"}");
+  server.on("/api/rainmaker/status",HTTP_GET,[]{BusaLocalRequest request(server);busaApi_rainmakerStatus(request);
   });
   server.on("/api/settings-tab",HTTP_GET,[]{
     int n=server.arg("n").toInt();

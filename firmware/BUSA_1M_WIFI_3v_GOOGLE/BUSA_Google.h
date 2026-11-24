@@ -225,8 +225,8 @@ void googleWorker(void* unused){
     busaGoogleNetworkBusy=false;
   }
 }
-void addGoogleRoutes(){
-  server.on("/api/google/config",HTTP_POST,[]{
+static void busaApi_googleConfig(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
     if(!apClient()){server.send(403,"text/plain","Настройка только из локальной сети БУСА");return;}
     String url=server.arg("url"),token=server.arg("token");
     url.trim();token.trim();
@@ -239,8 +239,10 @@ void addGoogleRoutes(){
     }
     googleRestart=true;googleRestartAt=millis();
     server.send(200,"text/plain","Настройка сохранена; перезапуск БУСА для применения");
-  });
-  server.on("/api/google/test",HTTP_POST,[]{
+}
+
+static void busaApi_googleTest(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
     if(!apClient()||server.arg("confirm")!="YES"){
       server.send(403,"text/plain; charset=utf-8","Проверка доступна только в сети БУСА");return;
     }
@@ -249,8 +251,10 @@ void addGoogleRoutes(){
     }
     googleTestRequested=true;
     server.send(200,"text/plain; charset=utf-8","Запрос отправки принят. Статус появится после попытки HTTPS.");
-  });
-  server.on("/api/google/off",HTTP_POST,[]{
+}
+
+static void busaApi_googleOff(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
     if(!apClient()||server.arg("confirm")!="YES"){
       server.send(403,"text/plain","Подтвердите локально");return;
     }
@@ -259,6 +263,14 @@ void addGoogleRoutes(){
     prefs.remove("g-token");
     googleRestart=true;googleRestartAt=millis();
     server.send(200,"text/plain","Отправка отключена; БУСА перезапускается");
+}
+
+void addGoogleRoutes(){
+  server.on("/api/google/config",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_googleConfig(request);
+  });
+  server.on("/api/google/test",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_googleTest(request);
+  });
+  server.on("/api/google/off",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_googleOff(request);
   });
 }
 void launchGoogleCloud(){

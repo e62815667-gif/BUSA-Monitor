@@ -4,9 +4,10 @@
 #include <BUSA_DisplayProtocol.h>
 
 String statusJSON();
+static void busaDispatchDisplayApi(const busa_uart::ApiRequest&,int&,String&);
 namespace busa_display_link {
 using namespace busa_uart;
-static uint8_t rx[headerSize+diagnosticBytes+crcSize];
+static uint8_t rx[headerSize+apiMaxRequest+crcSize];
 static Decoder decoder(rx,sizeof(rx));
 static uint8_t* raw=nullptr;
 static uint8_t* wire=nullptr;
@@ -19,7 +20,7 @@ static void begin(){
     raw=static_cast<uint8_t*>(heap_caps_malloc(maxRaw,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
     wire=static_cast<uint8_t*>(heap_caps_malloc(maxWire,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
     if(!raw||!wire){free(raw);free(wire);raw=nullptr;wire=nullptr;return;}
-    Serial1.setRxBufferSize(1024);
+    if(!Serial1.setRxBufferSize(4096)){free(raw);free(wire);raw=nullptr;wire=nullptr;return;}
     Serial1.begin(baud,SERIAL_8N1,mainRx,mainTx);
     ready=true;
 }
@@ -28,6 +29,21 @@ static bool enqueue(uint8_t type,uint32_t seq,const uint8_t* data,size_t length)
     wireAt=0;
     wireSize=encode(type,seq,data,length,raw,maxRaw,wire,maxWire);
     return wireSize!=0;
+}
+static void handleApi(const Frame& f){
+    if(wireAt<wireSize){++busyDrops;return;}
+    ApiRequest req{};
+    int code=400;String body="Invalid request";
+    if(parseApiRequest(f.data,f.size,req)){
+        if(!haveDiagnostic||uint32_t(millis()-lastDiagnostic)>staleMs){code=409;body="Display session not ready";}
+        else busaDispatchDisplayApi(req,code,body);
+    }
+    if(body.length()>maxPayload-2){code=413;body="Response exceeds UART limit";}
+    uint8_t* payload=raw+headerSize;
+    payload[0]=uint8_t(code);payload[1]=uint8_t(code>>8);
+    memcpy(payload+2,body.c_str(),body.length());
+    enqueue(apiResponse,f.seq,payload,body.length()+2);
+    memset(rx,0,sizeof(rx));
 }
 static void poll(){
     if(!ready)return;
@@ -41,6 +57,8 @@ static void poll(){
             String snapshot=statusJSON();
             if(snapshot.length()>0&&snapshot.length()<=maxPayload)
                 enqueue(status,f.seq,reinterpret_cast<const uint8_t*>(snapshot.c_str()),snapshot.length());
+        }else if(f.kind==apiRequest){
+            handleApi(f);
         }else if(decodeMetrics(f,metrics,displayFirmware)){
             lastDiagnostic=millis();haveDiagnostic=true;
             enqueue(diagnosticsAck,f.seq,nullptr,0);

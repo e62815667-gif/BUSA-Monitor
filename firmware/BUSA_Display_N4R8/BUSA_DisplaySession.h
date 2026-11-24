@@ -27,6 +27,16 @@ public:
     bool connected()const{return haveData_&&uint32_t(millis()-lastData_)<=staleMs;}
     const JsonDocument& snapshot()const{return model_;}
     uint32_t snapshotRevision()const{return revision_;}
+    // A command is never automatically retried: a missing ACK is an unknown result.
+    bool submitApi(const uint8_t* p,size_t n){
+        ApiRequest q{};
+        if(!connected()||queuedSize_||pending_==apiResponse||apiResultReady_||!parseApiRequest(p,n,q))return false;
+        memcpy(queued_,p,n);queuedSize_=n;return true;
+    }
+    bool takeApiResult(int& code,String& body){
+        if(!apiResultReady_)return false;
+        code=apiCode_;body=apiBody_;apiBody_="";apiResultReady_=false;return true;
+    }
     void poll(const uint32_t* boardMetrics,const char* firmware,uint32_t loopMax){
         if(!decoder_)return;
         Frame f{};
@@ -38,12 +48,18 @@ public:
         }
         const uint32_t now=millis();
         if(pending_&&uint32_t(now-requestAt_)>=3500){
-            ++timeouts_;++lost_;pending_=0;wireSize_=wireAt_=0;
+            ++timeouts_;++lost_;
+            if(pending_==apiResponse){apiCode_=0;apiBody_="Response not received";apiResultReady_=true;}
+            pending_=0;wireSize_=wireAt_=0;
         }
         if(!pending_){
             if(!diagnosticSent_||uint32_t(now-lastDiag_)>=1500)
                 sendDiagnostics(boardMetrics,firmware,loopMax,now);
-            else if(!requestSent_||uint32_t(now-lastRequest_)>=250){
+            else if(queuedSize_){
+                if(connected())start(apiRequest,queued_,queuedSize_,apiResponse,now);
+                else {apiCode_=0;apiBody_="Display link unavailable";apiResultReady_=true;}
+                memset(queued_,0,sizeof(queued_));queuedSize_=0;
+            }else if(!requestSent_||uint32_t(now-lastRequest_)>=250){
                 lastRequest_=now;requestSent_=true;
                 start(requestStatus,nullptr,0,status,now);
             }
@@ -68,6 +84,15 @@ private:
     void handle(const Frame& f){
         if(!pending_||f.seq!=expectedSeq_||f.kind!=pending_){++lost_;return;}
         if(f.kind==diagnosticsAck&&f.size==0){pending_=0;return;}
+        if(f.kind==apiResponse){
+            apiCode_=0;apiBody_="";
+            if(f.size>=2){
+                apiCode_=int(f.data[0])|(int(f.data[1])<<8);
+                if(!apiBody_.reserve(f.size-1))apiCode_=0;
+                else for(size_t i=2;i<f.size;++i)apiBody_+=char(f.data[i]);
+            }
+            apiResultReady_=true;pending_=0;return;
+        }
         if(f.kind!=status)return;
         JsonDocument candidate;
         const DeserializationError error=deserializeJson(candidate,reinterpret_cast<const char*>(f.data),f.size);
@@ -98,7 +123,12 @@ private:
     }
     Decoder* decoder_=nullptr;
     uint8_t* rxStorage_=nullptr;
-    uint8_t raw_[headerSize+diagnosticBytes+crcSize]={};
+    uint8_t queued_[apiMaxRequest]={};
+    size_t queuedSize_=0;
+    bool apiResultReady_=false;
+    int apiCode_=0;
+    String apiBody_;
+    uint8_t raw_[headerSize+apiMaxRequest+crcSize]={};
     uint8_t wire_[2*sizeof(raw_)+2]={};
     size_t wireSize_=0,wireAt_=0;
     uint8_t pending_=0;
