@@ -1,7 +1,7 @@
 name: BUSA dual-board COLL1 and display OTA build
 on:
   push:
-    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125]
+    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125]
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +28,8 @@ jobs:
           node tests/test_perf1_polling.cjs
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_perf2.cpp -o /tmp/busa-perf2-test
           /tmp/busa-perf2-test
+          g++ -std=c++11 -pthread -Wall -Wextra -Werror tests/test_uart_tx_mailbox.cpp -o /tmp/busa-mailbox-test
+          /tmp/busa-mailbox-test
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_protocol.cpp -o /tmp/busa-display-protocol-test
           /tmp/busa-display-protocol-test
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_api.cpp -o /tmp/busa-display-api-test
@@ -94,7 +96,8 @@ jobs:
           assert usb.read_bytes()[0x10000:]==ota.read_bytes()
           assert b'display_diagnostics' in ota.read_bytes()
           assert b'UNRELIABLE_PULSES' in ota.read_bytes()
-          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF2' in ota.read_bytes()
+          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF3' in ota.read_bytes()
+          assert b'main_uart_tx_worker_max_ms' in ota.read_bytes()
           assert b'loop_profile' in ota.read_bytes()
           assert b'/api/display-ota/upload' in ota.read_bytes()
           checks=[]
@@ -109,7 +112,7 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_ESP32_PERF2
+          name: BUSA_ESP32_PERF3
           retention-days: 30
           path: dual_delivery_main/
           if-no-files-found: error

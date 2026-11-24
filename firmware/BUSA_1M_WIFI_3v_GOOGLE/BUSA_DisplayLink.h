@@ -1,6 +1,8 @@
 #pragma once
 #include <Arduino.h>
 #include <esp_heap_caps.h>
+#include <driver/uart.h>
+#include <BUSA_UartTxMailbox.h>
 #include <BUSA_DisplayProtocol.h>
 #include "BUSA_DisplayOtaMain.h"
 
@@ -12,8 +14,27 @@ static uint8_t rx[headerSize+apiMaxRequest+crcSize];
 static Decoder decoder(rx,sizeof(rx));
 static uint8_t* raw=nullptr;
 static uint8_t* wire=nullptr;
-static size_t wireSize=0, wireAt=0;
 static uint32_t lastDiagnostic=0, tx=0, busyDrops=0;
+static TxMailbox txMailbox;
+static TaskHandle_t txTask=nullptr;
+static uint32_t txWorstMs=0,txErrors=0,jsonWorstMs=0,encodeWorstMs=0,apiWorstMs=0;
+static void txWorker(void*){
+    for(;;){
+        ulTaskNotifyTake(pdTRUE,portMAX_DELAY);
+        const size_t n=txMailbox.take();
+        if(!n)continue;
+        const uint32_t started=millis();
+        // Only this task writes UART1. No Arduino Serial mutex is held.
+        const int written=uart_write_bytes(UART_NUM_1,wire,n);
+        txMailbox.complete(written,millis()-started);
+    }
+}
+static void drainTx(){
+    bool success=false;uint32_t elapsed=0;
+    if(!txMailbox.reap(success,elapsed))return;
+    if(elapsed>txWorstMs)txWorstMs=elapsed;
+    if(success)++tx;else ++txErrors;
+}
 static uint32_t metrics[metricCount]={};
 static char displayFirmware[versionBytes]={};
 static bool ready=false, haveDiagnostic=false;
@@ -23,16 +44,22 @@ static void begin(){
     if(!raw||!wire){free(raw);free(wire);raw=nullptr;wire=nullptr;return;}
     if(!Serial1.setRxBufferSize(4096)||Serial1.setTxBufferSize(mainTxBuffer)!=mainTxBuffer){free(raw);free(wire);raw=nullptr;wire=nullptr;return;}
     Serial1.begin(baud,SERIAL_8N1,mainRx,mainTx);
+    if(!uart_is_driver_installed(UART_NUM_1)||xTaskCreatePinnedToCore(txWorker,"busa-uart-tx",3072,nullptr,2,&txTask,1)!=pdPASS){Serial1.end();free(raw);free(wire);raw=nullptr;wire=nullptr;return;}
     ready=true;
 }
 static bool enqueue(uint8_t type,uint32_t seq,const uint8_t* data,size_t length){
-    if(wireAt<wireSize){++busyDrops;return false;}
-    wireAt=0;
-    wireSize=encode(type,seq,data,length,raw,maxRaw,wire,maxWire);
-    return wireSize!=0;
+    drainTx();
+    if(txMailbox.busy()){++busyDrops;return false;}
+    const uint32_t started=millis();
+    const size_t size=encode(type,seq,data,length,raw,maxRaw,wire,maxWire);
+    const uint32_t elapsed=millis()-started;if(elapsed>encodeWorstMs)encodeWorstMs=elapsed;
+    if(!txMailbox.publish(size))return false;
+    xTaskNotifyGive(txTask);return true;
 }
 static void handleApi(const Frame& f){
-    if(wireAt<wireSize){++busyDrops;return;}
+    drainTx();
+    if(txMailbox.busy()){++busyDrops;return;}
+    const uint32_t started=millis();
     ApiRequest req{};
     int code=400;String body="Invalid request";
     if(parseApiRequest(f.data,f.size,req)){
@@ -44,28 +71,28 @@ static void handleApi(const Frame& f){
     payload[0]=uint8_t(code);payload[1]=uint8_t(code>>8);
     memcpy(payload+2,body.c_str(),body.length());
     enqueue(apiResponse,f.seq,payload,body.length()+2);
+    const uint32_t elapsed=millis()-started;if(elapsed>apiWorstMs)apiWorstMs=elapsed;
     memset(rx,0,sizeof(rx));
 }
 static bool otaCapable(){return ready&&haveDiagnostic&&uint32_t(millis()-lastDiagnostic)<=staleMs&&strncmp(displayFirmware,busa_ota::displayFamily,strlen(busa_ota::displayFamily))==0;}
-static void drainTx(){
-    if(wireAt>=wireSize)return;
-    const size_t count=txWriteBudget(wireSize-wireAt,Serial1.availableForWrite());
-    if(count){wireAt+=Serial1.write(wire+wireAt,count);if(wireAt==wireSize)++tx;}
-}
 static void poll(){
     busa_display_ota::tick();
     if(!ready)return;
     // Finish queuing an existing frame before accepting the next request.
     drainTx();
     Frame f{};
-    // Bounded byte budget: UART traffic must not starve other loop work.
-    for(unsigned i=0;i<256&&Serial1.available();++i){
-        int c=Serial1.read();
-        if(c<0||!decoder.push(uint8_t(c),f))continue;
+    // One bounded, zero-wait IDF read; no per-byte Arduino wait or TX mutex.
+    uint8_t bytes[256];
+    const int count=uart_read_bytes(UART_NUM_1,bytes,sizeof(bytes),0);
+    for(int i=0;i<count;++i){
+        if(!decoder.push(bytes[i],f))continue;
         if(busa_display_ota::handle(f,enqueue))continue;
         if(f.kind==requestStatus&&f.size==0){
-            if(wireAt<wireSize){++busyDrops;continue;}
+            drainTx();
+            if(txMailbox.busy()){++busyDrops;continue;}
+            const uint32_t started=millis();
             String snapshot=statusJSON();
+            const uint32_t elapsed=millis()-started;if(elapsed>jsonWorstMs)jsonWorstMs=elapsed;
             if(snapshot.length()>0&&snapshot.length()<=maxPayload)
                 enqueue(status,f.seq,reinterpret_cast<const uint8_t*>(snapshot.c_str()),snapshot.length());
         }else if(f.kind==apiRequest){
@@ -97,6 +124,12 @@ static String diagnosticJSON(){
     s+=",\"main_uart_format_errors\":"+String(decoder.counters.formatErrors);
     s+=",\"main_uart_overflow\":"+String(decoder.counters.overflow);
     s+=",\"main_uart_busy_drops\":"+String(busyDrops);
+    s+=",\"main_uart_tx_worker_max_ms\":"+String(txWorstMs);
+    s+=",\"main_uart_tx_write_errors\":"+String(txErrors);
+    s+=",\"main_uart_tx_pending\":"+String(txMailbox.busy()?"true":"false");
+    s+=",\"main_uart_json_max_ms\":"+String(jsonWorstMs);
+    s+=",\"main_uart_encode_max_ms\":"+String(encodeWorstMs);
+    s+=",\"main_uart_api_max_ms\":"+String(apiWorstMs);
     const char* names[]={"uptime_ms","reset_reason","cpu_mhz","free_ram","min_ram","psram_total","psram_free","max_loop_ms","uart_rx","uart_tx","uart_crc","uart_lost","uart_timeout","lcd_init","render_last_ms","render_max_ms","fps_milli","touch_init","touch_errors","sd_status"};
     for(size_t i=0;i<sizeof(names)/sizeof(names[0]);++i){s+=",\"";s+=names[i];s+="\":";s+=metricJson(Metric(i));}
     s+=",\"sd_total_bytes\":"+bytesJson(sdTotalLow,sdTotalHigh);
