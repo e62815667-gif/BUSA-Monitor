@@ -47,9 +47,16 @@ static void handleApi(const Frame& f){
     memset(rx,0,sizeof(rx));
 }
 static bool otaCapable(){return ready&&haveDiagnostic&&uint32_t(millis()-lastDiagnostic)<=staleMs&&strncmp(displayFirmware,busa_ota::displayFamily,strlen(busa_ota::displayFamily))==0;}
+static void drainTx(){
+    if(wireAt>=wireSize)return;
+    const size_t count=txWriteBudget(wireSize-wireAt,Serial1.availableForWrite());
+    if(count){wireAt+=Serial1.write(wire+wireAt,count);if(wireAt==wireSize)++tx;}
+}
 static void poll(){
     busa_display_ota::tick();
     if(!ready)return;
+    // Finish queuing an existing frame before accepting the next request.
+    drainTx();
     Frame f{};
     // Bounded byte budget: UART traffic must not starve other loop work.
     for(unsigned i=0;i<256&&Serial1.available();++i){
@@ -68,15 +75,7 @@ static void poll(){
             enqueue(diagnosticsAck,f.seq,nullptr,0);
         }
     }
-    if(wireAt<wireSize){
-        // Leave space for the IDF ring item overhead. Core 2.0.17 may
-        // report FIFO space when its ring is full, so do not write in that case.
-        const size_t count=txWriteBudget(wireSize-wireAt,Serial1.availableForWrite());
-        if(count){
-            wireAt+=Serial1.write(wire+wireAt,count);
-            if(wireAt==wireSize)++tx;
-        }
-    }
+    drainTx();
 }
 static String metricJson(Metric m){
     return !haveDiagnostic||metrics[m]==UINT32_MAX?String("null"):String(metrics[m]);

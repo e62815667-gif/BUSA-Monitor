@@ -8,6 +8,7 @@
 #include <BUSA_DisplayProtocol.h>
 #include "BUSA_GuitionPins.h"
 #include "BUSA_GuitionFactoryInit.h"
+#include "BUSA_DirtyRows.h"
 
 namespace busa_guition {
 // The original device uses Arduino_GFX QSPI and the exact extracted register
@@ -20,7 +21,9 @@ public:
 protected:
     void tftInit() override {
         applyFactoryInit(*_bus,[](uint8_t ms){delay(ms);});
-        invertDisplay(false);
+        // Arduino_GFX 1.5.0 uses (_ips ^ i); IPS=true requires true for INVOFF.
+        // Field photograph shows complementary colors with the previous INVON.
+        invertDisplay(true);
     }
 };
 
@@ -94,7 +97,14 @@ public:
     bool touchReady() const{return touchReady_;}
     bool sdReady() const{return sdReady_;}
     Arduino_GFX& panel(){return canvas_;}
-    void present(){canvas_.flush();}
+    void noteDirtyRows(int16_t y1,int16_t y2){dirtyRows_.note(y1,y2);}
+    void present(){
+        int16_t first=0,count=0;
+        const bool valid=dirtyRows_.take(first,count);
+        if(firstFrame_||!valid||count==busa_guition::HEIGHT){canvas_.flush();firstFrame_=false;return;}
+        // The canvas is still authoritative; send only its contiguous dirty rows.
+        lcd_.draw16bitRGBBitmap(0,first,canvas_.getFramebuffer()+size_t(first)*busa_guition::WIDTH,busa_guition::WIDTH,count);
+    }
     void backlight(bool on){digitalWrite(BACKLIGHT,on&&panelReady_?HIGH:LOW);}
     bool readRawTouch(TS_Point& p){
         if(!touchReady_||!touch_.touched())return false;
@@ -155,6 +165,8 @@ private:
     Arduino_ESP32QSPI qspi_;
     FactoryPanel lcd_;
     PsramCanvas canvas_;
+    DirtyRows dirtyRows_{busa_guition::HEIGHT};
+    bool firstFrame_=true;
     SPIClass shared_;
     XPT2046_Touchscreen touch_;
     bool panelReady_=false,lcdReady_=false,touchReady_=false,sdReady_=false,capacityKnown_=false;

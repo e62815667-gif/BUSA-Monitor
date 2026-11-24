@@ -66,13 +66,15 @@ private:
     static const char* sensor(uint8_t i){static const char* names[]={"Вода","Колонна","Куб","Верх колонны"};return names[i];}
     static lv_color_t color(uint32_t c){return lv_color_hex(c);}
     uint32_t ink()const{return theme_==0?0x19384b:0xe6f2f7;}
-    uint32_t paper()const{return theme_==0?0xf3f7fa:0x061521;}
-    uint32_t surface()const{return theme_==0?0xffffff:0x0c2132;}
-    uint32_t line()const{return theme_==0?0xc9dce6:0x244253;}
+    uint32_t paper()const{return theme_==0?0xf0f6f8:0x060e15;}
+    uint32_t surface()const{return theme_==0?0xffffff:0x0d2430;}
+    uint32_t line()const{return theme_==0?0xb6d2df:0x285064;}
+    static constexpr uint32_t accent(){return 0x009fde;}
     static void flush(lv_disp_drv_t* d,const lv_area_t* a,lv_color_t* p){
         auto* self=static_cast<Interface*>(d->user_data);
         if(!self->frameOpen_){self->frameStart_=millis();self->frameOpen_=true;}
         self->hw_.panel().draw16bitRGBBitmap(a->x1,a->y1,reinterpret_cast<uint16_t*>(p),a->x2-a->x1+1,a->y2-a->y1+1);
+        self->hw_.noteDirtyRows(a->y1,a->y2);
         if(lv_disp_flush_is_last(d)){self->hw_.present();self->hw_.frameComplete(self->frameStart_);self->frameOpen_=false;}
         lv_disp_flush_ready(d);
     }
@@ -88,7 +90,7 @@ private:
         return std::isfinite(t.a)&&std::isfinite(t.b)&&std::isfinite(t.c)&&std::isfinite(t.d)&&std::isfinite(t.e)&&std::isfinite(t.f)&&
           fabs(t.a)<2&&fabs(t.b)<2&&fabs(t.d)<2&&fabs(t.e)<2&&fabs(t.c)<10000&&fabs(t.f)<10000&&fabs(t.a*t.e-t.b*t.d)>0.0001;
     }
-    void rootStyle(lv_obj_t* o){lv_obj_set_style_bg_color(o,color(paper()),0);lv_obj_set_style_text_color(o,color(ink()),0);lv_obj_set_style_text_font(o,&busa_font,0);}
+    void rootStyle(lv_obj_t* o){lv_obj_set_style_bg_color(o,color(paper()),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);lv_obj_set_style_text_color(o,color(ink()),0);lv_obj_set_style_text_font(o,&busa_font,0);}
     void startCalibration(){
         calibrating_=true;calibrationValid_=false;calIndex_=0;held_=false;awaitRelease_=true;calSamples_=0;sumX_=sumY_=0;
         lastCalibrationRead_=millis()-busa_touch::readPeriodMs;
@@ -137,16 +139,16 @@ private:
     }
     void hideKeyboard(){if(!keyboard_)return;lv_keyboard_set_textarea(keyboard_,nullptr);lv_obj_add_flag(keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_set_height(body_,HEIGHT-28-43);}
     lv_obj_t* label(lv_obj_t* parent,const char* text){
-        auto* o=lv_label_create(parent);lv_obj_set_style_text_font(o,&busa_font,0);lv_label_set_text(o,text);return o;
+        auto* o=lv_label_create(parent);lv_obj_set_style_text_font(o,&busa_font,0);lv_obj_set_style_text_color(o,color(ink()),0);lv_label_set_text(o,text);return o;
     }
     lv_obj_t* button(lv_obj_t* parent,const char* text,int id,int width=LV_PCT(100)){
         auto* o=lv_btn_create(parent);lv_obj_set_size(o,width,34);lv_obj_set_style_radius(o,8,0);
-        lv_obj_set_style_bg_color(o,color(0x2087ed),0);lv_obj_set_style_shadow_width(o,0,0);
+        lv_obj_set_style_bg_color(o,color(accent()),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);lv_obj_set_style_shadow_width(o,0,0);
         auto* l=label(o,text);lv_obj_set_style_text_color(l,color(0xffffff),0);lv_obj_center(l);
         lv_obj_set_user_data(o,reinterpret_cast<void*>(intptr_t(id)));lv_obj_add_event_cb(o,event,LV_EVENT_CLICKED,this);return o;
     }
     lv_obj_t* panel(lv_obj_t* parent,int width=LV_PCT(100),int height=LV_SIZE_CONTENT){
-        auto* o=lv_obj_create(parent);lv_obj_set_size(o,width,height);lv_obj_set_style_bg_color(o,color(surface()),0);
+        auto* o=lv_obj_create(parent);lv_obj_set_size(o,width,height);lv_obj_set_style_bg_color(o,color(surface()),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);
         lv_obj_set_style_border_color(o,color(line()),0);lv_obj_set_style_border_width(o,1,0);
         lv_obj_set_style_radius(o,9,0);lv_obj_set_style_pad_all(o,6,0);lv_obj_set_style_pad_row(o,5,0);
         lv_obj_set_flex_flow(o,LV_FLEX_FLOW_COLUMN);lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);return o;
@@ -159,7 +161,7 @@ private:
     lv_obj_t* field(lv_obj_t* parent,const char* title,const String& value,bool numeric,bool secret=false,int width=LV_PCT(100)){
         auto* box=panel(parent,width);label(box,title);
         auto* ta=lv_textarea_create(box);lv_obj_set_width(ta,LV_PCT(100));lv_obj_set_height(ta,34);
-        lv_obj_set_style_text_font(ta,&busa_font,0);lv_obj_set_style_pad_all(ta,5,0);lv_textarea_set_one_line(ta,true);
+        lv_obj_set_style_text_font(ta,&busa_font,0);lv_obj_set_style_text_color(ta,color(ink()),0);lv_obj_set_style_bg_color(ta,color(surface()),0);lv_obj_set_style_border_color(ta,color(line()),0);lv_obj_set_style_pad_all(ta,5,0);lv_textarea_set_one_line(ta,true);
         lv_textarea_set_max_length(ta,numeric?14:220);
         if(numeric)lv_textarea_set_accepted_chars(ta,"0123456789.-,");
         lv_textarea_set_password_mode(ta,secret);lv_textarea_set_text(ta,value.c_str());
@@ -196,7 +198,7 @@ private:
     void render(){
         hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
         wifiList_=nullptr;chart_=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;scanPending_=false;
-        for(int i=0;i<6;++i){lv_obj_set_style_bg_color(navButtons_[i],color(i==page_?0x2087ed:surface()),0);lv_obj_set_style_text_color(lv_obj_get_child(navButtons_[i],0),color(i==page_?0xffffff:ink()),0);}
+        for(int i=0;i<6;++i){lv_obj_set_style_bg_color(navButtons_[i],color(i==page_?accent():surface()),0);lv_obj_set_style_text_color(lv_obj_get_child(navButtons_[i],0),color(i==page_?0xffffff:ink()),0);}
         switch(page_){case 0:home();break;case 1:temperatures();break;case 2:water();break;case 3:graphs();break;case 4:calculator();break;case 5:settings();break;}
         refresh();
     }
@@ -209,7 +211,7 @@ private:
         for(unsigned i=0;i<7;++i){auto* dot=lv_obj_create(center);lv_obj_remove_style_all(dot);lv_obj_set_size(dot,3,3);
             lv_obj_set_style_bg_color(dot,color(i<4?0x38bdf8:0xc5fffa),0);lv_obj_set_style_bg_opa(dot,LV_OPA_COVER,0);lv_obj_set_style_radius(dot,LV_RADIUS_CIRCLE,0);motion_[i]=dot;}
         auto* right=panel(middle,151,144);
-        for(int i=0;i<4;++i){auto* p=i%2?right:left;auto* name=label(p,sensor(i));lv_obj_set_style_text_color(name,color(colors_[i]),0);live_[4+i]=label(p,"—");}
+        for(int i=0;i<4;++i){auto* p=i%2?right:left;auto* name=label(p,sensor(i));lv_obj_set_style_text_color(name,color(colors_[i]),0);live_[4+i]=label(p,"—");lv_obj_set_style_text_color(live_[4+i],color(colors_[i]),0);}
         auto* r=row(body_);live_[8]=label(r,"Расход —");live_[9]=label(r,"Вода —");
     }
     void temperatures(){
@@ -400,7 +402,9 @@ private:
             int t=(now/40+i*23)%100,x=0,y=0;
             if(i<2){x=142;y=1144-t*8;}else if(i==2){x=684+t*2;y=367;}else if(i==3){x=788+t*2;y=913;}
             else{x=300+(i-4)*90;y=1420-t;}
-            lv_obj_set_pos(motion_[i],x*BUSA_ASSET_W/1024,y*BUSA_ASSET_H/1536);}
+            // LVGL invalidation only when the quantized display position changes.
+            const int16_t px=x*BUSA_ASSET_W/1024,py=y*BUSA_ASSET_H/1536;
+            if(lv_obj_get_x(motion_[i])!=px||lv_obj_get_y(motion_[i])!=py)lv_obj_set_pos(motion_[i],px,py);}
     }
     Hardware& hw_;DisplaySession& session_;Preferences prefs_;
     lv_disp_drv_t driver_{};lv_disp_draw_buf_t drawBuffer_{};lv_indev_drv_t input_{};

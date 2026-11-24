@@ -33,6 +33,7 @@
 #include <U8g2_for_Adafruit_GFX.h>
 #include <math.h>
 #include "BUSA_WaterFlowMath.h"
+#include <BUSA_LoopProfile.h>
 #include "BUSA_DisplayLink.h"
 #include "BUSA_LocalRequest.h"
 
@@ -53,9 +54,10 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF2";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
+static busa_perf::LoopProfile busaLoopProfile;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
 uint32_t busaLastI2cStepMs=0,busaMaxI2cStepMs=0;
 uint32_t busaI2cSuspendedUntil=0,busaI2cErrorCount=0,busaI2cStallCount=0;
@@ -1455,6 +1457,11 @@ String statusJSON(){
   s+=",\"setup_done_ms\":"+String(busaSetupDoneMs);
   s+=",\"loop_worst_ms\":"+String(busaMaxLoopMs);
   s+=",\"slow_loop_count\":"+String(busaSlowLoops);
+  s+=",\"loop_profile\":{\"last\":"+quoteJson(busa_perf::LoopProfile::name(busaLoopProfile.last()))+",\"max_ms\":{";
+  for(size_t i=0;i<busa_perf::stageCount;++i){if(i)s+=",";s+=quoteJson(busa_perf::LoopProfile::name(i))+":"+String(busaLoopProfile.worst(i));}
+  s+="},\"slow_count\":{";
+  for(size_t i=0;i<busa_perf::stageCount;++i){if(i)s+=",";s+=quoteJson(busa_perf::LoopProfile::name(i))+":"+String(busaLoopProfile.slow(i));}
+  s+="}}";
   s+=",\"key_scan_last_ms\":"+String(busaLastKeyScanMs);
   s+=",\"key_scan_worst_ms\":"+String(busaMaxKeyScanMs);
   s+=",\"i2c_step_last_ms\":"+String(busaLastI2cStepMs);
@@ -4826,9 +4833,17 @@ void loop(){
   }
   uint32_t now=millis();
   const uint32_t tickStart=now;
+  busaLoopProfile.begin(tickStart);
   soundPoll(now);
-  if(!otaActive)busa_display_link::poll(); // Fill UART TX before potentially slow HTTP work.
+  busaLoopProfile.mark(busa_perf::early,millis());
+  if(!otaActive)busa_display_link::poll();
+  busaLoopProfile.mark(busa_perf::uart,millis());
   {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
+  busaLoopProfile.mark(busa_perf::http,millis());
+  // Service pending UART immediately after the synchronous HTTP call, without
+  // changing HTTP handlers or accessing the application model from two tasks.
+  if(!otaActive)busa_display_link::poll();
+  busaLoopProfile.mark(busa_perf::uart,millis());
   // One nonblocking driver scan serves both TFT and web UI. Every scan ends.
   busaWebEventsPoll(now); // Passive local journal; no temperature readings or output writes.
   busaWifiScanPoll(now);
@@ -4844,6 +4859,7 @@ void loop(){
   if(tftRebootPending && elapsed(millis(),tftRebootAt,3000)){soundOutputsOff();ESP.restart();}
   if(googleRestart && elapsed(millis(),googleRestartAt,3500)){soundOutputsOff();ESP.restart();}
   busaRemoteAlarmApply(); // remote sound thresholds only; writes NVS in main loop
+  busaLoopProfile.mark(busa_perf::services,millis());
   {const uint32_t started=millis();sampleTemperatures(now);busaObserve("TEMP",started,busaTempWorstMs);}
   {const uint32_t started=millis();probeOneWire(now);busaObserve("ONEWIRE",started,busaOneWireWorstMs);} // Diagnose on idle 1-Wire bus only
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
@@ -4855,10 +4871,14 @@ void loop(){
   }
     sampleFlow(now);
   collectionMeter.sample(now,collectionPulses());
+  busaLoopProfile.mark(busa_perf::peripherals,millis());
   busa_display_link::poll();
+  busaLoopProfile.mark(busa_perf::uart,millis());
   busaGoogleSnapshotPoll(); // Main-loop-only capture; worker owns immutable JSON.
+  busaLoopProfile.mark(busa_perf::snapshot,millis());
   busaRainMakerPoll(now);
-  v13Collect(now); // Shared graph sampling, including when TFT screen is asleep.
+  v13Collect(now);
+  busaLoopProfile.mark(busa_perf::cloud,millis()); // Shared graph sampling, including when TFT screen is asleep.
   // TFT graph is repainted inside its own plot border by v14RefreshLive().
   // Never set tftDirty here: that would erase the entire screen every 5 s.
   // Landscape V14.7: repaint changed fields at 5 Hz; full frame only on page/theme change.
@@ -4879,6 +4899,9 @@ void loop(){
     busaLastTftRenderMs=millis()-started;
     busaObserve("TFT",started,busaTftWorstMs);
   }
+  busaLoopProfile.mark(busa_perf::tft,millis());
+  if(busa_display_ota::busy())busa_display_link::poll();
+  busaLoopProfile.mark(busa_perf::uart,millis());
   // Pairing uses a clean boot. The original Wi-Fi procedures are untouched.
   static uint32_t bleRestartAt=0;
   if(busaRmStartRequested&&!busaOtaPendingVerification()){
@@ -4907,6 +4930,7 @@ void loop(){
      elapsed(millis(),busaRmCloudBootAt,30000)){
     prefs.putBool("rmCloudBusy",false);
   }
+  busaLoopProfile.mark(busa_perf::services,millis());
   // Display updates take priority over peripheral diagnostics.
   if(i2cOnline){
     if((busaI2cElectricalFault || i2cFoundCount==0) && !busaI2cSuspended(now) &&
@@ -4930,6 +4954,7 @@ void loop(){
     {const uint32_t started=millis();pollKeys(now);busaObserve("KEYPAD",started,busaMaxKeyScanMs);}
     }
   }
+  busaLoopProfile.mark(busa_perf::i2c,millis());
   if(elapsed(now,lastUart,5000)){
     lastUart=now;
     Serial.printf("BUSA ALIVE ms=%lu stage=%s AP=%d i2c=%d tft=%d worst_loop=%lu key_ms=%lu i2c_ms=%lu\n",
@@ -4940,7 +4965,9 @@ void loop(){
       (unsigned long)now,(int)wifiRunning,(int)i2cOnline,(int)tftStarted,
       (unsigned long)flowPulses(),(double)flowLpm);
   }
+  busaLoopProfile.mark(busa_perf::logging,millis());
   const uint32_t loopMs=millis()-tickStart;
+  busaLoopProfile.finish(loopMs);
   if(loopMs>busaMaxLoopMs)busaMaxLoopMs=loopMs;
   if(loopMs>100)busaSlowLoops++;
   delay(1); // Yield to Wi-Fi/RTOS each pass, with less idle latency than 2 ms.
