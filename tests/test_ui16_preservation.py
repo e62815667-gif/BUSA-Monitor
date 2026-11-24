@@ -5,7 +5,13 @@ import base64, hashlib, json, re
 root=Path(__file__).resolve().parents[1]
 source=(root/'firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
 baseline=json.loads((root/'tests/fixtures/ui16_preservation.json').read_text())
-backend=re.sub(r'R"HTMLBUSA\(.*?\)HTMLBUSA"','<WEB_PAGE>',source,flags=re.S)
+# COL1 is authorized to change the pulse input, calibration and status only.
+# Reverse each exact reviewed change before applying the original byte-level guard.
+normalized=source
+for old,new in reversed(json.loads((root/'tests/fixtures/collection_gpio1_delta.json').read_text())):
+    assert normalized.count(new)==1, 'Missing or ambiguous approved COL1 change'
+    normalized=normalized.replace(new,old,1)
+backend=re.sub(r'R"HTMLBUSA\(.*?\)HTMLBUSA"','<WEB_PAGE>',normalized,flags=re.S)
 for release in ['UI16-CUBE1-20261121-GEOM1-MOTION1-20261122','UI16-CUBE1-20261121-GEOM1']:
     backend=backend.replace(release,'<UI_RELEASE>')
 # The only authorized Main change is one NVS load immediately after prefs.begin.
