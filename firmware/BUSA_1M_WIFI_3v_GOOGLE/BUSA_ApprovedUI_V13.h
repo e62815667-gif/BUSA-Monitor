@@ -68,10 +68,10 @@ static String v13Temp(int i,uint32_t now){
 }
 static String v13Ref(float v){return isfinite(v)?String(v,1):String("--");}
 static String v13Flow(){
-  return String("Н/Д"); // Collection sensor absent; YF-S401 reports WATER only
+  return collectionDisplay(collectionMeter.rate());
 }
 static String v13Total(){
-  return String("Н/Д"); // Do not confuse water pulses with collected liquid
+  return collectionDisplay(collectionMeter.total());
 }
 static void v13Frame(uint32_t now){
   screen->fillScreen(BG);
@@ -136,7 +136,7 @@ static void v13Home(uint32_t now,bool layout){
     screenField(v13Temp(i,now),24,y+34,84,hasTemp(i,now)?GREEN:YELLOW);
   }
   screenField(v13Flow(),192,204,39,YELLOW);
-  screenField(v13Total(),192,226,39,flowSeen?GREEN:YELLOW);
+  screenField(v13Total(),192,226,39,isfinite(collectionMeter.total())?GREEN:YELLOW);
   busaDrawRelayStrip(242);
 }
 static void v13Temperatures(uint32_t now,bool layout){
@@ -197,13 +197,13 @@ static void v13Collection(uint32_t now,bool layout){
     v13Panel(5,166,230,68);
     v13Text("График отбора",13,184,V13_CYAN);
     v13Panel(5,238,230,34);
-    v13Text("Нет датчика отбора",11,254,YELLOW);
+    v13Text("Датчик отбора GPIO1",11,254,GRAY);
   }
-  screenField(v13Flow()+" мл/мин",18,94,207,flowSeen?GREEN:YELLOW);
-  screenField(v13Total()+" мл",18,151,207,flowSeen?GREEN:YELLOW);
+  screenField(v13Flow()+" мл/мин",18,94,207,isfinite(collectionMeter.rate())?GREEN:YELLOW);
+  screenField(v13Total()+" мл",18,151,207,isfinite(collectionMeter.total())?GREEN:YELLOW);
   screen->fillRect(12,188,216,38,PANEL);
-  v13Text("Пока нет датчика отбора",15,210,YELLOW);
-  screenField("YF-S401 вода: "+String(flowPulses())+" имп.",15,269,208,GRAY);
+  v13Text(!collectionMeter.seen()?"Нет импульсов":!collectionMeter.calibrated()?"Нужна калибровка":"График в разделе Граф",15,210,YELLOW);
+  screenField(String("Импульсы: ")+collectionNumber((double)collectionMeter.pulses()),15,269,208,GRAY);
 }
 static void v13TemperatureGraph(int x,int y,int w,int h){
   screen->fillRect(x,y,w,h,PANEL);

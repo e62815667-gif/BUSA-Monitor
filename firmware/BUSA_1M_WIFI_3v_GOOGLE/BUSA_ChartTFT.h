@@ -50,8 +50,29 @@ static void busaDrawChart(uint32_t now){
    }
   }
  }
- if(graphSubView!=0||!points){
-  const char* msg=graphSubView==1?"Нет датчика отбора":graphSubView==2?"Нет данных питания":"Нет измерений";
+ if(graphSubView==1){
+  const int bins=min((int)minutes*30,160);int16_t indices[160];busaChartHistory.selectMs(now,(uint32_t)minutes*60000u,indices,bins);
+  double ceiling=0;
+  for(int b=0;b<bins;b++){
+   const double value=collectionMeter.convert(busaChartHistory.collectionValue(indices[b]));
+   if(isfinite(value)&&value>ceiling)ceiling=value;
+  }
+  if(ceiling<=0)ceiling=1;
+  int priorX=0,priorY=0;bool prior=false;
+  for(int b=0;b<bins;b++){
+   const double value=collectionMeter.convert(busaChartHistory.collectionValue(indices[b]));
+   if(!isfinite(value)){prior=false;continue;}
+   ++points;const int x=px+(int)((b+0.5f)*pw/bins),y=py+ph-(int)(value/ceiling*ph);
+   if(prior)screen->drawLine(priorX,priorY,x,y,colors[0]);else screen->fillCircle(x,y,1,colors[0]);
+   prior=true;priorX=x;priorY=y;
+  }
+  if(points){
+   busaChartText(collectionDisplay(ceiling),2,py+3,muted,true);
+   busaChartText("0",2,py+ph+3,muted,true);
+  }
+ }
+ if(graphSubView==2||!points){
+  const char* msg=graphSubView==1?(!collectionMeter.seen()?"Нет импульсов":!collectionMeter.calibrated()?"Нужна калибровка":"Нет измерений"):graphSubView==2?"Нет данных питания":"Нет измерений";
   busaChartText(msg,px+5,py+ph/2+4,muted,true);
  }
  const int ry=portrait?247:188,rw=(w-22)/5;
