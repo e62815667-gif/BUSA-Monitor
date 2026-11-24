@@ -6,8 +6,8 @@ import argparse,hashlib,struct,subprocess,sys,zipfile
 def package(build,core,esptool,sketch_dir=None):
     build=Path(build).resolve();core=Path(core).resolve()
     base=build/'BUSA_1M_WIFI_3v_GOOGLE.ino'
-    app=build/'BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin'
-    usb=build/'BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin'
+    app=build/'BUSA_UI16_CUBE1_MOTION1_COLL1_OTA.bin'
+    usb=build/'BUSA_UI16_CUBE1_MOTION1_COLL1_USB_MERGED.bin'
     app.write_bytes(base.with_suffix('.ino.bin').read_bytes())
     # Preserve the official Arduino bootloader header (QIO menu uses DIO for ROM boot).
     # Keep the compact USB layout; do NOT fill/erase RainMaker fctry.
@@ -19,7 +19,7 @@ def package(build,core,esptool,sketch_dir=None):
     assert 60000<len(data)<=0x300000
     assert data[0]==0xe9 and struct.unpack_from('<H',data,12)[0]==9
     assert struct.unpack_from('<I',data,32)[0]==0xabcd5432
-    assert b'14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122' in data
+    assert b'14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-COLL1-20261124' in data
     assert merged[0x10000:]==data and len(merged)<=0x310000
     for offset,path in [(0,Path(str(base)+'.bootloader.bin')),(0x8000,Path(str(base)+'.partitions.bin')),(0xe000,core/'tools/partitions/boot_app0.bin')]:
         blob=path.read_bytes();assert merged[offset:offset+len(blob)]==blob

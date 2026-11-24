@@ -9,6 +9,9 @@ const uint8_t BUSA_GRAPH_MINUTES[5]={5,10,15,30,60};
 '''+re.search(r'static const char\* const BUSA_RELAY_LABELS\[4\]=.*?;',source).group()+r'''
 #include "BUSA_ChartHistory.h"
 BusaChart::History busaChartHistory;uint32_t fakeNow=0;
+#include "BUSA_Collection.h"
+BusaCollection::Meter collectionMeter;
+'''+source[source.index('static String collectionDisplay('):source.index('// Isolated 3.3V I2C keypad',source.index('static String collectionDisplay('))]+r'''
 uint32_t millis(){return fakeNow;}bool deviceClockValid(){return true;}
 bool relayOn[4]={false,true,false,true};bool busaSoundActive(uint8_t i){return relayOn[i];}
 const int u8g2_font_5x7_t_cyrillic=5,u8g2_font_6x13_t_cyrillic=6;
@@ -28,14 +31,19 @@ void ruText(const String& s,int x,int y,uint16_t){int chars=0;for(unsigned char 
 #include "BUSA_ChartTFT.h"
 int main(){
  BusaChart::Row rows[1801];busaChartHistory.begin(rows,1801,0);float v[4]={24,78,96,NAN};
- for(int m=0;m<1801;m++){fakeNow=m*2000;v[0]+=0.01f;busaChartHistory.capture(fakeNow,v);}
+ for(int m=0;m<1801;m++){fakeNow=m*2000;v[0]+=0.01f;busaChartHistory.capture(fakeNow,v,NAN,m%3==0?NAN:600.0f+m);}
+
+ for(int state=0;state<3;state++){
+ if(state==1){collectionMeter.begin(0);collectionMeter.sample(2000,20);}
+ if(state==2)assert(collectionMeter.setCalibration(10));
  for(int portrait=0;portrait<2;portrait++)for(tftThemeMode=0;tftThemeMode<3;tftThemeMode++)for(graphSubView=0;graphSubView<3;graphSubView++)for(graphRangeIndex=0;graphRangeIndex<5;graphRangeIndex++)for(tftView=0;tftView<2;tftView++){
   display.w=portrait?240:320;display.h=portrait?320:240;busaDrawChart(fakeNow);
   busaDrawRelayStrip(portrait?242:180);
+ }
  }
 }
 '''
 with tempfile.TemporaryDirectory() as d:
  p=Path(d)/'tft.cpp';p.write_text(code);exe=Path(d)/'tft'
  subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-Werror','-I'+str(fw),str(p),'-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)
-print('PASS production TFT chart/relay geometry: 180 orientation/theme/tab/range/focus combinations; no out-of-screen text or draw commands')
+print('PASS production TFT chart/relay geometry: 540 orientation/theme/tab/range/focus/sensor combinations; no out-of-screen text or draw commands')

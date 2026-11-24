@@ -1,0 +1,50 @@
+[
+  [
+    "constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V\n",
+    "constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V\nconstexpr uint8_t COLLECTION_GPIO=1; // Input, verified 3.3 V logic required\nstatic_assert(COLLECTION_GPIO==1 && COLLECTION_GPIO!=FLOW_GPIO,\"Collection GPIO changed\");\n"
+  ],
+  [
+    "GEOM1-MOTION1-20261122\";",
+    "GEOM1-MOTION1-20261122-COLL1-20261124\";"
+  ],
+  [
+    "float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}\n",
+    "float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}\n#include \"BUSA_Collection.h\"\nstatic BusaCollection::Meter collectionMeter;\nstatic portMUX_TYPE collectionMux=portMUX_INITIALIZER_UNLOCKED;\nstatic volatile uint64_t collectionPulseCount=0;\nstatic void IRAM_ATTR collectionISR(){\n portENTER_CRITICAL_ISR(&collectionMux);++collectionPulseCount;portEXIT_CRITICAL_ISR(&collectionMux);\n}\nstatic uint64_t collectionPulses(){\n portENTER_CRITICAL(&collectionMux);const uint64_t count=collectionPulseCount;portEXIT_CRITICAL(&collectionMux);return count;\n}\nstatic String collectionNumber(double value){\n if(!isfinite(value))return \"null\";\n char buffer[32];snprintf(buffer,sizeof(buffer),\"%.9g\",value);return String(buffer);\n}\nstatic String collectionDisplay(double value){\n if(!isfinite(value))return \"Н/Д\";\n char buffer[24];\n for(int precision=4;precision>=1;--precision){\n  const int n=snprintf(buffer,sizeof(buffer),\"%.*g\",precision,value);\n  if(n>0&&n<=5)return String(buffer);\n }\n return \"Н/Д\";\n}\n"
+  ],
+  [
+    "static bool busaNvsReady=false;\n",
+    "static bool busaNvsReady=false;\nstatic void loadCollectionCalibration(){\n if(busaNvsReady)collectionMeter.setCalibration(prefs.getFloat(\"collPulseMl\",NAN));\n}\nstatic bool saveCollectionCalibration(float value){\n if(!busaNvsReady||!BusaCollection::Meter::validCalibration(value))return false;\n if(prefs.putFloat(\"collPulseMl\",value)!=sizeof(float))return false;\n if(prefs.getFloat(\"collPulseMl\",NAN)!=value)return false;\n return collectionMeter.setCalibration(value);\n}\n"
+  ],
+  [
+    " busaChartHistory.capture(now,values,cooling);",
+    " busaChartHistory.capture(now,values,cooling,(float)collectionMeter.raw());"
+  ],
+  [
+    "  s+=\",\\\"collection\\\":{\\\"sensor_present\\\":false,\\\"ml_per_min\\\":null,\\\"total_ml\\\":null}\";",
+    "  s+=\",\\\"collection\\\":{\\\"gpio\\\":1,\\\"sensor_present\\\":\"+String(collectionMeter.seen()?\"true\":\"false\");\n  char collectionCount[24];snprintf(collectionCount,sizeof(collectionCount),\"%llu\",(unsigned long long)collectionPulses());\n  s+=\",\\\"pulses\\\":\"+String(collectionCount)+\",\\\"calibrated\\\":\"+String(collectionMeter.calibrated()?\"true\":\"false\");\n  s+=\",\\\"pulses_per_ml\\\":\"+collectionNumber(collectionMeter.calibration());\n  s+=\",\\\"ml_per_min\\\":\"+collectionNumber(collectionMeter.rate())+\",\\\"total_ml\\\":\"+collectionNumber(collectionMeter.total())+\"}\";"
+  ],
+  [
+    "  busaNvsReady=prefs.begin(\"busa-r04\",false);\n",
+    "  collectionMeter.begin(millis());\n  pinMode(COLLECTION_GPIO,INPUT);\n  attachInterrupt(digitalPinToInterrupt(COLLECTION_GPIO),collectionISR,FALLING);\n  busaNvsReady=prefs.begin(\"busa-r04\",false);\n  loadCollectionCalibration();\n"
+  ],
+  [
+    "  server.on(\"/api/temperature/calibration\",HTTP_POST,[]{",
+    "  server.on(\"/api/collection/calibration\",HTTP_POST,[]{\n    if(!apClient()||server.arg(\"confirm\")!=\"YES\"){server.send(403,\"text/plain\",\"Только БУСА AP\");return;}\n    String value=server.arg(\"pulses_per_ml\");value.trim();char* end=nullptr;\n    const float factor=strtof(value.c_str(),&end);\n    if(value.isEmpty()||*end!='\\0'||!BusaCollection::Meter::validCalibration(factor)){\n      server.send(400,\"text/plain; charset=utf-8\",\"Неверный коэффициент\");return;\n    }\n    if(!saveCollectionCalibration(factor)){server.send(500,\"text/plain; charset=utf-8\",\"Ошибка сохранения\");return;}\n    server.send(200,\"application/json\",String(\"{\\\"pulses_per_ml\\\":\")+collectionNumber(factor)+\"}\");\n  });\n  server.on(\"/api/temperature/calibration\",HTTP_POST,[]{"
+  ],
+  [
+    "  // No invented collection values: only cooling-water pulse counts are sampled.\n",
+    "  // Collection and water pulse histories remain independent.\n"
+  ],
+  [
+    "    j+=\"],\\\"cooling_calibrated\\\":false,\\\"collection_sensor\\\":false,\\\"history_ready\\\":\"+String(busaChartReady?\"true\":\"false\")+\"}\";",
+    "    j+=\"],\\\"collection_ml_min\\\":[\";\n    for(int i=0;i<bins;i++){if(i)j+=\",\";j+=collectionNumber(collectionMeter.convert(busaChartHistory.collectionValue(selected[i])));}\n    j+=\"],\\\"cooling_calibrated\\\":false,\\\"collection_sensor\\\":\"+String(collectionMeter.seen()?\"true\":\"false\")+\",\\\"history_ready\\\":\"+String(busaChartReady?\"true\":\"false\")+\"}\";"
+  ],
+  [
+    "    j+=\"\\\"collection_sensor\\\":false,\\\"time_ms\\\":\"+String(now)+\",\";",
+    "    j+=\"\\\"collection_sensor\\\":\"+String(collectionMeter.seen()?\"true\":\"false\")+\",\\\"time_ms\\\":\"+String(now)+\",\";"
+  ],
+  [
+    "    sampleFlow(now);\n",
+    "    sampleFlow(now);\n  collectionMeter.sample(now,collectionPulses());\n"
+  ]
+]

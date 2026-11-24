@@ -38,6 +38,8 @@ constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver
 constexpr uint8_t BUS_SDA=40,BUS_SCL=41; // Isolated PCF8575 keypad only; GPIO8/9 disconnected
 constexpr uint8_t TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14;
 constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
+constexpr uint8_t COLLECTION_GPIO=1; // Input, verified 3.3 V logic required
+static_assert(COLLECTION_GPIO==1 && COLLECTION_GPIO!=FLOW_GPIO,"Collection GPIO changed");
 constexpr uint8_t BUSA_RESERVED_BUZZER_GPIO=2; // active 3.3V logic buzzer input, T1/T2
 constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
@@ -48,7 +50,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-COLL1-20261124";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -228,6 +230,29 @@ void sampleFlow(uint32_t now){
   if(waterSamplesRecorded<40)waterSamplesRecorded++;
 }
 float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}
+#include "BUSA_Collection.h"
+static BusaCollection::Meter collectionMeter;
+static portMUX_TYPE collectionMux=portMUX_INITIALIZER_UNLOCKED;
+static volatile uint64_t collectionPulseCount=0;
+static void IRAM_ATTR collectionISR(){
+ portENTER_CRITICAL_ISR(&collectionMux);++collectionPulseCount;portEXIT_CRITICAL_ISR(&collectionMux);
+}
+static uint64_t collectionPulses(){
+ portENTER_CRITICAL(&collectionMux);const uint64_t count=collectionPulseCount;portEXIT_CRITICAL(&collectionMux);return count;
+}
+static String collectionNumber(double value){
+ if(!isfinite(value))return "null";
+ char buffer[32];snprintf(buffer,sizeof(buffer),"%.9g",value);return String(buffer);
+}
+static String collectionDisplay(double value){
+ if(!isfinite(value))return "Н/Д";
+ char buffer[24];
+ for(int precision=4;precision>=1;--precision){
+  const int n=snprintf(buffer,sizeof(buffer),"%.*g",precision,value);
+  if(n>0&&n<=5)return String(buffer);
+ }
+ return "Н/Д";
+}
 
 // Isolated 3.3V I2C keypad PCF8575/PCF8575A only; PCA9685 LED board detached.
 bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
@@ -451,6 +476,15 @@ uint8_t pcfPairCount=0,pcfScanError=0;
 uint32_t pcfLastScanAt=0;
 Preferences prefs;
 static bool busaNvsReady=false;
+static void loadCollectionCalibration(){
+ if(busaNvsReady)collectionMeter.setCalibration(prefs.getFloat("collPulseMl",NAN));
+}
+static bool saveCollectionCalibration(float value){
+ if(!busaNvsReady||!BusaCollection::Meter::validCalibration(value))return false;
+ if(prefs.putFloat("collPulseMl",value)!=sizeof(float))return false;
+ if(prefs.getFloat("collPulseMl",NAN)!=value)return false;
+ return collectionMeter.setCalibration(value);
+}
 Preferences keypadBackupPrefs;
 bool keypadBackupOpen=false;
 // Wall clock: phone supplies UTC epoch and local UTC offset via protected AP;
@@ -1242,7 +1276,7 @@ static void busaCaptureChart(uint32_t now){
  if(lastAt&&dt&&flowSeen&&pulses>=lastPulses)
   cooling=(float)(pulses-lastPulses)*3600000.0f/(dt*FLOW_HZ_PER_LPM*60.0f);
  lastAt=now;lastPulses=pulses;
- busaChartHistory.capture(now,values,cooling);
+ busaChartHistory.capture(now,values,cooling,(float)collectionMeter.raw());
 }
 #include "BUSA_ChartTFT.h"
 #include "BUSA_ApprovedUI_V13.h"
@@ -1450,7 +1484,11 @@ String statusJSON(){
   s+=",\"lpm\":"+(flowReady?String(flowLpm,3):String("null"));
   s+=",\"total_l_estimate\":"+String(totalWaterLitres(),3);
   s+=",\"calibrated\":false,\"seen_pulses\":"+(flowSeen?String("true"):String("false"))+"}";
-  s+=",\"collection\":{\"sensor_present\":false,\"ml_per_min\":null,\"total_ml\":null}";
+  s+=",\"collection\":{\"gpio\":1,\"sensor_present\":"+String(collectionMeter.seen()?"true":"false");
+  char collectionCount[24];snprintf(collectionCount,sizeof(collectionCount),"%llu",(unsigned long long)collectionPulses());
+  s+=",\"pulses\":"+String(collectionCount)+",\"calibrated\":"+String(collectionMeter.calibrated()?"true":"false");
+  s+=",\"pulses_per_ml\":"+collectionNumber(collectionMeter.calibration());
+  s+=",\"ml_per_min\":"+collectionNumber(collectionMeter.rate())+",\"total_ml\":"+collectionNumber(collectionMeter.total())+"}";
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
   s+=",\"pca9685_ack_only\":false,\"pca9685_enabled\":false";
   s+=",\"tft_attempted\":"+(tftStarted?String("true"):String("false"));
@@ -3776,7 +3814,11 @@ void setup(){
   pinMode(FLOW_GPIO,INPUT); // requires an electrically verified 3.3 V logic signal
   attachInterrupt(digitalPinToInterrupt(FLOW_GPIO),flowISR,FALLING);
   Serial0.println("WATER GPIO15 interrupt attached (input only)");
+  collectionMeter.begin(millis());
+  pinMode(COLLECTION_GPIO,INPUT);
+  attachInterrupt(digitalPinToInterrupt(COLLECTION_GPIO),collectionISR,FALLING);
   busaNvsReady=prefs.begin("busa-r04",false);
+  loadCollectionCalibration();
   busaCalcLoadGeometry();
   // A pending OTA must first pass the normal local boot self-test. Keep the
   // request in NVS; confirm below, then reboot into the existing isolated BLE mode.
@@ -4211,6 +4253,16 @@ void setup(){
     if(m<0||m>2||!saveThemeMode((uint8_t)m)){server.send(400,"text/plain","Тема не сохранена");return;}
     server.send(200,"text/plain; charset=utf-8",m==0?"Светлая тема":m==1?"Тёмная тема":"Системная тема");
   });
+  server.on("/api/collection/calibration",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
+    String value=server.arg("pulses_per_ml");value.trim();char* end=nullptr;
+    const float factor=strtof(value.c_str(),&end);
+    if(value.isEmpty()||*end!='\0'||!BusaCollection::Meter::validCalibration(factor)){
+      server.send(400,"text/plain; charset=utf-8","Неверный коэффициент");return;
+    }
+    if(!saveCollectionCalibration(factor)){server.send(500,"text/plain; charset=utf-8","Ошибка сохранения");return;}
+    server.send(200,"application/json",String("{\"pulses_per_ml\":")+collectionNumber(factor)+"}");
+  });
   server.on("/api/temperature/calibration",HTTP_POST,[]{
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
     float values[4];
@@ -4278,7 +4330,7 @@ void setup(){
     server.send(200,"text/plain; charset=utf-8",keypadMessage);
   });
   // One shared history source for the physical TFT and local iPhone.
-  // No invented collection values: only cooling-water pulse counts are sampled.
+  // Collection and water pulse histories remain independent.
   server.on("/api/web-events",HTTP_GET,[]{
    const uint32_t after=(uint32_t)strtoul(server.arg("after").c_str(),nullptr,10);
    String result="{\"boot_id\":"+String(busaWebBootId)+",\"uptime_ms\":"+String(millis())+",\"events\":[";bool comma=false;
@@ -4302,7 +4354,9 @@ void setup(){
     }
     j+="],\"cooling_lph\":[";
     for(int i=0;i<bins;i++){if(i)j+=",";float value=busaChartHistory.coolingValue(selected[i]);j+=isfinite(value)?String(value,2):String("null");}
-    j+="],\"cooling_calibrated\":false,\"collection_sensor\":false,\"history_ready\":"+String(busaChartReady?"true":"false")+"}";
+    j+="],\"collection_ml_min\":[";
+    for(int i=0;i<bins;i++){if(i)j+=",";j+=collectionNumber(collectionMeter.convert(busaChartHistory.collectionValue(selected[i])));}
+    j+="],\"cooling_calibrated\":false,\"collection_sensor\":"+String(collectionMeter.seen()?"true":"false")+",\"history_ready\":"+String(busaChartReady?"true":"false")+"}";
     server.send(200,"application/json; charset=utf-8",j);
   });
   server.on("/api/graph-history",HTTP_GET,[]{
@@ -4327,7 +4381,7 @@ void setup(){
       j+=String(waterPulseHistory[idx]);
     }
     j+="],\"water_interval_ms\":2000,\"water_calibrated\":false,";
-    j+="\"collection_sensor\":false,\"time_ms\":"+String(now)+",";
+    j+="\"collection_sensor\":"+String(collectionMeter.seen()?"true":"false")+",\"time_ms\":"+String(now)+",";
     j+="\"temperature_samples\":"+String(v13HistoryCount)+"}";
     server.send(200,"application/json; charset=utf-8",j);
   });
@@ -4478,6 +4532,7 @@ void loop(){
     tftDirty=true;
   }
     sampleFlow(now);
+  collectionMeter.sample(now,collectionPulses());
   busaGoogleSnapshotPoll(); // Main-loop-only capture; worker owns immutable JSON.
   busaRainMakerPoll(now);
   v13Collect(now); // Shared graph sampling, including when TFT screen is asleep.

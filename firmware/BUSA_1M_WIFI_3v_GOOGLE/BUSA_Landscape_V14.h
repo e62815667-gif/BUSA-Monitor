@@ -204,11 +204,11 @@ static void v14Home(uint32_t now,bool layout){
   }
   hqPanel(248,27,69,66);
   v14Tiny("ОТБОР",253,41,V14_TEXT);
-  v14Metric("Н/Д",253,73,59,false);
+  v14Metric(v13Flow(),253,73,59,isfinite(collectionMeter.rate()));
   v14Tiny("мл/мин",253,86,V14_MUTED);
   hqPanel(248,101,69,70);
   v14Tiny("СОБРАНО",252,115,V14_TEXT);
-  v14Metric("Н/Д",253,142,59,false);
+  v14Metric(v13Total(),253,142,59,isfinite(collectionMeter.total()));
   v14Tiny("мл",253,164,V14_MUTED);
   busaDrawRelayStrip(180);
 }
@@ -259,11 +259,11 @@ static void v14Collection(bool layout){
   // The flow graph is shown only under "Графики"; no duplicate here.
   hqPanel(5,25,151,181);
   v14Print("Расход отбора",13,47,V14_TEXT);
-  v14Metric("НЕТ ДАТЧИКА",14,113,137,false);
+  v14Metric(v13Flow(),14,113,137,isfinite(collectionMeter.rate()));
   v14Print("мл/мин",17,146,V14_MUTED);
   hqPanel(162,25,153,181);
   v14Print("Собрано",170,47,V14_TEXT);
-  v14Metric("Н/Д",174,113,128,false);
+  v14Metric(v13Total(),174,113,128,isfinite(collectionMeter.total()));
   v14Print("мл",174,146,V14_MUTED);
 }
 // Approved diagnostic-style graph layout: two views, independent vertical lanes.
@@ -488,7 +488,12 @@ void v14RefreshLive(uint32_t now){
   if(currentPage==0){
     for(int i=0;i<4;i++)
       v14Metric(v13Temp(i,now),21,27+i*36+31,94,hasTemp(i,now),HQ_NAVY);
+    v14Metric(v13Flow(),253,73,59,isfinite(collectionMeter.rate()));
+    v14Metric(v13Total(),253,142,59,isfinite(collectionMeter.total()));
     busaDrawRelayStrip(180);
+  } else if(currentPage==2){
+    v14Metric(v13Flow(),14,113,137,isfinite(collectionMeter.rate()));
+    v14Metric(v13Total(),174,113,128,isfinite(collectionMeter.total()));
   } else if(currentPage==1 && !editingTemp && !deleteConfirmPending){
     if(!tftView){
       for(int sensor=0;sensor<4;sensor++){
