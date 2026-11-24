@@ -2,6 +2,12 @@
 #include <stdint.h>
 #include <cmath>
 namespace busa_touch {
+// XPT2046 v1.4 caches valid samples for 3 ms. Keep a wider polling interval.
+constexpr uint32_t readPeriodMs=10;
+inline bool sampleDue(uint32_t now,uint32_t& last){
+    if(uint32_t(now-last)<readPeriodMs)return false;
+    last=now;return true;
+}
 struct Point {int x,y;};
 struct Transform {double a,b,c,d,e,f;};
 inline bool fit(const Point* r,const Point* s,Transform& t){

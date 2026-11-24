@@ -23,7 +23,8 @@ public:
         driver_.flush_cb=flush;driver_.user_data=this;
         if(!lv_disp_drv_register(&driver_))return false;
         lv_indev_drv_init(&input_);input_.type=LV_INDEV_TYPE_POINTER;input_.read_cb=readTouch;input_.user_data=this;
-        if(!lv_indev_drv_register(&input_))return false;
+        if(!lv_indev_drv_register(&input_)||!input_.read_timer)return false;
+        lv_timer_set_period(input_.read_timer,busa_touch::readPeriodMs);
         prefs_.begin("busa-touch",false);
         calibrationValid_=prefs_.getBytesLength("affineC0")==sizeof(transform_)&&prefs_.getBytes("affineC0",&transform_,sizeof(transform_))==sizeof(transform_)&&validTransform();
         theme_=prefs_.getUChar("theme",2);if(theme_>2)theme_=2;
@@ -85,6 +86,7 @@ private:
     void rootStyle(lv_obj_t* o){lv_obj_set_style_bg_color(o,color(paper()),0);lv_obj_set_style_text_color(o,color(ink()),0);lv_obj_set_style_text_font(o,&busa_font,0);}
     void startCalibration(){
         calibrating_=true;calibrationValid_=false;calIndex_=0;held_=false;awaitRelease_=true;calSamples_=0;sumX_=sumY_=0;
+        lastCalibrationRead_=millis()-busa_touch::readPeriodMs;
         auto* root=lv_scr_act();lv_obj_clean(root);rootStyle(root);
         auto* msg=lv_label_create(root);lv_label_set_text(msg,"Калибровка: нажмите и отпустите метку");lv_obj_align(msg,LV_ALIGN_CENTER,0,0);
         calMark_=lv_obj_create(root);lv_obj_remove_style_all(calMark_);lv_obj_set_size(calMark_,18,18);
@@ -93,6 +95,7 @@ private:
     busa_touch::Point target()const{static const busa_touch::Point p[]={{20,20},{460,20},{20,252},{460,252}};return p[calIndex_];}
     void placeMark(){auto p=target();lv_obj_set_pos(calMark_,p.x-9,p.y-9);}
     void calibrationPoll(){
+        if(!busa_touch::sampleDue(millis(),lastCalibrationRead_))return;
         TS_Point p;bool down=hw_.readRawTouch(p);
         if(awaitRelease_){if(!down)awaitRelease_=false;return;}
         if(down){
@@ -401,6 +404,7 @@ private:
     busa_touch::Transform transform_{};busa_touch::Point raw_[3]{},screen_[3]{};
     bool calibrationValid_=false,calibrating_=false,held_=false,wasConnected_=false,waiting_=false,scanPending_=false,frameOpen_=false,awaitRelease_=false,formValid_=false;
     int calIndex_=0,calSamples_=0,sumX_=0,sumY_=0,page_=0,sub_=-1,pendingPage_=0,pendingSub_=-1,graphKind_=0,graphMinutes_=5,calcMode_=0;
+    uint32_t lastCalibrationRead_=0;
     uint8_t theme_=2,requestedTheme_=2;uint32_t lastTick_=0,lastAnimation_=0,revision_=0,lastScan_=0,frameStart_=0,lastGraph_=0,viewGeneration_=0,pendingGeneration_=0;
     Route pendingRoute_=Route::wifiScan;String networks_[32];unsigned networkCount_=0;String calcInput_[4][5];
 };
