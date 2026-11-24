@@ -48,7 +48,7 @@ public:
                 revision_=session_.snapshotRevision();wasConnected_=session_.connected();refresh();
             }
             if(page_==0&&now-lastAnimation_>=80){lastAnimation_=now;animate(now);}
-            if(page_==3&&graphKind_!=2&&!waiting_&&session_.connected()&&now-lastGraph_>=5000)requestGraph();
+            if(page_==3&&!waiting_&&session_.connected()&&now-lastGraph_>=5000)requestGraph();
             if(scanPending_&&!waiting_&&now-lastScan_>=1200&&page_==5&&sub_==1){lastScan_=now;send(ApiRoute::wifiScan,{});}
         }
         lv_timer_handler();
@@ -227,9 +227,9 @@ private:
         chart_=lv_chart_create(body_);lv_obj_set_size(chart_,LV_PCT(100),105);lv_chart_set_type(chart_,LV_CHART_TYPE_LINE);
         lv_chart_set_point_count(chart_,160);lv_obj_set_style_bg_color(chart_,color(surface()),0);lv_chart_set_range(chart_,LV_CHART_AXIS_PRIMARY_Y,0,1250);
         for(int i=0;i<4;++i)series_[i]=lv_chart_add_series(chart_,color(colors_[i]),LV_CHART_AXIS_PRIMARY_Y);
-        pageStatus_=label(body_,"Выберите период");if(graphKind_==2)set(pageStatus_,"Нет датчика");else requestGraph();
+        pageStatus_=label(body_,"Выберите период");requestGraph();
     }
-    void requestGraph(){lastGraph_=millis();if(graphKind_==2)return;send(Route::chartHistory,{{"minutes",String(graphMinutes_)}});}
+    void requestGraph(){lastGraph_=millis();send(Route::chartHistory,{{"minutes",String(graphMinutes_)}});}
     void calculator(){
         static const char* names[]={"Разбавление","Ареометр","Расчёт выхода","Объём куба"};
         static const char* labels[4][5]={{"Объём, л","Исходная, %","Нужная, %","",""},{"Температура, °C","Показание, %","","",""},{"Объём, л","Исходная, %","На выходе, %","Доля 1, %","Доля 2, %"},{"Диаметр, см","Высота, см","Уровень, см","",""}};
@@ -345,9 +345,10 @@ private:
             lv_dropdown_set_options(wifiList_,options.length()?options.c_str():"Нет сетей");set(pageStatus_,d["error"]|"");return;}
         if(pendingRoute_==Route::chartHistory&&chart_){
             JsonDocument d;if(deserializeJson(d,body)){set(pageStatus_,"Ошибка графика");return;}
-            int count=graphKind_==0?d["temperature"][0].size():d["cooling_lph"].size();if(count<=0)return;
+            const char* flowKey=graphKind_==2?"collection_ml_min":"cooling_lph";
+            int count=graphKind_==0?d["temperature"][0].size():d[flowKey].size();if(count<=0)return;
             lv_chart_set_point_count(chart_,count);double lo=0,hi=graphKind_==0?125:1;
-            for(int k=0;k<4;++k){JsonArrayConst arr=graphKind_==0?d["temperature"][k].as<JsonArrayConst>():d["cooling_lph"].as<JsonArrayConst>();
+            for(int k=0;k<4;++k){JsonArrayConst arr=graphKind_==0?d["temperature"][k].as<JsonArrayConst>():d[flowKey].as<JsonArrayConst>();
                 for(int i=0;i<count;++i){JsonVariantConst v=arr[i];bool valid=!v.isNull()&&(graphKind_==0||k==0);
                     double x=valid?v.as<double>():0;if(valid){lo=min(lo,x);hi=max(hi,x);}
                     lv_chart_set_value_by_id(chart_,series_[k],i,valid?lv_coord_t(constrain(x*10,-30000.0,30000.0)):LV_CHART_POINT_NONE);}}
@@ -369,7 +370,8 @@ private:
             set(live_[9],"Вода "+measured(d["water"]["total_l_estimate"]," л",2));
         }else if(page_==1){for(int i=0;i<4;++i)set(live_[i],measured(d["temperatures"][i]["c"]," °C",2));}
         else if(page_==2){auto rate=d["water"]["lpm"];set(live_[0],String("Расход: ")+(ok&&!rate.isNull()?String(rate.as<double>()*60,1)+" л/ч":"—"));
-            set(live_[1],"Израсходовано: "+measured(d["water"]["total_l_estimate"]," л",2));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));}
+            set(live_[1],"Израсходовано: "+measured(d["water"]["total_l_estimate"]," л",2));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));
+            set(live_[3],String("Отбор: ")+measured(d["collection"]["ml_per_min"]," мл/мин",1)+" · "+measured(d["collection"]["total_ml"]," мл",1));}
         else if(page_==5){
             if(sub_==1)set(live_[0],ok?String("Wi-Fi: ")+(d["station"]["ssid"]|"—"):"Нет связи");
             else if(sub_==3)set(live_[0],ok?String("Google: ")+String(d["google"]["configured"].as<bool>()?"настроен":"не настроен")+" · код "+String(d["google"]["state"]|0):"Нет связи");

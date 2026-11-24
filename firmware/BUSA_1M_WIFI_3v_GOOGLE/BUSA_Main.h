@@ -53,7 +53,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-20261125";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-20261125";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -1662,6 +1662,7 @@ String statusJSON(){
   s+=",\"ap\":{\"enabled\":"+(wifiRunning?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.softAPIP().toString())+"}";
   s+=",\"display_diagnostics\":"+busa_display_link::diagnosticJSON();
+  s+=",\"display_ota_supported\":true";
   s+=",\"ota\":"+otaJSON();
   s+=",\"ota_boot\":{\"running\":"+quoteJson(busaOtaRunning)+
     ",\"selected\":"+quoteJson(busaOtaBoot)+
@@ -1693,10 +1694,12 @@ String otaJSON(){
    +",\"success\":"+(otaSuccess?"true":"false")
    +",\"bytes\":"+String(otaBytes)+",\"message\":"+quoteJson(otaMessage)+"}";
 }
+static busa_ota::Marker mainOtaMarker(busa_ota::mainFamily);
 void uploadOTA(){
  HTTPUpload &u=server.upload();
  if(u.status==UPLOAD_FILE_START){
-  otaWriteAllowed=false;otaActive=false;otaSuccess=false;otaBytes=0;
+  otaWriteAllowed=false;otaActive=false;otaSuccess=false;otaBytes=0;mainOtaMarker.reset();
+  if(busa_display_ota::busy()){otaMessage="Обновляется экран";return;}
   if(!apClient()||otaToken.length()<16||(uint32_t)(millis()-otaTokenIssued)>90000
      ||server.header("X-Busa-Token")!=otaToken||!u.filename.endsWith(".bin")){
     otaMessage="Отказ: локальная авторизация / формат BIN";return;
@@ -1711,6 +1714,7 @@ void uploadOTA(){
   if(otaBytes==0 && (u.currentSize<4||u.buf[0]!=0xe9)){
     otaMessage="Неверный образ APP BIN";Update.abort();otaActive=false;otaWriteAllowed=false;return;
   }
+  mainOtaMarker.feed(u.buf,u.currentSize);
   if(Update.write(u.buf,u.currentSize)!=u.currentSize){
     otaMessage="Ошибка записи";Update.printError(Serial0);
     Update.abort();otaActive=false;otaWriteAllowed=false;return;
@@ -1718,6 +1722,7 @@ void uploadOTA(){
   otaBytes+=u.currentSize;
  }else if(u.status==UPLOAD_FILE_END){
   if(!otaWriteAllowed)return;
+  if(!mainOtaMarker.found()){Update.abort();otaActive=false;otaWriteAllowed=false;otaMessage="BIN не для основной платы";return;}
   otaSuccess=Update.end(true);otaActive=false;otaWriteAllowed=false;
   otaMessage=otaSuccess?"Успешно, перезагрузка":"BIN не прошёл проверку";
   if(!otaSuccess)Update.printError(Serial0);
@@ -1725,6 +1730,28 @@ void uploadOTA(){
  }else if(u.status==UPLOAD_FILE_ABORTED){
   if(otaWriteAllowed)Update.abort();
   otaWriteAllowed=false;otaActive=false;otaMessage="Отменено";
+ }
+}
+static String displayOtaToken;
+static uint32_t displayOtaTokenAt=0,displayOtaSize=0;
+static bool displayUploadOpen=false,displayUploadOk=false;
+static void uploadDisplayOTA(){
+ HTTPUpload& u=server.upload();
+ if(u.status==UPLOAD_FILE_START){
+  displayUploadOpen=false;displayUploadOk=false;
+  if(!apClient()||otaActive||otaRestart||busa_display_ota::busy()||!busa_display_link::otaCapable()||
+     displayOtaToken.length()<16||uint32_t(millis()-displayOtaTokenAt)>90000||
+     server.header("X-Busa-Token")!=displayOtaToken||!u.filename.endsWith(".bin"))return;
+  displayOtaToken="";otaToken="";
+  displayUploadOpen=busa_display_ota::begin(displayOtaSize);
+ }else if(u.status==UPLOAD_FILE_WRITE){
+  if(displayUploadOpen&&!busa_display_ota::append(u.buf,u.currentSize))displayUploadOpen=false;
+ }else if(u.status==UPLOAD_FILE_END){
+  if(displayUploadOpen)displayUploadOk=busa_display_ota::seal();
+  displayUploadOpen=false;
+ }else if(u.status==UPLOAD_FILE_ABORTED){
+  if(displayUploadOpen)busa_display_ota::abort();
+  displayUploadOpen=false;displayUploadOk=false;
  }
 }
 #include "BUSA_Google.h"
@@ -2918,6 +2945,8 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <div class="row">Время работы <b id="aboutUptime">—</b></div></div>
 
 <div class="card settingCard" data-stab="5" hidden><h2>Обновление ПО</h2>
+<div class="settingsTabs" role="tablist" aria-label="Плата для обновления"><button id="otaMainTab" type="button" class="on" role="tab" aria-selected="true">Основная плата</button><button id="otaScreenTab" type="button" role="tab" aria-selected="false">Обновление экрана</button></div>
+<div id="otaMainPanel">
 <div class="row">Установленная прошивка <b id="otaFirmware">—</b></div>
 <p class="hint">Обновление только локально по Wi-Fi БУСА. Выбирайте APP_OTA.bin, настройки и раскладку клавиш не стирайте.</p>
 <h3>Обновление прошивки</h3>
@@ -2925,6 +2954,13 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <input type="file" accept=".bin" id="firmwareFile">
 <button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
 <p id="updateResult" role="status">Ожидание подтверждения</p></div>
+<div id="otaScreenPanel" hidden><h3>Обновление экрана GUITION N4R8</h3>
+<div class="row">Прошивка экрана <b id="displayOtaVersion">—</b></div>
+<p class="hint">Выбирайте только DISPLAY_OTA.bin. Передача выполняется через основную плату по UART.</p>
+<input type="file" accept=".bin" id="displayFirmwareFile">
+<button type="button" class="full" id="displayManualUpdate" disabled>Обновить экран</button>
+<progress id="displayOtaProgress" max="100" value="0" style="width:100%"></progress>
+<p id="displayUpdateResult" role="status">Проверка связи с экраном</p></div></div>
 <div class="settingCard" data-stab="6" hidden><div class="card"><h2>Диагностика</h2>
 <div class="settingsTabs diagTabs">
 <button type="button" data-diag-btn="screen" class="on">Экран</button>
@@ -3805,6 +3841,56 @@ request();
 })();
 
 /* BUSA_DESIGN_JS_END */
+</script><script>
+(()=>{
+ const el=id=>document.getElementById(id),main=el('otaMainTab'),screen=el('otaScreenTab'),mainPanel=el('otaMainPanel'),screenPanel=el('otaScreenPanel');
+ const button=el('displayManualUpdate'),message=el('displayUpdateResult'),progress=el('displayOtaProgress');
+ let uploading=false,polling=false;
+ const active=new Set(['receiving','ready','sending','waiting_boot']);
+ const messages={idle:'Выберите OTA-файл экрана',receiving:'Загрузка файла на основную плату',ready:'Файл проверен. Ожидается экран',sending:'Передача по UART',waiting_boot:'Записано. Проверка запуска экрана',success:'Экран успешно обновлён',error:'Обновление не подтверждено. Проверьте связь и версию'};
+ async function refresh(){
+  if(uploading||polling||screenPanel.hidden||screenPanel.closest('[data-stab]').hidden)return;
+  polling=true;
+  try{
+   const response=await fetch('/api/display-ota/status',{cache:'no-store'});
+   if(!response.ok)throw Error('HTTP '+response.status);
+   const data=await response.json();
+   el('displayOtaVersion').textContent=data.firmware||'—';
+   button.disabled=!data.capable||active.has(data.state);
+   progress.value=data.size?Math.min(100,Math.floor(100*data.confirmed/data.size)):0;
+   message.textContent=active.has(data.state)||data.state==='success'||data.state==='error'?messages[data.state]:data.capable?messages.idle:'Нет связи или экран не поддерживает OTA';
+  }catch(e){button.disabled=true;message.textContent='Нет связи с основной платой. Результат не подтверждён';}
+  finally{polling=false;}
+ }
+ function select(display){
+  mainPanel.hidden=display;screenPanel.hidden=!display;
+  main.classList.toggle('on',!display);screen.classList.toggle('on',display);
+  main.setAttribute('aria-selected',String(!display));screen.setAttribute('aria-selected',String(display));
+  if(display)refresh();
+ }
+ main.onclick=()=>select(false);screen.onclick=()=>select(true);
+ button.onclick=async()=>{
+  if(uploading)return;
+  const file=el('displayFirmwareFile').files[0];
+  if(!file||!file.name.endsWith('.bin')||file.size<60000||file.size>0x1c0000){message.textContent='Выберите подходящий OTA BIN экрана';return;}
+  if(!confirm('Подтвердите обновление экрана GUITION N4R8. Не отключайте питание.'))return;
+  uploading=true;button.disabled=true;progress.value=0;
+  try{
+   const r=await fetch('/api/display-ota/prepare',{method:'POST',body:new URLSearchParams({confirm:'YES',size:String(file.size)})});
+   if(!r.ok)throw Error(await r.text());
+   const grant=await r.json(),body=new FormData();body.append('firmware',file,file.name);
+   await new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();xhr.open('POST','/api/display-ota/upload',true);xhr.setRequestHeader('X-Busa-Token',grant.token);
+    xhr.timeout=180000;xhr.upload.onprogress=e=>{if(e.lengthComputable)message.textContent='Wi-Fi: '+Math.round(e.loaded*100/e.total)+'%';};
+    xhr.onload=()=>xhr.status===200?resolve():reject(Error(xhr.responseText||'HTTP '+xhr.status));
+    xhr.onerror=()=>reject(Error('Связь прервана'));xhr.ontimeout=()=>reject(Error('Истекло время передачи'));xhr.send(body);
+   });
+   message.textContent='Файл принят. Ожидается подтверждение экрана';
+  }catch(e){message.textContent='Ошибка: '+e.message;}
+  finally{uploading=false;refresh();}
+ };
+ setInterval(refresh,2000);
+})();
 </script></body></html>
 )HTMLBUSA";
 
@@ -4520,12 +4606,35 @@ void setup(){
   });
 
   addGoogleRoutes();
+  server.on("/api/display-ota/status",HTTP_GET,[]{
+    if(!apClient()){server.send(403,"text/plain","Local AP only");return;}
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json",busa_display_ota::status(busa_display_link::otaCapable(),busa_display_link::displayFirmware));
+  });
+  server.on("/api/display-ota/prepare",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только локальная сеть БУСА");return;}
+    if(otaActive||otaRestart||busa_display_ota::busy()||!busa_display_link::otaCapable()){
+      server.send(409,"text/plain","Экран недоступен или выполняется обновление");return;
+    }
+    const String size=server.arg("size");char* stop=nullptr;
+    const unsigned long bytes=strtoul(size.c_str(),&stop,10);
+    if(size.isEmpty()||*stop||!busa_ota::validSize(bytes)){server.send(400,"text/plain","Неверный размер OTA");return;}
+    char token[17];snprintf(token,sizeof(token),"%08lx%08lx",(unsigned long)esp_random(),(unsigned long)esp_random());
+    displayOtaToken=token;displayOtaTokenAt=millis();displayOtaSize=bytes;
+    server.sendHeader("Cache-Control","no-store");
+    server.send(200,"application/json",String("{\"token\":")+quoteJson(displayOtaToken)+"}");
+  });
+  server.on("/api/display-ota/upload",HTTP_POST,[]{
+    server.sendHeader("Cache-Control","no-store");
+    server.send(displayUploadOk?200:400,"application/json",busa_display_ota::status(busa_display_link::otaCapable(),busa_display_link::displayFirmware));
+    displayUploadOk=false;
+  },uploadDisplayOTA);
   server.on("/api/ota/status",HTTP_GET,[]{
     server.sendHeader("Cache-Control","no-store");
     server.send(200,"application/json",otaJSON());
   });
   server.on("/api/ota/prepare",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"||otaActive){
+    if(!apClient()||server.arg("confirm")!="YES"||otaActive||otaRestart||busa_display_ota::busy()){
       server.send(403,"text/plain","Требуется локальная сеть БУСА и согласие");return;
     }
     char token[17];

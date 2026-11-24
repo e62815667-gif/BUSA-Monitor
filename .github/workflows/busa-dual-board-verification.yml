@@ -1,7 +1,7 @@
-name: BUSA dual-board integration verification
+name: BUSA dual-board COLL1 and display OTA build
 on:
   push:
-    branches: [lab/guition-n4r8-display-check-20261124]
+    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125]
   workflow_dispatch:
 permissions:
   contents: read
@@ -28,6 +28,21 @@ jobs:
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_touch_calibration.cpp -o /tmp/busa-touch-test
           /tmp/busa-touch-test
           node tests/test_display_receiver.cjs
+          python3 -B tests/test_collection.py
+          g++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/common/src tests/test_display_ota_protocol.cpp -o /tmp/busa-ota-protocol-test
+          /tmp/busa-ota-protocol-test
+          g++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/common/src tests/test_display_ota_sender.cpp -o /tmp/busa-ota-sender-test
+          /tmp/busa-ota-sender-test
+          python3 -B tests/test_display_ota_receiver.py
+          python3 -B tests/test_display_ota_partitions.py firmware/BUSA_Display_N4R8/partitions.csv
+          node tests/test_display_ota_ui.cjs
+          python3 - <<'PY'
+          import re,subprocess
+          from pathlib import Path
+          source=Path('firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h').read_text()
+          for script in re.findall(r'<script>(.*?)</script>',source,re.S):
+              subprocess.run(['node','--check'],input=script.encode(),check=True)
+          PY
           python3 -B tests/test_water_config_contract.py
           python3 -B -m unittest discover -s tests -p test_firmware_contract.py -v
           python3 -B ci/generate_calculator.py --check
@@ -59,18 +74,21 @@ jobs:
         run: |
           set -euo pipefail
           python3 ci/package_ui16.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
-          mkdir -p delivery
-          cp out/BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin delivery/BUSA_MAIN_N16R8_USB.bin
-          cp out/BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin delivery/BUSA_MAIN_N16R8_OTA.bin
+          mkdir -p dual_delivery_main
+          cp out/BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin dual_delivery_main/MAIN_USB_MERGED.bin
+          cp out/BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin dual_delivery_main/MAIN_OTA.bin
+          git archive --format=zip -o dual_delivery_main/SOURCE.zip HEAD firmware/BUSA_1M_WIFI_3v_GOOGLE firmware/BUSA_Display_N4R8 firmware/common ci tests .github/workflows/busa-dual-board-verification.yml AGENTS.md docs/BUSA_BASELINE_2026-11-23.md
           python3 - <<'PY'
           from pathlib import Path
           import hashlib, subprocess
-          root=Path('delivery')
-          usb=root/'BUSA_MAIN_N16R8_USB.bin'
-          ota=root/'BUSA_MAIN_N16R8_OTA.bin'
+          root=Path('dual_delivery_main')
+          usb=root/'MAIN_USB_MERGED.bin'
+          ota=root/'MAIN_OTA.bin'
           assert usb.read_bytes()[0x10000:]==ota.read_bytes()
           assert b'display_diagnostics' in ota.read_bytes()
           assert b'UNRELIABLE_PULSES' in ota.read_bytes()
+          assert b'UART2-COLL1-DISPLAYOTA1-20261125' in ota.read_bytes()
+          assert b'/api/display-ota/upload' in ota.read_bytes()
           checks=[]
           for p in (usb,ota):
               data=p.read_bytes()
@@ -83,9 +101,9 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_MAIN_N16R8_USB_OTA
+          name: BUSA_DUALOTA_MAIN_N16R8
           retention-days: 30
-          path: delivery/
+          path: dual_delivery_main/
           if-no-files-found: error
 
   display_firmware:
@@ -130,23 +148,41 @@ jobs:
           core="$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
           esptool="$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
           prefix=display_out/BUSA_Display_N4R8.ino
-          python3 "$esptool" --chip esp32s3 image_info "$prefix.bin"
-          python3 "$esptool" --chip esp32s3 merge_bin -o display_delivery/BUSA_DISPLAY_N4R8_USB.bin --flash_mode dio --flash_size 4MB 0x0 "$prefix.bootloader.bin" 0x8000 "$prefix.partitions.bin" 0xe000 "$core/tools/partitions/boot_app0.bin" 0x10000 "$prefix.bin"
+          grep -qx 'CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y' "$core/tools/sdk/esp32s3/sdkconfig"
+          python3 "$esptool" --chip esp32s3 image_info --version 2 "$prefix.bin" > display_delivery/OTA_IMAGE_INFO.txt
+          cp "$prefix.bin" display_delivery/DISPLAY_OTA.bin
+          python3 "$esptool" --chip esp32s3 merge_bin -o display_delivery/DISPLAY_USB_MERGED.bin --flash_mode dio --flash_size 4MB 0x0 "$prefix.bootloader.bin" 0x8000 "$prefix.partitions.bin" 0xe000 "$core/tools/partitions/boot_app0.bin" 0x10000 "$prefix.bin"
           python3 - <<'PY'
           from pathlib import Path
-          import hashlib
-          b=Path('display_delivery/BUSA_DISPLAY_N4R8_USB.bin')
+          import hashlib,struct
+          b=Path('display_delivery/DISPLAY_USB_MERGED.bin')
           app=Path('display_out/BUSA_Display_N4R8.ino.bin').read_bytes()
           data=b.read_bytes()
           assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
-          assert len(data)<=0x310000
-          assert b'BUSA-DISPLAY-N4R8-UART2' in app
-          print(b.name,len(data),hashlib.sha256(data).hexdigest())
-          (b.parent/'SHA256SUMS.txt').write_text(hashlib.sha256(data).hexdigest()+'  '+b.name+'\n')
+          assert 60000<len(app)<=0x1c0000 and len(data)<=0x1d0000
+          assert b'BUSA-DISPLAY-N4R8-OTA1-20261125' in app
+          assert b'14v9-N16R8-' not in app
+          assert app[0]==0xe9 and struct.unpack_from('<H',app,12)[0]==9
+          info=(b.parent/'OTA_IMAGE_INFO.txt').read_text()
+          assert 'Checksum:' in info and 'Validation hash:' in info and info.count('(valid)')>=2
+          raw=Path('display_out/BUSA_Display_N4R8.ino.partitions.bin').read_bytes()
+          entries={}
+          for pos in range(0,len(raw)-31,32):
+              magic,typ,sub,offset,size,label,flags=struct.unpack_from('<HBBII16sI',raw,pos)
+              if magic!=0x50aa:break
+              entries[label.split(b'\0',1)[0].decode()]=(typ,sub,offset,size)
+          assert entries['app0']==(0,0x10,0x10000,0x1c0000)
+          assert entries['app1']==(0,0x11,0x1d0000,0x1c0000)
+          assert entries['nvs'][2:]==(0x9000,0x5000)
+          assert all(offset+size<=0x400000 for typ,sub,offset,size in entries.values())
+          checks=[]
+          for f in [b,b.parent/'DISPLAY_OTA.bin']:
+              digest=hashlib.sha256(f.read_bytes()).hexdigest();checks.append(digest+'  '+f.name);print(f.name,f.stat().st_size,digest)
+          (b.parent/'SHA256SUMS.txt').write_text('\n'.join(checks)+'\n')
           PY
           git rev-parse HEAD > display_delivery/SOURCE_COMMIT.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_DISPLAY_N4R8_USB
+          name: BUSA_DUALOTA_DISPLAY_N4R8
           path: display_delivery/
           if-no-files-found: error

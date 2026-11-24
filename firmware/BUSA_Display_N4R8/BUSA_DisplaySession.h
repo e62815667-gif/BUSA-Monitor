@@ -7,12 +7,14 @@
 #include <esp_heap_caps.h>
 #include <esp_system.h>
 #include <BUSA_DisplayProtocol.h>
+#include "BUSA_DisplayOtaReceiver.h"
 
 namespace busa_guition {
 using namespace busa_uart;
 class DisplaySession {
 public:
     bool begin(){
+        ota_.begin();
         auto* storage=static_cast<uint8_t*>(heap_caps_malloc(maxRaw,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
         if(!storage)return false;
         decoder_=new(std::nothrow) Decoder(storage,maxRaw);
@@ -30,14 +32,15 @@ public:
     // A command is never automatically retried: a missing ACK is an unknown result.
     bool submitApi(const uint8_t* p,size_t n){
         ApiRequest q{};
-        if(!connected()||queuedSize_||pending_==apiResponse||apiResultReady_||!parseApiRequest(p,n,q))return false;
+        if(ota_.priority()||!connected()||queuedSize_||pending_==apiResponse||apiResultReady_||!parseApiRequest(p,n,q))return false;
         memcpy(queued_,p,n);queuedSize_=n;return true;
     }
     bool takeApiResult(int& code,String& body){
         if(!apiResultReady_)return false;
         code=apiCode_;body=apiBody_;apiBody_="";apiResultReady_=false;return true;
     }
-    void poll(const uint32_t* boardMetrics,const char* firmware,uint32_t loopMax){
+    void poll(const uint32_t* boardMetrics,const char* firmware,uint32_t loopMax,bool localReady){
+        ota_.tick(millis(),localReady,connected());
         if(!decoder_)return;
         Frame f{};
         // Drain bytes in bounded slices; caller must service poll between
@@ -49,17 +52,22 @@ public:
         const uint32_t now=millis();
         if(pending_&&uint32_t(now-requestAt_)>=3500){
             ++timeouts_;++lost_;
+            ota_.timeout(pending_);
             if(pending_==apiResponse){apiCode_=0;apiBody_="Response not received";apiResultReady_=true;}
             pending_=0;wireSize_=wireAt_=0;
         }
         if(!pending_){
-            if(!diagnosticSent_||uint32_t(now-lastDiag_)>=1500)
+            uint8_t kind=0,expected=0,data[8]={};size_t count=0;
+            const bool supported=model_["display_ota_supported"]|false;
+            if(ota_.priority()&&ota_.next(now,supported,connected(),localReady,kind,expected,data,count))start(kind,data,count,expected,now);
+            else if(!diagnosticSent_||uint32_t(now-lastDiag_)>=1500)
                 sendDiagnostics(boardMetrics,firmware,loopMax,now);
             else if(queuedSize_){
                 if(connected())start(apiRequest,queued_,queuedSize_,apiResponse,now);
                 else {apiCode_=0;apiBody_="Display link unavailable";apiResultReady_=true;}
                 memset(queued_,0,sizeof(queued_));queuedSize_=0;
-            }else if(!requestSent_||uint32_t(now-lastRequest_)>=250){
+            }else if(ota_.next(now,supported,connected(),localReady,kind,expected,data,count))start(kind,data,count,expected,now);
+            else if(!requestSent_||uint32_t(now-lastRequest_)>=250){
                 lastRequest_=now;requestSent_=true;
                 start(requestStatus,nullptr,0,status,now);
             }
@@ -83,6 +91,7 @@ private:
     }
     void handle(const Frame& f){
         if(!pending_||f.seq!=expectedSeq_||f.kind!=pending_){++lost_;return;}
+        if(ota_.reply(f)){pending_=0;return;}
         if(f.kind==diagnosticsAck&&f.size==0){pending_=0;return;}
         if(f.kind==apiResponse){
             apiCode_=0;apiBody_="";
@@ -121,6 +130,7 @@ private:
         start(displayDiagnostics,packet,sizeof(packet),diagnosticsAck,now);
         diagnosticSent_=true;lastDiag_=now;
     }
+    DisplayOtaReceiver ota_;
     Decoder* decoder_=nullptr;
     uint8_t* rxStorage_=nullptr;
     uint8_t queued_[apiMaxRequest]={};

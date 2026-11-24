@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <esp_heap_caps.h>
 #include <BUSA_DisplayProtocol.h>
+#include "BUSA_DisplayOtaMain.h"
 
 String statusJSON();
 static void busaDispatchDisplayApi(const busa_uart::ApiRequest&,int&,String&);
@@ -45,13 +46,16 @@ static void handleApi(const Frame& f){
     enqueue(apiResponse,f.seq,payload,body.length()+2);
     memset(rx,0,sizeof(rx));
 }
+static bool otaCapable(){return ready&&haveDiagnostic&&uint32_t(millis()-lastDiagnostic)<=staleMs&&strncmp(displayFirmware,busa_ota::displayFamily,strlen(busa_ota::displayFamily))==0;}
 static void poll(){
+    busa_display_ota::tick();
     if(!ready)return;
     Frame f{};
     // Bounded byte budget: UART traffic must not starve other loop work.
     for(unsigned i=0;i<256&&Serial1.available();++i){
         int c=Serial1.read();
         if(c<0||!decoder.push(uint8_t(c),f))continue;
+        if(busa_display_ota::handle(f,enqueue))continue;
         if(f.kind==requestStatus&&f.size==0){
             if(wireAt<wireSize){++busyDrops;continue;}
             String snapshot=statusJSON();
