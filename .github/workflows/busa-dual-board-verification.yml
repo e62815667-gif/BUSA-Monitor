@@ -114,7 +114,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p display_delivery
-          python3 -m pip install --disable-pip-version-check 'Pillow==13.0.0'
+          python3 -m pip install --disable-pip-version-check 'Pillow==13.0.0' 'esptool==4.5.1'
+          python3 -c 'import serial, bitstring, cryptography, reedsolo'
           python3 ci/generate_guition_asset.py
           npx --yes lv_font_conv@1.5.3 --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --range 0x20-0x7e,0xa0-0xff,0x400-0x52f,0x2013-0x2026,0x2190-0x2193 --size 14 --bpp 4 --format lvgl --no-compress --lv-include lvgl.h --output firmware/BUSA_Display_N4R8/busa_font.c
           cp firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Calculator.h firmware/BUSA_Display_N4R8/
