@@ -1,7 +1,7 @@
-name: BUSA UI16 CUBE1 MOTION1 build
+name: BUSA MOTION1 COL1 build
 on:
   push:
-    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local, feat/busa-ui16-holographic, feat/busa-android-ui16, feat/busa-cylinder-calculator-20261121, feat/busa-cylinder-geometry-persist-20261121, feat/busa-approved-home-motion-20261122]
+    branches: [feat/busa-calculator-20261105, feat/busa-ui7-local, feat/busa-ui16-holographic, feat/busa-android-ui16, feat/busa-cylinder-calculator-20261121, feat/busa-cylinder-geometry-persist-20261121, feat/busa-approved-home-motion-20261122, feat/busa-collection-gpio1-20261124]
     paths:
       - 'ci/ble_official_provisioning.py'
       - 'ci/busa_ble_ota_stability.py'
@@ -68,6 +68,7 @@ jobs:
           python3 -B tests/test_rm_telemetry.py
           python3 -B tests/test_rm_preservation.py
           python3 -B tests/test_ui16_preservation.py
+          python3 -B tests/test_collection_gpio1.py
           python3 -B ci/generate_calculator.py --check
           python3 -B ci/generate_viewport.py --check
           python3 -B ci/generate_design.py --check
@@ -126,14 +127,14 @@ jobs:
           python3 ci/package_ui16.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_UI16_CUBE1_MOTION1_20261122
+          name: BUSA_MOTION1_COL1_20261124
           retention-days: 30
           path: |
-            out/BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin
-            out/BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin
+            out/OTA.bin
+            out/USB_MERGED.bin
             out/SHA256SUMS.txt
             out/OTA_IMAGE_INFO.txt
             out/PARTITIONS.csv
             out/SOURCE_COMMIT.txt
             out/SOURCE_SHA256SUMS.txt
-            out/BUSA_N16R8_RM_CALC4_WIFI1_UI16_CUBE1_SOURCE.zip
+            out/BUSA_MOTION1_COL1_SOURCE.zip
