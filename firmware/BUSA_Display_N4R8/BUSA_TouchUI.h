@@ -15,7 +15,7 @@ public:
     bool begin(){
         if(!hw_.lcdReady())return false;
         lv_init();
-        static_assert(LV_COLOR_DEPTH==16,"RGB565 required");
+        static_assert(LV_COLOR_DEPTH==16 && LV_COLOR_16_SWAP==0,"Native RGB565 required");
         auto* pixels=static_cast<lv_color_t*>(heap_caps_malloc(WIDTH*24*sizeof(lv_color_t),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
         if(!pixels)return false;
         lv_disp_draw_buf_init(&drawBuffer_,pixels,nullptr,WIDTH*24);
@@ -25,7 +25,7 @@ public:
         lv_indev_drv_init(&input_);input_.type=LV_INDEV_TYPE_POINTER;input_.read_cb=readTouch;input_.user_data=this;
         if(!lv_indev_drv_register(&input_))return false;
         prefs_.begin("busa-touch",false);
-        calibrationValid_=prefs_.getBytesLength("affine")==sizeof(transform_)&&prefs_.getBytes("affine",&transform_,sizeof(transform_))==sizeof(transform_)&&validTransform();
+        calibrationValid_=prefs_.getBytesLength("affineC0")==sizeof(transform_)&&prefs_.getBytes("affineC0",&transform_,sizeof(transform_))==sizeof(transform_)&&validTransform();
         theme_=prefs_.getUChar("theme",2);if(theme_>2)theme_=2;
         asset_=static_cast<uint8_t*>(heap_caps_malloc(BUSA_ASSET_SIZE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
         if(asset_){
@@ -67,7 +67,7 @@ private:
         auto* self=static_cast<Interface*>(d->user_data);
         if(!self->frameOpen_){self->frameStart_=millis();self->frameOpen_=true;}
         self->hw_.panel().draw16bitRGBBitmap(a->x1,a->y1,reinterpret_cast<uint16_t*>(p),a->x2-a->x1+1,a->y2-a->y1+1);
-        if(lv_disp_flush_is_last(d)){self->hw_.frameComplete(self->frameStart_);self->frameOpen_=false;}
+        if(lv_disp_flush_is_last(d)){self->hw_.present();self->hw_.frameComplete(self->frameStart_);self->frameOpen_=false;}
         lv_disp_flush_ready(d);
     }
     static void readTouch(lv_indev_drv_t* d,lv_indev_data_t* data){
@@ -107,7 +107,7 @@ private:
         if(!busa_touch::fit(raw_,screen_,transform_)||!validTransform()){startCalibration();return;}
         const auto fitted=busa_touch::apply(transform_,value),expected=target();
         if(abs(fitted.x-expected.x)>18||abs(fitted.y-expected.y)>18){startCalibration();return;}
-        calibrationValid_=prefs_.putBytes("affine",&transform_,sizeof(transform_))==sizeof(transform_);
+        calibrationValid_=prefs_.putBytes("affineC0",&transform_,sizeof(transform_))==sizeof(transform_);
         if(!calibrationValid_){startCalibration();return;}
         calibrating_=false;build();
     }

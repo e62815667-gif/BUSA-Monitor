@@ -1,6 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <Arduino_GFX_Library.h>
+#include <esp_heap_caps.h>
 #include <SPI.h>
 #include <SD.h>
 #include <XPT2046_Touchscreen.h>
@@ -16,25 +17,33 @@ class FactoryPanel final : public Arduino_NV3041A {
 public:
     explicit FactoryPanel(Arduino_DataBus* bus)
         : Arduino_NV3041A(bus,GFX_NOT_DEFINED,0,true,WIDTH,HEIGHT) {}
-    void setRotation(uint8_t) override {
-        // Retain the factory landscape MADCTL value. No additional LCD write.
-        Arduino_TFT::setRotation(0);
-    }
 protected:
     void tftInit() override {
         applyFactoryInit(*_bus,[](uint8_t ms){delay(ms);});
+        invertDisplay(false);
+    }
+};
+
+// Use the factory demo full-frame path; allocate explicitly in external RAM.
+class PsramCanvas final : public Arduino_Canvas {
+public:
+    explicit PsramCanvas(Arduino_G* output):Arduino_Canvas(WIDTH,HEIGHT,output) {}
+    bool begin(int32_t speed) override {
+        if(!_framebuffer) _framebuffer=static_cast<uint16_t*>(heap_caps_aligned_alloc(16,size_t(WIDTH)*HEIGHT*sizeof(uint16_t),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
+        return _framebuffer && Arduino_Canvas::begin(speed);
     }
 };
 
 class Hardware {
 public:
     Hardware():qspi_(LCD_CS,LCD_SCK,LCD_D0,LCD_D1,LCD_D2,LCD_D3),
-               lcd_(&qspi_),shared_(HSPI),touch_(TOUCH_CS) {}
+               lcd_(&qspi_),canvas_(&lcd_),shared_(HSPI),touch_(TOUCH_CS) {}
     void begin() {
         pinMode(BACKLIGHT,OUTPUT);digitalWrite(BACKLIGHT,LOW);
         pinMode(TOUCH_CS,OUTPUT);digitalWrite(TOUCH_CS,HIGH);
         pinMode(SD_CS,OUTPUT);digitalWrite(SD_CS,HIGH);
-        lcdReady_=lcd_.begin(LCD_CLOCK_HZ);
+        lcdReady_=canvas_.begin(LCD_CLOCK_HZ);
+        if(lcdReady_){canvas_.fillScreen(BLACK);canvas_.flush();}
         shared_.begin(SHARED_SPI_SCK,SHARED_SPI_MISO,SHARED_SPI_MOSI,-1);
         touchReady_=touch_.begin(shared_);
         touch_.setRotation(0);
@@ -47,7 +56,8 @@ public:
     // A successfully configured library is not proof of a physical touch.
     bool touchReady() const{return touchReady_;}
     bool sdReady() const{return sdReady_;}
-    Arduino_GFX& panel(){return lcd_;}
+    Arduino_GFX& panel(){return canvas_;}
+    void present(){canvas_.flush();}
     void backlight(bool on){digitalWrite(BACKLIGHT,on&&lcdReady_?HIGH:LOW);}
     bool readRawTouch(TS_Point& p){
         if(!touchReady_||!touch_.touched())return false;
@@ -107,6 +117,7 @@ public:
 private:
     Arduino_ESP32QSPI qspi_;
     FactoryPanel lcd_;
+    PsramCanvas canvas_;
     SPIClass shared_;
     XPT2046_Touchscreen touch_;
     bool lcdReady_=false,touchReady_=false,sdReady_=false,capacityKnown_=false;
