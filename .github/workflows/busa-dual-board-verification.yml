@@ -25,6 +25,8 @@ jobs:
           /tmp/busa-display-protocol-test
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_api.cpp -o /tmp/busa-display-api-test
           /tmp/busa-display-api-test
+          g++ -std=c++11 -Wall -Wextra -Werror tests/test_touch_calibration.cpp -o /tmp/busa-touch-test
+          /tmp/busa-touch-test
           node tests/test_display_receiver.cjs
           python3 -B tests/test_water_config_contract.py
           python3 -B -m unittest discover -s tests -p test_firmware_contract.py -v
@@ -86,7 +88,7 @@ jobs:
           path: delivery/
           if-no-files-found: error
 
-  display_components:
+  display_firmware:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     steps:
@@ -104,10 +106,42 @@ jobs:
           arduino-cli lib install "GFX Library for Arduino@1.5.0"
           arduino-cli lib install "XPT2046_Touchscreen@1.4"
           arduino-cli lib install "ArduinoJson@7.4.3"
-      - name: Compile hardware and UART components without release artifacts
+          arduino-cli lib install "lvgl@8.4.0"
+      - name: Prepare approved graphics and Cyrillic font
         run: |
           set -euo pipefail
-          mkdir -p /tmp/BusaDisplayCompile
-          cp firmware/BUSA_Display_N4R8/*.h /tmp/BusaDisplayCompile/
-          cp tests/fixtures/display_component_compile.ino /tmp/BusaDisplayCompile/BusaDisplayCompile.ino
-          arduino-cli compile --clean --library firmware/common --fqbn 'esp32:esp32:esp32s3:FlashSize=4M,PartitionScheme=huge_app,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio,DebugLevel=none' /tmp/BusaDisplayCompile
+          mkdir -p display_delivery
+          python3 ci/generate_guition_asset.py
+          npx --yes lv_font_conv@1.5.3 --font /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf --range 0x20-0x7e,0xa0-0xff,0x400-0x52f,0x2013-0x2026,0x2190-0x2193 --size 14 --bpp 4 --format lvgl --no-compress --lv-include lvgl.h --output firmware/BUSA_Display_N4R8/busa_font.c
+          cp firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Calculator.h firmware/BUSA_Display_N4R8/
+          cp firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_CalcCoefficients.h firmware/BUSA_Display_N4R8/
+      - name: Compile GUITION N4R8 native interface
+        run: |
+          set -euo pipefail
+          arduino-cli compile --clean --library firmware/common --build-property 'compiler.cpp.extra_flags=-DLV_CONF_SKIP' --build-property 'compiler.c.extra_flags=-DLV_CONF_SKIP' --fqbn 'esp32:esp32:esp32s3:FlashSize=4M,PartitionScheme=huge_app,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio,DebugLevel=none' --output-dir display_out firmware/BUSA_Display_N4R8
+      - name: Package GUITION USB image and verify flash boundaries
+        run: |
+          set -euo pipefail
+          core="$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17"
+          esptool="$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          prefix=display_out/BUSA_Display_N4R8.ino
+          python3 "$esptool" --chip esp32s3 image_info "$prefix.bin"
+          python3 "$esptool" --chip esp32s3 merge_bin -o display_delivery/BUSA_DISPLAY_N4R8_USB.bin --flash_mode dio --flash_size 4MB 0x0 "$prefix.bootloader.bin" 0x8000 "$prefix.partitions.bin" 0xe000 "$core/tools/partitions/boot_app0.bin" 0x10000 "$prefix.bin"
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          b=Path('display_delivery/BUSA_DISPLAY_N4R8_USB.bin')
+          app=Path('display_out/BUSA_Display_N4R8.ino.bin').read_bytes()
+          data=b.read_bytes()
+          assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
+          assert len(data)<=0x310000
+          assert b'BUSA-DISPLAY-N4R8-UART2' in app
+          print(b.name,len(data),hashlib.sha256(data).hexdigest())
+          (b.parent/'SHA256SUMS.txt').write_text(hashlib.sha256(data).hexdigest()+'  '+b.name+'\n')
+          PY
+          git rev-parse HEAD > display_delivery/SOURCE_COMMIT.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_DISPLAY_N4R8_USB
+          path: display_delivery/
+          if-no-files-found: error
