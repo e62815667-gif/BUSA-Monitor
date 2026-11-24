@@ -21,7 +21,7 @@ static void begin(){
     raw=static_cast<uint8_t*>(heap_caps_malloc(maxRaw,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
     wire=static_cast<uint8_t*>(heap_caps_malloc(maxWire,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
     if(!raw||!wire){free(raw);free(wire);raw=nullptr;wire=nullptr;return;}
-    if(!Serial1.setRxBufferSize(4096)){free(raw);free(wire);raw=nullptr;wire=nullptr;return;}
+    if(!Serial1.setRxBufferSize(4096)||Serial1.setTxBufferSize(mainTxBuffer)!=mainTxBuffer){free(raw);free(wire);raw=nullptr;wire=nullptr;return;}
     Serial1.begin(baud,SERIAL_8N1,mainRx,mainTx);
     ready=true;
 }
@@ -69,11 +69,10 @@ static void poll(){
         }
     }
     if(wireAt<wireSize){
-        int avail=Serial1.availableForWrite();
-        if(avail>0){
-            size_t count=wireSize-wireAt;
-            if(count>size_t(avail))count=size_t(avail);
-            if(count>256)count=256;
+        // Leave space for the IDF ring item overhead. Core 2.0.17 may
+        // report FIFO space when its ring is full, so do not write in that case.
+        const size_t count=txWriteBudget(wireSize-wireAt,Serial1.availableForWrite());
+        if(count){
             wireAt+=Serial1.write(wire+wireAt,count);
             if(wireAt==wireSize)++tx;
         }

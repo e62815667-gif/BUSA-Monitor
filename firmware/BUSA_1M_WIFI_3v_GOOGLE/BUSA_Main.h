@@ -53,7 +53,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 uint32_t busaMaxKeyScanMs=0,busaLastKeyScanMs=0,busaKeySkipUntil=0;
@@ -3373,7 +3373,8 @@ async function refreshGraphHistory(force=false){
  }catch(e){if(token===chartFetchToken&&active===3)get('chartState').textContent='Нет связи';}
  finally{clearTimeout(timeout);if(chartRequestController===controller)chartRequestController=null;}
 }
-async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;statusFailures=0;
+function displayOtaOwnsStatusPoll(){const p=get('otaScreenPanel');return document.busaOtaUploading||document.busaOtaStatusPolling||(document.busaOtaTransfer&&p&&!p.hidden&&!p.closest('[data-stab]').hidden);}
+async function update(){if(pollBusy||document.hidden||displayOtaOwnsStatusPoll())return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;statusFailures=0;
 networkLeds(s.network_indicators,s.station,s.google);refreshWebEvents();
  // Physical buttons and browser navigation are independent.
  let names=['Вода','Колонна','Куб','Авария'];
@@ -3643,7 +3644,7 @@ syncClock();setInterval(syncClock,300000);
 update();setInterval(update,3000);
 // Graph cadence is fixed and independent of status polling and selected time range.
 setInterval(()=>{if(active===3&&!document.hidden)refreshGraphHistory();},CHART_REFRESH_MS);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&active===3)refreshGraphHistory(true);});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){update();if(active===3)refreshGraphHistory(true);}});
 </script><script src="/calculator.js?v=CALC1"></script><script>
 /* BUSA_VIEWPORT_JS_BEGIN */
 /* One-screen navigation; long content scrolls within its own panel. */
@@ -3849,18 +3850,19 @@ request();
  const active=new Set(['receiving','ready','sending','waiting_boot']);
  const messages={idle:'Выберите OTA-файл экрана',receiving:'Загрузка файла на основную плату',ready:'Файл проверен. Ожидается экран',sending:'Передача по UART',waiting_boot:'Записано. Проверка запуска экрана',success:'Экран успешно обновлён',error:'Обновление не подтверждено. Проверьте связь и версию'};
  async function refresh(){
-  if(uploading||polling||screenPanel.hidden||screenPanel.closest('[data-stab]').hidden)return;
-  polling=true;
+  if(uploading||polling||document.hidden||screenPanel.hidden||screenPanel.closest('[data-stab]').hidden||(typeof pollBusy!=='undefined'&&pollBusy))return;
+  polling=true;document.busaOtaStatusPolling=true;
   try{
    const response=await fetch('/api/display-ota/status',{cache:'no-store'});
    if(!response.ok)throw Error('HTTP '+response.status);
    const data=await response.json();
+   document.busaOtaTransfer=active.has(data.state);
    el('displayOtaVersion').textContent=data.firmware||'—';
    button.disabled=!data.capable||active.has(data.state);
    progress.value=data.size?Math.min(100,Math.floor(100*data.confirmed/data.size)):0;
    message.textContent=active.has(data.state)?messages[data.state]:uploadError||((data.state==='success'||data.state==='error')?messages[data.state]:data.capable?messages.idle:'Нет связи или экран не поддерживает OTA');
   }catch(e){button.disabled=true;message.textContent='Нет связи с основной платой. Результат не подтверждён';}
-  finally{polling=false;}
+  finally{polling=false;document.busaOtaStatusPolling=false;}
  }
  function select(display){
   mainPanel.hidden=display;screenPanel.hidden=!display;
@@ -3874,7 +3876,7 @@ request();
   const file=el('displayFirmwareFile').files[0];
   if(!file||!file.name.endsWith('.bin')||file.size<60000||file.size>0x1c0000){message.textContent='Выберите подходящий OTA BIN экрана';return;}
   if(!confirm('Подтвердите обновление экрана GUITION N4R8. Не отключайте питание.'))return;
-  uploading=true;uploadError='';button.disabled=true;progress.value=0;
+  uploading=true;document.busaOtaUploading=true;uploadError='';button.disabled=true;progress.value=0;
   try{
    const r=await fetch('/api/display-ota/prepare',{method:'POST',body:new URLSearchParams({confirm:'YES',size:String(file.size)})});
    if(!r.ok)throw Error(await r.text());
@@ -3885,9 +3887,10 @@ request();
     xhr.onload=()=>xhr.status===200?resolve():reject(Error(xhr.responseText||'HTTP '+xhr.status));
     xhr.onerror=()=>reject(Error('Связь прервана'));xhr.ontimeout=()=>reject(Error('Истекло время передачи'));xhr.send(body);
    });
+   document.busaOtaTransfer=true;
    message.textContent='Файл принят. Ожидается подтверждение экрана';
   }catch(e){uploadError='Ошибка: '+e.message;message.textContent=uploadError;}
-  finally{uploading=false;refresh();}
+  finally{uploading=false;document.busaOtaUploading=false;refresh();}
  };
  setInterval(refresh,2000);
 })();
@@ -4822,6 +4825,7 @@ void loop(){
   uint32_t now=millis();
   const uint32_t tickStart=now;
   soundPoll(now);
+  busa_display_link::poll(); // Fill UART TX before potentially slow HTTP work.
   {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
   // One nonblocking driver scan serves both TFT and web UI. Every scan ends.
   busaWebEventsPoll(now); // Passive local journal; no temperature readings or output writes.

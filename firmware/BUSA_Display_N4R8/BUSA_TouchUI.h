@@ -53,7 +53,7 @@ public:
             if(revision_!=session_.snapshotRevision()||wasConnected_!=session_.connected()){
                 revision_=session_.snapshotRevision();wasConnected_=session_.connected();refresh();
             }
-            if(page_==0&&now-lastAnimation_>=80){lastAnimation_=now;animate(now);}
+            if(page_==0&&now-lastAnimation_>=60){lastAnimation_=now;animate(now);}
             if(page_==3&&!waiting_&&session_.connected()&&now-lastGraph_>=5000)requestGraph();
             if(scanPending_&&!waiting_&&now-lastScan_>=1200&&page_==5&&sub_==1){lastScan_=now;send(ApiRoute::wifiScan,{});}
         }
@@ -395,7 +395,8 @@ private:
         const auto& d=session_.snapshot();bool water=session_.connected()&&!d["water"]["lpm"].isNull()&&d["water"]["lpm"].as<float>()>0;
         bool temp=session_.connected()&&!d["temperatures"][2]["c"].isNull();
         for(int i=0;i<7;++i){if(!motion_[i])continue;bool active=i<4?water:temp;
-            if(!active){lv_obj_add_flag(motion_[i],LV_OBJ_FLAG_HIDDEN);continue;}lv_obj_clear_flag(motion_[i],LV_OBJ_FLAG_HIDDEN);
+            if(!active){if(!lv_obj_has_flag(motion_[i],LV_OBJ_FLAG_HIDDEN))lv_obj_add_flag(motion_[i],LV_OBJ_FLAG_HIDDEN);continue;}
+            if(lv_obj_has_flag(motion_[i],LV_OBJ_FLAG_HIDDEN))lv_obj_clear_flag(motion_[i],LV_OBJ_FLAG_HIDDEN);
             int t=(now/40+i*23)%100,x=0,y=0;
             if(i<2){x=142;y=1144-t*8;}else if(i==2){x=684+t*2;y=367;}else if(i==3){x=788+t*2;y=913;}
             else{x=300+(i-4)*90;y=1420-t;}

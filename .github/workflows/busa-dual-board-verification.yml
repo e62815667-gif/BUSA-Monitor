@@ -1,7 +1,7 @@
 name: BUSA dual-board COLL1 and display OTA build
 on:
   push:
-    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125]
+    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125]
   workflow_dispatch:
 permissions:
   contents: read
@@ -23,6 +23,9 @@ jobs:
           /tmp/busa-uart-test
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_p1_wiring.cpp -o /tmp/busa-p1-wiring-test
           /tmp/busa-p1-wiring-test
+          g++ -std=c++11 -Wall -Wextra -Werror tests/test_uart_tx_budget.cpp -o /tmp/busa-uart-budget-test
+          /tmp/busa-uart-budget-test
+          node tests/test_perf1_polling.cjs
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_protocol.cpp -o /tmp/busa-display-protocol-test
           /tmp/busa-display-protocol-test
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_api.cpp -o /tmp/busa-display-api-test
@@ -89,7 +92,7 @@ jobs:
           assert usb.read_bytes()[0x10000:]==ota.read_bytes()
           assert b'display_diagnostics' in ota.read_bytes()
           assert b'UNRELIABLE_PULSES' in ota.read_bytes()
-          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125' in ota.read_bytes()
+          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF1' in ota.read_bytes()
           assert b'/api/display-ota/upload' in ota.read_bytes()
           checks=[]
           for p in (usb,ota):
@@ -182,7 +185,7 @@ jobs:
           assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
           assert 60000<len(app)<=0x1c0000 and len(data)<=0x1d0000
           major='5' if os.environ['CORE_VERSION']=='3.0.0' else '4'
-          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-261125').encode() in app
+          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-PF1').encode() in app
           assert b'[BOOT] FIRST_FRAME OK' in app
           assert b'[BOOT] PSRAM ' in app
           assert b'[BOOT] LCD GEOMETRY ' in app

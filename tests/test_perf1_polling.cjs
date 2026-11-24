@@ -1,0 +1,17 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const path=require('node:path');
+const s=fs.readFileSync(path.join(__dirname,'../firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h'),'utf8');
+const src=s.match(/function displayOtaOwnsStatusPoll\(\)\{[^\n]+\}/)[0];
+const parent={hidden:false},panel={hidden:false,closest(){return parent;}},document={};
+const ctx={document,get(){return panel;}};
+vm.createContext(ctx);vm.runInContext(src,ctx);
+const owns=()=>vm.runInContext('displayOtaOwnsStatusPoll()',ctx);
+assert.equal(Boolean(owns()),false);
+document.busaOtaUploading=true;assert.equal(owns(),true);
+document.busaOtaUploading=false;document.busaOtaStatusPolling=true;assert.equal(owns(),true);
+document.busaOtaStatusPolling=false;document.busaOtaTransfer=true;assert.equal(owns(),true);
+panel.hidden=true;assert.equal(owns(),false);
+panel.hidden=false;parent.hidden=true;assert.equal(owns(),false);
+parent.hidden=false;document.busaOtaTransfer=false;assert.equal(owns(),false);
+assert.match(s,/async function update\(\)\{if\(pollBusy\|\|document.hidden\|\|displayOtaOwnsStatusPoll\(\)\)return;/);
+console.log('PASS: shared status polling gate, OTA priority and navigation recovery');

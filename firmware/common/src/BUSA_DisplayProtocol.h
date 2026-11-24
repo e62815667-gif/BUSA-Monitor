@@ -12,6 +12,15 @@ constexpr size_t maxWire=2*maxRaw+2;
 constexpr int mainTx=9, mainRx=8, displayTx=43, displayRx=44;
 // Shared software default, not a hardware pin assignment.
 constexpr uint32_t baud=115200;
+// Keep the wire protocol compatible with installed OTA1 receivers. A ring
+// buffer lets the hardware drain bytes even when the application loop is busy.
+constexpr size_t mainTxBuffer=4096, txReserve=128, txSlice=2048;
+inline size_t txWriteBudget(size_t pending,int available){
+    if(available<=int(txReserve))return 0;
+    size_t n=size_t(available)-txReserve;
+    if(n>txSlice)n=txSlice;
+    return n<pending?n:pending;
+}
 constexpr uint32_t staleMs=5000;
 // Diagnostic schema v1, little-endian 32-bit words; unknown=UINT32_MAX.
 // No text fields or credentials are accepted from the wire.
