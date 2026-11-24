@@ -8,6 +8,7 @@ public:
     explicit BusaLocalRequest(WebServer& http):http_(&http){}
     explicit BusaLocalRequest(const busa_uart::ApiRequest& req):request_(&req){}
     bool local()const{return http_?::apClient():request_!=nullptr;}
+    bool uart()const{return request_!=nullptr;}
     bool hasArg(const String& key){return http_?http_->hasArg(key):busa_uart::findArg(*request_,key.c_str())!=nullptr;}
     String arg(const String& key){
         if(http_)return http_->arg(key);

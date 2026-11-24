@@ -70,7 +70,7 @@ public:
                 size_t n=wireSize_-wireAt_;
                 if(n>size_t(avail))n=size_t(avail);
                 wireAt_+=Serial1.write(wire_+wireAt_,n);
-                if(wireAt_==wireSize_)++tx_;
+                if(wireAt_==wireSize_){++tx_;memset(raw_,0,sizeof(raw_));memset(wire_,0,sizeof(wire_));}
             }
         }
     }
@@ -98,7 +98,7 @@ private:
         const DeserializationError error=deserializeJson(candidate,reinterpret_cast<const char*>(f.data),f.size);
         const char* device=candidate["device"]|"";
         if(error||strcmp(device,"BUSA-1M-001")!=0||!candidate["temperatures"].is<JsonArray>()||
-           candidate["temperatures"].size()!=4){
+           candidate["temperatures"].size()!=4||candidate["display_references"].size()!=4||candidate["calibration_offsets"].size()!=4){
             ++lost_;pending_=0;return;
         }
         model_=std::move(candidate);

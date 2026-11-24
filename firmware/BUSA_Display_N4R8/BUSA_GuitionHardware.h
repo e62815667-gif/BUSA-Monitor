@@ -68,6 +68,7 @@ public:
         if(actual!=size){++assetErrors_;++readErrors_;lastError_=3;return false;}
         return true;
     }
+    void invalidAsset(){++assetErrors_;lastError_=3;}
     void refreshCapacity(){
         if(!sdReady_)return;
         total_=SD.totalBytes();

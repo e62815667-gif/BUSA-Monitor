@@ -28,7 +28,10 @@ public:
         calibrationValid_=prefs_.getBytesLength("affine")==sizeof(transform_)&&prefs_.getBytes("affine",&transform_,sizeof(transform_))==sizeof(transform_)&&validTransform();
         theme_=prefs_.getUChar("theme",2);if(theme_>2)theme_=2;
         asset_=static_cast<uint8_t*>(heap_caps_malloc(BUSA_ASSET_SIZE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
-        if(asset_&&!hw_.readAsset("/busa/rig.rgb565a",asset_,BUSA_ASSET_SIZE))memcpy(asset_,BUSA_ASSET,BUSA_ASSET_SIZE);
+        if(asset_){
+            if(!hw_.readAsset("/busa/rig.rgb565a",asset_,BUSA_ASSET_SIZE))memcpy(asset_,BUSA_ASSET,BUSA_ASSET_SIZE);
+            else if(memcmp(asset_,BUSA_ASSET,BUSA_ASSET_SIZE)!=0){hw_.invalidAsset();memcpy(asset_,BUSA_ASSET,BUSA_ASSET_SIZE);}
+        }
         art_.header.always_zero=0;art_.header.cf=LV_IMG_CF_TRUE_COLOR_ALPHA;
         art_.header.w=BUSA_ASSET_W;art_.header.h=BUSA_ASSET_H;art_.data_size=BUSA_ASSET_SIZE;art_.data=asset_?asset_:BUSA_ASSET;
         lastTick_=millis();
@@ -45,6 +48,7 @@ public:
                 revision_=session_.snapshotRevision();wasConnected_=session_.connected();refresh();
             }
             if(page_==0&&now-lastAnimation_>=80){lastAnimation_=now;animate(now);}
+            if(page_==3&&graphKind_!=2&&!waiting_&&session_.connected()&&now-lastGraph_>=5000)requestGraph();
             if(scanPending_&&!waiting_&&now-lastScan_>=1200&&page_==5&&sub_==1){lastScan_=now;send(ApiRoute::wifiScan,{});}
         }
         lv_timer_handler();
@@ -80,7 +84,7 @@ private:
     }
     void rootStyle(lv_obj_t* o){lv_obj_set_style_bg_color(o,color(paper()),0);lv_obj_set_style_text_color(o,color(ink()),0);lv_obj_set_style_text_font(o,&busa_font,0);}
     void startCalibration(){
-        calibrating_=true;calibrationValid_=false;calIndex_=0;held_=true;calSamples_=0;
+        calibrating_=true;calibrationValid_=false;calIndex_=0;held_=false;awaitRelease_=true;calSamples_=0;sumX_=sumY_=0;
         auto* root=lv_scr_act();lv_obj_clean(root);rootStyle(root);
         auto* msg=lv_label_create(root);lv_label_set_text(msg,"Калибровка: нажмите и отпустите метку");lv_obj_align(msg,LV_ALIGN_CENTER,0,0);
         calMark_=lv_obj_create(root);lv_obj_remove_style_all(calMark_);lv_obj_set_size(calMark_,18,18);
@@ -90,6 +94,7 @@ private:
     void placeMark(){auto p=target();lv_obj_set_pos(calMark_,p.x-9,p.y-9);}
     void calibrationPoll(){
         TS_Point p;bool down=hw_.readRawTouch(p);
+        if(awaitRelease_){if(!down)awaitRelease_=false;return;}
         if(down){
             if(!held_){held_=true;calSamples_=0;sumX_=sumY_=0;}
             if(calSamples_<32){sumX_+=p.x;sumY_+=p.y;++calSamples_;}
@@ -181,9 +186,9 @@ private:
         render();
     }
     void render(){
-        hideKeyboard();lv_obj_clean(body_);for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
+        hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
         wifiList_=nullptr;chart_=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;scanPending_=false;
-        for(int i=0;i<6;++i)lv_obj_set_style_bg_color(navButtons_[i],color(i==page_?0x2087ed:surface()),0);
+        for(int i=0;i<6;++i){lv_obj_set_style_bg_color(navButtons_[i],color(i==page_?0x2087ed:surface()),0);lv_obj_set_style_text_color(lv_obj_get_child(navButtons_[i],0),color(i==page_?0xffffff:ink()),0);}
         switch(page_){case 0:home();break;case 1:temperatures();break;case 2:water();break;case 3:graphs();break;case 4:calculator();break;case 5:settings();break;}
         refresh();
     }
@@ -224,14 +229,14 @@ private:
         for(int i=0;i<4;++i)series_[i]=lv_chart_add_series(chart_,color(colors_[i]),LV_CHART_AXIS_PRIMARY_Y);
         pageStatus_=label(body_,"Выберите период");if(graphKind_==2)set(pageStatus_,"Нет датчика");else requestGraph();
     }
-    void requestGraph(){if(graphKind_==2)return;send(Route::chartHistory,{{"minutes",String(graphMinutes_)}});}
+    void requestGraph(){lastGraph_=millis();if(graphKind_==2)return;send(Route::chartHistory,{{"minutes",String(graphMinutes_)}});}
     void calculator(){
         static const char* names[]={"Разбавление","Ареометр","Расчёт выхода","Объём куба"};
         static const char* labels[4][5]={{"Объём, л","Исходная, %","Нужная, %","",""},{"Температура, °C","Показание, %","","",""},{"Объём, л","Исходная, %","На выходе, %","Доля 1, %","Доля 2, %"},{"Диаметр, см","Высота, см","Уровень, см","",""}};
         static const int counts[]={3,2,5,3};
         auto* r=row(body_);for(int i=0;i<4;++i)button(r,names[i],320+i,112);
         label(body_,names[calcMode_]);for(int i=0;i<counts[calcMode_];++i)fields_[i]=field(body_,labels[calcMode_][i],calcInput_[calcMode_][i],true);
-        button(body_,"Рассчитать",330);resultLabel_=label(body_,"");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
+        button(body_,"Рассчитать",330);if(calcMode_==3){button(body_,"Загрузить размеры",331);button(body_,"Сохранить размеры",332);}resultLabel_=label(body_,"");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
     }
     void settings(){
         label(body_,"НАСТРОЙКИ");
@@ -245,7 +250,8 @@ private:
         else if(sub_==3){live_[0]=label(body_,"Google —");fields_[0]=field(body_,"URL Apps Script","",false);fields_[1]=field(body_,"Токен","",false,true);button(body_,"Сохранить подключение",210);button(body_,"Проверить отправку",211);button(body_,"Отключить передачу",212);}
         else if(sub_==4){for(int i=0;i<5;++i){live_[i]=label(body_,"—");lv_obj_set_width(live_[i],LV_PCT(100));lv_label_set_long_mode(live_[i],LV_LABEL_LONG_WRAP);}}
         else if(sub_==5){button(body_,"Обновить журнал",213);resultLabel_=label(body_,"");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);send(Route::events,{{"after","0"}});}
-        else if(sub_==6){for(int i=0;i<8;++i){live_[i]=label(body_,"—");lv_obj_set_width(live_[i],LV_PCT(100));lv_label_set_long_mode(live_[i],LV_LABEL_LONG_WRAP);}}
+        else if(sub_==6){for(int i=0;i<10;++i){live_[i]=label(body_,"—");lv_obj_set_width(live_[i],LV_PCT(100));lv_label_set_long_mode(live_[i],LV_LABEL_LONG_WRAP);}
+            button(body_,"Обучение клавиатуры",217);button(body_,"Считать и далее",218);button(body_,"Предыдущий шаг",219);button(body_,"Отмена обучения",220);}
         else if(sub_==7){button(body_,"Включить сопряжение",214);button(body_,"Отключить Bluetooth",215);button(body_,"Обновить состояние",216);resultLabel_=label(body_,"");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);}
         pageStatus_=label(body_,"");lv_obj_set_width(pageStatus_,LV_PCT(100));lv_label_set_long_mode(pageStatus_,LV_LABEL_LONG_WRAP);
     }
@@ -256,7 +262,7 @@ private:
     }
     bool submit(Route route,const ApiBuilder& b,const uint8_t* bytes){
         if(waiting_||!session_.submitApi(bytes,b.size())){set(pageStatus_,"Нет связи или выполняется запрос");return false;}
-        waiting_=true;pendingRoute_=route;pendingPage_=page_;pendingSub_=sub_;set(pageStatus_,"Выполняется…");return true;
+        waiting_=true;pendingRoute_=route;pendingPage_=page_;pendingSub_=sub_;pendingGeneration_=viewGeneration_;set(pageStatus_,"Выполняется…");return true;
     }
     void form(Route route,const char* key,int n){
         uint8_t bytes[apiMaxRequest]={};ApiBuilder b(bytes,sizeof(bytes),route);
@@ -279,6 +285,7 @@ private:
         if(id>=310&&id<=314){static const int minutes[]={5,10,15,30,60};graphMinutes_=minutes[id-310];requestGraph();return;}
         if(id>=320&&id<=323){calcMode_=id-320;render();return;}
         hideKeyboard();
+        if((id==200||id==201||id==202)&&(!formValid_||!session_.connected())){set(pageStatus_,"Нет актуальных настроек. Дождитесь связи.");return;}
         switch(id){
             case 200:alarms();break;
             case 201:send(Route::waterCoefficient,{{"confirm","YES"},{"pulses_per_litre",text(fields_[0])}});break;
@@ -295,7 +302,13 @@ private:
             case 214:send(Route::rainmakerEnable,{{"confirm","YES"}});break;
             case 215:send(Route::rainmakerDisable,{{"confirm","YES"}});break;
             case 216:send(Route::rainmakerStatus,{});break;
+            case 217:send(Route::keypadStart,{{"confirm","YES"}});break;
+            case 218:send(Route::keypadNext,{{"confirm","YES"}});break;
+            case 219:send(Route::keypadUndo,{{"confirm","YES"}});break;
+            case 220:send(Route::keypadCancel,{{"confirm","YES"}});break;
             case 330:calculate();break;
+            case 331:send(Route::geometryRead,{});break;
+            case 332:send(Route::geometrySave,{{"confirm","YES"},{"diameter",text(fields_[0])},{"height",text(fields_[1])}});break;
         }
     }
     void calculate(){
@@ -317,9 +330,12 @@ private:
         else set(resultLabel_,"Вместимость: "+String(r.capacity,3)+" л"+(r.levelKnown?String("\nОбъём: ")+String(r.liquid,3)+" л":""));
     }
     void handleResult(int code,const String& body){
-        if(calibrating_||pendingPage_!=page_||pendingSub_!=sub_)return;
+        if(calibrating_||pendingPage_!=page_||pendingSub_!=sub_||pendingGeneration_!=viewGeneration_)return;
         if(code<200||code>=300){set(pageStatus_,code==0?String("Ответ не получен; проверьте состояние"):String("Ошибка ")+code+": "+body.substring(0,100));return;}
         set(pageStatus_,"Выполнено");
+        if(pendingRoute_==Route::geometryRead&&calcMode_==3){JsonDocument d;if(!deserializeJson(d,body)){for(int i=0;i<2;++i){calcInput_[3][i]=d[i?"height":"diameter"]|"";lv_textarea_set_text(fields_[i],calcInput_[3][i].c_str());}set(resultLabel_,"Размеры загружены");}return;}
+        if(pendingRoute_==Route::geometrySave){set(resultLabel_,"Размеры сохранены");return;}
+        if(pendingRoute_>=Route::keypadStart&&pendingRoute_<=Route::keypadCancel){set(pageStatus_,body);return;}
         if(pendingRoute_==Route::theme){theme_=requestedTheme_;prefs_.putUChar("theme",theme_);build();return;}
         if(pendingRoute_==Route::wifiConnect||pendingRoute_==Route::googleConfig){if(fields_[0]&&pendingRoute_==Route::wifiConnect)lv_textarea_set_text(fields_[0],"");if(fields_[1]&&pendingRoute_==Route::googleConfig)lv_textarea_set_text(fields_[1],"");}
         if(pendingRoute_==Route::wifiScan){JsonDocument d;if(deserializeJson(d,body)){set(pageStatus_,"Ошибка списка сетей");return;}scanPending_=d["scanning"]|false;
@@ -342,6 +358,9 @@ private:
     }
     void refresh(){
         const auto& d=session_.snapshot();const bool ok=session_.connected();
+        const bool settingsForm=page_==1||page_==2||(page_==5&&sub_==0);
+        if(settingsForm&&!ok)formValid_=false;
+        if(settingsForm&&ok&&!formValid_){render();return;}
         set(connection_,ok?String("UART · ") + ((d["wifi"]["sta_connected"]|false)?"Wi-Fi":"Локально"):"UART · нет связи");
         if(page_==0){
             for(int i=0;i<4;++i){auto v=d["sound_alerts"]["channels"][i]["sound_on"];set(live_[i],String("К")+String(i+1)+"  "+(!ok||v.isNull()?"—":v.as<bool>()?"Звук":"Тихо"));
@@ -353,12 +372,13 @@ private:
             set(live_[1],"Израсходовано: "+measured(d["water"]["total_l_estimate"]," л",2));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));}
         else if(page_==5){
             if(sub_==1)set(live_[0],ok?String("Wi-Fi: ")+(d["station"]["ssid"]|"—"):"Нет связи");
-            else if(sub_==3)set(live_[0],ok?String("Google: ")+String(d["google"]["state"]|"—"):"Нет связи");
+            else if(sub_==3)set(live_[0],ok?String("Google: ")+String(d["google"]["configured"].as<bool>()?"настроен":"не настроен")+" · код "+String(d["google"]["state"]|0):"Нет связи");
             else if(sub_==4){set(live_[0],ok?String(d["firmware"]|"—"):"Нет связи");set(live_[1],"Время работы: "+measured(d["uptime_ms"]," мс",0));
                 set(live_[2],"Wi-Fi: "+String(ok&&(d["wifi"]["sta_connected"]|false)?"подключён":"—"));set(live_[3],"RAM: "+measured(d["esp32"]["free_heap_bytes"]," байт",0));set(live_[4],"PSRAM: "+measured(d["performance"]["psram_total_bytes"]," байт",0));}
             else if(sub_==6){set(live_[0],"UART: "+String(ok?"связь есть":"нет связи"));set(live_[1],"LCD: "+String(hw_.lcdReady()?"инициализирован":"ошибка"));set(live_[2],"Сенсор: "+String(calibrationValid_?"калиброван":"нет"));set(live_[3],"microSD: "+String(hw_.sdReady()?"доступна":"нет"));
                 set(live_[4],"GPIO15: "+String(ok?(d["diagnostics"]["water_flow"]["status"]|"—"):"—"));set(live_[5],"PCF8575: "+String(ok&&(d["modules"]["pcf8575"]|false)?"доступен":"—"));
-                set(live_[6],"I2C ошибок: "+measured(d["performance"]["i2c_errors"],"",0));set(live_[7],"Макс. цикл: "+measured(d["performance"]["loop_worst_ms"]," мс",0));}
+                set(live_[6],"I2C ошибок: "+measured(d["performance"]["i2c_errors"],"",0));set(live_[7],"Макс. цикл: "+measured(d["performance"]["loop_worst_ms"]," мс",0));
+                set(live_[8],"Клавиатура: "+String(ok?(d["keypad"]["message"]|"—"):"—"));set(live_[9],"Следующая: "+String(ok?(d["keypad"]["expected"]|"—"):"—"));}
         }
     }
     void animate(uint32_t now){
@@ -377,9 +397,9 @@ private:
     lv_obj_t* navButtons_[6]={};lv_obj_t* fields_[8]={};lv_obj_t* live_[12]={};lv_obj_t* motion_[7]={};lv_chart_series_t* series_[4]={};
     lv_img_dsc_t art_{};uint8_t* asset_=nullptr;
     busa_touch::Transform transform_{};busa_touch::Point raw_[3]{},screen_[3]{};
-    bool calibrationValid_=false,calibrating_=false,held_=false,wasConnected_=false,waiting_=false,scanPending_=false,frameOpen_=false;
+    bool calibrationValid_=false,calibrating_=false,held_=false,wasConnected_=false,waiting_=false,scanPending_=false,frameOpen_=false,awaitRelease_=false,formValid_=false;
     int calIndex_=0,calSamples_=0,sumX_=0,sumY_=0,page_=0,sub_=-1,pendingPage_=0,pendingSub_=-1,graphKind_=0,graphMinutes_=5,calcMode_=0;
-    uint8_t theme_=2,requestedTheme_=2;uint32_t lastTick_=0,lastAnimation_=0,revision_=0,lastScan_=0,frameStart_=0;
+    uint8_t theme_=2,requestedTheme_=2;uint32_t lastTick_=0,lastAnimation_=0,revision_=0,lastScan_=0,frameStart_=0,lastGraph_=0,viewGeneration_=0,pendingGeneration_=0;
     Route pendingRoute_=Route::wifiScan;String networks_[32];unsigned networkCount_=0;String calcInput_[4][5];
 };
 constexpr uint32_t Interface::colors_[4];

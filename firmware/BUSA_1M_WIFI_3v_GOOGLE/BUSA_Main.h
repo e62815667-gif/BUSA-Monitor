@@ -4017,7 +4017,8 @@ static void busaApi_calibration(BusaLocalRequest& server){
 static void busaApi_events(BusaLocalRequest& server){
    const uint32_t after=(uint32_t)strtoul(server.arg("after").c_str(),nullptr,10);
    String result="{\"boot_id\":"+String(busaWebBootId)+",\"uptime_ms\":"+String(millis())+",\"events\":[";bool comma=false;
-   for(uint16_t i=0;i<busaWebJournal.size();i++){
+   const uint16_t limit=server.uart()?min(uint16_t(35),busaWebJournal.size()):busaWebJournal.size();
+   for(uint16_t i=0;i<limit;i++){
     const auto* e=busaWebJournal.latest(i);if(!e||e->seq<=after)continue;
     if(comma)result+=",";comma=true;
     result+="{\"id\":"+String(e->seq)+",\"uptime_ms\":"+String(e->uptime)+",\"epoch\":"+String(e->epoch)+",\"kind\":"+String(e->kind)+",\"text\":"+quoteJson(String(e->text))+"}";
@@ -4103,6 +4104,80 @@ static void busaApi_rainmakerStatus(BusaLocalRequest& server){
        ",\"pop\":\"123456789\"}");
 }
 
+static void busaApi_keypadStart(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
+    if(!pcfDetected){server.send(409,"text/plain","PCF8575 not found");return;}
+    startKeyLearning();
+    server.send(200,"text/plain; charset=utf-8","Обучение: нажми F1 и отпусти");
+}
+
+static void busaApi_keypadNext(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient()||server.arg("confirm")!="YES"){
+      server.send(403,"text/plain","Local AP only");return;
+    }
+    if(!keypadLearning){
+      server.send(409,"text/plain; charset=utf-8","Обучение сейчас не запущено");return;
+    }
+    // Try a fresh scan if the key is still held; otherwise use the last pair
+    // observed at the CURRENT step, only within the last 10 seconds.
+    int detected=scanKeyPair(),pair=-1;
+    if(detected>=0)pair=detected;
+    else if(candidatePair>=0&&candidateStep==learnStep &&
+            !elapsed(millis(),candidateAt,10000))pair=candidatePair;
+    if(pair<0){
+      keypadMessage=detected==-2?
+        "Несколько линий замкнуты: отпусти другие клавиши":
+        "Сигнала нет: F1 или текущая клавиша не распознана. Повтори нажатие.";
+      server.send(409,"text/plain; charset=utf-8",keypadMessage);return;
+    }
+    if(!learnCommitPair(pair)){
+      server.send(409,"text/plain; charset=utf-8",keypadMessage);return;
+    }
+    keyHeld=true; // Avoid double submission of the same held key
+    server.send(200,"text/plain; charset=utf-8",keypadMessage);
+}
+
+static void busaApi_keypadUndo(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
+    if(!keypadLearning||learnStep==0){server.send(409,"text/plain","No previous step");return;}
+    learnStep--;newPairs[learnStep]=255;
+    pendingPair=-1;keyHeld=false;candidatePair=-1;candidateStep=255;
+    keypadMessage="Повтори "+String(KEY_CAPS[learnStep]);
+    tftDirty=true;
+    server.send(200,"text/plain; charset=utf-8",keypadMessage);
+}
+
+static void busaApi_keypadCancel(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
+    keypadLearning=false;learnStep=0;candidatePair=-1;candidateStep=255;
+    keypadMessage=keypadReady?"Сохранённая раскладка сохранена":"Обучение отменено";
+    tftDirty=true;
+    server.send(200,"text/plain; charset=utf-8",keypadMessage);
+}
+
+static void busaApi_geometryRead(BusaLocalRequest& server){
+    server.send(200,"application/json",String("{\"diameter\":")+quoteJson(busaCalcInputs[3][0])+",\"height\":"+quoteJson(busaCalcInputs[3][1])+"}");
+}
+static void busaApi_geometrySave(BusaLocalRequest& server){
+    if(!server.local()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local only");return;}
+    const String diameter=server.arg("diameter"),height=server.arg("height");
+    double d=0,h=0;
+    if(diameter.length()>12||height.length()>12||!busaCalcParse(diameter,d)||!busaCalcParse(height,h)||!BusaCalc::cylinder(d,h).ok){
+        server.send(400,"text/plain","Invalid dimensions");return;
+    }
+    const String oldD=busaCalcInputs[3][0],oldH=busaCalcInputs[3][1];
+    busaCalcInputs[3][0]=diameter;busaCalcInputs[3][1]=height;
+    if(!busaCalcStoreGeometry()){
+        busaCalcInputs[3][0]=oldD;busaCalcInputs[3][1]=oldH;
+        server.send(500,"text/plain","Save failed");return;
+    }
+    server.send(200,"application/json","{\"ok\":true}");
+}
+
 static void busaDispatchDisplayApi(const busa_uart::ApiRequest& request,int& code,String& body){
     BusaLocalRequest local(request);
     if(!busaNvsReady||otaActive){code=409;body="Device busy";return;}
@@ -4122,6 +4197,12 @@ static void busaDispatchDisplayApi(const busa_uart::ApiRequest& request,int& cod
       case busa_uart::ApiRoute::googleConfig:busaApi_googleConfig(local);break;
       case busa_uart::ApiRoute::googleTest:busaApi_googleTest(local);break;
       case busa_uart::ApiRoute::googleOff:busaApi_googleOff(local);break;
+      case busa_uart::ApiRoute::keypadStart:busaApi_keypadStart(local);break;
+      case busa_uart::ApiRoute::keypadNext:busaApi_keypadNext(local);break;
+      case busa_uart::ApiRoute::keypadUndo:busaApi_keypadUndo(local);break;
+      case busa_uart::ApiRoute::keypadCancel:busaApi_keypadCancel(local);break;
+      case busa_uart::ApiRoute::geometryRead:busaApi_geometryRead(local);break;
+      case busa_uart::ApiRoute::geometrySave:busaApi_geometrySave(local);break;
       default:code=404;body="Unknown request";return;
     }
     code=local.code();body=local.body();
@@ -4465,52 +4546,13 @@ void setup(){
   });
   server.on("/api/temperature/calibration",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_calibration(request);
   });
-  server.on("/api/keypad/start",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
-    if(!pcfDetected){server.send(409,"text/plain","PCF8575 not found");return;}
-    startKeyLearning();
-    server.send(200,"text/plain; charset=utf-8","Обучение: нажми F1 и отпусти");
+  server.on("/api/keypad/start",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_keypadStart(request);
   });
-  server.on("/api/keypad/next",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){
-      server.send(403,"text/plain","Local AP only");return;
-    }
-    if(!keypadLearning){
-      server.send(409,"text/plain; charset=utf-8","Обучение сейчас не запущено");return;
-    }
-    // Try a fresh scan if the key is still held; otherwise use the last pair
-    // observed at the CURRENT step, only within the last 10 seconds.
-    int detected=scanKeyPair(),pair=-1;
-    if(detected>=0)pair=detected;
-    else if(candidatePair>=0&&candidateStep==learnStep &&
-            !elapsed(millis(),candidateAt,10000))pair=candidatePair;
-    if(pair<0){
-      keypadMessage=detected==-2?
-        "Несколько линий замкнуты: отпусти другие клавиши":
-        "Сигнала нет: F1 или текущая клавиша не распознана. Повтори нажатие.";
-      server.send(409,"text/plain; charset=utf-8",keypadMessage);return;
-    }
-    if(!learnCommitPair(pair)){
-      server.send(409,"text/plain; charset=utf-8",keypadMessage);return;
-    }
-    keyHeld=true; // Avoid double submission of the same held key
-    server.send(200,"text/plain; charset=utf-8",keypadMessage);
+  server.on("/api/keypad/next",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_keypadNext(request);
   });
-  server.on("/api/keypad/undo",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
-    if(!keypadLearning||learnStep==0){server.send(409,"text/plain","No previous step");return;}
-    learnStep--;newPairs[learnStep]=255;
-    pendingPair=-1;keyHeld=false;candidatePair=-1;candidateStep=255;
-    keypadMessage="Повтори "+String(KEY_CAPS[learnStep]);
-    tftDirty=true;
-    server.send(200,"text/plain; charset=utf-8",keypadMessage);
+  server.on("/api/keypad/undo",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_keypadUndo(request);
   });
-  server.on("/api/keypad/cancel",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
-    keypadLearning=false;learnStep=0;candidatePair=-1;candidateStep=255;
-    keypadMessage=keypadReady?"Сохранённая раскладка сохранена":"Обучение отменено";
-    tftDirty=true;
-    server.send(200,"text/plain; charset=utf-8",keypadMessage);
+  server.on("/api/keypad/cancel",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_keypadCancel(request);
   });
   // One shared history source for the physical TFT and local iPhone.
   // No invented collection values: only cooling-water pulse counts are sampled.
