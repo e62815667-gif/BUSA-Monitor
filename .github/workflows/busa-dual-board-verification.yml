@@ -154,7 +154,9 @@ jobs:
       - name: Compile GUITION N4R8 native interface
         run: |
           set -euo pipefail
-          arduino-cli compile --clean --library firmware/common --build-property 'compiler.cpp.extra_flags=-DLV_CONF_SKIP -DLV_MEM_SIZE=98304' --build-property 'compiler.c.extra_flags=-DLV_CONF_SKIP -DLV_MEM_SIZE=98304' --fqbn 'esp32:esp32:esp32s3:FlashSize=4M,PartitionScheme=huge_app,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio,DebugLevel=none' --output-dir display_out firmware/BUSA_Display_N4R8
+          flags='-DLV_CONF_SKIP -DLV_MEM_SIZE=98304'
+          if [ "$CORE_VERSION" = "3.0.0" ]; then flags="-MMD -c $flags"; fi
+          arduino-cli compile --clean --library firmware/common --build-property "compiler.cpp.extra_flags=$flags" --build-property "compiler.c.extra_flags=$flags" --fqbn 'esp32:esp32:esp32s3:FlashSize=4M,PartitionScheme=huge_app,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio,DebugLevel=none' --output-dir display_out firmware/BUSA_Display_N4R8
       - name: Package GUITION USB image and verify flash boundaries
         run: |
           set -euo pipefail
