@@ -8,8 +8,8 @@ constexpr uint8_t displayDiagnostics=3, diagnosticsAck=4;
 constexpr size_t maxPayload=12288;
 constexpr size_t maxRaw=headerSize+maxPayload+crcSize;
 constexpr size_t maxWire=2*maxRaw+2;
-// Approved physical wiring.
-constexpr int mainTx=8, mainRx=9, displayTx=17, displayRx=18;
+// P1: yellow TXD -> main RX GPIO8; blue RXD <- main TX GPIO9.
+constexpr int mainTx=9, mainRx=8, displayTx=43, displayRx=44;
 // Shared software default, not a hardware pin assignment.
 constexpr uint32_t baud=115200;
 constexpr uint32_t staleMs=5000;

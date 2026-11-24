@@ -3,11 +3,11 @@
 #include <stddef.h>
 
 namespace busa_guition {
-// User-approved UART wiring, 2026-11-24.
-constexpr int MAIN_TX = 8;
-constexpr int MAIN_RX = 9;
-constexpr int DISPLAY_TX = 17;
-constexpr int DISPLAY_RX = 18;
+// User-approved P1 UART wiring, 2026-11-25.
+constexpr int MAIN_TX = 9;
+constexpr int MAIN_RX = 8;
+constexpr int DISPLAY_TX = 43;
+constexpr int DISPLAY_RX = 44;
 constexpr int WIDTH = 480;
 constexpr int HEIGHT = 272;
 

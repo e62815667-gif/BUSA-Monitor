@@ -21,6 +21,8 @@ jobs:
           /tmp/busa-water-flow-test
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_uart_frame.cpp -o /tmp/busa-uart-test
           /tmp/busa-uart-test
+          g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_p1_wiring.cpp -o /tmp/busa-p1-wiring-test
+          /tmp/busa-p1-wiring-test
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_protocol.cpp -o /tmp/busa-display-protocol-test
           /tmp/busa-display-protocol-test
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_display_api.cpp -o /tmp/busa-display-api-test
@@ -87,7 +89,7 @@ jobs:
           assert usb.read_bytes()[0x10000:]==ota.read_bytes()
           assert b'display_diagnostics' in ota.read_bytes()
           assert b'UNRELIABLE_PULSES' in ota.read_bytes()
-          assert b'UART2-COLL1-DISPLAYOTA1-20261125' in ota.read_bytes()
+          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125' in ota.read_bytes()
           assert b'/api/display-ota/upload' in ota.read_bytes()
           checks=[]
           for p in (usb,ota):
@@ -162,7 +164,7 @@ jobs:
           data=b.read_bytes()
           assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
           assert 60000<len(app)<=0x1c0000 and len(data)<=0x1d0000
-          assert b'BUSA-DISPLAY-N4R8-OTA1-LCDFIX1-20261125' in app
+          assert b'BUSA-DISPLAY-N4R8-LCDFIX1-P1-20261125' in app
           assert b'14v9-N16R8-' not in app
           assert app[0]==0xe9 and struct.unpack_from('<H',app,12)[0]==9
           info=(b.parent/'OTA_IMAGE_INFO.txt').read_text()
