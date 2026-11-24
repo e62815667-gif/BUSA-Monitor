@@ -51,6 +51,39 @@ jobs:
           mkdir -p out
           arduino-cli compile --clean --fqbn 'esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=qio,DebugLevel=none' --library firmware/common --output-dir out firmware/BUSA_1M_WIFI_3v_GOOGLE
 
+      - name: Package and verify N16R8 USB and OTA
+        run: |
+          set -euo pipefail
+          python3 ci/package_ui16.py --build-dir out --core-dir "$HOME/.arduino15/packages/esp32/hardware/esp32/2.0.17" --esptool "$HOME/.arduino15/packages/esp32/tools/esptool_py/4.5.1/esptool.py"
+          mkdir -p delivery
+          cp out/BUSA_UI16_CUBE1_MOTION1_USB_MERGED.bin delivery/BUSA_MAIN_N16R8_USB.bin
+          cp out/BUSA_UI16_CUBE1_MOTION1_APP_OTA.bin delivery/BUSA_MAIN_N16R8_OTA.bin
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib, subprocess
+          root=Path('delivery')
+          usb=root/'BUSA_MAIN_N16R8_USB.bin'
+          ota=root/'BUSA_MAIN_N16R8_OTA.bin'
+          assert usb.read_bytes()[0x10000:]==ota.read_bytes()
+          assert b'display_diagnostics' in ota.read_bytes()
+          assert b'UNRELIABLE_PULSES' in ota.read_bytes()
+          checks=[]
+          for p in (usb,ota):
+              data=p.read_bytes()
+              assert data[0]==0xe9
+              digest=hashlib.sha256(data).hexdigest()
+              checks.append(f'{digest}  {p.name}')
+              print(p.name,len(data),digest)
+          (root/'SHA256SUMS.txt').write_text('\n'.join(checks)+'\n')
+          (root/'SOURCE_COMMIT.txt').write_bytes(subprocess.check_output(['git','rev-parse','HEAD']))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_MAIN_N16R8_USB_OTA
+          retention-days: 30
+          path: delivery/
+          if-no-files-found: error
+
   display_components:
     runs-on: ubuntu-22.04
     timeout-minutes: 30
@@ -66,7 +99,7 @@ jobs:
           arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core update-index
           arduino-cli core install esp32:esp32@2.0.17
-          arduino-cli lib install "GFX Library for Arduino@1.6.9"
+          arduino-cli lib install "GFX Library for Arduino@1.5.0"
           arduino-cli lib install "XPT2046_Touchscreen@1.4"
           arduino-cli lib install "ArduinoJson@7.4.3"
       - name: Compile hardware and UART components without release artifacts
