@@ -33,10 +33,11 @@
 #include <U8g2_for_Adafruit_GFX.h>
 #include <math.h>
 #include "BUSA_WaterFlowMath.h"
+#include "BUSA_DisplayLink.h"
 
 constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
-constexpr uint8_t BUS_SDA=40,BUS_SCL=41; // Isolated PCF8575 keypad only; GPIO8/9 disconnected
+constexpr uint8_t BUS_SDA=40,BUS_SCL=41; // Isolated PCF8575 keypad only
 constexpr uint8_t TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14;
 constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr uint8_t BUSA_RESERVED_BUZZER_GPIO=2; // active 3.3V logic buzzer input, T1/T2
@@ -1621,6 +1622,7 @@ String statusJSON(){
   s+="}";
   s+=",\"ap\":{\"enabled\":"+(wifiRunning?String("true"):String("false"));
   s+=",\"ip\":"+quoteJson(WiFi.softAPIP().toString())+"}";
+  s+=",\"display_diagnostics\":"+busa_display_link::diagnosticJSON();
   s+=",\"ota\":"+otaJSON();
   s+=",\"ota_boot\":{\"running\":"+quoteJson(busaOtaRunning)+
     ",\"selected\":"+quoteJson(busaOtaBoot)+
@@ -4510,6 +4512,7 @@ void setup(){
   updateBootStage(2);
   busaReportStage("I2C_READY");
   updateBootStage(3);
+  busa_display_link::begin();
   launchGoogleCloud();
   busaSetupDoneMs=millis()-busaBootAt;
   busaReportStage("SETUP_DONE");
@@ -4570,6 +4573,7 @@ void loop(){
     tftDirty=true;
   }
     sampleFlow(now);
+  busa_display_link::poll();
   busaGoogleSnapshotPoll(); // Main-loop-only capture; worker owns immutable JSON.
   busaRainMakerPoll(now);
   v13Collect(now); // Shared graph sampling, including when TFT screen is asleep.
