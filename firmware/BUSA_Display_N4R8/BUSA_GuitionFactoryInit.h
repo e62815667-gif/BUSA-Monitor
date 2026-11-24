@@ -124,15 +124,18 @@ constexpr InitStep factoryInit[] = {
 constexpr size_t factoryInitCount = sizeof(factoryInit) / sizeof(factoryInit[0]);
 static_assert(factoryInitCount == 103, "Factory initialization operation count changed");
 
-// Bus interface: beginWrite(), writeC8D8(command,data), endWrite().
+// Preserve factory register bytes; enforce the published panel startup waits.
+// Bus interface: sendCommand(), beginWrite(), writeC8D8(), endWrite().
 template<class Bus, class Delay>
 void applyFactoryInit(Bus& bus, Delay waitMs) {
+    bus.sendCommand(0x01); // NV3041A software reset, no reset GPIO
+    waitMs(120);
     for (const auto& step : factoryInit) {
         switch (step.op) {
         case 0x00: bus.beginWrite(); break;
         case 0x07: bus.writeC8D8(step.a, step.b); break;
         case 0x0b: bus.endWrite(); break;
-        case 0x0c: waitMs(step.a); break;
+        case 0x0c: waitMs(step.a == 40 ? 120 : 200); break;
         }
     }
 }

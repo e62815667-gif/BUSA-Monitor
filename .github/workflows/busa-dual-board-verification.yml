@@ -131,6 +131,8 @@ jobs:
       - name: Prepare approved graphics and Cyrillic font
         run: |
           set -euo pipefail
+          g++ -std=c++11 -Wall -Wextra -Werror tests/test_guition_startup.cpp -o /tmp/busa-guition-startup
+          /tmp/busa-guition-startup
           mkdir -p display_delivery
           python3 -m pip install --disable-pip-version-check 'Pillow==13.0.0' 'esptool==4.5.1'
           python3 -c 'import serial, bitstring, cryptography, reedsolo'
@@ -160,7 +162,7 @@ jobs:
           data=b.read_bytes()
           assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
           assert 60000<len(app)<=0x1c0000 and len(data)<=0x1d0000
-          assert b'BUSA-DISPLAY-N4R8-OTA1-20261125' in app
+          assert b'BUSA-DISPLAY-N4R8-OTA1-LCDFIX1-20261125' in app
           assert b'14v9-N16R8-' not in app
           assert app[0]==0xe9 and struct.unpack_from('<H',app,12)[0]==9
           info=(b.parent/'OTA_IMAGE_INFO.txt').read_text()

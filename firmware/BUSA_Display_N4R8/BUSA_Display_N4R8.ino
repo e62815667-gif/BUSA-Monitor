@@ -18,7 +18,7 @@ void loop(){
     uint32_t metrics[busa_uart::metricCount];
     for(auto& v:metrics)v=UINT32_MAX;
     displayHardware.metrics(metrics);metrics[busa_uart::wifiStatus]=0;
-    displaySession.poll(metrics,"BUSA-DISPLAY-N4R8-OTA1-20261125",maxLoop,uiReady&&displayHardware.lcdReady()&&displayHardware.touchReady());
+    displaySession.poll(metrics,"BUSA-DISPLAY-N4R8-OTA1-LCDFIX1-20261125",maxLoop,uiReady&&displayHardware.lcdReady()&&displayHardware.touchReady());
     if(uiReady)interface.poll();
     const uint32_t span=millis()-started;if(span>maxLoop)maxLoop=span;
     delay(2);
