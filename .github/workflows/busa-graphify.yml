@@ -1,0 +1,56 @@
+name: BUSA working-branch code graph
+on:
+  push:
+    branches:
+      - feat/busa-dual-ota-20261125
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: busa-graphify-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  graph:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      GRAPHIFY_BACKEND: none
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned open-source Graphify
+        run: |
+          python -m pip install --disable-pip-version-check graphifyy==0.9.119
+          python -m pip check
+      - name: Index current source code without model API
+        run: |
+          set -euo pipefail
+          graphify extract . --code-only
+          test -s graphify-out/graph.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          g = json.loads(Path('graphify-out/graph.json').read_text())
+          assert g.get('nodes'), 'Empty code graph'
+          assert 'BUSA_GuitionHardware.h' in json.dumps(g['nodes']), 'Display hardware missing from code graph'
+          assert 'BUSA_Main.h' in json.dumps(g['nodes']), 'Main board missing from code graph'
+          print('Indexed nodes:', len(g['nodes']))
+          print('Display and main-board source present')
+          PY
+          git rev-parse HEAD > graphify-out/SOURCE_COMMIT.txt
+          git branch --show-current > graphify-out/SOURCE_BRANCH.txt
+          printf '%s\n' "$GITHUB_REF_NAME" > graphify-out/SOURCE_BRANCH.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BUSA_GRAPHIFY_${{ github.sha }}
+          path: |
+            graphify-out/graph.json
+            graphify-out/GRAPH_REPORT.md
+            graphify-out/SOURCE_COMMIT.txt
+            graphify-out/SOURCE_BRANCH.txt
+          retention-days: 7
+          if-no-files-found: error
