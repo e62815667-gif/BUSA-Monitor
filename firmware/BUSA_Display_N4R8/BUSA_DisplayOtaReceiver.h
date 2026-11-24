@@ -19,7 +19,8 @@ public:
   if(prefsReady_&&prefs_.getBytesLength("pending")==sizeof(record_))
    if(prefs_.getBytes("pending",&record_,sizeof(record_))!=sizeof(record_))record_={};
   const auto* running=esp_ota_get_running_partition();esp_ota_img_states_t state=ESP_OTA_IMG_UNDEFINED;
-  pendingBoot_=running&&esp_ota_get_state_partition(running,&state)==ESP_OK&&state==ESP_OTA_IMG_PENDING_VERIFY;
+  const bool haveState=running&&esp_ota_get_state_partition(running,&state)==ESP_OK;
+  pendingBoot_=haveState&&(state==ESP_OTA_IMG_PENDING_VERIFY||(!record_.id&&state==ESP_OTA_IMG_UNDEFINED));
   if(record_.id&&(!running||running->address!=record_.address)){id_=record_.id;report_=busa_ota::bootFailed;pendingBoot_=false;}
   else if(record_.id&&!pendingBoot_){
    id_=record_.id;report_=state==ESP_OTA_IMG_VALID?busa_ota::bootOk:busa_ota::bootFailed;
@@ -27,6 +28,7 @@ public:
  }
  bool priority()const{return active_||report_;}
  bool receiving()const{return active_;}
+ bool blocksApi()const{return active_||report_==busa_ota::written;}
  void tick(uint32_t now,bool localReady,bool connected){
   if(active_&&uint32_t(now-progressAt_)>=30000)fail();
   if(!pendingBoot_)return;
@@ -41,7 +43,10 @@ public:
  bool next(uint32_t now,bool supported,bool connected,bool localReady,uint8_t& kind,uint8_t& expected,uint8_t* data,size_t& size){
   using busa_uart::write32;
   size=0;
-  if(report_){kind=busa_ota::result;expected=busa_ota::ack;write32(data,id_);data[4]=report_;size=5;return true;}
+  if(report_){
+   if((report_==busa_ota::bootOk||report_==busa_ota::bootFailed)&&(!supported||!connected))return false;
+   kind=busa_ota::result;expected=busa_ota::ack;write32(data,id_);data[4]=report_;size=5;return true;
+  }
   if(active_){kind=busa_ota::request;expected=busa_ota::chunk;write32(data,id_);write32(data+4,received_);size=8;return true;}
   if(!supported||!connected||!localReady||!prefsReady_||pendingBoot_||record_.id||uint32_t(now-lastPoll_)<1000)return false;
   lastPoll_=now;kind=busa_ota::poll;expected=busa_ota::offer;return true;
@@ -53,7 +58,8 @@ public:
    if(f.size!=4||busa_uart::read32(f.data)!=id_||!report_)return true;
    if(report_==busa_ota::written){ESP.restart();return true;}
    if(report_==busa_ota::bootOk||report_==busa_ota::bootFailed){
-    if(prefsReady_&&prefs_.remove("pending"))record_={};
+    if(prefsReady_){prefs_.remove("pending");}
+    record_={};
    }
    report_=0;return true;
   }

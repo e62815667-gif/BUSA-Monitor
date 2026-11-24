@@ -3845,7 +3845,7 @@ request();
 (()=>{
  const el=id=>document.getElementById(id),main=el('otaMainTab'),screen=el('otaScreenTab'),mainPanel=el('otaMainPanel'),screenPanel=el('otaScreenPanel');
  const button=el('displayManualUpdate'),message=el('displayUpdateResult'),progress=el('displayOtaProgress');
- let uploading=false,polling=false;
+ let uploading=false,polling=false,uploadError='';
  const active=new Set(['receiving','ready','sending','waiting_boot']);
  const messages={idle:'Выберите OTA-файл экрана',receiving:'Загрузка файла на основную плату',ready:'Файл проверен. Ожидается экран',sending:'Передача по UART',waiting_boot:'Записано. Проверка запуска экрана',success:'Экран успешно обновлён',error:'Обновление не подтверждено. Проверьте связь и версию'};
  async function refresh(){
@@ -3858,7 +3858,7 @@ request();
    el('displayOtaVersion').textContent=data.firmware||'—';
    button.disabled=!data.capable||active.has(data.state);
    progress.value=data.size?Math.min(100,Math.floor(100*data.confirmed/data.size)):0;
-   message.textContent=active.has(data.state)||data.state==='success'||data.state==='error'?messages[data.state]:data.capable?messages.idle:'Нет связи или экран не поддерживает OTA';
+   message.textContent=active.has(data.state)?messages[data.state]:uploadError||((data.state==='success'||data.state==='error')?messages[data.state]:data.capable?messages.idle:'Нет связи или экран не поддерживает OTA');
   }catch(e){button.disabled=true;message.textContent='Нет связи с основной платой. Результат не подтверждён';}
   finally{polling=false;}
  }
@@ -3874,7 +3874,7 @@ request();
   const file=el('displayFirmwareFile').files[0];
   if(!file||!file.name.endsWith('.bin')||file.size<60000||file.size>0x1c0000){message.textContent='Выберите подходящий OTA BIN экрана';return;}
   if(!confirm('Подтвердите обновление экрана GUITION N4R8. Не отключайте питание.'))return;
-  uploading=true;button.disabled=true;progress.value=0;
+  uploading=true;uploadError='';button.disabled=true;progress.value=0;
   try{
    const r=await fetch('/api/display-ota/prepare',{method:'POST',body:new URLSearchParams({confirm:'YES',size:String(file.size)})});
    if(!r.ok)throw Error(await r.text());
@@ -3886,7 +3886,7 @@ request();
     xhr.onerror=()=>reject(Error('Связь прервана'));xhr.ontimeout=()=>reject(Error('Истекло время передачи'));xhr.send(body);
    });
    message.textContent='Файл принят. Ожидается подтверждение экрана';
-  }catch(e){message.textContent='Ошибка: '+e.message;}
+  }catch(e){uploadError='Ошибка: '+e.message;message.textContent=uploadError;}
   finally{uploading=false;refresh();}
  };
  setInterval(refresh,2000);

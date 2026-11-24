@@ -32,7 +32,7 @@ public:
     // A command is never automatically retried: a missing ACK is an unknown result.
     bool submitApi(const uint8_t* p,size_t n){
         ApiRequest q{};
-        if(ota_.priority()||!connected()||queuedSize_||pending_==apiResponse||apiResultReady_||!parseApiRequest(p,n,q))return false;
+        if(ota_.blocksApi()||!connected()||queuedSize_||pending_==apiResponse||apiResultReady_||!parseApiRequest(p,n,q))return false;
         memcpy(queued_,p,n);queuedSize_=n;return true;
     }
     bool takeApiResult(int& code,String& body){
@@ -40,7 +40,7 @@ public:
         code=apiCode_;body=apiBody_;apiBody_="";apiResultReady_=false;return true;
     }
     void poll(const uint32_t* boardMetrics,const char* firmware,uint32_t loopMax,bool localReady){
-        ota_.tick(millis(),localReady,connected());
+        ota_.tick(millis(),localReady,connected()&&(model_["display_ota_supported"]|false));
         if(!decoder_)return;
         Frame f{};
         // Drain bytes in bounded slices; caller must service poll between

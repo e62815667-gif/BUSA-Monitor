@@ -119,7 +119,12 @@ int main(){
  reset();DisplayOtaReceiver first;first.begin();offerImage(first,p);transfer(first,p);assert(boot==&slot1);
  running=&slot1;state=ESP_OTA_IMG_PENDING_VERIFY;DisplayOtaReceiver failedBoot;failedBoot.begin();
  failedBoot.tick(clockMs+30000,true,false);assert(rolledBack==1);
- running=&slot0;state=ESP_OTA_IMG_VALID;DisplayOtaReceiver rolled;rolled.begin();report(rolled,bootFailed);assert(saved.empty());
+ running=&slot0;state=ESP_OTA_IMG_VALID;DisplayOtaReceiver rolled;rolled.begin();
+ uint8_t req[8]={},kind=0,expected=0;size_t count=0;
+ assert(!rolled.next(++clockMs,false,true,true,kind,expected,req,count));
+ report(rolled,bootFailed);assert(saved.empty());
+ reset();state=ESP_OTA_IMG_UNDEFINED;canRollback=false;DisplayOtaReceiver initial;initial.begin();
+ const int before=confirmed;initial.tick(++clockMs,true,false);assert(confirmed==before+1&&state==ESP_OTA_IMG_VALID);
 }
 '''
 with tempfile.TemporaryDirectory() as d:
