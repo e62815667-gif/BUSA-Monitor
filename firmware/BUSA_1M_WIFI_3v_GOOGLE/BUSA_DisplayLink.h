@@ -1,7 +1,7 @@
 #pragma once
 #include <Arduino.h>
 #include <esp_heap_caps.h>
-#include "../common/BUSA_DisplayProtocol.h"
+#include <BUSA_DisplayProtocol.h>
 
 String statusJSON();
 namespace busa_display_link {
@@ -13,6 +13,7 @@ static uint8_t* wire=nullptr;
 static size_t wireSize=0, wireAt=0;
 static uint32_t lastDiagnostic=0, tx=0, busyDrops=0;
 static uint32_t metrics[metricCount]={};
+static char displayFirmware[versionBytes]={};
 static bool ready=false, haveDiagnostic=false;
 static void begin(){
     raw=static_cast<uint8_t*>(heap_caps_malloc(maxRaw,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
@@ -40,7 +41,7 @@ static void poll(){
             String snapshot=statusJSON();
             if(snapshot.length()>0&&snapshot.length()<=maxPayload)
                 enqueue(status,f.seq,reinterpret_cast<const uint8_t*>(snapshot.c_str()),snapshot.length());
-        }else if(decodeMetrics(f,metrics)){
+        }else if(decodeMetrics(f,metrics,displayFirmware)){
             lastDiagnostic=millis();haveDiagnostic=true;
             enqueue(diagnosticsAck,f.seq,nullptr,0);
         }
@@ -69,6 +70,7 @@ static String diagnosticJSON(){
     String s="{\"link\":\"";
     s+=!ready?"INIT_FAILED":!haveDiagnostic?"WAITING":age>staleMs?"STALE":"CONNECTED";
     s+="\",\"age_ms\":"+ (haveDiagnostic?String(age):String("null"));
+    s+=",\"firmware\":"+(haveDiagnostic?String("\"")+displayFirmware+"\"":String("null"));
     s+=",\"main_uart_rx\":"+String(decoder.counters.rx);
     s+=",\"main_uart_tx\":"+String(tx);
     s+=",\"main_uart_crc_errors\":"+String(decoder.counters.crcErrors);

@@ -1,4 +1,4 @@
-#include "../firmware/common/BUSA_UartFrame.h"
+#include "../firmware/common/src/BUSA_UartFrame.h"
 #include <assert.h>
 #include <string.h>
 using namespace busa_uart;
