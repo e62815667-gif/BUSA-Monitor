@@ -16,7 +16,7 @@ namespace busa_guition {
 class FactoryPanel final : public Arduino_NV3041A {
 public:
     explicit FactoryPanel(Arduino_DataBus* bus)
-        : Arduino_NV3041A(bus,GFX_NOT_DEFINED,0,true,WIDTH,HEIGHT) {}
+        : Arduino_NV3041A(bus,GFX_NOT_DEFINED,0,true,busa_guition::WIDTH,busa_guition::HEIGHT) {}
 protected:
     void tftInit() override {
         applyFactoryInit(*_bus,[](uint8_t ms){delay(ms);});
@@ -27,10 +27,26 @@ protected:
 // Use the factory demo full-frame path; allocate explicitly in external RAM.
 class PsramCanvas final : public Arduino_Canvas {
 public:
-    explicit PsramCanvas(Arduino_G* output):Arduino_Canvas(WIDTH,HEIGHT,output) {}
+    explicit PsramCanvas(Arduino_G* output):Arduino_Canvas(busa_guition::WIDTH,busa_guition::HEIGHT,output) {}
     bool begin(int32_t speed) override {
-        if(!_framebuffer) _framebuffer=static_cast<uint16_t*>(heap_caps_aligned_alloc(16,size_t(WIDTH)*HEIGHT*sizeof(uint16_t),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
-        return _framebuffer && Arduino_Canvas::begin(speed);
+        constexpr size_t bytes=size_t(busa_guition::WIDTH)*busa_guition::HEIGHT*sizeof(uint16_t);
+        static_assert(bytes==261120,"Unexpected canvas size");
+        if(width()!=busa_guition::WIDTH||height()!=busa_guition::HEIGHT){
+            Serial.println("[BOOT] CANVAS GEOMETRY FAIL");return false;
+        }
+        if(!_framebuffer){
+            _framebuffer=static_cast<uint16_t*>(heap_caps_aligned_alloc(16,bytes,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
+            Serial.printf("[BOOT] CANVAS ALIGNED bytes=%u %s\n",unsigned(bytes),_framebuffer?"OK":"FAIL");
+            if(!_framebuffer){
+                // QSPI copies RGB565 pixels into its own DMA buffer.
+                _framebuffer=static_cast<uint16_t*>(heap_caps_malloc(bytes,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
+                Serial.printf("[BOOT] CANVAS MALLOC bytes=%u %s\n",unsigned(bytes),_framebuffer?"OK":"FAIL");
+            }
+        }
+        if(!_framebuffer)return false;
+        const bool ready=Arduino_Canvas::begin(speed);
+        Serial.printf("[BOOT] CANVAS BASE %s\n",ready?"OK":"FAIL");
+        return ready;
     }
 };
 
@@ -43,7 +59,8 @@ public:
         pinMode(TOUCH_CS,OUTPUT);digitalWrite(TOUCH_CS,HIGH);
         pinMode(SD_CS,OUTPUT);digitalWrite(SD_CS,HIGH);
         Serial.println("[BOOT] LCD BEGIN");
-        panelReady_=lcd_.begin(LCD_CLOCK_HZ);
+        Serial.printf("[BOOT] LCD GEOMETRY %dx%d\n",int(lcd_.width()),int(lcd_.height()));
+        panelReady_=lcd_.width()==busa_guition::WIDTH&&lcd_.height()==busa_guition::HEIGHT&&lcd_.begin(LCD_CLOCK_HZ);
         Serial.printf("[BOOT] LCD %s\n",panelReady_?"OK":"FAIL");
         if(panelReady_){
             lcd_.fillScreen(BLACK);
