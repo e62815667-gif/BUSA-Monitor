@@ -151,7 +151,7 @@ private:
     lv_obj_t* field(lv_obj_t* parent,const char* title,const String& value,bool numeric,bool secret=false,int width=LV_PCT(100)){
         auto* box=panel(parent,width);label(box,title);
         auto* ta=lv_textarea_create(box);lv_obj_set_width(ta,LV_PCT(100));lv_obj_set_height(ta,34);
-        lv_obj_set_style_text_font(ta,&busa_font,0);lv_obj_set_style_pad_all(5,0);lv_textarea_set_one_line(ta,true);
+        lv_obj_set_style_text_font(ta,&busa_font,0);lv_obj_set_style_pad_all(ta,5,0);lv_textarea_set_one_line(ta,true);
         lv_textarea_set_max_length(ta,numeric?14:220);
         if(numeric)lv_textarea_set_accepted_chars(ta,"0123456789.-,");
         lv_textarea_set_password_mode(ta,secret);lv_textarea_set_text(ta,value.c_str());
