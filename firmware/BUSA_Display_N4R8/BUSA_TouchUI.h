@@ -13,17 +13,20 @@ class Interface {
 public:
     Interface(Hardware& hw,DisplaySession& session):hw_(hw),session_(session){}
     bool begin(){
-        if(!hw_.lcdReady())return false;
+        if(!hw_.lcdReady()){Serial.println("[BOOT] LVGL SKIP LCD/CANVAS");return false;}
         lv_init();
+        Serial.println("[BOOT] LVGL INIT OK");
         static_assert(LV_COLOR_DEPTH==16 && LV_COLOR_16_SWAP==0,"Native RGB565 required");
         auto* pixels=static_cast<lv_color_t*>(heap_caps_malloc(WIDTH*24*sizeof(lv_color_t),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
-        if(!pixels)return false;
+        if(!pixels){Serial.println("[BOOT] LVGL BUFFER FAIL");return false;}
         lv_disp_draw_buf_init(&drawBuffer_,pixels,nullptr,WIDTH*24);
         lv_disp_drv_init(&driver_);driver_.hor_res=WIDTH;driver_.ver_res=HEIGHT;driver_.draw_buf=&drawBuffer_;
         driver_.flush_cb=flush;driver_.user_data=this;
-        if(!lv_disp_drv_register(&driver_))return false;
+        if(!lv_disp_drv_register(&driver_)){Serial.println("[BOOT] LVGL DISPLAY FAIL");return false;}
+        Serial.println("[BOOT] LVGL DISPLAY OK");
         lv_indev_drv_init(&input_);input_.type=LV_INDEV_TYPE_POINTER;input_.read_cb=readTouch;input_.user_data=this;
-        if(!lv_indev_drv_register(&input_)||!input_.read_timer)return false;
+        if(!lv_indev_drv_register(&input_)||!input_.read_timer){Serial.println("[BOOT] LVGL INPUT FAIL");return false;}
+        Serial.println("[BOOT] LVGL INPUT OK");
         lv_timer_set_period(input_.read_timer,busa_touch::readPeriodMs);
         prefs_.begin("busa-touch",false);
         calibrationValid_=prefs_.getBytesLength("affineC0")==sizeof(transform_)&&prefs_.getBytes("affineC0",&transform_,sizeof(transform_))==sizeof(transform_)&&validTransform();
@@ -36,7 +39,9 @@ public:
         art_.header.always_zero=0;art_.header.cf=LV_IMG_CF_TRUE_COLOR_ALPHA;
         art_.header.w=BUSA_ASSET_W;art_.header.h=BUSA_ASSET_H;art_.data_size=BUSA_ASSET_SIZE;art_.data=asset_?asset_:BUSA_ASSET;
         lastTick_=millis();
+        Serial.println("[BOOT] LVGL SCREEN BEGIN");
         if(calibrationValid_)build();else startCalibration();
+        Serial.println("[BOOT] LVGL SCREEN OK");
         hw_.backlight(true);return true;
     }
     void poll(){

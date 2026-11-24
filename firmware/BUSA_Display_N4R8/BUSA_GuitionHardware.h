@@ -38,16 +38,36 @@ class Hardware {
 public:
     Hardware():qspi_(LCD_CS,LCD_SCK,LCD_D0,LCD_D1,LCD_D2,LCD_D3),
                lcd_(&qspi_),canvas_(&lcd_),shared_(HSPI),touch_(TOUCH_CS) {}
-    void begin() {
+    void beginDisplay() {
         pinMode(BACKLIGHT,OUTPUT);digitalWrite(BACKLIGHT,LOW);
         pinMode(TOUCH_CS,OUTPUT);digitalWrite(TOUCH_CS,HIGH);
         pinMode(SD_CS,OUTPUT);digitalWrite(SD_CS,HIGH);
-        lcdReady_=canvas_.begin(LCD_CLOCK_HZ);
+        Serial.println("[BOOT] LCD BEGIN");
+        panelReady_=lcd_.begin(LCD_CLOCK_HZ);
+        Serial.printf("[BOOT] LCD %s\n",panelReady_?"OK":"FAIL");
+        if(panelReady_){
+            lcd_.fillScreen(BLACK);
+            backlight(true);
+            Serial.println("[BOOT] BACKLIGHT HIGH");
+        }
+        const bool ramReady=psramFound();
+        Serial.printf("[BOOT] PSRAM %s total=%u free=%u largest=%u\n",ramReady?"OK":"FAIL",
+                      unsigned(ESP.getPsramSize()),unsigned(ESP.getFreePsram()),
+                      unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)));
+        lcdReady_=panelReady_&&ramReady&&canvas_.begin(GFX_SKIP_OUTPUT_BEGIN);
+        Serial.printf("[BOOT] CANVAS %s\n",lcdReady_?"OK":"FAIL");
         if(lcdReady_){canvas_.fillScreen(BLACK);canvas_.flush();}
+        if(!lcdReady_)lastError_=1;
+    }
+    void beginPeripherals() {
+        Serial.println("[BOOT] TOUCH BEGIN");
         shared_.begin(SHARED_SPI_SCK,SHARED_SPI_MISO,SHARED_SPI_MOSI,-1);
         touchReady_=touch_.begin(shared_);
         touch_.setRotation(0);
+        Serial.printf("[BOOT] TOUCH %s\n",touchReady_?"OK":"FAIL");
+        Serial.println("[BOOT] SD BEGIN");
         sdReady_=SD.begin(SD_CS,shared_,4000000,"/sd",5,false) && SD.cardType()!=CARD_NONE;
+        Serial.printf("[BOOT] SD %s\n",sdReady_?"OK":"UNAVAILABLE");
         if(sdReady_)refreshCapacity();
         if(!lcdReady_)lastError_=1;
         else if(!sdReady_)lastError_=2;
@@ -58,7 +78,7 @@ public:
     bool sdReady() const{return sdReady_;}
     Arduino_GFX& panel(){return canvas_;}
     void present(){canvas_.flush();}
-    void backlight(bool on){digitalWrite(BACKLIGHT,on&&lcdReady_?HIGH:LOW);}
+    void backlight(bool on){digitalWrite(BACKLIGHT,on&&panelReady_?HIGH:LOW);}
     bool readRawTouch(TS_Point& p){
         if(!touchReady_||!touch_.touched())return false;
         p=touch_.getPoint();
@@ -90,7 +110,7 @@ public:
         const uint32_t now=millis();
         renderLast_=now-started;
         if(renderMax_==UINT32_MAX||renderLast_>renderMax_)renderMax_=renderLast_;
-        if(!frames_){frameWindow_=now;frames_=1;return;}
+        if(!frames_){Serial.println("[BOOT] FIRST_FRAME OK");frameWindow_=now;frames_=1;return;}
         ++frames_;
         const uint32_t span=now-frameWindow_;
         if(span>=1000){
@@ -120,7 +140,7 @@ private:
     PsramCanvas canvas_;
     SPIClass shared_;
     XPT2046_Touchscreen touch_;
-    bool lcdReady_=false,touchReady_=false,sdReady_=false,capacityKnown_=false;
+    bool panelReady_=false,lcdReady_=false,touchReady_=false,sdReady_=false,capacityKnown_=false;
     uint64_t total_=0,free_=0;
     uint32_t touchErrors_=0,readErrors_=0,assetErrors_=0,lastError_=0;
     uint32_t renderLast_=UINT32_MAX,renderMax_=UINT32_MAX,fpsMilli_=UINT32_MAX;

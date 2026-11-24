@@ -59,6 +59,11 @@ inline void mbedtls_sha256_init(mbedtls_sha256_context* p){p->ctx=EVP_MD_CTX_new
 inline int mbedtls_sha256_starts_ret(mbedtls_sha256_context* p,int){return EVP_DigestInit_ex(p->ctx,EVP_sha256(),nullptr)==1?0:1;}
 inline int mbedtls_sha256_update_ret(mbedtls_sha256_context* p,const uint8_t* b,size_t n){return EVP_DigestUpdate(p->ctx,b,n)==1?0:1;}
 inline int mbedtls_sha256_finish_ret(mbedtls_sha256_context* p,uint8_t* b){unsigned n=0;return EVP_DigestFinal_ex(p->ctx,b,&n)==1&&n==32?0:1;}
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+inline int mbedtls_sha256_starts(mbedtls_sha256_context* p,int v){return mbedtls_sha256_starts_ret(p,v);}
+inline int mbedtls_sha256_update(mbedtls_sha256_context* p,const uint8_t* b,size_t n){return mbedtls_sha256_update_ret(p,b,n);}
+inline int mbedtls_sha256_finish(mbedtls_sha256_context* p,uint8_t* b){return mbedtls_sha256_finish_ret(p,b);}
+#endif
 inline void mbedtls_sha256_free(mbedtls_sha256_context* p){EVP_MD_CTX_free(p->ctx);}
 '''}
 code=r'''
@@ -132,6 +137,7 @@ with tempfile.TemporaryDirectory() as d:
     for name,content in headers.items():
         p=d/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text(content)
     p=d/'test.cpp';p.write_text(code);exe=d/'test'
-    subprocess.run(['g++','-std=c++11','-Wall','-Wextra','-Werror','-I'+str(d),'-I'+str(root/'firmware/common/src'),'-I'+str(root/'firmware/BUSA_Display_N4R8'),str(p),'-lcrypto','-o',str(exe)],check=True)
-    subprocess.run([str(exe)],check=True)
+    for major in (2,3):
+        subprocess.run(['g++',f'-DESP_ARDUINO_VERSION_MAJOR={major}','-std=c++11','-Wall','-Wextra','-Werror','-I'+str(d),'-I'+str(root/'firmware/common/src'),'-I'+str(root/'firmware/BUSA_Display_N4R8'),str(p),'-lcrypto','-o',str(exe)],check=True)
+        subprocess.run([str(exe)],check=True)
 print('PASS production display OTA receiver: SHA-256, alternate partition, write/NVS failures, timeout, boot confirmation and rollback (mock flash)')

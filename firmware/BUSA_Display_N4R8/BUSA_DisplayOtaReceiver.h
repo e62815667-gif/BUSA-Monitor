@@ -4,6 +4,15 @@
 #include <esp_ota_ops.h>
 #include <sdkconfig.h>
 #include <mbedtls/sha256.h>
+#if defined(ESP_ARDUINO_VERSION_MAJOR) && ESP_ARDUINO_VERSION_MAJOR >= 3
+#define BUSA_SHA_START mbedtls_sha256_starts
+#define BUSA_SHA_UPDATE mbedtls_sha256_update
+#define BUSA_SHA_FINISH mbedtls_sha256_finish
+#else
+#define BUSA_SHA_START mbedtls_sha256_starts_ret
+#define BUSA_SHA_UPDATE mbedtls_sha256_update_ret
+#define BUSA_SHA_FINISH mbedtls_sha256_finish_ret
+#endif
 #include <BUSA_DisplayOtaProtocol.h>
 #include <BUSA_DisplayProtocol.h>
 #if !CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE
@@ -81,7 +90,7 @@ private:
   }
   if(esp_ota_begin(target_,size,&handle_)!=ESP_OK){report_=busa_ota::failed;return;}
   active_=true;mbedtls_sha256_init(&sha_);
-  if(mbedtls_sha256_starts_ret(&sha_,0)!=0){fail();return;}
+  if(BUSA_SHA_START(&sha_,0)!=0){fail();return;}
   progressAt_=millis();
  }
  void receive(const Frame& f){
@@ -91,13 +100,13 @@ private:
   if(!count||f.size!=8+count||read32(f.data)!=id_||read32(f.data+4)!=received_){fail();return;}
   const auto* data=f.data+8;
   if((received_==0&&!busa_ota::validHeader(data,count))||
-     mbedtls_sha256_update_ret(&sha_,data,count)!=0||esp_ota_write(handle_,data,count)!=ESP_OK){fail();return;}
+     BUSA_SHA_UPDATE(&sha_,data,count)!=0||esp_ota_write(handle_,data,count)!=ESP_OK){fail();return;}
   marker_.feed(data,count);received_+=count;progressAt_=millis();
   if(received_==size_)finish();
  }
  void finish(){
   uint8_t actual[32];
-  if(mbedtls_sha256_finish_ret(&sha_,actual)!=0||memcmp(actual,expected_,32)!=0||!marker_.found()){fail();return;}
+  if(BUSA_SHA_FINISH(&sha_,actual)!=0||memcmp(actual,expected_,32)!=0||!marker_.found()){fail();return;}
   const esp_err_t rc=esp_ota_end(handle_);active_=false;mbedtls_sha256_free(&sha_);
   if(rc!=ESP_OK){report_=busa_ota::failed;return;}
   const BootRecord record{id_,target_->address};BootRecord check{};
@@ -119,3 +128,7 @@ private:
  busa_ota::Marker marker_{busa_ota::displayFamily};
 };
 }
+
+#undef BUSA_SHA_START
+#undef BUSA_SHA_UPDATE
+#undef BUSA_SHA_FINISH
