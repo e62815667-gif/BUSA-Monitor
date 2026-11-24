@@ -1,0 +1,34 @@
+[
+  [
+    "#include <math.h>\n",
+    "#include <math.h>\n#include \"BUSA_CollectionPulse.h\"\n"
+  ],
+  [
+    "constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V\n",
+    "constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V\nconstexpr uint8_t COLLECTION_GPIO=1;\nstatic_assert(COLLECTION_GPIO!=FLOW_GPIO && COLLECTION_GPIO!=2 && COLLECTION_GPIO!=BUS_SDA && COLLECTION_GPIO!=BUS_SCL &&\n  COLLECTION_GPIO!=TFT_CS && COLLECTION_GPIO!=TFT_DC && COLLECTION_GPIO!=TFT_RST && COLLECTION_GPIO!=TFT_MOSI && COLLECTION_GPIO!=TFT_SCK &&\n  COLLECTION_GPIO!=TPIN[0] && COLLECTION_GPIO!=TPIN[1] && COLLECTION_GPIO!=TPIN[2] && COLLECTION_GPIO!=TPIN[3] &&\n  COLLECTION_GPIO!=KPIN[0] && COLLECTION_GPIO!=KPIN[1] && COLLECTION_GPIO!=KPIN[2] && COLLECTION_GPIO!=KPIN[3],\"GPIO1 conflict\");\n"
+  ],
+  [
+    "GEOM1-MOTION1-20261122\";",
+    "GEOM1-MOTION1-20261122-COL1-20261124\";"
+  ],
+  [
+    "float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}\n",
+    "float totalWaterLitres(){return (float)flowPulses()/(FLOW_HZ_PER_LPM*60.0f);}\n\nportMUX_TYPE collectionMux=portMUX_INITIALIZER_UNLOCKED;\nvolatile uint32_t collectionCounter=0;\nBusaCollectionPulse collectionPulse;\nvoid IRAM_ATTR collectionISR(){\n  portENTER_CRITICAL_ISR(&collectionMux);\n  ++collectionCounter;\n  portEXIT_CRITICAL_ISR(&collectionMux);\n}\nvoid sampleCollection(uint32_t now){\n  portENTER_CRITICAL(&collectionMux);\n  const uint32_t count=collectionCounter;\n  portEXIT_CRITICAL(&collectionMux);\n  collectionPulse.sample(now,count);\n}\nString collectionNumber(double value){\n  if(!isfinite(value))return \"null\";\n  char out[32];snprintf(out,sizeof(out),\"%.9g\",value);return String(out);\n}\nString collectionJSON(){\n  char count[24];snprintf(count,sizeof(count),\"%llu\",(unsigned long long)collectionPulse.pulses());\n  String s=\"{\\\"sensor_present\\\":\";s+=(collectionPulse.seen()?\"true\":\"false\");\n  s+=\",\\\"gpio\\\":\"+String(COLLECTION_GPIO)+\",\\\"pulses\\\":\"+String(count);\n  s+=\",\\\"calibrated\\\":\";s+=(collectionPulse.calibrated()?\"true\":\"false\");\n  s+=\",\\\"pulses_per_ml\\\":\"+collectionNumber(collectionPulse.coefficient());\n  s+=\",\\\"ml_per_min\\\":\"+collectionNumber(collectionPulse.rate());\n  s+=\",\\\"total_ml\\\":\"+collectionNumber(collectionPulse.volume())+\"}\";\n  return s;\n}\n"
+  ],
+  [
+    "  s+=\",\\\"collection\\\":{\\\"sensor_present\\\":false,\\\"ml_per_min\\\":null,\\\"total_ml\\\":null}\";",
+    "  s+=\",\\\"collection\\\":\"+collectionJSON();"
+  ],
+  [
+    "  busaNvsReady=prefs.begin(\"busa-r04\",false);\n",
+    "  pinMode(COLLECTION_GPIO,INPUT); // electrically verified 3.3 V logic signal only\n  collectionPulse.begin(millis(),0);\n  attachInterrupt(digitalPinToInterrupt(COLLECTION_GPIO),collectionISR,FALLING);\n  busaNvsReady=prefs.begin(\"busa-r04\",false);\n  if(busaNvsReady&&prefs.isKey(\"colPulsesMl\"))collectionPulse.calibrate(prefs.getFloat(\"colPulsesMl\",NAN));\n"
+  ],
+  [
+    "  server.on(\"/api/keypad/start\",HTTP_POST,[]{",
+    "  server.on(\"/api/collection/calibration\",HTTP_POST,[]{\n    if(!apClient()||server.arg(\"confirm\")!=\"YES\"){server.send(403,\"text/plain\",\"BUSA local AP only\");return;}\n    String raw=server.arg(\"pulses_per_ml\");raw.trim();char* end=nullptr;\n    const float value=strtof(raw.c_str(),&end);\n    if(raw.isEmpty()||!end||*end||!BusaCollectionPulse::validCalibration(value)){\n      server.send(400,\"text/plain\",\"Invalid pulses_per_ml\");return;\n    }\n    if(!busaNvsReady||prefs.putFloat(\"colPulsesMl\",value)!=sizeof(float)){\n      server.send(500,\"text/plain\",\"Calibration not saved\");return;\n    }\n    collectionPulse.calibrate(value);\n    server.send(200,\"application/json; charset=utf-8\",collectionJSON());\n  });\n  server.on(\"/api/keypad/start\",HTTP_POST,[]{"
+  ],
+  [
+    "    sampleFlow(now);\n",
+    "    sampleFlow(now);\n    sampleCollection(now);\n"
+  ]
+]
