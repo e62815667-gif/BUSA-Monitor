@@ -171,7 +171,7 @@ void googleWorker(void* unused){
     busaGoogleNetworkBusy=true;
     googleState=3;
     // The full read-only status object includes every OneWire diagnostic error,
-    // keypad scan_error, I2C, PCA9685, YF-S401 pulse counts and Wi-Fi state.
+    // keypad scan_error, I2C, YF-S401 pulse counts and Wi-Fi state.
     // Never save the authentication token inside telemetry/raw sheet rows.
     String packet=String("{\"version\":3,\"kind\":\"monitor_diagnostics\",\"device_id\":\"BUSA-1M-001\",\"sent_epoch\":")
       +String((uint32_t)time(nullptr))

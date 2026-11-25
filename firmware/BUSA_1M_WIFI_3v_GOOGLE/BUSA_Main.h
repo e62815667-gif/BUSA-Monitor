@@ -1067,7 +1067,7 @@ void pollKeys(uint32_t now){
   keyCount++;
   if(tftDisplayOff){
     // Any key wakes TFT without performing the key's original function.
-    wakeTftDisplay();keyMessage="Экран пробуждён";return;
+    keyMessage=wakeTftDisplay()?"Запрос включения экрана":"Экран: нет подтверждения связи";return;
   }
   tftDisplayActivityMs=now;
   if(keypadLearning){learnCommitPair(pair);}
@@ -1211,7 +1211,7 @@ static void busaWebEventsPoll(uint32_t now){
  }
  const bool buzzer=buzzerTempChannels[0].on||buzzerTempChannels[1].on;
  if(buzzer!=oldBuzzer){oldBuzzer=buzzer;busaWebRecord(buzzer?"Зуммер включён":"Зуммер выключен");}
- if(oldScreen!=tftDisplayOff){oldScreen=tftDisplayOff;busaWebRecord(oldScreen?"Экран выключен":"Экран включён");}
+ if(oldScreen!=tftDisplayOff){oldScreen=tftDisplayOff;busaWebRecord(oldScreen?"Запрошено выключение экрана":"Запрошено включение экрана");}
  if(oldTheme!=tftThemeMode){oldTheme=tftThemeMode;busaWebRecord("Тема экрана изменена");}
  if(oldLearning!=keypadLearning){oldLearning=keypadLearning;busaWebRecord(oldLearning?"Начато обучение клавиатуры":"Обучение клавиатуры завершено");}
  if(oldReady!=keypadReady){oldReady=keypadReady;busaWebRecord(oldReady?"Раскладка клавиатуры готова":"Раскладка клавиатуры недоступна",oldReady?0:1);}
@@ -3182,7 +3182,7 @@ if(Number.isFinite(currentPulse)){
 const cs=s.google;
 const screenDiag=s.display_diagnostics;
 get('displayState').textContent=screenDiag?.link==='CONNECTED'?(screenDiag.lcd_init===1?'Связь есть · LCD запущен':'Связь есть · LCD не запущен'):(screenDiag?.link==='STALE'?'Нет свежих данных':'Нет подтверждения связи');
-get('screenSleep').disabled=!(screenDiag?.link==='CONNECTED'&&String(screenDiag.firmware||'').endsWith('-HW1'));
+get('screenSleep').disabled=!!window.busaCloudInstalled||s.network_indicators?.cloud_fresh===true||!(screenDiag?.link==='CONNECTED'&&String(screenDiag.firmware||'').endsWith('-HW1'));
 get('screenWake').disabled=get('screenSleep').disabled;
 if(!themeInitialized && typeof s.tft_theme_mode==='number'){
   get('themeModeSelect').value=String(s.tft_theme_mode);
@@ -4647,7 +4647,7 @@ void loop(){
       busaI2cRunGpioSelfTest();
       busaObserve("I2C_GPIO_TEST",started,busaI2cWorstMs);
     }
-    // Query connected PCF/PCA once per 6 s. Probe one supported I2C address
+    // Query connected PCF8575 once per 6 s. Probe one supported I2C address
     // per loop; prevent keypad bus errors from starving the web server.
     // Profile each blocking component and quarantine a misbehaving I2C bus.
     if(!busaI2cElectricalFault){

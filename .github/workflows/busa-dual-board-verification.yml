@@ -1,7 +1,7 @@
 name: BUSA dual-board COLL1 and display OTA build
 on:
   push:
-    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125]
+    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125, fix/busa-actual-hardware-20261125]
   workflow_dispatch:
 permissions:
   contents: read
@@ -38,6 +38,7 @@ jobs:
           /tmp/busa-touch-test
           node tests/test_display_receiver.cjs
           python3 -B tests/test_collection.py
+          python3 -B tests/test_hardware_actual.py
           g++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/common/src tests/test_display_ota_protocol.cpp -o /tmp/busa-ota-protocol-test
           /tmp/busa-ota-protocol-test
           g++ -std=c++11 -Wall -Wextra -Werror -Ifirmware/common/src tests/test_display_ota_sender.cpp -o /tmp/busa-ota-sender-test
@@ -96,7 +97,7 @@ jobs:
           assert usb.read_bytes()[0x10000:]==ota.read_bytes()
           assert b'display_diagnostics' in ota.read_bytes()
           assert b'UNRELIABLE_PULSES' in ota.read_bytes()
-          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF3' in ota.read_bytes()
+          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF3-HW1' in ota.read_bytes()
           assert b'main_uart_tx_worker_max_ms' in ota.read_bytes()
           assert b'loop_profile' in ota.read_bytes()
           assert b'/api/display-ota/upload' in ota.read_bytes()
@@ -112,7 +113,7 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_ESP32_PERF3
+          name: BUSA_ESP32_HW1
           retention-days: 30
           path: dual_delivery_main/
           if-no-files-found: error
@@ -194,7 +195,7 @@ jobs:
           assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
           assert 60000<len(app)<=0x1c0000 and len(data)<=0x1d0000
           major='5' if os.environ['CORE_VERSION']=='3.0.0' else '4'
-          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-HQ1').encode() in app
+          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-HW1').encode() in app
           assert b'[BOOT] FIRST_FRAME OK' in app
           assert b'[BOOT] PSRAM ' in app
           assert b'[BOOT] LCD GEOMETRY ' in app
@@ -221,6 +222,6 @@ jobs:
           git rev-parse HEAD > display_delivery/SOURCE_COMMIT.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_SCREEN_HQ1_${{ matrix.core }}
+          name: BUSA_SCREEN_HW1_${{ matrix.core }}
           path: display_delivery/
           if-no-files-found: error
