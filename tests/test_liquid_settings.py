@@ -17,9 +17,9 @@ assert 'Израсходовано' in water and 'fields_' not in water and 'И�
 assert 'sub_==9' in ui and 'Route::collectionCoefficient' in ui and 'Route::waterCoefficient' in ui
 assert 'collectionConfig_?222:201' in ui
 html=main.split('R"HTMLBUSA(',1)[1].split(')HTMLBUSA"',1)[0]
-monitor=html.split('data-section="2"',1)[1].split('</section>',1)[0]
+monitor=html.split('<section class="page" data-section="2"',1)[1].split('</section>',1)[0]
 assert 'Израсходовано' in monitor and 'Импульс' not in monitor and '<input' not in monitor
-settings=html.split('data-stab="9"',1)[1].split('<div class="settingCard" data-stab="6"',1)[0]
+settings=html.split('<div class="card settingCard" data-stab="9"',1)[1].split('<div class="settingCard" data-stab="6"',1)[0]
 for key in ['waterPplInput','waterPplSave','waterPplPassport','collectionPplInput','collectionPplSave']:
     assert 'id="'+key+'"' in settings and html.count('id="'+key+'"')==1
 assert 'data-liquid-panel="collection"' in settings and 'data-liquid-panel="water" hidden' in settings
