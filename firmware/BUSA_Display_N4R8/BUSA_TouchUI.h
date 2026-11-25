@@ -354,7 +354,7 @@ private:
         static constexpr int rightWidth=WIDTH-2*PAD-318-10;
         for(int i=0;i<4;++i){
             auto* name=at(scene,i==3?"Авария":sensor(i),xs[i],ys[i]);
-            auto* reading=live_[4+i]=at(scene,"—",xs[i],ys[i]+17,&busa_font_value);
+            auto* reading=live_[4+i]=at(scene,"—",xs[i],ys[i]+lv_font_get_line_height(&busa_font)+2,&busa_font_value);
             lv_obj_set_style_text_color(reading,color(colors_[i]),0);
             if(i>=2){for(auto* l:{name,reading}){lv_obj_set_width(l,rightWidth);lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_RIGHT,0);}}
         }
