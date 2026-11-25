@@ -20,6 +20,7 @@ prelude=r'''
 #include <lvgl.h>
 #include "BUSA_TouchKeys.h"
 #include "BUSA_NavIcons.h"
+#include "BUSA_GraphView.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -48,6 +49,9 @@ struct UiTest {
     void registerKey(lv_obj_t* o,int,int){controls.push_back(o);}
     static String value(JsonStub){return {};}
     void calculate(bool){}
+    int graphKind_=0,graphMinutes_=5;bool graphDirty_=false;
+    lv_obj_t *chart_=nullptr,*graphRange_[5]={},*graphLegend_[4]={},*graphY_[4]={},*graphX_[4]={};lv_chart_series_t* series_[4]={};
+    void requestGraph(){} void set(lv_obj_t* l,const String& s){if(l)lv_label_set_text(l,s.c_str());}
 '''
 checks=r'''
     void init(){
@@ -78,6 +82,17 @@ checks=r'''
         if(size.y>height||std::strstr(text,"...")!=nullptr){
             std::fprintf(stderr,"TEXT CLIPPED '%s' need %dpx high, have %dpx; width %d\n",text,size.y,height,width);std::abort();
         }
+    }
+    void verifyGraphs(){
+        for(int mode=0;mode<3;++mode){
+            init();graphKind_=mode;resultLabel_=nullptr;graphs();verify();assertFits(chart_);
+            unsigned n=0;for(auto* s=lv_chart_get_series_next(chart_,nullptr);s;s=lv_chart_get_series_next(chart_,s))++n;
+            assert(n==(mode==0?4u:1u));
+            for(int k=0;k<4;++k){labelFits(graphY_[k]);labelFits(graphX_[k]);}
+            labelFits(pageStatus_);
+            if(mode==0)for(int i=0;i<4;++i)labelFits(graphLegend_[i]);
+        }
+        std::puts("PASS native LVGL graph pages, distinct series and axis geometry");
     }
     void verifyNavigation(){
         init();buildNavigation(lv_scr_act());lv_obj_update_layout(nav_);
@@ -160,7 +175,7 @@ int main(){
         assert(!ui.fields_[0]&&!ui.fields_[1]&&ui.fields_[2]);
         ui.geometryExpanded_=true;ui.init();ui.calculator();ui.verify();
         assert(ui.fields_[0]&&ui.fields_[1]&&ui.fields_[2]);
-        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();ui.verifyNavigation();
+        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();ui.verifyNavigation();ui.verifyGraphs();
     }
     ui.theme_=1;assert(ui.paper()==0x080808&&ui.surface()==0x202020);
     ui.theme_=2;assert(ui.paper()==0x060e15&&ui.surface()==0x0d2430);
@@ -172,9 +187,9 @@ if len(sys.argv)!=2: raise SystemExit('usage: test_guition_lvgl_layout.py /path/
 lvgl=Path(sys.argv[1]).resolve()
 assert (lvgl/'lvgl.h').is_file(),lvgl
 sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav')]
-flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch)]
+flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
 with tempfile.TemporaryDirectory() as tmp:
-    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
+    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+between('    void graphAxes(', '    void graphTimeLabels()')+between('    void clearGraph(){','    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
     def compile_one(item):
         i,s=item;o=tmp/f'{i}.o';subprocess.run(['gcc','-std=gnu99','-O0',*flags,'-c',str(s),'-o',str(o)],check=True);return str(o)
     with ThreadPoolExecutor(max_workers=2) as pool: objects=list(pool.map(compile_one,enumerate(sources)))

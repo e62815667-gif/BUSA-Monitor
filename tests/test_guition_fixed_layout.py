@@ -22,14 +22,14 @@ assert nums['SCENE']+nums['METRICS']+nums['RELAYS']+2*nums['GAP']==body
 # Geometry of all dense screens; bounds of fixed-height children, plus flex row gaps.
 # Label font generation uses 12px condensed (measured line height 17 px); host LVGL tests check actual glyph bounds.
 assert 'row(body_,70)' in u and 'panel(r,235,70)' in u and 'row(p,20)' in u and 'row(p,42)' in u
-assert 'row(body_,18)' in u and 'row(body_,134)' in u and 'lv_obj_set_size(chart_,LV_PCT(100),102)' in u
+assert 'row(body_,18)' in u and 'row(body_,134)' in u and 'lv_obj_set_size(chart_,421,plotHeight)' in u
 assert 'row(body_,42)' in u and 'panel(body_,LV_PCT(100),calcMode_==2?36:50)' in u
 assert 'pagedResult(int height=80,unsigned lines=5)' in u and 'pagedResult(60,4)' in u
-for page, heights in {'temperature':[18,70,70,26], 'water':[18,134,26], 'graph':[26,15,102,26,14], 'calc5':[42,42,42,22,36], 'calc_geometry_expanded':[42,26,42,22,50], 'calc_geometry_collapsed':[42,26,42,22,50], 'settings':[18,27,27,27,27,27], 'calibration':[26,42,42,26,24], 'wifi':[26,26,26,42,26,24], 'theme':[26,26,26,26,26,24], 'google':[26,17,42,26,26,24], 'about':[26,60,16,16,16,16,24], 'journal':[26,26,80,26,24], 'diagnostics':[26,16,16,16,16,16,26,26,14], 'ble':[26,26,26,60,26,14], 'ota':[26,40,24]}.items():
+for page, heights in {'temperature':[18,70,70,26], 'water':[18,134,26], 'graph_temp':[26,17,17,84,15,26], 'graph_flow':[26,17,103,15,26], 'calc5':[42,42,42,22,36], 'calc_geometry_expanded':[42,26,42,22,50], 'calc_geometry_collapsed':[42,26,42,22,50], 'settings':[18,27,27,27,27,27], 'calibration':[26,42,42,26,24], 'wifi':[26,26,26,42,26,24], 'theme':[26,26,26,26,26,24], 'google':[26,17,42,26,26,24], 'about':[26,60,16,16,16,16,24], 'journal':[26,26,80,26,24], 'diagnostics':[26,16,16,16,16,16,26,26,14], 'ble':[26,26,26,60,26,14], 'ota':[26,40,24]}.items():
     assert sum(heights)+2*(len(heights)-1)<=body,(page,sum(heights)+2*(len(heights)-1),body)
 for id in range(200,221): assert re.search(r'\bcase '+str(id)+r':',u),id
 for id in range(400,409): assert re.search(r'\b'+str(id)+r'\b',u),id
-assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-U7-HW2')+1<=40 for i in (4,5))
+assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-U8-HW2')+1<=40 for i in (4,5))
 print('PASS: fixed-height budgets for fixed page variants and preservation of existing actions')
 
 assert 'geometryExpanded_=!geometryValid();render();' in u
@@ -59,3 +59,9 @@ print('PASS exact browser calculator terminology, notes and result units')
 assert 'for(int n=0;n<2;++n)' in calc and 'int i=n*2+col' in calc
 assert 'static_assert(BUSA_NAV_W==BUSA_NAV_H' in u
 print('PASS square icons and 2x2 calculator tabs contract')
+
+assert 'graphDirty_||now-lastGraph_>=2000' in u
+assert 'graphMinutes_=minutes[id-310];render();return;' in u
+assert 'pendingGeneration_!=viewGeneration_' in u
+assert 'for(unsigned i=0;i<spec.series;++i)' in u
+print('PASS graph switching, periods, generation isolation and distinct series contract')
