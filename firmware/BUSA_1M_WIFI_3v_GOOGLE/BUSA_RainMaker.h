@@ -282,7 +282,7 @@ static void busaRainMakerApply(){
       }
     }else if(q.target==4){
       if(q.action==5&&q.i>=0&&q.i<=2)ok=saveThemeMode((uint8_t)q.i);
-      else if(q.action==6){
+      else if(q.action==6&&busa_display_link::keypadCapable()){
         if(q.b){wakeTftDisplay();ok=true;}
         else {darkenTftDisplay();ok=true;}
       }else if(q.action==7&&q.i>=0&&q.i<8){navigatePage((uint8_t)q.i);ok=true;}

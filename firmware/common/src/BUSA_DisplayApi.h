@@ -20,11 +20,11 @@ enum class ApiRoute:uint8_t {
     googleConfig=13,
     googleTest=14,
     googleOff=15,
-    keypadStart=16,keypadNext=17,keypadUndo=18,keypadCancel=19,geometryRead=20,geometrySave=21
+    keypadStart=16,keypadNext=17,keypadUndo=18,keypadCancel=19,geometryRead=20,geometrySave=21,referenceEdit=22,calibrationEdit=23
 };
 struct ApiArg {const uint8_t* key;size_t keySize;const uint8_t* value;size_t valueSize;};
 struct ApiRequest {ApiRoute route;size_t count;ApiArg args[apiMaxArgs];};
-inline bool validRoute(uint8_t r){return r>=1&&r<=21;}
+inline bool validRoute(uint8_t r){return r>=1&&r<=23;}
 inline bool validKey(const uint8_t* p,size_t n){
     if(!p||!n||n>apiMaxKey)return false;
     for(size_t i=0;i<n;++i){uint8_t c=p[i];if(!((c>='a'&&c<='z')||(c>='A'&&c<='Z')||(c>='0'&&c<='9')||c=='_'))return false;}

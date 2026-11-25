@@ -7,6 +7,7 @@
 #include "BUSA_DisplayOtaMain.h"
 
 String statusJSON();
+String busaUartStatusJSON();
 static void busaDispatchDisplayApi(const busa_uart::ApiRequest&,int&,String&);
 namespace busa_display_link {
 using namespace busa_uart;
@@ -74,6 +75,9 @@ static void handleApi(const Frame& f){
     const uint32_t elapsed=millis()-started;if(elapsed>apiWorstMs)apiWorstMs=elapsed;
     memset(rx,0,sizeof(rx));
 }
+static bool linkActive(){return ready&&haveDiagnostic&&uint32_t(millis()-lastDiagnostic)<=staleMs;}
+static bool lcdInitialized(){return linkActive()&&metrics[lcdInit]==1;}
+static bool keypadCapable(){const size_t n=strlen(displayFirmware);return linkActive()&&n>=4&&!strcmp(displayFirmware+n-4,"-HW2");}
 static bool otaCapable(){return ready&&haveDiagnostic&&uint32_t(millis()-lastDiagnostic)<=staleMs&&strncmp(displayFirmware,busa_ota::displayFamily,strlen(busa_ota::displayFamily))==0;}
 static void poll(){
     busa_display_ota::tick();
@@ -91,7 +95,7 @@ static void poll(){
             drainTx();
             if(txMailbox.busy()){++busyDrops;continue;}
             const uint32_t started=millis();
-            String snapshot=statusJSON();
+            String snapshot=busaUartStatusJSON();
             const uint32_t elapsed=millis()-started;if(elapsed>jsonWorstMs)jsonWorstMs=elapsed;
             if(snapshot.length()>0&&snapshot.length()<=maxPayload)
                 enqueue(status,f.seq,reinterpret_cast<const uint8_t*>(snapshot.c_str()),snapshot.length());
