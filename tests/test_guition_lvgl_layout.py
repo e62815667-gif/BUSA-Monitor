@@ -49,8 +49,8 @@ struct UiTest {
     void registerKey(lv_obj_t* o,int,int){controls.push_back(o);}
     static String value(JsonStub){return {};}
     void calculate(bool){}
-    int graphKind_=0,graphMinutes_=5;bool graphDirty_=false;
-    lv_obj_t *chart_=nullptr,*graphNotice_=nullptr,*graphUnit_=nullptr,*graphRange_[5]={},*graphLegend_[4]={},*graphPlots_[4]={},*graphY_[4][4]={},*graphX_[4]={};lv_chart_series_t* series_[4]={};
+    int graphKind_=0;static constexpr int graphMinutes_=5;bool graphDirty_=false;
+    lv_obj_t *chart_=nullptr,*graphNotice_=nullptr,*graphUnit_=nullptr,*graphLegend_[4]={},*graphPlots_[4]={},*graphY_[4][4]={},*graphX_[4]={};lv_chart_series_t* series_[4]={};
     void requestGraph(){} void set(lv_obj_t* l,const String& s){if(l)lv_label_set_text(l,s.c_str());}
 '''
 checks=r'''
@@ -86,24 +86,29 @@ checks=r'''
     void verifyGraphs(){
         for(int mode=0;mode<3;++mode){
             init();graphKind_=mode;resultLabel_=nullptr;pageStatus_=nullptr;graphUnit_=nullptr;
-            for(auto& p:graphPlots_)p=nullptr;for(auto& p:graphLegend_)p=nullptr;
+            for(auto& p:graphPlots_)p=nullptr;for(auto& p:graphLegend_)p=nullptr;for(auto& p:graphX_)p=nullptr;
             graphs();verify();
+            assert(controls.size()==3);
+            assert(lv_obj_get_child_cnt(body_)==3);
             const int n=mode==0?4:1;
             for(int k=0;k<n;++k){
                 assertFits(graphPlots_[k]);
                 assert(lv_chart_get_series_next(graphPlots_[k],nullptr)==series_[k]);
                 assert(!lv_chart_get_series_next(graphPlots_[k],series_[k]));
-                assert(lv_obj_get_height(graphPlots_[k])==(mode==0?42:123));
+                assert(lv_obj_get_height(graphPlots_[k])==(mode==0?65:123));
                 assert(lv_obj_get_style_line_width(graphPlots_[k],LV_PART_ITEMS)==(mode==0?2:3));
                 for(int j=0;j<(mode==0?2:4);++j)labelFits(graphY_[k][j]);
-                if(mode==0){lv_label_set_text(graphLegend_[k],k==3?"Авария 26,8 °C":k==0?"Вода 28,1 °C":k==1?"Колонна 26,6 °C":"Куб 30,9 °C");lv_obj_update_layout(body_);labelFits(graphLegend_[k]);}
+                if(mode==0){lv_label_set_text(graphLegend_[k],k==3?"Авария 26,8 °C":k==0?"Вода 28,1 °C":k==1?"Колонна 26,6 °C":"Куб 30,9 °C");lv_obj_update_layout(body_);labelFits(graphLegend_[k]);
+                    assert(lv_obj_get_style_text_align(graphLegend_[k],0)==LV_TEXT_ALIGN_CENTER);
+                    lv_area_t title,plot;lv_obj_get_content_coords(graphLegend_[k],&title);lv_obj_get_coords(graphPlots_[k],&plot);
+                    assert(abs((title.x1+title.x2)-(plot.x1+plot.x2))<=2);}
             }
             if(mode==0){
                 lv_area_t a,b,c,d;lv_obj_get_coords(graphPlots_[0],&a);lv_obj_get_coords(graphPlots_[2],&b);lv_obj_get_coords(graphPlots_[1],&c);lv_obj_get_coords(graphPlots_[3],&d);
                 assert(a.y1==b.y1&&c.y1==d.y1&&a.y2<c.y1&&a.x2<b.x1&&a.x1==c.x1&&b.x1==d.x1);
             }else{assert(!graphPlots_[1]);labelFits(graphUnit_);}
             assert(!pageStatus_);
-            for(int k=0;k<4;++k)labelFits(graphX_[k]);
+            for(int k=0;k<4;++k){if(mode==0)assert(!graphX_[k]);else labelFits(graphX_[k]);}
             labelFits(graphNotice_);
             graphNotice("");assert(lv_obj_has_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN));
             graphNotice("Нет связи");assert(!lv_obj_has_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN));lv_obj_update_layout(chart_);labelFits(graphNotice_);
