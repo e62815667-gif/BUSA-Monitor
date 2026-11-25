@@ -330,7 +330,7 @@ private:
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;}
         hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
-        wifiList_=nullptr;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& s:series_)s=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
+        wifiList_=nullptr;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& p:graphPlots_)p=nullptr;for(auto& s:series_)s=nullptr;for(auto& y:graphY_)for(auto& l:y)l=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
         for(int i=0;i<6;++i)selected(navButtons_[i],i==page_);
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
         lv_obj_set_style_pad_row(body_,page_==0?GAP:2,0);
@@ -393,9 +393,10 @@ private:
         const auto& d=session_.snapshot();fields_[0]=field(p,"Импульсов на 1 литр",value(d["water"]["pulses_per_litre"]),true);
         selected(button(body_,"Сохранить коэффициент",201),true);
     }
-    void graphAxes(double high){
-        for(int i=0;i<4;++i){
-            char b[32];snprintf(b,sizeof(b),"%.3g",high*(3-i)/3.0);lv_label_set_text(graphY_[i],b);
+    void graphAxes(unsigned k,double low,double high){
+        const int ticks=graphKind_==0?2:4;
+        for(int i=0;i<ticks;++i){
+            char b[32];snprintf(b,sizeof(b),"%.4g",high-(high-low)*i/(ticks-1));lv_label_set_text(graphY_[k][i],b);
         }
     }
     void graphTimeLabels(){
@@ -404,8 +405,9 @@ private:
         const bool ok=session_.connected()&&sscanf(clock,"%d.%d.%d %d:%d",&d,&m,&y,&h,&min)==5&&h>=0&&h<24&&min>=0&&min<60;
         for(int i=0;i<4;++i){
             char b[16];
-            if(ok){int t=(h*60+min-(3-i)*graphMinutes_/3+1440)%1440;snprintf(b,sizeof(b),"%02d:%02d",t/60,t%60);}
-            else snprintf(b,sizeof(b),"-%d мин",(3-i)*graphMinutes_/3);
+            const int ago=graphKind_==0?(i%2==0?graphMinutes_:0):(3-i)*graphMinutes_/3;
+            if(ok){int t=(h*60+min-ago+1440)%1440;snprintf(b,sizeof(b),"%02d:%02d",t/60,t%60);}
+            else snprintf(b,sizeof(b),"-%d мин",ago);
             lv_label_set_text(graphX_[i],b);
         }
     }
@@ -415,10 +417,31 @@ private:
         if(*message)lv_obj_clear_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN);
         else lv_obj_add_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN);
     }
+    void makeGraph(lv_obj_t* parent,unsigned k,int width,int height,uint32_t rgb){
+        auto* plot=row(parent,height);
+        const int axisWidth=graphKind_==0?34:48;
+        auto* y=plain(plot,axisWidth,height);lv_obj_set_flex_flow(y,LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_flex_align(y,LV_FLEX_ALIGN_SPACE_BETWEEN,LV_FLEX_ALIGN_END,LV_FLEX_ALIGN_CENTER);
+        for(int i=0;i<(graphKind_==0?2:4);++i){graphY_[k][i]=smallLabel(y,"0");lv_obj_set_style_text_font(graphY_[k][i],&busa_font_nav,0);}
+        auto* c=lv_chart_create(plot);graphPlots_[k]=c;lv_obj_set_size(c,width-axisWidth-3,height);
+        lv_chart_set_type(c,LV_CHART_TYPE_LINE);lv_obj_set_style_pad_all(c,0,0);
+        lv_chart_set_point_count(c,160);
+        lv_obj_set_style_bg_color(c,color(theme_==0?0xeef4f7:theme_==1?0x101010:0x081822),0);
+        lv_obj_set_style_border_color(c,color(line()),0);lv_obj_set_style_bg_opa(c,LV_OPA_COVER,0);
+        lv_obj_set_style_line_color(c,color(theme_==0?0xc0ced6:theme_==1?0x353535:0x284451),LV_PART_MAIN);
+        lv_obj_set_style_line_width(c,1,LV_PART_MAIN);lv_obj_set_style_line_width(c,graphKind_==0?2:3,LV_PART_ITEMS);
+        lv_obj_set_style_line_opa(c,LV_OPA_COVER,LV_PART_ITEMS);
+        lv_obj_set_style_size(c,0,LV_PART_INDICATOR);
+        lv_chart_set_div_line_count(c,graphKind_==0?3:4,4);lv_chart_set_range(c,LV_CHART_AXIS_PRIMARY_Y,0,1000);
+        series_[k]=lv_chart_add_series(c,color(rgb),LV_CHART_AXIS_PRIMARY_Y);
+        lv_chart_set_all_value(c,series_[k],LV_CHART_POINT_NONE);graphAxes(k,0,graphKind_==0?125:10);
+    }
     void clearGraph(){
         if(!chart_)return;
-        for(unsigned i=0;i<busa_graph::spec(graphKind_).series;++i)lv_chart_set_all_value(chart_,series_[i],LV_CHART_POINT_NONE);
-        graphAxes(graphKind_==0?125:10);lv_chart_refresh(chart_);
+        for(unsigned i=0;i<busa_graph::spec(graphKind_).series;++i){
+            lv_chart_set_all_value(graphPlots_[i],series_[i],LV_CHART_POINT_NONE);
+            graphAxes(i,0,graphKind_==0?125:10);lv_chart_refresh(graphPlots_[i]);
+        }
     }
     void graphs(){
         auto* r=row(body_,24);
@@ -426,32 +449,31 @@ private:
         for(int i=0;i<3;++i){auto* b=button(r,names[i],300+i,156);lv_obj_set_height(b,24);lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);selected(b,graphKind_==i);}
         const auto spec=busa_graph::spec(graphKind_);
         if(graphKind_==0){
-            auto* legend=row(body_,17);static const int order[]={0,2,1,3};
-            for(int i:order){auto* l=smallLabel(legend,i==3?"Авария":sensor(i));graphLegend_[i]=l;lv_obj_set_style_text_color(l,color(colors_[i]),0);}
-        }
-        const int plotHeight=graphKind_==0?104:123;
-        auto* plot=row(body_,plotHeight);
-        auto* y=plain(plot,48,plotHeight);lv_obj_set_flex_flow(y,LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_flex_align(y,LV_FLEX_ALIGN_SPACE_BETWEEN,LV_FLEX_ALIGN_END,LV_FLEX_ALIGN_CENTER);
-        for(int i=0;i<4;++i){graphY_[i]=smallLabel(y,"0");lv_obj_set_style_text_font(graphY_[i],&busa_font_nav,0);}
-        chart_=lv_chart_create(plot);lv_obj_set_size(chart_,421,plotHeight);lv_chart_set_type(chart_,LV_CHART_TYPE_LINE);
-        lv_obj_set_style_pad_all(chart_,0,0);
-        lv_chart_set_point_count(chart_,160);lv_obj_set_style_bg_color(chart_,color(theme_==0?0xeef4f7:theme_==1?0x101010:0x081822),0);lv_obj_set_style_border_color(chart_,color(line()),0);
-        lv_obj_set_style_bg_opa(chart_,LV_OPA_COVER,0);
-        lv_obj_set_style_line_color(chart_,color(theme_==0?0xc0ced6:theme_==1?0x353535:0x284451),LV_PART_MAIN);
-        lv_obj_set_style_line_width(chart_,1,LV_PART_MAIN);lv_obj_set_style_line_width(chart_,3,LV_PART_ITEMS);
-        lv_obj_set_style_line_opa(chart_,LV_OPA_COVER,LV_PART_ITEMS);
-        lv_obj_set_style_size(chart_,2,LV_PART_INDICATOR);lv_chart_set_div_line_count(chart_,4,4);
-        lv_chart_set_range(chart_,LV_CHART_AXIS_PRIMARY_Y,0,1000);
-        for(unsigned i=0;i<spec.series;++i)series_[i]=lv_chart_add_series(chart_,color(graphKind_==0?colors_[i]:spec.color),LV_CHART_AXIS_PRIMARY_Y);
-        clearGraph();
+            static const int order[]={0,2,1,3};
+            for(int j=0;j<2;++j){
+                auto* lineRow=row(body_,60);
+                for(int col=0;col<2;++col){
+                    const int k=order[j*2+col];
+                    auto* p=plain(lineRow,235,60);lv_obj_set_flex_flow(p,LV_FLEX_FLOW_COLUMN);lv_obj_set_style_pad_row(p,1,0);
+                    graphLegend_[k]=smallLabel(p,k==3?"Авария":sensor(k));lv_obj_set_style_text_color(graphLegend_[k],color(colors_[k]),0);
+                    makeGraph(p,k,235,42,colors_[k]);
+                }
+            }
+        }else makeGraph(body_,0,474,123,spec.color);
+        chart_=graphPlots_[0];
         graphNotice_=smallLabel(chart_,"");lv_obj_set_style_bg_color(graphNotice_,color(paper()),0);lv_obj_set_style_bg_opa(graphNotice_,LV_OPA_COVER,0);
         lv_obj_set_style_pad_hor(graphNotice_,3,0);lv_obj_align(graphNotice_,LV_ALIGN_TOP_MID,0,4);graphNotice("Ожидание данных");
-        auto* times=row(body_,15);auto* unitBox=plain(times,48,15);
-        static const char* units[]={"°C","мл/мин","л/ч"};graphUnit_=smallLabel(unitBox,units[graphKind_]);
-        lv_obj_set_style_text_font(graphUnit_,&busa_font_nav,0);lv_obj_align(graphUnit_,LV_ALIGN_LEFT_MID,0,0);
-        auto* timeAxis=row(times,15);lv_obj_set_width(timeAxis,421);
-        for(int i=0;i<4;++i){graphX_[i]=smallLabel(timeAxis,"—");lv_obj_set_style_text_font(graphX_[i],&busa_font_nav,0);}
+        auto* times=row(body_,15);
+        if(graphKind_==0){
+            for(int j=0;j<2;++j){auto* timeAxis=row(times,15);lv_obj_set_width(timeAxis,235);
+                for(int i=0;i<2;++i){graphX_[2*j+i]=smallLabel(timeAxis,"—");lv_obj_set_style_text_font(graphX_[2*j+i],&busa_font_nav,0);}}
+        }else{
+            auto* unitBox=plain(times,48,15);
+            static const char* units[]={"°C","мл/мин","л/ч"};graphUnit_=smallLabel(unitBox,units[graphKind_]);
+            lv_obj_set_style_text_font(graphUnit_,&busa_font_nav,0);lv_obj_align(graphUnit_,LV_ALIGN_LEFT_MID,0,0);
+            auto* timeAxis=row(times,15);lv_obj_set_width(timeAxis,421);
+            for(int i=0;i<4;++i){graphX_[i]=smallLabel(timeAxis,"—");lv_obj_set_style_text_font(graphX_[i],&busa_font_nav,0);}
+        }
         auto* ranges=row(body_,24);
         for(int i=0;i<5;++i){static const char* names[]={"5 мин","10 мин","15 мин","30 мин","1 ч"};static const int mins[]={5,10,15,30,60};
             graphRange_[i]=button(ranges,names[i],310+i,91);lv_obj_set_height(graphRange_[i],24);lv_obj_set_style_pad_top(graphRange_[i],0,0);lv_obj_set_style_pad_bottom(graphRange_[i],0,0);selected(graphRange_[i],graphMinutes_==mins[i]);}
@@ -669,15 +691,16 @@ private:
             if(deserializeJson(d,body)||!busa_graph::analyze(d.as<JsonObjectConst>(),graphKind_,graphMinutes_,scale)){
                 clearGraph();graphNotice("Ошибка данных графика");return;
             }
-            lv_chart_set_point_count(chart_,scale.count);
             for(unsigned k=0;k<busa_graph::spec(graphKind_).series;++k){
                 auto arr=busa_graph::samples(d.as<JsonObjectConst>(),graphKind_,k);
+                const auto bounds=graphKind_==0?busa_graph::temperatureBounds(arr):busa_graph::Bounds{0,scale.high};
+                auto* plot=graphPlots_[k];lv_chart_set_point_count(plot,scale.count);
                 for(unsigned i=0;i<scale.count;++i){
                     JsonVariantConst v=arr[i];
-                    lv_chart_set_value_by_id(chart_,series_[k],i,busa_graph::valid(v)?lv_coord_t(busa_graph::coordinate(v.as<double>(),scale.high)):LV_CHART_POINT_NONE);
+                    lv_chart_set_value_by_id(plot,series_[k],i,busa_graph::valid(v)?lv_coord_t(busa_graph::coordinate(v.as<double>(),bounds)):LV_CHART_POINT_NONE);
                 }
+                graphAxes(k,bounds.low,bounds.high);lv_chart_refresh(plot);
             }
-            graphAxes(scale.high);lv_chart_refresh(chart_);
             const char* notice=busa_graph::state(d.as<JsonObjectConst>(),graphKind_,scale);
             graphNotice(strcmp(notice,"Данные с включения")==0?"":notice);return;}
         if(pendingRoute_==Route::events){JsonDocument d;if(deserializeJson(d,body)){set(pageStatus_,"Ошибка журнала");return;}String s;
@@ -865,7 +888,7 @@ private:
     busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1,previousPage_=0;
     lv_obj_t* keyEdit_=nullptr;String keyOriginal_;bool keyDropdown_=false,displaySleeping_=false;uint16_t keyOriginalChoice_=0;
     int lastTapKey_=-1,tapMode_=0;size_t tapIndex_=0;uint32_t lastTapAt_=0,lastTestSeq_=0,testUntil_=0;lv_obj_t* testOverlay_=nullptr;
-    lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphNotice_=nullptr,*graphUnit_=nullptr;lv_obj_t* graphRange_[5]={};lv_obj_t* graphLegend_[4]={};lv_obj_t* graphY_[4]={};lv_obj_t* graphX_[4]={};bool graphDirty_=false;
+    lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphNotice_=nullptr,*graphUnit_=nullptr;lv_obj_t* graphRange_[5]={};lv_obj_t* graphLegend_[4]={};lv_obj_t* graphPlots_[4]={};lv_obj_t* graphY_[4][4]={};lv_obj_t* graphX_[4]={};bool graphDirty_=false;
     lv_obj_t* navButtons_[6]={};lv_obj_t* fields_[8]={};lv_obj_t* live_[16]={};lv_obj_t* motion_[7]={};lv_chart_series_t* series_[4]={};
     lv_img_dsc_t art_{},navArt_[6]{};uint8_t* asset_=nullptr;
     lv_obj_t *calcNotes_=nullptr,*touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*touchTarget_=nullptr,*pageCounter_=nullptr;String pageContent_;unsigned pageOffset_=0,pageLines_=5;

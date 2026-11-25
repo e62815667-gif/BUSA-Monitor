@@ -32,6 +32,18 @@ inline bool analyze(JsonObjectConst doc,unsigned kind,int minutes,Scale& s){
     if(kind!=0)s.high=std::ceil(s.high/10.0)*10;
     return std::isfinite(s.high)&&s.high>0;
 }
+struct Bounds {double low,high;};
+inline Bounds temperatureBounds(JsonArrayConst a){
+    double lo=125,hi=-55;bool any=false;
+    for(auto v:a)if(valid(v)){double x=v.as<double>();if(!any||x<lo)lo=x;if(!any||x>hi)hi=x;any=true;}
+    if(!any)return {0,125};
+    lo=std::floor((lo-0.5)/2)*2;hi=std::ceil((hi+0.5)/2)*2;
+    return {lo,hi};
+}
+inline int coordinate(double value,Bounds b){
+    if(value<=b.low)return 0;if(value>=b.high)return 1000;
+    return int(std::lround((value-b.low)/(b.high-b.low)*1000));
+}
 inline int coordinate(double value,double high){
     if(value<=0)return 0;if(value>=high)return 1000;
     return int(std::lround(value/high*1000));

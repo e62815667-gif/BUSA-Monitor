@@ -20,5 +20,7 @@ int main(){
     assert(analyze(j,1,5,s)&&s.points==1&&s.high==6400&&coordinate(6400,s.high)==1000);
     assert(!analyze(j,1,10,s));c.remove(0);assert(!analyze(j,1,5,s));
     d["ok"]=false;assert(!analyze(j,0,5,s));
+    auto bounds=temperatureBounds(samples(j,0,2));assert(bounds.low==20&&bounds.high==24&&coordinate(22,bounds)==500);
+    JsonDocument neg;auto na=neg.to<JsonArray>();na.add(-5.2);na.add(-4.9);bounds=temperatureBounds(na);assert(bounds.low<=-5.2&&bounds.high>=-4.9&&coordinate(-5.2,bounds)>0);
     std::puts("PASS real JSON graph mapping, null samples, no sensor, zero flow, scaling and stale periods");
 }

@@ -22,14 +22,14 @@ assert nums['SCENE']+nums['METRICS']+nums['RELAYS']+2*nums['GAP']==body
 # Geometry of all dense screens; bounds of fixed-height children, plus flex row gaps.
 # Label font generation uses 12px condensed (measured line height 17 px); host LVGL tests check actual glyph bounds.
 assert 'row(body_,70)' in u and 'panel(r,235,70)' in u and 'row(p,20)' in u and 'row(p,42)' in u
-assert 'row(body_,18)' in u and 'row(body_,134)' in u and 'lv_obj_set_size(chart_,421,plotHeight)' in u
+assert 'row(body_,18)' in u and 'row(body_,134)' in u and 'lv_obj_set_size(c,width-axisWidth-3,height)' in u
 assert 'row(body_,42)' in u and 'panel(body_,LV_PCT(100),calcMode_==2?36:50)' in u
 assert 'pagedResult(int height=80,unsigned lines=5)' in u and 'pagedResult(60,4)' in u
-for page, heights in {'temperature':[18,70,70,26], 'water':[18,134,26], 'graph_temp':[24,17,104,15,24], 'graph_flow':[24,123,15,24], 'calc5':[42,42,42,22,36], 'calc_geometry_expanded':[42,26,42,22,50], 'calc_geometry_collapsed':[42,26,42,22,50], 'settings':[18,27,27,27,27,27], 'calibration':[26,42,42,26,24], 'wifi':[26,26,26,42,26,24], 'theme':[26,26,26,26,26,24], 'google':[26,17,42,26,26,24], 'about':[26,60,16,16,16,16,24], 'journal':[26,26,80,26,24], 'diagnostics':[26,16,16,16,16,16,26,26,14], 'ble':[26,26,26,60,26,14], 'ota':[26,40,24]}.items():
+for page, heights in {'temperature':[18,70,70,26], 'water':[18,134,26], 'graph_temp':[24,60,60,15,24], 'graph_flow':[24,123,15,24], 'calc5':[42,42,42,22,36], 'calc_geometry_expanded':[42,26,42,22,50], 'calc_geometry_collapsed':[42,26,42,22,50], 'settings':[18,27,27,27,27,27], 'calibration':[26,42,42,26,24], 'wifi':[26,26,26,42,26,24], 'theme':[26,26,26,26,26,24], 'google':[26,17,42,26,26,24], 'about':[26,60,16,16,16,16,24], 'journal':[26,26,80,26,24], 'diagnostics':[26,16,16,16,16,16,26,26,14], 'ble':[26,26,26,60,26,14], 'ota':[26,40,24]}.items():
     assert sum(heights)+2*(len(heights)-1)<=body,(page,sum(heights)+2*(len(heights)-1),body)
 for id in range(200,221): assert re.search(r'\bcase '+str(id)+r':',u),id
 for id in range(400,409): assert re.search(r'\b'+str(id)+r'\b',u),id
-assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-U9-HW2')+1<=40 for i in (4,5))
+assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-U10-HW2')+1<=40 for i in (4,5))
 print('PASS: fixed-height budgets for fixed page variants and preservation of existing actions')
 
 assert 'geometryExpanded_=!geometryValid();render();' in u
@@ -63,12 +63,12 @@ print('PASS square icons and 2x2 calculator tabs contract')
 assert 'graphDirty_||now-lastGraph_>=2000' in u
 assert 'graphMinutes_=minutes[id-310];render();return;' in u
 assert 'pendingGeneration_!=viewGeneration_' in u
-assert 'for(unsigned i=0;i<spec.series;++i)' in u
+assert 'makeGraph(p,k,235,42,colors_[k])' in u and 'temperatureBounds(arr)' in u
 print('PASS graph switching, periods, generation isolation and distinct series contract')
 
 graphs=u[u.index('    void graphs(){'):u.index('    void requestGraph(){')]
 assert 'spec.title' not in graphs and 'pageStatus_=' not in graphs
-assert 'graphKind_==0?104:123' in graphs
-assert 'lv_obj_set_style_line_width(chart_,3,LV_PART_ITEMS)' in graphs
+assert 'makeGraph(body_,0,474,123,spec.color)' in graphs
+assert 'lv_obj_set_style_line_width(c,graphKind_==0?2:3,LV_PART_ITEMS)' in u
 assert 'if(route!=Route::chartHistory)set(pageStatus_,"Выполняется…")' in u
 print('PASS expanded plot, unobtrusive status and stronger traces')
