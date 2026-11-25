@@ -73,7 +73,7 @@ private:
     uint32_t line()const{return theme_==0?0xb6d2df:0x285064;}
     static constexpr uint32_t accent(){return 0x009fde;}
     uint32_t muted()const{return theme_==0?0x527181:0x9bb6c4;}
-    static constexpr int TOP=28, NAV=42, PAD=3, GAP=3, SCENE=138, METRICS=27, RELAYS=25;
+    static constexpr int TOP=28, NAV=42, PAD=3, GAP=3, SCENE=132, METRICS=30, RELAYS=28;
     static_assert(TOP+NAV+2*PAD+SCENE+METRICS+RELAYS+2*GAP==272,"Home must fit native display");
     static void flush(lv_disp_drv_t* d,const lv_area_t* a,lv_color_t* p){
         auto* self=static_cast<Interface*>(d->user_data);
@@ -137,7 +137,7 @@ private:
         lv_obj_clear_flag(self->keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_move_foreground(self->keyboard_);
         lv_obj_set_height(self->body_,HEIGHT-TOP-128);
         lv_obj_update_layout(self->body_);
-        lv_obj_scroll_to_view(ta,LV_ANIM_OFF);
+        lv_obj_scroll_to_view_recursive(ta,LV_ANIM_OFF);
     }
     static void keyboardEvent(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));
@@ -168,6 +168,8 @@ private:
         lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_center(l);
         lv_obj_set_user_data(o,reinterpret_cast<void*>(intptr_t(id)));lv_obj_add_event_cb(o,event,LV_EVENT_CLICKED,this);return o;
     }
+    void setBg(lv_obj_t* o,uint32_t c){if(lv_obj_get_style_bg_color(o,0).full!=color(c).full)lv_obj_set_style_bg_color(o,color(c),0);}
+    void setInk(lv_obj_t* o,uint32_t c){if(lv_obj_get_style_text_color(o,0).full!=color(c).full)lv_obj_set_style_text_color(o,color(c),0);}
     void selected(lv_obj_t* o,bool on){
         lv_obj_set_style_bg_color(o,color(on?(theme_==0?0x007bb3:0x11455d):surface()),0);
         lv_obj_set_style_border_color(o,color(on?accent():line()),0);
@@ -229,7 +231,7 @@ private:
             lv_obj_set_style_radius(p,9,0);lv_obj_set_style_border_width(p,1,0);lv_obj_set_style_border_color(p,color(line()),0);
             statusDots_[i]=plain(p,5,5);lv_obj_set_style_radius(statusDots_[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_opa(statusDots_[i],LV_OPA_COVER,0);lv_obj_set_pos(statusDots_[i],5,6);
             at(p,names[i],15,2,&busa_font_small);}
-        connection_=at(top,"UART",430,7,&busa_font_small);
+        connection_=at(top,"UART",423,7,&busa_font_small);lv_obj_set_width(connection_,54);lv_obj_set_style_text_align(connection_,LV_TEXT_ALIGN_RIGHT,0);lv_label_set_long_mode(connection_,LV_LABEL_LONG_DOT);
         body_=lv_obj_create(root);lv_obj_set_pos(body_,0,TOP);lv_obj_set_size(body_,WIDTH,HEIGHT-TOP-NAV);
         lv_obj_set_style_bg_color(body_,color(paper()),0);lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
         lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,GAP,0);lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);
@@ -240,7 +242,7 @@ private:
         lv_obj_set_style_pad_all(nav_,2,0);lv_obj_set_style_pad_column(nav_,2,0);lv_obj_set_flex_flow(nav_,LV_FLEX_FLOW_ROW);
         static const char* titles[]={"Главная","Температуры","Вода и отбор","Графики","Калькулятор","Настройки"};
         for(int i=0;i<6;++i){auto* b=button(nav_,titles[i],100+i,76);lv_obj_set_height(b,34);
-            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_obj_align(l,LV_ALIGN_BOTTOM_MID,0,0);
+            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_obj_set_width(l,74);lv_obj_align(l,LV_ALIGN_BOTTOM_MID,0,0);
             navIcon(b,i);navButtons_[i]=b;}
         keyboard_=lv_keyboard_create(root);lv_obj_set_size(keyboard_,WIDTH,128);lv_obj_align(keyboard_,LV_ALIGN_BOTTOM_MID,0,0);
         lv_obj_add_flag(keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_add_event_cb(keyboard_,keyboardEvent,LV_EVENT_ALL,this);
@@ -253,6 +255,7 @@ private:
         if(page_==0){lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);}
         else{lv_obj_add_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_AUTO);}
         switch(page_){case 0:home();break;case 1:temperatures();break;case 2:water();break;case 3:graphs();break;case 4:calculator();break;case 5:settings();break;}
+        lv_obj_update_layout(body_);lv_obj_scroll_to_y(body_,0,LV_ANIM_OFF);
         refresh();
     }
     void home(){
@@ -281,8 +284,8 @@ private:
     void temperatures(){
         const auto& doc=session_.snapshot();label(body_,"ТЕМПЕРАТУРЫ");
         static const int order[]={0,2,1,3};
-        for(int lineNo=0;lineNo<2;++lineNo){auto* r=row(body_,68);
-            for(int col=0;col<2;++col){int i=order[lineNo*2+col];auto* p=panel(r,235,68);auto* head=row(p,21);
+        for(int lineNo=0;lineNo<2;++lineNo){auto* r=row(body_,70);
+            for(int col=0;col<2;++col){int i=order[lineNo*2+col];auto* p=panel(r,235,70);auto* head=row(p,21);
                 label(head,i==3?"Авария":sensor(i));live_[i]=label(head,"—");lv_obj_set_style_text_font(live_[i],&busa_font_value,0);lv_obj_set_style_text_color(live_[i],color(colors_[i]),0);
                 auto* fields=row(p,39);fields_[2*i]=field(fields,"ВКЛ, °C",value(doc["display_references"][i]["target"]),true,false,110);
                 fields_[2*i+1]=field(fields,"ВЫКЛ, °C",value(doc["display_references"][i]["notice"]),true,false,110);}}
@@ -298,7 +301,7 @@ private:
         selected(button(body_,"Сохранить коэффициент",201),true);pageStatus_=smallLabel(body_,"");lv_obj_set_width(pageStatus_,LV_PCT(100));
     }
     void graphs(){
-        auto* r=row(body_,25);
+        auto* r=row(body_,28);
         selected(button(r,"Температура",300,156),graphKind_==0);
         selected(button(r,"Отбор",302,156),graphKind_==2);selected(button(r,"Охлаждение",301,156),graphKind_==1);
         auto* legend=row(body_,13);
@@ -453,15 +456,15 @@ private:
         if(settingsForm&&!ok)formValid_=false;
         if(settingsForm&&ok&&!formValid_){render();return;}
         set(connection_,ok?"UART":"Нет связи");
-        lv_obj_set_style_text_color(connection_,color(ok?accent():0xff6473),0);
+        setInk(connection_,ok?accent():0xff6473);
         const bool indicators[]={ok&&(d["station"]["connected"]|false),ok&&(d["network_indicators"]["internet"]|false),ok};
-        for(int i=0;i<3;++i)lv_obj_set_style_bg_color(statusDots_[i],color(indicators[i]?0x53d486:0x8297a1),0);
+        for(int i=0;i<3;++i)setBg(statusDots_[i],indicators[i]?0x53d486:0x8297a1);
         String clock=ok?String(d["clock"]["datetime"]|"—"):String("—");set(clock_,"Дата и время: "+clock);
         if(page_==0){
             for(int i=0;i<4;++i){auto v=d["sound_alerts"]["channels"][i]["sound_on"];const bool on=ok&&!v.isNull()&&v.as<bool>();
                 set(live_[i],!ok||v.isNull()?"Нет связи":on?"Вкл.":"Выкл.");
-                lv_obj_set_style_bg_color(lv_obj_get_parent(live_[i]),color(on?(i==3?0x42232d:0x14382e):surface()),0);
-                lv_obj_set_style_text_color(live_[i],color(on?(i==3?0xff6473:0x53d486):muted()),0);
+                setBg(lv_obj_get_parent(live_[i]),on?(i==3?0x42232d:0x14382e):surface());
+                setInk(live_[i],on?(i==3?0xff6473:0x53d486):muted());
                 set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1));}
             auto rate=d["water"]["lpm"];set(live_[8],ok&&!rate.isNull()?String(rate.as<double>()*60,1)+" л/ч":"—");
             set(live_[9],measured(d["water"]["total_l_estimate"]," л",1));
