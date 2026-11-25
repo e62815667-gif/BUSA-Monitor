@@ -137,7 +137,8 @@ int main(){
     drv.hor_res=WIDTH;drv.ver_res=HEIGHT;drv.draw_buf=&buf;drv.flush_cb=flush;assert(lv_disp_drv_register(&drv));
     UiTest ui;
     for(int theme=0;theme<3;++theme){ui.theme_=theme;
-        for(int mode=0;mode<4;++mode){ui.calcMode_=mode;ui.init();ui.calculator();ui.verify();}
+        for(int mode=0;mode<4;++mode){ui.calcMode_=mode;ui.init();ui.calculator();ui.verify();
+            if(mode==2){lv_label_set_text(ui.resultLabel_,"Абсолютный спирт: 100,00 л АС   Головы: 10,00 л АС\nХвосты: 10,00 л АС   Выход продукта: 100,00 л");lv_obj_update_layout(ui.body_);ui.labelFits(ui.resultLabel_);}}
         ui.calcMode_=3;ui.geometryExpanded_=false;ui.init();ui.calculator();ui.verify();
         assert(!ui.fields_[0]&&!ui.fields_[1]&&ui.fields_[2]);
         ui.geometryExpanded_=true;ui.init();ui.calculator();ui.verify();

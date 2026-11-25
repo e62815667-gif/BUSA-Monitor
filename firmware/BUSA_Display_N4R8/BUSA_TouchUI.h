@@ -403,7 +403,7 @@ private:
         pageStatus_=statusLabel(body_,LV_PCT(100),14);set(pageStatus_,"Выберите период");requestGraph();
     }
     void requestGraph(){lastGraph_=millis();send(Route::chartHistory,{{"minutes",String(graphMinutes_)}});}
-    static const char* calcTitle(int mode){static const char* names[]={"Разбавление водой","Коррекция ареометра","Расчёт выхода","Объём куба"};return names[mode];}
+    static const char* calcTitle(int mode){static const char* names[]={"Разбавление водой","Коррекция ареометра","Вторая перегонка","Объём куба"};return names[mode];}
     void rememberCalc(){if(page_!=4)return;for(int i=0;i<5;++i)if(fields_[i])calcInput_[calcMode_][i]=text(fields_[i]);}
     bool geometryValid()const{
         const String& a=calcInput_[3][0];const String& b=calcInput_[3][1];char *ae=nullptr,*be=nullptr;
@@ -421,7 +421,7 @@ private:
     }
     void calcConditions(){
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;return;}
-        static const char* notes[]={"Все объёмы и концентрации — при 20 °C. Учтено изменение объёма смеси.","Температура 0…40 °C. Номинальная калибровка при 20 °C; оценка, не поверка прибора.","Доли рассчитываются от исходного количества вещества. Расчётная оценка без дополнительных потерь.","Вертикальный цилиндр с плоским дном. Размеры внутренние; уровень от дна. Диаметр и высота сохраняются."};
+        static const char* notes[]={"Все объёмы и крепость — при 20 °C. Учтено сжатие смеси.","Для водно-спиртового раствора без сахара, 0…40 °C. Стеклянный спиртомер, калибровка 20 °C; номинальное расширение стекла. Оценка, не поверка прибора.","Доли голов и хвостов — от абсолютного спирта (АС). Литры АС не равны фактическим объёмам фракций. Выход — расчётная оценка без дополнительных потерь.","Вертикальный цилиндр с плоским дном. Все размеры внутренние; уровень измеряется от дна. Диаметр и высота сохраняются до их изменения."};
         calcNotes_=plain(lv_scr_act(),WIDTH-8,HEIGHT-TOP-NAV-8);lv_obj_set_pos(calcNotes_,4,TOP+4);
         lv_obj_set_style_bg_color(calcNotes_,color(paper()),0);lv_obj_set_style_bg_opa(calcNotes_,LV_OPA_COVER,0);
         lv_obj_set_style_border_width(calcNotes_,1,0);lv_obj_set_style_border_color(calcNotes_,color(line()),0);
@@ -431,9 +431,9 @@ private:
         auto* close=button(calcNotes_,"Закрыть",334,120,false);lv_obj_align(close,LV_ALIGN_BOTTOM_MID,0,-8);
     }
     void calculator(){
-        static const char* labels[4][5]={{"Объём жидкости, л","Начальная крепость, %","Требуемая крепость, %","",""},{"Температура жидкости, °C","Показание ареометра, %","","",""},{"Исходный объём, л","Начальная крепость, %","Крепость на выходе, %","Доля 1, %","Доля 2, %"},{"Внутренний диаметр, см","Внутренняя высота, см","Уровень жидкости, см","",""}};
+        static const char* labels[4][5]={{"Объём спирта, л","Начальная крепость, %","Требуемая крепость, %","",""},{"Температура спирта, °C","Показание ареометра, %","","",""},{"Объём спирта-сырца, л","Крепость спирта-сырца, %","Крепость на выходе, %","Доля голов от АС, %","Доля хвостов от АС, %"},{"Внутренний диаметр, см","Внутренняя высота, см","Уровень жидкости, см","",""}};
         static const int counts[]={3,2,5,3};
-        auto* r=row(body_,28);for(int i=0;i<4;++i){auto* b=button(r,calcTitle(i),320+i,i==1?143:i==0?125:i==2?105:92);auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);lv_obj_set_height(b,28);selected(b,i==calcMode_);}
+        auto* r=row(body_,28);for(int i=0;i<4;++i){auto* b=button(r,calcTitle(i),320+i,i==1?143:i==0?125:i==2?112:85);auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);lv_obj_set_height(b,28);selected(b,i==calcMode_);}
         if(calcMode_==3){
             if(geometryExpanded_){
                 auto* controls=row(body_,26);button(controls,"Сохранить и свернуть",332,235);button(controls,"Загрузить размеры",331,235);
@@ -443,7 +443,7 @@ private:
                 fields_[2]=field(body_,labels[3][2],calcInput_[3][2],true);lv_textarea_set_placeholder_text(fields_[2],"0,00");
             }
         }else{
-            for(int i=0;i<counts[calcMode_];){auto* inputs=row(body_,42);const int n=counts[calcMode_]-i>3?3:counts[calcMode_]-i;for(int col=0;col<n;++col,++i){fields_[i]=field(inputs,labels[calcMode_][i],calcInput_[calcMode_][i],true,false,n==2?235:153);lv_textarea_set_placeholder_text(fields_[i],"0,00");}}
+            for(int i=0;i<counts[calcMode_];){auto* inputs=row(body_,42);const int n=calcMode_==2&&i==0?2:counts[calcMode_]-i;for(int col=0;col<n;++col,++i){fields_[i]=field(inputs,labels[calcMode_][i],calcInput_[calcMode_][i],true,false,n==2?235:153);lv_textarea_set_placeholder_text(fields_[i],"0,00");}}
         }
         auto* buttons=row(body_,26);
         selected(button(buttons,"Рассчитать",330,154),true);button(buttons,calcMode_==3?"Очистить уровень":"Очистить",333,154);button(buttons,"Условия расчёта",334,154);
@@ -577,8 +577,8 @@ private:
         else r=calcInput_[3][2].isEmpty()?BusaCalc::cylinder(v[0],v[1]):BusaCalc::cylinder(v[0],v[1],v[2]);
         if(!r.ok){set(resultLabel_,"Недопустимые значения");return;}
         if(calcMode_==0)set(resultLabel_,"Необходимо долить воды: "+fmt(r.water)+" л\nИтоговый объём: "+fmt(r.total)+" л");
-        else if(calcMode_==1)set(resultLabel_,"Крепость при 20 °C: "+fmt(r.strength)+" %");
-        else if(calcMode_==2)set(resultLabel_,"Исходное количество: "+fmt(r.absolute)+" л   Доля 1: "+fmt(r.heads)+" л\nДоля 2: "+fmt(r.tails)+" л   Выход: "+fmt(r.product)+" л");
+        else if(calcMode_==1)set(resultLabel_,"Крепость при 20 °C: "+fmt(r.strength)+" % об.");
+        else if(calcMode_==2)set(resultLabel_,"Абсолютный спирт: "+fmt(r.absolute)+" л АС"+"   "+"Головы: "+fmt(r.heads)+" л АС"+"\n"+"Хвосты: "+fmt(r.tails)+" л АС"+"   "+"Выход продукта: "+fmt(r.product)+" л");
         else set(resultLabel_,"Полный объём: "+fmt(r.capacity)+" л"+(r.levelKnown?String("\nОбъём жидкости: ")+fmt(r.liquid)+" л":""));
     }
     void handleResult(int code,const String& body){

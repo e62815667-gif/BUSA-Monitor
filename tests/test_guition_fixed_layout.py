@@ -29,7 +29,7 @@ for page, heights in {'temperature':[18,70,70,26], 'water':[18,134,26], 'graph':
     assert sum(heights)+2*(len(heights)-1)<=body,(page,sum(heights)+2*(len(heights)-1),body)
 for id in range(200,221): assert re.search(r'\bcase '+str(id)+r':',u),id
 for id in range(400,409): assert re.search(r'\b'+str(id)+r'\b',u),id
-assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-U5-HW2')+1<=40 for i in (4,5))
+assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-U6-HW2')+1<=40 for i in (4,5))
 print('PASS: fixed-height budgets for fixed page variants and preservation of existing actions')
 
 assert 'geometryExpanded_=!geometryValid();render();' in u
@@ -37,3 +37,21 @@ assert 'geometryExpanded_=false;render();' in u
 assert 'if(fields_[i])calcInput_[calcMode_][i]=text(fields_[i]);' in u
 assert 'button(body_,geometrySummary().c_str(),335)' in u
 print('PASS geometry view contract: stored dimensions, collapse, reopen and null-safe fields')
+
+# Browser labels, notes, result labels/units are the reference, not duplicated guesses.
+web=(r/'calculator/ui.js').read_text()
+calc=u[u.index('    static const char* calcTitle'):u.index('    void pageText')]
+result=u[u.index('    void calculate('):u.index('    void handleResult')]
+for line in web.splitlines():
+    if not line.strip().startswith('{name:'): continue
+    name=re.search(r"name:'([^']+)'",line).group(1)
+    assert '"'+name+'"' in calc,name
+    for label,key in re.findall(r"\['([^']+)','([^']+)'\]",line.split('note:')[0]):
+        assert '"'+label+'"' in calc,label
+    note=re.search(r"note:'([^']+)'",line).group(1)
+    assert '"'+note+'"' in calc,note
+    for label,key,unit in re.findall(r"\['([^']+)','([^']+)','([^']+)'\]",line.split('results:')[1]):
+        assert label+':' in result,label
+        assert 'fmt(r.'+key+')' in result,key
+        assert '" '+unit+'"' in result,unit
+print('PASS exact browser calculator terminology, notes and result units')
