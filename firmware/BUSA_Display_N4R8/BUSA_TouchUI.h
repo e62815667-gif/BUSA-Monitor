@@ -424,7 +424,7 @@ private:
             auto* legend=row(body_,17);static const int order[]={0,2,1,3};
             for(int i:order){auto* l=smallLabel(legend,i==3?"Авария":sensor(i));graphLegend_[i]=l;lv_obj_set_style_text_color(l,color(colors_[i]),0);}
         }
-        const int plotHeight=graphKind_==0?84:103;
+        const int plotHeight=graphKind_==0?80:99;
         auto* plot=row(body_,plotHeight);
         auto* y=plain(plot,48,plotHeight);lv_obj_set_flex_flow(y,LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(y,LV_FLEX_ALIGN_SPACE_BETWEEN,LV_FLEX_ALIGN_END,LV_FLEX_ALIGN_CENTER);
