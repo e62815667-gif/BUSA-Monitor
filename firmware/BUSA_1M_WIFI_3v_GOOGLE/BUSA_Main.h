@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainTx && BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainRx,
   "Buzzer pin conflicts with I2C, UART or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-PERF4-HW2-NAME1-TIME1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-PERF4-HW2-NAME1-TIME1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -2498,7 +2498,7 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <p class="liquidRateLabel">Текущий отбор</p><div class="liquidRateGrid"><div><strong id="collectionMlMin">—</strong><small>мл/мин</small></div><div><strong id="collectionLph">—</strong><small>л/ч</small></div></div>
 <div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div></article>
 <article class="liquidPanel coolingPanel"><div class="liquidPanelHeading"><h2>Охлаждение</h2><span id="coolingAvailability">Нет данных</span></div>
-<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Учтено воды</small><strong id="coolingTotal">—</strong><small>л</small></div></div></article>
+<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Израсходовано</small><strong id="coolingTotal">—</strong><small>л</small></div></div></article>
 </section>
 <section class="page" data-section="3" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><strong>ГРАФИКИ</strong></div>
 <div class="chartCard"><div class="chartTabs" role="tablist" aria-label="Вид графика">
@@ -2517,7 +2517,8 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <button type="button" data-stab-btn="5" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 18v3h16v-3"/></svg></span><span>Обновление ПО</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="8" class="approvedMenuItem"><span class="approvedMenuIcon">▤</span><span>Журнал событий</span><span class="approvedArrow">›</span></button>
 <button type="button" data-stab-btn="6" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 18h4l3-8 4 6 3-4h4"/><circle cx="12" cy="12" r="10"/></svg></span><span>Диагностика</span><span class="approvedArrow">›</span></button>
-<button type="button" data-stab-btn="4" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/></svg></span><span>О системе</span><span class="approvedArrow">›</span></button></div>
+<button type="button" data-stab-btn="4" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 11v6M12 7h.01"/></svg></span><span>О системе</span><span class="approvedArrow">›</span></button>
+<button type="button" data-stab-btn="9" class="approvedMenuItem"><span class="approvedMenuIcon"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg></span><span>Отбор и вода</span><span class="approvedArrow">›</span></button></div>
 <button type="button" id="settingsBack" hidden class="approvedBack">‹ Все настройки</button>
 <div class="settingCard" data-stab="8" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 8h6M9 12h6M9 16h5"/></svg><strong>СОБЫТИЯ</strong></div>
 <div class="card">
@@ -2597,6 +2598,16 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <button type="button" class="full" id="displayManualUpdate" disabled>Обновить экран</button>
 <progress id="displayOtaProgress" max="100" value="0" style="width:100%"></progress>
 <p id="displayUpdateResult" role="status">Проверка связи с экраном</p></div></div>
+<div class="card settingCard" data-stab="9" hidden><h2>Отбор и вода</h2>
+<div class="chartTabs" role="tablist" aria-label="Датчик"><button type="button" data-liquid-tab="collection" class="on" aria-selected="true">Отбор</button><button type="button" data-liquid-tab="water" aria-selected="false">Вода</button></div>
+<div data-liquid-panel="collection"><h3>Коэффициент калибровки</h3><div class="wifiField"><label for="collectionPplInput">Импульсов на 1 мл</label><input id="collectionPplInput" type="number" min="0" step="any" inputmode="decimal"></div>
+<button id="collectionPplSave" type="button" class="full">Сохранить коэффициент</button><p id="collectionPplResult" role="status" class="hint"></p></div>
+<div data-liquid-panel="water" hidden><h3>Коэффициент калибровки</h3>
+ <div class="wifiField"><label for="waterPplInput">Импульсов на 1 литр</label><input id="waterPplInput" type="number" min="1" max="100000" step="0.1"  inputmode="decimal"></div>
+ <button id="waterPplSave" type="button" class="full">Сохранить коэффициент</button>
+ <button id="waterPplPassport" type="button" class="full">Вернуть паспортные 5880</button>
+ <p id="waterPplResult" role="status" class="hint"></p>
+</div></div>
 <div class="settingCard" data-stab="6" hidden><div class="card"><h2>Диагностика</h2>
 <div class="settingsTabs diagTabs">
 <button type="button" data-diag-btn="screen" class="on">Экран</button>
@@ -2645,10 +2656,7 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <div class="card" data-diag-panel="flow" hidden><h2>Расходомер охлаждающей воды</h2>
 <pre id="diagFlow" style="white-space:pre-wrap;word-break:break-word">Ожидание импульсов...</pre>
 <p class="hint">Паспорт YF-S401: 5880 имп/л (98 Гц при 1 л/мин). Изменённый коэффициент не устраняет ошибки сигнала.</p>
- <div class="wifiField"><label for="waterPplInput">Импульсов на 1 литр</label><input id="waterPplInput" type="number" min="1" max="100000" step="0.1" value="5880" inputmode="decimal"></div>
- <button id="waterPplSave" type="button" class="full">Сохранить коэффициент</button>
- <button id="waterPplPassport" type="button" class="full">Вернуть паспортные 5880</button>
- <p id="waterPplResult" role="status" class="hint"></p></div>
+</div>
 </div>
 </section>
 <section class="page" data-section="7" hidden><div id="busaCalculator"></div></section></main>
@@ -2734,7 +2742,7 @@ window.fetch=async function(input,options){
  catch(e){if(method==='POST')message(label+': нет связи','warn');throw e;}
 };
 document.addEventListener('click',e=>{
- const button=e.target.closest('button');if(!button||button.matches('.appTabs button,[data-stab-btn],[data-chart],[data-minutes],#settingsBack'))return;
+ const button=e.target.closest('button');if(!button||button.matches('.appTabs button,[data-stab-btn],[data-chart],[data-minutes],[data-liquid-tab],#settingsBack'))return;
  const title=button.textContent.replace(/\s+/g,' ').trim();if(title)message('Действие: '+title);
 });
 
@@ -2764,7 +2772,8 @@ function settingsTab(n,send=true){
  if(n===1&&previous!==1)wifiRefreshNetworks();
  if(n===7&&previous!==7)rainmakerRefreshStatus();
  if(n===8)refreshWebEvents();
- if(send&&n!==-1)message('Открыты настройки: '+({0:'Температура',1:'Wi-Fi',2:'Экран',3:'Google',4:'О системе',5:'Обновление ПО',6:'Диагностика',7:'Bluetooth',8:'Журнал событий'}[n]||'Настройки'));
+ if(n===9&&previous!==9){waterPplInitialized=false;collectionPplInitialized=false;liquidTab('collection');}
+ if(send&&n!==-1)message('Открыты настройки: '+({0:'Температура',1:'Wi-Fi',2:'Экран',3:'Google',4:'О системе',5:'Обновление ПО',6:'Диагностика',7:'Bluetooth',8:'Журнал событий',9:'Отбор и вода'}[n]||'Настройки'));
  // Local settings stay in browser; physical TFT navigation is independent.
 }
 get('settingsBack').onclick=()=>{
@@ -2777,7 +2786,12 @@ const DISPLAY_ORDER=[0,2,1,3];
 const SENSOR_NAMES=['Вода','Колонна','Куб','Авария'];
 const SENSOR_COLORS=['#38bdf8','#53d486','#f4c84a','#ff6473'];
 const decimal1=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
-let previousWater=null,waterPplInitialized=false;
+let previousWater=null,waterPplInitialized=false,collectionPplInitialized=false;
+function liquidTab(kind){
+ document.querySelectorAll('[data-liquid-panel]').forEach(p=>p.hidden=p.dataset.liquidPanel!==kind);
+ document.querySelectorAll('[data-liquid-tab]').forEach(b=>{const on=b.dataset.liquidTab===kind;b.classList.toggle('on',on);b.setAttribute('aria-selected',String(on));});
+}
+document.querySelectorAll('[data-liquid-tab]').forEach(b=>b.onclick=()=>liquidTab(b.dataset.liquidTab));
 function measured(v){return typeof v==='number'&&Number.isFinite(v)&&v>=0;}
 function formatVolumeMl(v){if(!measured(v))return '—';return v<1000?decimal1.format(v)+' мл':decimal1.format(v/1000)+' л';}
 function formatNumeric(v){return typeof v==='number'&&Number.isFinite(v)?decimal1.format(v):'—';}
@@ -2790,7 +2804,7 @@ function updateLiquidPanels(s){
  setMeasured('collectionMlMin',mlMin);setMeasured('collectionLph',measured(mlMin)?mlMin*.06:null);
  get('collectionTotal').textContent=formatVolumeMl(total);
  get('collectionTime').textContent=formatRunTime(collection?c.duration_ms??c.elapsed_ms:null);
- get('collectionAvailability').textContent=!s?'Нет связи':collection?(c.calibrated===false?'Импульсы · нет калибровки':'Данные датчика'):'Нет импульсов';
+ get('collectionAvailability').textContent=!s?'Нет связи':collection?(c.calibrated===false?'Нет калибровки':'Данные датчика'):'Нет данных';
  setMeasured('homeCollectionRate',mlMin);
  const volume=formatVolumeMl(total),split=volume.lastIndexOf(' ');
  get('homeCollectionTotal').textContent=split<0?volume:volume.slice(0,split);get('homeCollectionUnit').textContent=split<0?'мл':volume.slice(split+1);
@@ -2803,7 +2817,7 @@ function updateLiquidPanels(s){
  setMeasured('coolingLph',lph);setMeasured('coolingTotal',ready?w.total_l_estimate:null);
  get('homeCoolingRate').textContent=(measured(lph)?decimal1.format(lph):'—')+' л/ч';
  get('homeWaterUsed').textContent=(ready?decimal1.format(w.total_l_estimate):'—')+' л';
- get('coolingAvailability').textContent=!s?'Нет связи':w?.credible===false?'Недостоверные импульсы':ready?(w.volume_complete===false?'Учтено частично · были помехи':w.calibrated?'Данные датчика':'Расчётно · без калибровки'):'Нет импульсов';
+ get('coolingAvailability').textContent=!s?'Нет связи':w?.credible===false?'Недостоверные данные':ready?(w.volume_complete===false?'Частичный объём · были помехи':w.calibrated?'Данные датчика':'Расчётно · без калибровки'):'Нет данных';
  get('rigArtStage').classList.toggle('hasCollection',measured(mlMin)&&mlMin>0);
  get('rigArtStage').classList.toggle('hasCooling',measured(lph)&&lph>0);
 }
@@ -2943,6 +2957,20 @@ async function saveWaterPpl(value){
 }
 get('waterPplSave').onclick=()=>saveWaterPpl(get('waterPplInput').value);
 get('waterPplPassport').onclick=()=>saveWaterPpl('5880');
+get('collectionPplSave').onclick=async()=>{
+ const input=get('collectionPplInput'),status=get('collectionPplResult'),button=get('collectionPplSave');
+ const raw=input.value.trim(),numeric=Number(raw);
+ if(!raw||!Number.isFinite(numeric)||numeric<=0){status.textContent='Укажите положительный коэффициент';return;}
+ button.disabled=true;
+ try{
+  const response=await fetch('/api/collection/calibration',{method:'POST',body:new URLSearchParams({confirm:'YES',pulses_per_ml:String(numeric)})});
+  if(!response.ok)throw Error(await response.text());
+  const data=await response.json();if(!Number.isFinite(data.pulses_per_ml)||data.pulses_per_ml<=0)throw Error('Некорректный ответ');
+  input.value=String(data.pulses_per_ml);collectionPplInitialized=true;
+  status.textContent='Сохранено';
+ }catch(err){status.textContent='Ошибка: '+err.message;}
+ finally{button.disabled=false;}
+};
 get('tempCalSave').onclick=async()=>{
  const button=get('tempCalSave'),data=new URLSearchParams({confirm:'YES'});
  for(let i=0;i<4;i++){
@@ -3025,6 +3053,10 @@ updateRelayBadges(s.sound_alerts?.channels);
 if(!waterPplInitialized && Number.isFinite(s.water?.pulses_per_litre)){
  get('waterPplInput').value=Number(s.water.pulses_per_litre).toFixed(1);
  waterPplInitialized=true;
+}
+if(!collectionPplInitialized&&s.collection){
+ get('collectionPplInput').value=Number.isFinite(s.collection.pulses_per_ml)?String(s.collection.pulses_per_ml):'';
+ collectionPplInitialized=true;
 }
 let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?(s.water.sample_ready?'НЕДОСТОВЕРНО':'НЕТ ДАННЫХ'):formatNumeric(f);get('pulses').textContent=s.water.pulses;updateLiquidPanels(s);
 flog.push(f);if(flog.length>80)flog.shift();
@@ -3595,6 +3627,17 @@ static void busaApi_waterCoefficient(BusaLocalRequest& server){
        String("{\"ok\":true,\"pulses_per_litre\":")+String(waterPulsesPerLitre,1)+"}");
 }
 
+static void busaApi_collectionCoefficient(BusaLocalRequest& server){
+  const auto apClient=[&server](){return server.local();};
+  if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
+  String value=server.arg("pulses_per_ml");value.replace(',','.');value.trim();char* end=nullptr;
+  const float factor=strtof(value.c_str(),&end);
+  if(value.isEmpty()||*end!='\0'||!BusaCollection::Meter::validCalibration(factor)){
+    server.send(400,"text/plain; charset=utf-8","Неверный коэффициент");return;
+  }
+  if(!saveCollectionCalibration(factor)){server.send(500,"text/plain; charset=utf-8","Ошибка сохранения");return;}
+  server.send(200,"application/json",String("{\"pulses_per_ml\":")+collectionNumber(factor)+"}");
+}
 static void busaApi_temperatureAlarms(BusaLocalRequest& server){
   const auto apClient=[&server](){return server.local();};
     if(!apClient()){server.send(403,"text/plain","BUSA local AP only");return;}
@@ -3950,6 +3993,7 @@ static void busaDispatchDisplayApi(const busa_uart::ApiRequest& request,int& cod
     if(!busaNvsReady||otaActive){code=409;body="Device busy";return;}
     switch(request.route){
       case busa_uart::ApiRoute::waterCoefficient:busaApi_waterCoefficient(local);break;
+      case busa_uart::ApiRoute::collectionCoefficient:busaApi_collectionCoefficient(local);break;
       case busa_uart::ApiRoute::temperatureAlarms:busaApi_temperatureAlarms(local);break;
       case busa_uart::ApiRoute::wifiScan:busaApi_wifiScan(local);break;
       case busa_uart::ApiRoute::wifiDisconnect:busaApi_wifiDisconnect(local);break;
@@ -4311,16 +4355,7 @@ void setup(){
   });
   server.on("/api/tft/theme",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_theme(request);
   });
-  server.on("/api/collection/calibration",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только БУСА AP");return;}
-    String value=server.arg("pulses_per_ml");value.trim();char* end=nullptr;
-    const float factor=strtof(value.c_str(),&end);
-    if(value.isEmpty()||*end!='\0'||!BusaCollection::Meter::validCalibration(factor)){
-      server.send(400,"text/plain; charset=utf-8","Неверный коэффициент");return;
-    }
-    if(!saveCollectionCalibration(factor)){server.send(500,"text/plain; charset=utf-8","Ошибка сохранения");return;}
-    server.send(200,"application/json",String("{\"pulses_per_ml\":")+collectionNumber(factor)+"}");
-  });
+  server.on("/api/collection/calibration",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_collectionCoefficient(request);});
   server.on("/api/temperature/calibration",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_calibration(request);
   });
   server.on("/api/keypad/start",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_keypadStart(request);

@@ -104,7 +104,7 @@ with sync_playwright() as p:
                 assert canvas['height']<=canvas['width']*440/640+2
                 assert page.locator('.chartCadence').inner_text()=='Обновление 2 с'
             if section==5:
-                assert page.locator('#settingsMenu>.approvedMenuItem:visible').count()==9
+                assert page.locator('#settingsMenu>.approvedMenuItem:visible').count()==10
             if width==390 and height==780:
                 page.screenshot(path=str(shots/(name+'.png')),animations='disabled')
         assert not posts,('navigation must not command the device',posts)

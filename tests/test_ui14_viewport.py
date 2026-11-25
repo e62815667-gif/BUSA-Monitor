@@ -50,15 +50,15 @@ with sync_playwright() as p:
             assert not page.evaluate('scrollY!==0||document.documentElement.scrollWidth>innerWidth+1||document.documentElement.scrollHeight>innerHeight+1')
             assert page.locator('main').evaluate('(e)=>e.scrollTop')<=1
         page.locator('[data-page="5"]').click();settle()
-        assert page.locator('#settingsMenu>.approvedMenuItem:visible').count()==9,(width,height,'missing settings item')
-        assert page.locator('#settingsMenu>.approvedMenuItem').evaluate_all('(es)=>es.map(e=>Number(e.dataset.stabBtn))')==[0,1,2,3,7,5,8,6,4]
+        assert page.locator('#settingsMenu>.approvedMenuItem:visible').count()==10,(width,height,'missing settings item')
+        assert page.locator('#settingsMenu>.approvedMenuItem').evaluate_all('(es)=>es.map(e=>Number(e.dataset.stabBtn))')==[0,1,2,3,7,5,8,6,4,9]
         inside('#settingsMenu>.approvedMenuItem');frame()
         menu_size=page.locator('#settingsMenu').evaluate('''e=>{
           const r=e.getBoundingClientRect();return {top:e.scrollTop,outside:[...e.children].some(x=>{const b=x.getBoundingClientRect();return b.top<r.top-1||b.bottom>r.bottom+1;})};
         }''')
         assert not menu_size['outside'] and menu_size['top']==0,(width,height,menu_size)
         if width in [375,390]:page.screenshot(path=str(shots/f'settings-{width}x{height}.png'))
-        for item in [0,1,2,3,7,5,8,6,4]:
+        for item in [0,1,2,3,7,5,8,6,4,9]:
             page.locator(f'[data-stab-btn="{item}"]').click();settle();frame()
             card=page.locator(f'.settingCard[data-stab="{item}"]')
             assert card.is_visible()

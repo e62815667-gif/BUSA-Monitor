@@ -388,15 +388,13 @@ private:
         selected(button(body_,"Сохранить пороги",200),true);
     }
     void water(){
-        heading("ВОДА И ОТБОР");auto* r=row(body_,134);
-        auto* q=panel(r,235,134);label(q,"Отбор жидкости");live_[3]=label(q,"—");live_[4]=label(q,"—");live_[5]=smallLabel(q,"—");live_[6]=smallLabel(q,"—");live_[7]=smallLabel(q,"—");
-        lv_obj_set_style_text_font(live_[3],&busa_font_value,0);lv_obj_set_style_text_color(live_[3],color(colors_[0]),0);
-        for(int i=3;i<=7;++i){lv_obj_set_width(live_[i],LV_PCT(100));lv_label_set_long_mode(live_[i],LV_LABEL_LONG_WRAP);}
-        auto* p=panel(r,235,134);label(p,"Охлаждение");live_[0]=label(p,"—");live_[1]=label(p,"—");live_[2]=smallLabel(p,"—");
-        lv_obj_set_style_text_font(live_[0],&busa_font_value,0);lv_obj_set_style_text_color(live_[0],color(colors_[0]),0);
-        for(int i=0;i<=2;++i){lv_obj_set_width(live_[i],LV_PCT(100));lv_label_set_long_mode(live_[i],LV_LABEL_LONG_WRAP);}
-        const auto& d=session_.snapshot();fields_[0]=field(p,"Импульсов на 1 литр",value(d["water"]["pulses_per_litre"]),true);
-        selected(button(body_,"Сохранить коэффициент",201),true);
+        heading("ВОДА И ОТБОР");auto* r=row(body_,172);
+        auto* q=panel(r,235,172);label(q,"Отбор жидкости");
+        live_[3]=label(q,"—");live_[4]=label(q,"—");live_[6]=label(q,"—");live_[7]=label(q,"—");
+        auto* p=panel(r,235,172);label(p,"Охлаждение");live_[0]=label(p,"—");label(p,"Израсходовано");live_[1]=label(p,"—");
+        for(auto* card:{q,p}){lv_obj_set_flex_align(card,LV_FLEX_ALIGN_SPACE_EVENLY,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
+            for(unsigned i=0;i<lv_obj_get_child_cnt(card);++i){auto* l=lv_obj_get_child(card,i);lv_obj_set_width(l,LV_PCT(100));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);}}
+        for(int i:{0,1,3}){lv_obj_set_style_text_font(live_[i],&busa_font_value,0);lv_obj_set_style_text_color(live_[i],color(colors_[0]),0);}
     }
     void graphAxes(unsigned k,double low,double high){
         const int ticks=graphKind_==0?2:4;
@@ -553,10 +551,10 @@ private:
         auto* r=row(body_,26);button(r,"Предыдущая",410,152);pageCounter_=smallLabel(r,"1 / 1");button(r,"Следующая",411,152);
     }
     void settings(){
-        if(sub_<0){label(body_,"НАСТРОЙКИ");static const char* names[]={"Температура","Wi-Fi","Экран","Google","Bluetooth · RainMaker","Обновление ПО","Журнал событий","Диагностика","О системе"};
-            static const int ids[]={400,401,402,403,407,408,405,406,404};
-            for(int i=0;i<9;){auto* r=row(body_,27);for(int col=0;col<2&&i<9;++col,++i)button(r,names[i],ids[i],235);}return;}
-        static const char* title[]={"Температура","Wi-Fi","Экран","Google","О системе","Журнал событий","Диагностика","Bluetooth · RainMaker","Обновление ПО"};
+        if(sub_<0){label(body_,"НАСТРОЙКИ");static const char* names[]={"Температура","Wi-Fi","Экран","Google","Bluetooth · RainMaker","Обновление ПО","Журнал событий","Диагностика","О системе","Отбор и вода"};
+            static const int ids[]={400,401,402,403,407,408,405,406,404,412};
+            for(int i=0;i<10;){auto* r=row(body_,27);for(int col=0;col<2&&i<10;++col,++i)button(r,names[i],ids[i],235);}return;}
+        static const char* title[]={"Температура","Wi-Fi","Экран","Google","О системе","Журнал событий","Диагностика","Bluetooth · RainMaker","Обновление ПО","Отбор и вода"};
         auto* top=row(body_,26);label(top,title[sub_]);button(top,"Все настройки",409,132);
         const auto& d=session_.snapshot();
         if(sub_==0){static const int order[]={0,2,1,3};for(int i=0;i<4;){auto* r=row(body_,42);for(int col=0;col<2;++col,++i){int k=order[i];fields_[k]=field(r,k==3?"Авария":sensor(k),value(d["calibration_offsets"][k]),true,false,235);}}button(body_,"Сохранить поправки",202);}
@@ -573,6 +571,16 @@ private:
             auto* r=row(body_,26);button(r,"Начать обучение 20 клавиш",217,235);button(r,"Считать и далее",218,235);auto* b=row(body_,26);button(b,"Назад на шаг",219,235);button(b,"Отмена",220,235);}
         else if(sub_==7){auto* r=row(body_,26);button(r,"Включить сопряжение",214,235);button(r,"Отключить Bluetooth",215,235);button(body_,"Обновить состояние",216);pagedResult(60,4);}
         else if(sub_==8){auto* l=label(body_,"Обновление через локальное приложение");lv_obj_set_width(l,LV_PCT(100));lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);}
+        else if(sub_==9){
+            auto* tabs=row(body_,28);selected(button(tabs,"Отбор",413,235),collectionConfig_);selected(button(tabs,"Вода",414,235),!collectionConfig_);
+            auto* card=panel(body_,LV_PCT(100),76);auto* title=label(card,"Коэффициент калибровки");lv_obj_set_width(title,LV_PCT(100));lv_obj_set_style_text_align(title,LV_TEXT_ALIGN_CENTER,0);
+            String coefficient;
+            if(collectionConfig_){auto v=d["collection"]["pulses_per_ml"];if(v.is<double>()){char s[32];snprintf(s,sizeof(s),"%.9g",v.as<double>());coefficient=s;coefficient.replace('.',',');}}
+            else coefficient=value(d["water"]["pulses_per_litre"]);
+            fields_[0]=field(card,collectionConfig_?"Импульсов на 1 мл":"Импульсов на 1 литр",coefficient,true);
+            if(collectionConfig_)lv_textarea_set_accepted_chars(fields_[0],"0123456789.,eE+-");
+            selected(button(body_,"Сохранить коэффициент",collectionConfig_?222:201),true);
+        }
         pageStatus_=statusLabel(body_,LV_PCT(100),sub_==6||sub_==7?14:24);
         if(sub_==5)send(Route::events,{{"after","0"}});
     }
@@ -606,14 +614,17 @@ private:
         if(id>=100&&id<106){rememberCalc();if(page_!=id-100)previousPage_=page_;page_=id-100;sub_=-1;render();return;}
         if(id>=400&&id<409){sub_=id-400;if(sub_==2)requestedTheme_=theme_;render();return;}
         if(id==409){sub_=-1;render();return;}
+        if(page_==5&&id==412){sub_=9;collectionConfig_=true;render();return;}
+        if(page_==5&&sub_==9&&(id==413||id==414)){collectionConfig_=id==413;render();return;}
         if(id==410||id==411){if(id==410){if(pageOffset_)--pageOffset_;}else if(pageOffset_<255)++pageOffset_;pageText();return;}
         if(id>=300&&id<=302){graphKind_=id-300;render();return;}
         if(id>=320&&id<=323){rememberCalc();calcMode_=id-320;render();return;}
         hideKeyboard();
-        if((id==200||id==201||id==202)&&(!formValid_||!session_.connected())){set(pageStatus_,"Нет актуальных настроек. Дождитесь связи.");return;}
+        if((id==200||id==201||id==202||id==222)&&(!formValid_||!session_.connected())){set(pageStatus_,"Нет актуальных настроек. Дождитесь связи.");return;}
         switch(id){
             case 200:alarms();break;
-            case 201:send(Route::waterCoefficient,{{"confirm","YES"},{"pulses_per_litre",text(fields_[0])}});break;
+            case 201:if(page_==5&&sub_==9&&!collectionConfig_&&fields_[0])send(Route::waterCoefficient,{{"confirm","YES"},{"pulses_per_litre",text(fields_[0])}});break;
+            case 222:if(page_==5&&sub_==9&&collectionConfig_&&fields_[0])send(Route::collectionCoefficient,{{"confirm","YES"},{"pulses_per_ml",text(fields_[0])}});break;
             case 202:form(Route::calibration,"offset",4);break;
             case 203:send(Route::wifiScan,{{"start","1"},{"fresh","1"}});break;
             case 204:{unsigned i=lv_dropdown_get_selected(wifiList_);if(i<networkCount_)send(Route::wifiConnect,{{"ssid",networks_[i]},{"pass",lv_textarea_get_text(fields_[0])}});else set(pageStatus_,"Выберите сеть");break;}
@@ -820,7 +831,7 @@ private:
     }
     void refresh(){
         const auto& d=session_.snapshot();const bool ok=session_.connected();
-        const bool settingsForm=page_==1||page_==2||(page_==5&&sub_==0);
+        const bool settingsForm=page_==1||(page_==5&&(sub_==0||sub_==9));
         if(settingsForm&&!ok)formValid_=false;
         if(settingsForm&&ok&&!formValid_){render();return;}
         set(connection_,ok?"UART":"Нет связи");
@@ -842,13 +853,12 @@ private:
             metric(live_[11],measured(d["collection"]["total_ml"]," мл",1));
         }else if(page_==1){for(int i=0;i<4;++i)set(live_[i],measured(d["temperatures"][i]["c"]," °C",1));}
         else if(page_==2){auto rate=d["water"]["lpm"];set(live_[0],ok&&!rate.isNull()?fmt(rate.as<double>()*60)+" л/ч":"—");
-            set(live_[1],"Учтено: "+measured(d["water"]["total_l_estimate"]," л",1));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));
+            set(live_[1],measured(d["water"]["total_l_estimate"]," л",1));
             set(live_[3],measured(d["collection"]["ml_per_min"]," мл/мин",1));
             auto collectionRate=d["collection"]["ml_per_min"];set(live_[6],ok&&collectionRate.is<double>()?fmt(collectionRate.as<double>()*0.06)+" л/ч":"— л/ч");
             auto duration=d["collection"]["duration_ms"];if(duration.isNull())duration=d["collection"]["elapsed_ms"];
             set(live_[7],String("Время отбора: ")+(ok?durationText(duration):String("—")));
-            set(live_[4],"Собрано: "+measured(d["collection"]["total_ml"]," мл",1));
-            set(live_[5],!ok?"Нет связи":(d["collection"]["pulse_seen"]|(d["collection"]["sensor_present"]|false))?((d["collection"]["calibrated"]|false)?"Импульсы зарегистрированы":"Импульсы · нет калибровки"):"Нет импульсов");}
+            set(live_[4],"Собрано: "+measured(d["collection"]["total_ml"]," мл",1));}
         else if(page_==5){
             if(sub_==1)set(live_[0],ok?String("Wi-Fi: ")+(d["station"]["ssid"]|"—"):"Нет связи");
             else if(sub_==3)set(live_[0],ok?String("Google: ")+String(d["google"]["configured"].as<bool>()?"настроен":"не настроен")+" · код "+String(d["google"]["state"]|0):"Нет связи");
@@ -884,6 +894,7 @@ private:
     lv_img_dsc_t art_{},navArt_[6]{};uint8_t* asset_=nullptr;
     lv_obj_t *calcNotes_=nullptr,*touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*touchTarget_=nullptr,*pageCounter_=nullptr;String pageContent_;unsigned pageOffset_=0,pageLines_=5;
     busa_touch::Transform transform_{};busa_touch::Point raw_[3]{},screen_[3]{};
+    bool collectionConfig_=true;
     bool calibrationValid_=false,calibrating_=false,held_=false,wasConnected_=false,waiting_=false,scanPending_=false,frameOpen_=false,awaitRelease_=false,formValid_=false;
     int calIndex_=0,calSamples_=0,sumX_=0,sumY_=0,page_=0,sub_=-1,pendingPage_=0,pendingSub_=-1,graphKind_=0,calcMode_=0;
     static constexpr int graphMinutes_=5;

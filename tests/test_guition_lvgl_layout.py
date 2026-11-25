@@ -14,7 +14,7 @@ def between(a,b):
     return u[u.index(a):u.index(b,u.index(a))]
 helpers=between('    static const char* sensor(', '    static void flush(')
 widgets=between('    lv_obj_t* label(', '    void navIcon(')
-status=between('    lv_obj_t* statusLabel(', '    void water()')
+status=between('    lv_obj_t* statusLabel(', '    void graphAxes(')
 calc=between('    static const char* calcTitle(', '    void rememberCalc()')+between('    void calculator(){','    void pageText(){')
 prelude=r'''
 #include <lvgl.h>
@@ -82,6 +82,21 @@ checks=r'''
         if(size.y>height||std::strstr(text,"...")!=nullptr){
             std::fprintf(stderr,"TEXT CLIPPED '%s' need %dpx high, have %dpx; width %d\n",text,size.y,height,width);std::abort();
         }
+    }
+    void verifyWater(){
+        init();water();
+        lv_obj_update_layout(body_);
+        assert(lv_obj_get_child_cnt(body_)==2);
+        assert(controls.empty());
+        lv_label_set_text(live_[0],"0,0 л/ч");lv_label_set_text(live_[1],"1234,5 л");
+        lv_label_set_text(live_[3],"999,9 мл/мин");lv_label_set_text(live_[4],"Собрано: 1234,5 мл");
+        lv_label_set_text(live_[6],"60,0 л/ч");lv_label_set_text(live_[7],"Время отбора: 1ч30мин");
+        lv_obj_update_layout(body_);
+        auto* row=lv_obj_get_child(body_,1);assertFits(row);
+        assert(lv_obj_get_child_cnt(row)==2);
+        for(unsigned k=0;k<2;++k){auto* card=lv_obj_get_child(row,k);assertFits(card);
+            assert(lv_obj_get_height(card)==172);for(unsigned j=0;j<lv_obj_get_child_cnt(card);++j)labelFits(lv_obj_get_child(card,j));}
+        std::puts("PASS native water page: two monitoring cards, no edit controls, all labels fit");
     }
     void verifyGraphs(){
         for(int mode=0;mode<3;++mode){
@@ -197,7 +212,7 @@ int main(){
         assert(!ui.fields_[0]&&!ui.fields_[1]&&ui.fields_[2]);
         ui.geometryExpanded_=true;ui.init();ui.calculator();ui.verify();
         assert(ui.fields_[0]&&ui.fields_[1]&&ui.fields_[2]);
-        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();ui.verifyNavigation();ui.verifyGraphs();
+        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();ui.verifyNavigation();ui.verifyWater();ui.verifyGraphs();
     }
     ui.theme_=1;assert(ui.paper()==0x080808&&ui.surface()==0x202020);
     ui.theme_=2;assert(ui.paper()==0x060e15&&ui.surface()==0x0d2430);
