@@ -1,0 +1,120 @@
+"""Host LVGL 8.4 layout regression test with generated production fonts.
+Builds the exact production widget helpers and page builders, with only
+transport and calculator arithmetic stubbed (not layout or font metrics).
+The hardware's LCD/touch/photographic acceptance remains separate.
+"""
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+import subprocess, sys, tempfile
+root=Path(__file__).resolve().parents[1]
+sketch=root/'firmware/BUSA_Display_N4R8'
+u=(sketch/'BUSA_TouchUI.h').read_text()
+# Reuse exact production implementations instead of duplicating their dimensions.
+def between(a,b):
+    return u[u.index(a):u.index(b,u.index(a))]
+helpers=between('    static const char* sensor(', '    static void flush(')
+widgets=between('    lv_obj_t* label(', '    void navIcon(')
+status=between('    lv_obj_t* statusLabel(', '    void water()')
+calc=between('    static const char* calcTitle(', '    void rememberCalc()')+between('    void calculator(){','    void pageText(){')
+prelude=r'''
+#include <lvgl.h>
+#include <cassert>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <string>
+#include <vector>
+using String=std::string;
+constexpr int WIDTH=480,HEIGHT=272;
+LV_FONT_DECLARE(busa_font);
+LV_FONT_DECLARE(busa_font_small);
+LV_FONT_DECLARE(busa_font_value);
+LV_FONT_DECLARE(busa_font_nav);
+struct JsonStub { JsonStub operator[](const char*) const {return {};} JsonStub operator[](int) const {return {};} };
+struct SessionStub {JsonStub snapshot()const{return {};}};
+struct UiTest {
+    static constexpr uint32_t colors_[4]={0x38bdf8,0x53d486,0xf4c84a,0xff6473};
+    uint8_t theme_=2; int calcMode_=0;
+    lv_obj_t *body_=nullptr,*nav_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr;
+    lv_obj_t *fields_[8]={},*live_[16]={}; String calcInput_[4][5]; SessionStub session_;
+    std::vector<lv_obj_t*> controls;
+    static void event(lv_event_t*){} static void textFocus(lv_event_t*){}
+    void registerKey(lv_obj_t* o,int,int){controls.push_back(o);}
+    static String value(JsonStub){return {};}
+    void calculate(bool){}
+'''
+checks=r'''
+    void init(){
+        lv_obj_t* root=lv_scr_act();lv_obj_clean(root);lv_obj_remove_style_all(root);
+        lv_obj_set_style_bg_color(root,color(paper()),0);lv_obj_set_style_bg_opa(root,LV_OPA_COVER,0);
+        lv_obj_set_style_text_font(root,&busa_font,0);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
+        body_=lv_obj_create(root);lv_obj_set_pos(body_,0,TOP);lv_obj_set_size(body_,WIDTH,HEIGHT-TOP-NAV);
+        lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
+        lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,2,0);
+        lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);
+        controls.clear();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;
+    }
+    void assertFits(lv_obj_t* o){
+        lv_area_t a;lv_obj_get_coords(o,&a);
+        for(auto* p=lv_obj_get_parent(o);p;p=lv_obj_get_parent(p)){
+            lv_area_t b;lv_obj_get_content_coords(p,&b);
+            if(a.x1<b.x1||a.y1<b.y1||a.x2>b.x2||a.y2>b.y2){
+                std::fprintf(stderr,"CLIPPED mode=%d theme=%d object=[%d,%d,%d,%d] parent=[%d,%d,%d,%d]\n",calcMode_,theme_,a.x1,a.y1,a.x2,a.y2,b.x1,b.y1,b.x2,b.y2);
+                std::abort();
+            }
+            if(p==body_)break;
+        }
+    }
+    void labelFits(lv_obj_t* l){
+        assertFits(l);const char* text=lv_label_get_text(l);auto* f=lv_obj_get_style_text_font(l,0);
+        const int width=lv_obj_get_content_width(l),height=lv_obj_get_content_height(l);
+        lv_point_t size;lv_txt_get_size(&size,text,f,lv_obj_get_style_text_letter_space(l,0),lv_obj_get_style_text_line_space(l,0),width,LV_TEXT_FLAG_NONE);
+        if(size.y>height||std::strstr(text,"...")!=nullptr){
+            std::fprintf(stderr,"TEXT CLIPPED '%s' need %dpx high, have %dpx; width %d\n",text,size.y,height,width);std::abort();
+        }
+    }
+    void verify(){
+        lv_obj_update_layout(body_);
+        for(auto* o:controls){
+            assertFits(o);
+            if(lv_obj_check_type(o,&lv_textarea_class)){
+                auto* box=lv_obj_get_parent(o);auto* caption=lv_obj_get_child(box,0);labelFits(caption);
+                const char* title=lv_label_get_text(caption);auto* f=lv_obj_get_style_text_font(caption,0);
+                assert(lv_txt_get_width(title,strlen(title),f,0,LV_TEXT_FLAG_NONE)<=lv_obj_get_content_width(caption));
+                assert(lv_obj_get_height(o)==24);
+                assert(lv_obj_get_content_height(o)>=lv_font_get_line_height(lv_obj_get_style_text_font(o,0)));
+            }else labelFits(lv_obj_get_child(o,0));
+        }
+        if(resultLabel_)labelFits(resultLabel_);
+    }
+};
+constexpr uint32_t UiTest::colors_[4];
+static lv_color_t pixels[WIDTH*24];
+static lv_disp_draw_buf_t buf;
+static lv_disp_drv_t drv;
+static void flush(lv_disp_drv_t* d,const lv_area_t*,lv_color_t*){lv_disp_flush_ready(d);}
+int main(){
+    lv_init();lv_disp_draw_buf_init(&buf,pixels,nullptr,WIDTH*24);lv_disp_drv_init(&drv);
+    drv.hor_res=WIDTH;drv.ver_res=HEIGHT;drv.draw_buf=&buf;drv.flush_cb=flush;assert(lv_disp_drv_register(&drv));
+    UiTest ui;
+    for(int theme=0;theme<3;++theme){ui.theme_=theme;
+        for(int mode=0;mode<4;++mode){ui.calcMode_=mode;ui.init();ui.calculator();ui.verify();}
+        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();
+    }
+    ui.theme_=1;assert(ui.paper()==0x080808&&ui.surface()==0x202020);
+    ui.theme_=2;assert(ui.paper()==0x060e15&&ui.surface()==0x0d2430);
+    ui.theme_=0;assert(ui.paper()==0xf0f6f8&&ui.surface()==0xffffff);
+    std::puts("PASS native LVGL: production calculator and temperature controls, text and font bounds in all three themes");
+}
+'''
+if len(sys.argv)!=2: raise SystemExit('usage: test_guition_lvgl_layout.py /path/to/lvgl')
+lvgl=Path(sys.argv[1]).resolve()
+assert (lvgl/'lvgl.h').is_file(),lvgl
+sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav')]
+flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-I'+str(lvgl),'-I'+str(lvgl/'src')]
+with tempfile.TemporaryDirectory() as tmp:
+    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+checks)
+    def compile_one(item):
+        i,s=item;o=tmp/f'{i}.o';subprocess.run(['gcc','-std=gnu99','-O0',*flags,'-c',str(s),'-o',str(o)],check=True);return str(o)
+    with ThreadPoolExecutor(max_workers=2) as pool: objects=list(pool.map(compile_one,enumerate(sources)))
+    exe=tmp/'layout';subprocess.run(['g++','-std=c++11','-O0',*flags,str(cpp),*objects,'-lm','-o',str(exe)],check=True);subprocess.run([str(exe)],check=True)

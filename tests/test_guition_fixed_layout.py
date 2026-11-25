@@ -21,13 +21,13 @@ assert body==192
 assert nums['SCENE']+nums['METRICS']+nums['RELAYS']+2*nums['GAP']==body
 # Geometry of all dense screens; bounds of fixed-height children, plus flex row gaps.
 # Label font generation uses 12px condensed (line height <= 15 px) and 14px main (<=18px).
-assert 'row(body_,69)' in u and 'panel(r,235,69)' in u and 'row(p,23)' in u and 'row(p,38)' in u
-assert 'row(body_,22)' in u and 'row(body_,134)' in u and 'lv_obj_set_size(chart_,LV_PCT(100),102)' in u
-assert 'row(body_,38)' in u and 'panel(body_,LV_PCT(100),50)' in u
+assert 'row(body_,70)' in u and 'panel(r,235,70)' in u and 'row(p,20)' in u and 'row(p,41)' in u
+assert 'row(body_,18)' in u and 'row(body_,134)' in u and 'lv_obj_set_size(chart_,LV_PCT(100),102)' in u
+assert 'row(body_,41)' in u and 'panel(body_,LV_PCT(100),calcMode_==2?48:50)' in u
 assert 'pagedResult(int height=80,unsigned lines=5)' in u and 'pagedResult(60,4)' in u
-for page, heights in {'temperature':[22,69,69,26], 'water':[22,134,26], 'graph':[26,15,102,26,14], 'calc5':[26,38,38,26,50], 'settings':[18,27,27,27,27,27], 'calibration':[26,39,39,26,24], 'wifi':[26,26,26,39,26,24], 'theme':[26,26,26,24], 'google':[26,15,39,26,26,24], 'about':[26,60,15,15,15,15,24], 'journal':[26,26,80,26,24], 'diagnostics':[26,16,16,16,16,16,26,26,14], 'ble':[26,26,26,60,26,14], 'ota':[26,40,24]}.items():
+for page, heights in {'temperature':[18,70,70,26], 'water':[18,134,26], 'graph':[26,15,102,26,14], 'calc5':[28,41,41,26,48], 'calc_geometry':[28,41,26,26,50], 'settings':[18,27,27,27,27,27], 'calibration':[26,41,41,26,24], 'wifi':[26,26,26,41,26,24], 'theme':[26,26,26,26,26,24], 'google':[26,15,41,26,26,24], 'about':[26,60,16,16,16,16,24], 'journal':[26,26,80,26,24], 'diagnostics':[26,16,16,16,16,16,26,26,14], 'ble':[26,26,26,60,26,14], 'ota':[26,40,24]}.items():
     assert sum(heights)+2*(len(heights)-1)<=body,(page,sum(heights)+2*(len(heights)-1),body)
 for id in range(200,221): assert re.search(r'\bcase '+str(id)+r':',u),id
 for id in range(400,409): assert re.search(r'\b'+str(id)+r'\b',u),id
-assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-U2-HW2')+1<=40 for i in (4,5))
-print('PASS: fixed-height budgets for all 15 page variants and preservation of existing actions')
+assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-U3-HW2')+1<=40 for i in (4,5))
+print('PASS: fixed-height budgets for fixed page variants and preservation of existing actions')
