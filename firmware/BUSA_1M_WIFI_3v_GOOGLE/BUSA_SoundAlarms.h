@@ -9,13 +9,14 @@
 // A separate active-3.3V logic buzzer input on GPIO2. Use a compatible
 // low-current active buzzer module or an external driver as required.
 constexpr uint8_t BUSA_BUZZER_GPIO=2;
-constexpr bool BUSA_BUZZER_ACTIVE_HIGH=true;
+constexpr bool BUSA_BUZZER_ACTIVE_HIGH=false; // MH-FMD low level trigger
 BusaSound::Channel buzzerTempChannels[2];
 bool buzzerEnabled[2]={true,true};
 float buzzerOnC[2]={NAN,NAN},buzzerOffC[2]={NAN,NAN};
 bool buzzerSoundOn=false;
 uint32_t buzzerLastStartMs=0,buzzerActivationCount=0;
-int buzzerPinLevel(bool active){return active==BUSA_BUZZER_ACTIVE_HIGH?HIGH:LOW;}
+constexpr int buzzerPinLevel(bool active){return active==BUSA_BUZZER_ACTIVE_HIGH?HIGH:LOW;}
+static_assert(buzzerPinLevel(false)==HIGH && buzzerPinLevel(true)==LOW,"MH-FMD polarity");
 constexpr bool BUSA_SOUND_ACTIVE_LOW=true;
 constexpr uint32_t BUSA_SOUND_POLL_MS=200U;
 constexpr uint32_t BUSA_SOUND_TIMED_MS=90000UL;
@@ -128,7 +129,7 @@ String soundJSON(uint32_t now){
   s+=",\"t4_off_events\":"+String(soundT4OffEvents);
   s+=",\"k1_silenced_on_open\":"+(soundRoute.k1Hold?String("true"):String("false"));
   s+=",\"buzzer\":{\"gpio\":"+String(BUSA_BUZZER_GPIO);
-  s+=",\"logic_voltage_v\":3.3,\"active_high\":true,\"source\":\"T1_OR_T2\"";
+  s+=",\"logic_voltage_v\":3.3,\"active_high\":"+String(BUSA_BUZZER_ACTIVE_HIGH?"true":"false")+",\"source\":\"T1_OR_T2\"";
   s+=",\"sound_on\":"+(buzzerSoundOn?String("true"):String("false"));
   s+=",\"command_gpio_level\":"+String(buzzerPinLevel(buzzerSoundOn));
   s+=",\"activation_count\":"+String(buzzerActivationCount);

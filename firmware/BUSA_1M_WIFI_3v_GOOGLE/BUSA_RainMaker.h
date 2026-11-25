@@ -283,8 +283,7 @@ static void busaRainMakerApply(){
     }else if(q.target==4){
       if(q.action==5&&q.i>=0&&q.i<=2)ok=saveThemeMode((uint8_t)q.i);
       else if(q.action==6){
-        if(q.b){wakeTftDisplay();ok=true;}
-        else {darkenTftDisplay();ok=true;}
+        ok=q.b?wakeTftDisplay():darkenTftDisplay();
       }else if(q.action==7&&q.i>=0&&q.i<8){navigatePage((uint8_t)q.i);ok=true;}
     }else if(q.target==5){
       if(q.action==8&&q.b){

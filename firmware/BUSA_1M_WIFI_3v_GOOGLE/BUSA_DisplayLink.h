@@ -74,6 +74,8 @@ static void handleApi(const Frame& f){
     const uint32_t elapsed=millis()-started;if(elapsed>apiWorstMs)apiWorstMs=elapsed;
     memset(rx,0,sizeof(rx));
 }
+static bool lcdReady(){return ready&&haveDiagnostic&&uint32_t(millis()-lastDiagnostic)<=staleMs&&metrics[lcdInit]==1;}
+static bool supportsBacklightRequest(){return lcdReady()&&strstr(displayFirmware,"-HW1")!=nullptr;}
 static bool otaCapable(){return ready&&haveDiagnostic&&uint32_t(millis()-lastDiagnostic)<=staleMs&&strncmp(displayFirmware,busa_ota::displayFamily,strlen(busa_ota::displayFamily))==0;}
 static void poll(){
     busa_display_ota::tick();

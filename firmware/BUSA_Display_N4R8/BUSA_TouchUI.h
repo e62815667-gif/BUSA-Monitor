@@ -48,6 +48,11 @@ public:
     }
     void poll(){
         const uint32_t now=millis();lv_tick_inc(now-lastTick_);lastTick_=now;
+        const bool backlightWanted=calibrating_||!session_.connected()||!(session_.snapshot()["display_sleep"]|false);
+        if(backlightWanted!=backlightOn_){
+            backlightOn_=backlightWanted;hw_.backlight(backlightOn_);
+            lv_indev_reset(nullptr,nullptr);
+        }
         if(calibrating_)calibrationPoll();
         int code;String body;
         if(session_.takeApiResult(code,body)){waiting_=false;handleResult(code,body);}
@@ -86,7 +91,7 @@ private:
     static void readTouch(lv_indev_drv_t* d,lv_indev_data_t* data){
         auto* self=static_cast<Interface*>(d->user_data);TS_Point raw;
         data->state=LV_INDEV_STATE_REL;
-        if(self->calibrating_||!self->calibrationValid_||!self->hw_.readRawTouch(raw))return;
+        if(!self->backlightOn_||self->calibrating_||!self->calibrationValid_||!self->hw_.readRawTouch(raw))return;
         auto p=busa_touch::apply(self->transform_,{raw.x,raw.y});
         data->point.x=constrain(p.x,0,WIDTH-1);data->point.y=constrain(p.y,0,HEIGHT-1);data->state=LV_INDEV_STATE_PR;
     }
@@ -129,10 +134,11 @@ private:
     static void event(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));
         auto* o=lv_event_get_target(e);int id=int(reinterpret_cast<intptr_t>(lv_obj_get_user_data(o)));
-        self->action(id);
+        if(self->backlightOn_)self->action(id);
     }
     static void textFocus(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));auto* ta=lv_event_get_target(e);
+        if(!self->backlightOn_)return;
         lv_keyboard_set_textarea(self->keyboard_,ta);lv_keyboard_set_mode(self->keyboard_,lv_textarea_get_accepted_chars(ta)?LV_KEYBOARD_MODE_NUMBER:LV_KEYBOARD_MODE_TEXT_LOWER);
         lv_obj_clear_flag(self->keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_move_foreground(self->keyboard_);
         lv_obj_set_height(self->body_,HEIGHT-TOP-128);
@@ -475,7 +481,7 @@ private:
             set(live_[1],"Учтено: "+measured(d["water"]["total_l_estimate"]," л",2));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));
             set(live_[3],measured(d["collection"]["ml_per_min"]," мл/мин",1));
             set(live_[4],"Собрано: "+measured(d["collection"]["total_ml"]," мл",1));
-            set(live_[5],ok&&(d["collection"]["sensor_present"]|false)?"Датчик подключён":"Нет датчика");}
+            set(live_[5],!ok?"Нет связи":(d["collection"]["pulse_seen"]|(d["collection"]["sensor_present"]|false))?"Импульсы получены":(d["collection"]["installed"]|false)?"Нет импульсов":"Нет данных датчика");}
         else if(page_==5){
             if(sub_==1)set(live_[0],ok?String("Wi-Fi: ")+(d["station"]["ssid"]|"—"):"Нет связи");
             else if(sub_==3)set(live_[0],ok?String("Google: ")+String(d["google"]["configured"].as<bool>()?"настроен":"не настроен")+" · код "+String(d["google"]["state"]|0):"Нет связи");
@@ -507,6 +513,7 @@ private:
     lv_obj_t* navButtons_[6]={};lv_obj_t* fields_[8]={};lv_obj_t* live_[12]={};lv_obj_t* motion_[7]={};lv_chart_series_t* series_[4]={};
     lv_img_dsc_t art_{};uint8_t* asset_=nullptr;
     busa_touch::Transform transform_{};busa_touch::Point raw_[3]{},screen_[3]{};
+    bool backlightOn_=true;
     bool calibrationValid_=false,calibrating_=false,held_=false,wasConnected_=false,waiting_=false,scanPending_=false,frameOpen_=false,awaitRelease_=false,formValid_=false;
     int calIndex_=0,calSamples_=0,sumX_=0,sumY_=0,page_=0,sub_=-1,pendingPage_=0,pendingSub_=-1,graphKind_=0,graphMinutes_=5,calcMode_=0;
     uint32_t lastCalibrationRead_=0;

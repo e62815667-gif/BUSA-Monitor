@@ -1,18 +1,17 @@
 #pragma once
 /*
   BUSA-1M-001 БУСА 1М WiFi 3v-GOOGLE
-  ESP32-S3 N16R8, TFT GMT028-05 V1.1 320x240 landscape, monitoring-only.
+  ESP32-S3 N16R8, GUITION JC4827W543R_I 480x272 over UART, monitoring-only.
   LOW-VOLTAGE MONITORING + four relay channels for 12V SOUND ONLY. No motor or mains output.
   Approved hardware scope: mains power controller and motorized valve are
   REMOVED from this project; they are operated manually, outside ESP32.
   Approved informational section "Отбор" is retained without actuator control.
-  Real 4 x DS18B20 + YF-S401 cooling-water pulse readings, no simulated values.
-  Hardware compatibility of TFT controller, PCF8575 keypad and pulse output 
+  4 x DS18B20 + 2 x YF-S401 independent pulse inputs, no simulated values.
+  Hardware compatibility of GUITION, PCF8575 keypad and pulse inputs 
   must be verified on a powered-off low-voltage bench before connecting.
 */
 #include <Arduino.h>
 #include <WiFi.h>
-#include <SPI.h>
 #include <WebServer.h>
 #include <Update.h>
 #include <esp_ota_ops.h>
@@ -27,10 +26,6 @@
 #include <Preferences.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_ST7789.h>
-#include <Adafruit_ILI9341.h>
-#include <U8g2_for_Adafruit_GFX.h>
 #include <math.h>
 #include "BUSA_WaterFlowMath.h"
 #include <BUSA_LoopProfile.h>
@@ -40,21 +35,17 @@
 constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
 constexpr uint8_t BUS_SDA=40,BUS_SCL=41; // Isolated PCF8575 keypad only
-constexpr uint8_t TFT_CS=10,TFT_DC=11,TFT_RST=12,TFT_MOSI=13,TFT_SCK=14;
 constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr uint8_t COLLECTION_GPIO=1; // Input, verified 3.3 V logic required
 static_assert(COLLECTION_GPIO==1 && COLLECTION_GPIO!=FLOW_GPIO,"Collection GPIO changed");
 constexpr uint8_t BUSA_RESERVED_BUZZER_GPIO=2; // active 3.3V logic buzzer input, T1/T2
 constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
 static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
-static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!=BUS_SDA &&
-  BUSA_RESERVED_BUZZER_GPIO!=BUS_SCL && BUSA_RESERVED_BUZZER_GPIO!=TFT_CS &&
-  BUSA_RESERVED_BUZZER_GPIO!=TFT_DC && BUSA_RESERVED_BUZZER_GPIO!=TFT_RST &&
-  BUSA_RESERVED_BUZZER_GPIO!=TFT_MOSI && BUSA_RESERVED_BUZZER_GPIO!=TFT_SCK,
-  "Buzzer pin conflicts with I2C, TFT or flow pins");
+static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!=COLLECTION_GPIO &&
+  BUSA_RESERVED_BUZZER_GPIO!=BUS_SDA && BUSA_RESERVED_BUZZER_GPIO!=BUS_SCL,
+  "Buzzer pin conflicts with I2C or pulse inputs");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF3";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF3-HW1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -63,7 +54,6 @@ uint32_t busaLastI2cStepMs=0,busaMaxI2cStepMs=0;
 uint32_t busaI2cSuspendedUntil=0,busaI2cErrorCount=0,busaI2cStallCount=0;
 uint32_t busaTempWorstMs=0,busaOneWireWorstMs=0,busaTftWorstMs=0;
 uint32_t busaI2cWorstMs=0,busaHttpWorstMs=0;
-constexpr uint32_t BUSA_TFT_LIVE_REFRESH_MS=200; // Responsive changed-field refresh, not a full redraw
 constexpr uint32_t BUSA_KEYPAD_SLICE_MS=16; // four matrix rows per slice, max ~64 ms per sweep
 uint32_t busaLastTftRenderMs=0,busaTftFullRenderCount=0,busaTftLiveRenderCount=0;
 
@@ -279,17 +269,17 @@ static String collectionDisplay(double value){
  return "Н/Д";
 }
 
-// Isolated 3.3V I2C keypad PCF8575/PCF8575A only; PCA9685 LED board detached.
-bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
-uint8_t pcfAddr=0,pcaAddr=0x40;uint32_t lastBusProbe=0;
+// Isolated 3.3V I2C keypad PCF8575/PCF8575A only.
+bool i2cOnline=false,pcfDetected=false;
+uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
 uint8_t i2cFound[24]={0},i2cFoundCount=0;
 uint16_t i2cAckCount=0;
 uint32_t i2cFullScanAt=0;
 // A probe is a sample, not a state change. Keep each device's most recent
 // confirmed ACK, but report "online" only while confirmation is fresh.
-uint32_t busaI2cLastPcfAckMs=0,busaI2cLastPcaAckMs=0;
-uint32_t busaI2cPcfAcks=0,busaI2cPcaAcks=0;
-uint32_t busaI2cLastPcfNackMs=0,busaI2cLastPcaNackMs=0;
+uint32_t busaI2cLastPcfAckMs=0;
+uint32_t busaI2cPcfAcks=0;
+uint32_t busaI2cLastPcfNackMs=0;
 constexpr uint32_t BUSA_I2C_ACK_FRESH_MS=30000;
 // GPIO-only, open-drain I2C. ESP32-S3 hardware controller previously blocked for
 // 1000ms even with Wire.setTimeOut(25). This avoids the controller entirely.
@@ -490,7 +480,6 @@ bool busaI2cExchange(uint8_t address,const uint8_t* tx,size_t txLen,uint8_t* rx,
   return ok;
 }
 
-int pcaMode1=-1,pcaMode2=-1;
 bool pcfIdleReadOk=false;
 uint16_t pcfIdleDirect=0xffff;
 uint32_t keyCount=0,lastKeyScan=0,pendingAt=0;
@@ -536,7 +525,6 @@ bool ack(uint8_t address){
   return busaI2cExchange(address,nullptr,0,nullptr,0);
 }
 // Only scan the PCF8575 (0x20..0x27) or PCF8575A (0x38..0x3F) address sets.
-// LED driver PCA9685 is disconnected and must not be addressed.
 constexpr uint8_t BUSA_I2C_SCAN_START=0x20,BUSA_I2C_SCAN_END=0x3F;
 constexpr uint8_t BUSA_I2C_PRIORITY_ADDRS[]={0x20,0x38};
 uint8_t busaI2cScanNext=0x20,busaI2cPriorityNext=0;
@@ -588,14 +576,13 @@ void scanI2cAddresses(uint32_t now){
 void probeI2c(uint32_t now){
   if(!i2cOnline || busaI2cSuspended(now))return;
   busaI2cRebuildAddressCache(millis());
-  pcfDetected=false;pcfAddr=0;pcaDetected=false;pcaAddr=0;
+  pcfDetected=false;pcfAddr=0;
   // Only PCF8575 keypad is installed; no LED driver discovery or reads.
   for(uint8_t j=0;j<i2cFoundCount;j++){
     const uint8_t address=i2cFound[j];
     if(busaI2cIsPcfAddress(address) &&
        (!pcfDetected || address==0x20)){pcfDetected=true;pcfAddr=address;}
   }
-  pcaMode1=-1;pcaMode2=-1;
   pcfIdleReadOk=false;
   if(pcfDetected){
     uint8_t allHigh[2]={0xff,0xff},received[2]={};
@@ -817,7 +804,7 @@ bool saveThemeMode(uint8_t mode){
  prefs.putBool("tftDarkColor",tftThemeDark);
  tftDirty=true;return true;
 }
-void darkenTftDisplay(); // manual screen-off via F2 or local iPhone UI
+bool darkenTftDisplay(); // manual screen-off via F2 or local iPhone UI
 void keypadAction(int k){
   // # and * always remain unassigned; hold 0 >2 seconds for decimal comma.
   if(k==2 || k==3)return; // # and * always unused
@@ -981,8 +968,7 @@ void keypadAction(int k){
     }
     // Nothing else to open in read-only sections.
   }else if(k==1){ // F2: display OFF; monitoring continues
-    darkenTftDisplay();
-    keyMessage="TFT погашен (ручной режим)";
+    keyMessage=darkenTftDisplay()?"Запрос выключения экрана":"Экран: нет поддержки команды";
   }else if(wifiUiDigitFromKey(k)>=0){
     // Numbers NEVER open sections. Digits are used only inside an editor.
     keyMessage="Цифры работают только в полях ввода";
@@ -1025,7 +1011,7 @@ bool learnCommitPair(int pair){
   tftDirty=true;
   return true;
 }
-void wakeTftDisplay(); // Wake works even when the 5x4 keymap is untrained.
+bool wakeTftDisplay(); // Wake works even when the 5x4 keymap is untrained.
 bool tftDisplayOff=false;
 uint32_t tftDisplayActivityMs=0;
 bool keypadDeferredZero=false;
@@ -1101,189 +1087,28 @@ void pollKeys(uint32_t now){
   tftDirty=true;
 }
 
-Adafruit_ST7789 screenSt(TFT_CS,TFT_DC,TFT_RST);
-Adafruit_ILI9341 screenIli(TFT_CS,TFT_DC,TFT_RST);
-Adafruit_GFX* screen=nullptr;
-U8G2_FOR_ADAFRUIT_GFX ru;
-// A full-color PSRAM-backed TFT frame eliminates the blank flash on keypress.
-// Render a whole landscape screen offscreen and transfer one complete frame
-// over SPI only AFTER all cards, fonts and highlights are finished.
-// Falls back to the existing immediate renderer if no PSRAM is available.
-class BusaTftPsramFrame : public Adafruit_GFX {
- public:
-  uint16_t* data=nullptr;
-  BusaTftPsramFrame():Adafruit_GFX(320,240){}
-  bool ensure(){
-    if(!data && ESP.getPsramSize()>0){
-      data=(uint16_t*)heap_caps_malloc(320u*240u*sizeof(uint16_t),
-         MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
-    }
-    return data!=nullptr;
-  }
-  void drawPixel(int16_t x,int16_t y,uint16_t color) override {
-    if(data && x>=0 && y>=0 && x<320 && y<240)
-      data[(uint32_t)y*320u+(uint16_t)x]=color;
-  }
-  void fillRect(int16_t x,int16_t y,int16_t w,int16_t h,uint16_t color) override {
-    if(!data||w<=0||h<=0)return;
-    const int16_t x1=max((int16_t)0,x),y1=max((int16_t)0,y);
-    const int16_t x2=min((int16_t)320,(int16_t)(x+w));
-    const int16_t y2=min((int16_t)240,(int16_t)(y+h));
-    if(x2<=x1||y2<=y1)return;
-    for(int16_t yy=y1;yy<y2;yy++){
-      uint16_t* row=data+(uint32_t)yy*320u+x1;
-      for(int16_t xx=x1;xx<x2;xx++)*row++=color;
-    }
-  }
-  void drawFastHLine(int16_t x,int16_t y,int16_t w,uint16_t color) override {
-    fillRect(x,y,w,1,color);
-  }
-  void drawFastVLine(int16_t x,int16_t y,int16_t h,uint16_t color) override {
-    fillRect(x,y,1,h,color);
-  }
-  void fillScreen(uint16_t color) override {fillRect(0,0,320,240,color);}
-};
-static BusaTftPsramFrame busaTftFrame;
-
-uint8_t tftProfile=1;
-bool tftStarted=false;
-bool tftInverted=false; // Hardware inversion remains DISABLED
-bool tftThemeDark=false; // Real saved software color palette
-uint32_t splashStartedAt=0,splashHoldMs=1700;
-uint8_t tftRotation=0; // V13 approved default: 240x320 portrait; rotation 2 is upside-down
-uint8_t bootStage=0; // 0 TFT, 1 WiFi, 2 modules, 3 1-Wire, 4 ready
-bool bootSplashComplete=false;
+// The sole physical display is GUITION over UART. Retain keypad state and theme.
+bool tftThemeDark=false;
 bool tftRebootPending=false;
 uint32_t tftRebootAt=0;
-const char* tftProfileName(){return tftProfile==2?"ILI9341":"ST7789";}
-const uint16_t BG=0x080f,PANEL=0x10a3,BLUE=0x1c9f,GREEN=0x07e0,WHITE=0xffff,
-               YELLOW=0xffe0,GRAY=0xbdf7;
-const char* pages[8]={"Главная","Температуры","Отбор","Графики","События","Настройки","Диагностика","Калькулятор"};
-const uint8_t UI_ORDER[6]={0,1,2,3,7,5}; // Six main sections; Events/Diagnostics are Settings children
-void navigatePage(uint8_t target); // forward declaration
+const uint8_t UI_ORDER[6]={0,1,2,3,7,5};
+void navigatePage(uint8_t target);
 uint8_t orderSlot(uint8_t page){if(page==4||page==6)return 5;for(uint8_t i=0;i<6;i++)if(UI_ORDER[i]==page)return i;return 0;}
 void moveApprovedTab(int direction){int slot=(orderSlot(currentPage)+6+direction)%6;navigatePage(UI_ORDER[slot]);}
-// Defined below with the web server; needed by the TFT renderer.
 extern String stationSsid,otaMessage,nearbyNames[5];
 extern uint8_t nearbyCount;
-void ruText(const String &v,int x,int y,uint16_t color=WHITE){
-  // Explicit UTF-8 glyph renderer; transparent background, 0-degree orientation.
-  // Avoid Print::write byte-by-byte path and opaque font-cell rectangles.
-  ru.setFontMode(1);
-  ru.setFontDirection(0);
-  ru.setForegroundColor(color);
-  ru.drawUTF8(x,y,v.c_str());
+// Requested state; GUITION owns its backlight and never receives browser navigation.
+bool wakeTftDisplay(){
+  tftDisplayOff=false;tftDisplayActivityMs=millis();tftDirty=true;
+  return busa_display_link::supportsBacklightRequest();
 }
-
-void panelAt(int x,int y,int w,int h){
-  screen->fillRoundRect(x,y,w,h,5,PANEL);
-  screen->drawRoundRect(x,y,w,h,5,BLUE);
+bool darkenTftDisplay(){
+  if(!busa_display_link::supportsBacklightRequest())return false;
+  tftDisplayOff=true;return true;
 }
-// Cache 24 small fields so unchanged values are not erased and redrawn.
-struct TftField {
-  int16_t x=0,y=0,w=0;
-  uint16_t color=0;
-  String value;
-};
-TftField tftFields[24];
-uint8_t tftFieldCount=0;
-void screenField(const String &v,int x,int y,int w,uint16_t color=WHITE){
-  int found=-1;
-  for(int i=0;i<tftFieldCount;i++){
-    if(tftFields[i].x==x && tftFields[i].y==y && tftFields[i].w==w){
-      found=i;break;
-    }
-  }
-  if(found>=0){
-    if(tftFields[found].value==v && tftFields[found].color==color)return;
-  }else if(tftFieldCount<24){
-    found=tftFieldCount++;
-    tftFields[found].x=x;
-    tftFields[found].y=y;
-    tftFields[found].w=w;
-  }
-  if(found>=0){
-    tftFields[found].value=v;
-    tftFields[found].color=color;
-  }
-  screen->fillRect(x,y-13,w,16,PANEL);
-  ruText(v,x,y,color);
-}
-void updateBootStage(uint8_t stage){
-  if(!screen||!tftStarted)return;
-  bootStage=stage>4?4:stage;
-  const int16_t w=screen->width(),h=screen->height();
-  // Only update the footer. The white logo on black stays stationary.
-  const int16_t y=h-58;
-  screen->fillRect(0,y,w,58,0x0000);
-  screen->setTextColor(0xffff);
-  screen->setTextSize(1);
-  screen->setTextWrap(false);
-  const char* steps[]={"TFT INIT","WIFI INITIALIZING","MODULES CHECK","SENSOR BUS SCAN","READY"};
-  String status=String("BOOT: ")+steps[bootStage];
-  screen->setCursor(max(0,(w-(int)status.length()*6)/2),y+5);
-  screen->print(status);
-  const String version="FW V14.9 N16R8";
-  screen->setCursor(max(0,(w-(int)version.length()*6)/2),y+19);
-  screen->print(version);
-  const int16_t width=w-46;
-  screen->drawRect(22,y+38,width+2,10,0xffff);
-  const int16_t filled=(int16_t)((int32_t)width*bootStage/4);
-  if(filled>0)screen->fillRect(23,y+39,filled,8,0xffff);
-}
-void drawBootSplash(uint32_t holdMs){
-  if(!screen)return;
-  const int16_t w=screen->width(),h=screen->height();
-  screen->fillScreen(0x0000);
-  screen->setTextColor(0xffff);
-  screen->setTextWrap(false);
-  const int scale=w>=300?3:2;
-  screen->setTextSize(scale);
-  screen->setCursor((w-12*6*scale)/2,h/2-30);
-  screen->print("BUSA MONITOR");
-
-  screen->setTextSize(1);
-  splashHoldMs=holdMs;
-  splashStartedAt=millis();
-  tftDirty=true;
-  tftFieldCount=0;
-  updateBootStage(bootStage);
-}
-void startScreen(){
-  Serial0.println("TFT: HW SPI landscape; controller model unverified");
-  SPI.begin(TFT_SCK,-1,TFT_MOSI,TFT_CS);
-  SPI.setFrequency(16000000); // moderate stable starting frequency
-  if(tftProfile==2){screenIli.begin();screen=&screenIli;}
-  else{screenSt.init(240,320);screen=&screenSt;}
-  screen->setRotation(tftRotation); // 0..3 selected from iPhone
-  screen->invertDisplay(tftInverted);
-  ru.begin(*screen);
-  ru.setFont(u8g2_font_6x13_t_cyrillic);
-  ru.setFontMode(1);
-  tftStarted=true;
-  tftDisplayOff=false;tftDisplayActivityMs=millis();
-  drawBootSplash(2500); // 2.5 s splash; Wi-Fi AP and web start before peripheral scans
-  Serial0.printf("TFT init command sent: %s (pixels not yet confirmed)\n",tftProfileName());
-}
-// Display-only standby; does NOT sleep ESP32, alter sensors, Wi-Fi or GPIO.
-void wakeTftDisplay(){
-  if(!tftStarted)return;
-  screenSt.enableDisplay(true);
-  tftDisplayOff=false;
-  tftDisplayActivityMs=millis();
-  tftDirty=true;
-}
-void darkenTftDisplay(){
-  if(!tftStarted||tftDisplayOff)return;
-  screenSt.enableDisplay(false);
-  tftDisplayOff=true;
-}
-// Note: a separately wired always-on TFT backlight may still glow in display-off.
- // Portrait-specific layout prevents 320px-wide landscape cards from clipping at 240px.
 bool busaSoundEnabled(uint8_t i); bool busaSoundActive(uint8_t i);
 extern volatile bool googleEnabled; // Google status read by both TFT renderers
 extern volatile int googleInternet,googleHttp; // TFT indicators; definitions in Google module
-static void busaCalcDraw();
 #include "BUSA_ChartHistory.h"
 static BusaChart::History busaChartHistory;
 static bool busaChartReady=false,busaChartAttempted=false;
@@ -1299,45 +1124,7 @@ static void busaCaptureChart(uint32_t now){
  const float cooling=flowReady?flowLpm*60.0f:NAN;
  busaChartHistory.capture(now,values,cooling,(float)collectionMeter.raw());
 }
-#include "BUSA_ChartTFT.h"
-#include "BUSA_ApprovedUI_V13.h"
-
-#include "BUSA_ApprovedGraphics_HQ_V14.h"
-#include "BUSA_Landscape_V14.h"
-#include "BUSA_CalculatorTft.h"
-void renderScreen(uint32_t now){
-  if(!tftStarted||!screen)return;
-  if(!bootSplashComplete || !elapsed(now,splashStartedAt,splashHoldMs))return;
-  if(screen->width()>=300){
-    if(busaTftFrame.ensure()){
-      Adafruit_GFX* physical=screen;
-      screen=&busaTftFrame;
-      ru.begin(*screen);
-      ru.setFont(u8g2_font_6x13_t_cyrillic);
-      ru.setFontMode(1);
-      renderLandscape(now); // No drawing reaches the TFT until frame is complete.
-      screen=physical;
-      ru.begin(*screen);
-      ru.setFont(u8g2_font_6x13_t_cyrillic);
-      ru.setFontMode(1);
-      if(tftProfile==2){
-        screenIli.startWrite();
-        screenIli.setAddrWindow(0,0,320,240);
-        screenIli.writePixels(busaTftFrame.data,320u*240u);
-        screenIli.endWrite();
-      }else{
-        screenSt.startWrite();
-        screenSt.setAddrWindow(0,0,320,240);
-        screenSt.writePixels(busaTftFrame.data,320u*240u);
-        screenSt.endWrite();
-      }
-    }else{
-      renderLandscape(now); // Graceful fallback if PSRAM allocation fails.
-    }
-    return;
-  }
-  renderPortrait(now);
-}
+#include "BUSA_History.h"
 
 WebServer server(80);
 static esp_err_t busaOtaConfirmResult=ESP_ERR_NOT_FOUND;
@@ -1350,7 +1137,6 @@ uint8_t nearbyCount=0;
 volatile bool busaWifiScanRunning=false;
 uint32_t busaWifiScanStartedAt=0,busaWifiScanLastAt=0;
 
-bool screenAttempted=false;
 bool apClient(){return server.client().localIP()==WiFi.softAPIP();}
 
 String apPassword="";
@@ -1475,7 +1261,7 @@ String statusJSON(){
   s+=",\"http_worst_ms\":"+String(busaHttpWorstMs);
   s+=",\"tft_worst_ms\":"+String(busaTftWorstMs);
   s+=",\"tft_last_ms\":"+String(busaLastTftRenderMs);
-  s+=",\"tft_live_refresh_target_ms\":"+String(BUSA_TFT_LIVE_REFRESH_MS);
+  s+=",\"tft_live_refresh_target_ms\":0";
   s+=",\"tft_full_render_count\":"+String(busaTftFullRenderCount);
   s+=",\"tft_live_render_count\":"+String(busaTftLiveRenderCount);
   s+=",\"cpu_mhz\":"+String(ESP.getCpuFreqMHz());
@@ -1521,21 +1307,23 @@ String statusJSON(){
   s+=",\"rejected_edges_window\":"+String(waterRejectDelta);
   s+=",\"sample_window_ms\":"+String(waterSampleDurationMs);
   s+=",\"sample_ready\":";s+=(waterSampleReady?"true":"false");s+="}";
-  s+=",\"collection\":{\"gpio\":1,\"sensor_present\":"+String(collectionMeter.seen()?"true":"false");
+  s+=",\"collection\":{\"gpio\":1,\"model\":\"YF-S401\",\"installed\":true,\"pulse_seen\":"+String(collectionMeter.seen()?"true":"false");
+  // Legacy sensor_present means pulses observed, not physical installation.
+  s+=",\"sensor_present\":"+String(collectionMeter.seen()?"true":"false");
   char collectionCount[24];snprintf(collectionCount,sizeof(collectionCount),"%llu",(unsigned long long)collectionPulses());
   s+=",\"pulses\":"+String(collectionCount)+",\"calibrated\":"+String(collectionMeter.calibrated()?"true":"false");
   s+=",\"pulses_per_ml\":"+collectionNumber(collectionMeter.calibration());
   s+=",\"ml_per_min\":"+collectionNumber(collectionMeter.rate())+",\"total_ml\":"+collectionNumber(collectionMeter.total())+"}";
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
-  s+=",\"pca9685_ack_only\":false,\"pca9685_enabled\":false";
-  s+=",\"tft_attempted\":"+(tftStarted?String("true"):String("false"));
-  s+=",\"tft_rotation\":"+String(tftRotation);
-  s+=",\"tft_boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
-  s+=",\"tft_profile_id\":"+String(tftProfile);
-  s+=",\"tft_profile\":"+quoteJson(tftProfileName());
+  // Compatibility keys now describe actual UART LCD evidence, not a removed panel.
+  const bool displayReady=busa_display_link::lcdReady();
+  s+=",\"tft_attempted\":"+String(displayReady?"true":"false");
+  s+=",\"tft_rotation\":0,\"tft_profile_id\":0,\"tft_profile\":\"GUITION JC4827W543R_I\"";
+  s+=",\"tft_boot_complete\":"+String(displayReady?"true":"false");
   s+=",\"tft_physical_pixels_confirmed\":false";
+  s+=",\"display_model\":\"GUITION JC4827W543R_I\",\"display_width\":480,\"display_height\":272";
   s+=",\"last_key\":"+quoteJson(keyMessage)+"}";
-  s+=",\"tft_theme_inverted\":"+(tftInverted?String("true"):String("false"));
+  s+=",\"tft_theme_inverted\":false";
   s+=",\"tft_theme_dark\":"+(tftThemeDark?String("true"):String("false"));
   s+=",\"tft_theme_mode\":"+String(tftThemeMode);
   s+=",\"calibration_offsets\":[";
@@ -1578,14 +1366,10 @@ String statusJSON(){
   s+=",\"scan_range\":\"PCF_ONLY_0x20_0x27_0x38_0x3F\"";
   s+=",\"scan_next\":"+String(busaI2cScanNext);
   s+=",\"pcf_address\":"+String(pcfAddr);
-  s+=",\"pca_address\":null";
   s+=",\"ack_fresh_ms\":"+String(BUSA_I2C_ACK_FRESH_MS);
   s+=",\"pcf_last_ack_ms\":"+String(busaI2cLastPcfAckMs);
-  s+=",\"pca_last_ack_ms\":0";
   s+=",\"pcf_ack_total\":"+String(busaI2cPcfAcks);
-  s+=",\"pca_ack_total\":0";
   s+=",\"pcf_last_nack_ms\":"+String(busaI2cLastPcfNackMs);
-  s+=",\"pca_last_nack_ms\":0";
   s+=",\"driver\":\"IDF_INPUT_OUTPUT_OPEN_DRAIN\"";
   s+=",\"electrical_fault\":"+(busaI2cElectricalFault?String("true"):String("false"));
   s+=",\"scan_suppressed\":"+(busaI2cElectricalFault?String("true"):String("false"));
@@ -1631,15 +1415,11 @@ String statusJSON(){
   s+=",\"read_ok\":"+(pcfIdleReadOk?String("true"):String("false"));
   s+=",\"idle_pins_hex\":"+quoteJson(String(pcfIdleDirect,HEX));
   s+=",\"keyscan_error\":"+String(pcfScanError)+"}";
-  s+=",\"pca9685\":{\"expected_address\":64,\"installed\":false,\"address\":0,\"ack\":false";
-  s+=",\"mode1\":"+String(pcaMode1)+",\"mode2\":"+String(pcaMode2);
-  s+=",\"outputs_enabled\":false}";
-  s+=",\"tft\":{\"spi_cs\":"+String(TFT_CS)+",\"spi_mosi\":"+String(TFT_MOSI)+",\"spi_sck\":"+String(TFT_SCK)+",\"dc\":"+String(TFT_DC)+",\"rst\":"+String(TFT_RST);
-  s+=",\"profile\":"+quoteJson(tftProfileName())+",\"rotation\":"+String(tftRotation);
-  s+=",\"init_sent\":"+(tftStarted?String("true"):String("false"));
-  s+=",\"boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
+  s+=",\"tft\":{\"profile\":\"GUITION JC4827W543R_I\",\"transport\":\"UART\",\"width\":480,\"height\":272";
+  s+=",\"init_sent\":"+String(displayReady?"true":"false");
+  s+=",\"boot_complete\":"+String(displayReady?"true":"false");
   s+=",\"pixel_feedback_available\":false}";
-  s+=",\"water_flow\":{\"gpio\":15,\"input_level\":"+String(digitalRead(FLOW_GPIO));
+  s+=",\"water_flow\":{\"gpio\":15,\"model\":\"YF-S401\",\"installed\":true,\"input_level\":"+String(digitalRead(FLOW_GPIO));
   s+=",\"pulses\":"+String(flowPulses())+",\"rejected_edges\":"+String(flowRejectedEdges());
   s+=",\"pulse_seen\":"+(flowSeen?String("true"):String("false"));
   s+=",\"pulses_per_litre\":"+String(waterPulsesPerLitre,1);
@@ -2865,7 +2645,7 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
   </details></div></div>
 <div class="temperatureSaveRow"><button id="temperatureSave" type="button" class="full">Сохранить пороги</button><p id="temperatureSaveResult" class="hint"></p></div></section>
 <section class="page" data-section="2" hidden><div class="approvedPageTitle"><svg class="uiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><strong>ВОДА И ОТБОР</strong></div>
-<article class="liquidPanel collectionPanel"><div class="liquidPanelHeading"><h2>Отбор жидкости</h2><span id="collectionAvailability">Нет датчика</span></div>
+<article class="liquidPanel collectionPanel"><div class="liquidPanelHeading"><h2>Отбор жидкости</h2><span id="collectionAvailability">Ожидание данных</span></div>
 <p class="liquidRateLabel">Текущий отбор</p><div class="liquidRateGrid"><div><strong id="collectionMlMin">—</strong><small>мл/мин</small></div><div><strong id="collectionLph">—</strong><small>л/ч</small></div></div>
 <div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div></article>
 <article class="liquidPanel coolingPanel"><div class="liquidPanelHeading"><h2>Охлаждение</h2><span id="coolingAvailability">Нет данных</span></div>
@@ -2978,15 +2758,12 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <button type="button" data-diag-btn="esp">ESP32</button>
 <button type="button" data-diag-btn="flow">Расходомер</button>
 </div></div>
-<div class="card" data-diag-panel="screen"><h2>Экран TFT</h2>
-<div class="row">Состояние <b id="displayState">—</b></div>
-<div class="row">Контроллер <b id="tft">—</b></div>
-<p class="hint">ST7789 инициализируется программой; правильность изображения проверяется визуально.</p>
+<div class="card" data-diag-panel="screen"><h2>Экран GUITION</h2>
+<div class="row">Связь UART <b id="displayState">—</b></div>
+<div class="row">Модель <b>JC4827W543R_I · 480×272</b></div>
+<div class="row">Прошивка <b id="tft">—</b></div>
+<p class="hint">Состояние LCD передаётся экраном. Изображение проверяется визуально.</p>
 <div class="grid"><button id="screenSleep" type="button">Погасить экран</button><button id="screenWake" type="button">Разбудить экран</button></div>
-<label for="tftDriver">Контроллер</label><select id="tftDriver"><option value="1">ST7789 320×240</option></select>
-<label for="tftRotation">Ориентация</label><select id="tftRotation"><option value="1">Горизонтальная · 1</option></select>
-<button id="tftSave" type="button" class="full">Сохранить профиль TFT</button>
-<button id="tftTest" type="button" class="full">Тест изображения</button>
 <p id="tftProfileStatus" class="hint">—</p></div>
 <div class="card" data-diag-panel="keys" hidden><h2>Клавиатура 5×4</h2>
 <div class="row">PCF8575 <b id="pcf">—</b></div>
@@ -3030,7 +2807,7 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let busaGraphData={temperature:[[],[],[],[]],water_pulses:[]},busaGraphFetchedAt=0,busaGraphLoading=false;
 let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=false,calInitialized=false;
-let active=0,connected=false,pollBusy=false,statusFailures=0,settingsActive=-1,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
+let active=0,connected=false,pollBusy=false,statusFailures=0,settingsActive=-1,lastLocalNav=0,lastClockPush=0;
 let eventRecords=[];
 function networkLeds(info,station,google){
  const wifi=station?.connected===true,local=info?.local_client===true;
@@ -3163,7 +2940,7 @@ function updateLiquidPanels(s){
  setMeasured('collectionMlMin',mlMin);setMeasured('collectionLph',measured(mlMin)?mlMin*.06:null);
  get('collectionTotal').textContent=formatVolumeMl(total);
  get('collectionTime').textContent=formatRunTime(collection?c.duration_ms??c.elapsed_ms:null);
- get('collectionAvailability').textContent=!s?'Нет связи':collection?'Данные датчика':'Нет датчика';
+ get('collectionAvailability').textContent=!s?'Нет связи':collection?'Данные датчика':c?.installed===true?'Нет импульсов':'Нет датчика';
  setMeasured('homeCollectionRate',mlMin);
  const volume=formatVolumeMl(total),split=volume.lastIndexOf(' ');
  get('homeCollectionTotal').textContent=split<0?volume:volume.slice(0,split);get('homeCollectionUnit').textContent=split<0?'мл':volume.slice(split+1);
@@ -3219,26 +2996,13 @@ async function setScreenPower(action){
  try{
   const resp=await fetch('/api/tft/screen',{method:'POST',body:new URLSearchParams({action})});
   if(!resp.ok)throw new Error(await resp.text());
-  get('displayState').textContent=action==='wake'?'РАБОТАЕТ':'ЭКРАН ПОГАШЕН';
- }catch(e){get('displayState').textContent='ОШИБКА: '+e.message}
+  get('tftProfileStatus').textContent=action==='wake'?'Запрос включения передан':'Запрос выключения передан';
+ }catch(e){get('tftProfileStatus').textContent='ОШИБКА: '+e.message}
 }
 get('screenSleep').onclick=()=>setScreenPower('sleep');
 get('screenWake').onclick=()=>setScreenPower('wake');
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
 get('keyNext').onclick=()=>keyCommand('next');
-get('tftSave').onclick=async()=>{
- if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Блок реле временно выключатся на перезагрузке.'))return;
- try{
-  const r=await fetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value,rotation:get('tftRotation').value})});
-  get('tftProfileStatus').textContent=await r.text();
- }catch(e){get('tftProfileStatus').textContent='Ошибка: '+e.message}
-};
-get('tftTest').onclick=async()=>{
- try{
-  const r=await fetch('/api/tft/test',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
-  get('tftProfileStatus').textContent=await r.text();
- }catch(e){get('tftProfileStatus').textContent='Ошибка: '+e.message}
-};
 get('diagCopy').onclick=async()=>{
  const t=get('diagReport');
  if(!lastDiagnosticReport){get('diagCopyResult').textContent='Отчёт ещё не получен';return;}
@@ -3362,7 +3126,7 @@ function graphs(){
   values.forEach((v,i)=>{if(Number.isFinite(v)){ctx.beginPath();ctx.arc(x0+pw*(i+.5)/values.length,y0+ph-Math.max(0,Math.min(high,v))*ph/high,2.7,0,Math.PI*2);ctx.fill();}});
  }
  if(chartView===0)DISPLAY_ORDER.forEach(k=>line(temp[k]||[],SENSOR_COLORS[k]));else line(chosen,chartView===1?'#f4c84a':'#38bdf8');
- const note=chartView===1&&!data.collection_sensor?'Нет датчика отбора':points?'':chartView===2?'Нет импульсов охлаждения':'Ожидание измерений';
+ const note=chartView===1&&!data.collection_sensor?(data.collection_installed?'Нет импульсов отбора':'Нет датчика отбора'):points?'':chartView===2?'Нет импульсов охлаждения':'Ожидание измерений';
  get('chartState').textContent=note||(chartView===2&&!data.cooling_calibrated?'Расчётно · без калибровки':'Данные с включения');
  if(note){ctx.fillStyle='#a6c2d5';ctx.font='21px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(note,x0+pw/2,y0+ph/2);}
 }
@@ -3416,7 +3180,10 @@ if(Number.isFinite(currentPulse)){
 }
 // The browser's SSID picker is never automatically populated with old iPhone.
 const cs=s.google;
-get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
+const screenDiag=s.display_diagnostics;
+get('displayState').textContent=screenDiag?.link==='CONNECTED'?(screenDiag.lcd_init===1?'Связь есть · LCD запущен':'Связь есть · LCD не запущен'):(screenDiag?.link==='STALE'?'Нет свежих данных':'Нет подтверждения связи');
+get('screenSleep').disabled=!(screenDiag?.link==='CONNECTED'&&String(screenDiag.firmware||'').endsWith('-HW1'));
+get('screenWake').disabled=get('screenSleep').disabled;
 if(!themeInitialized && typeof s.tft_theme_mode==='number'){
   get('themeModeSelect').value=String(s.tft_theme_mode);
   document.documentElement.dataset.theme=s.tft_theme_mode===1?'dark':s.tft_theme_mode===2?'system':'light';
@@ -3452,8 +3219,7 @@ if(s.keypad){
    get('diagI2c').textContent='I2C GPIO40/41 · клавиатура | ACK total='+d.i2c?.ack_total+
      ' | addresses='+addresses.map(a=>'0x'+Number(a).toString(16).padStart(2,'0')).join(', ')+
      '\nPCF8575: ACK='+d.pcf8575?.online+' read='+d.pcf8575?.read_ok+
-     ' idle=0x'+d.pcf8575?.idle_pins_hex+
-     '\nPCA9685: отключён, не опрашивается';
+     ' idle=0x'+d.pcf8575?.idle_pins_hex;
    get('diagNetwork').textContent='Wi-Fi STA: '+(s.station.connected?'подключен':'нет связи')+
       '\nAP: '+(s.ap?.enabled?'работает':'нет')+' · '+(s.ap?.ip||'—')+
       '\nМощность TX: '+(s.performance?.wifi_tx_power_dbm??'—')+' dBm'+
@@ -3494,7 +3260,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (проверка изображения визуальная)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}
+get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=screenDiag?.link==='CONNECTED'?(screenDiag.firmware||'—'):'Нет свежих данных';
 }catch(e){statusFailures++;if(statusFailures>=3){if(connected)message('Нет ответа ESP32: проверь локальный Wi-Fi');connected=false;networkLeds(null,'');updateRelayBadges(null);updateLiquidPanels(null);for(let i=0;i<4;i++){get('t'+i).textContent='Н/Д';get('tempLive'+i).textContent='Н/Д';}}}finally{pollBusy=false}}
 get('temperatureSave').onclick=async()=>{
  const button=get('temperatureSave'),result=get('temperatureSaveResult');
@@ -3913,12 +3679,7 @@ void handleCommand(String x){
     int n=x.substring(5).toInt();
     if(n>=1&&n<=6){navigatePage((uint8_t)(n-1));editingTemp=false;tftView=0;tftDirty=true;lastRender=0;Serial0.printf("PAGE=%d\n",n);}
   }
-  else if(x=="TFT ST7789"){
-    tftProfile=1;
-    prefs.putUChar("tft",tftProfile);
-    Serial0.println("TFT profile saved. Reset board to apply.");
-  }
-  else Serial0.println("Commands: STATUS | PAGE 1..6 | TFT ST7789");
+  else Serial0.println("Commands: STATUS | PAGE 1..6");
 }
 void readConsole(){
   // CH343 UART0 (COM6 on current board) is diagnostic console.
@@ -4178,7 +3939,7 @@ static void busaApi_chartHistory(BusaLocalRequest& server){
     j+="],\"cooling_calibrated\":";j+=(waterCalibrationVerified()?"true":"false");
     j+=",\"collection_ml_min\":[";
     for(int i=0;i<bins;i++){if(i)j+=",";j+=collectionNumber(collectionMeter.convert(busaChartHistory.collectionValue(selected[i])));}
-    j+="],\"collection_sensor\":"+String(collectionMeter.seen()?"true":"false")+",\"history_ready\":"+String(busaChartReady?"true":"false")+"}";
+    j+="],\"collection_installed\":true,\"collection_sensor\":"+String(collectionMeter.seen()?"true":"false")+",\"history_ready\":"+String(busaChartReady?"true":"false")+"}";
     server.send(200,"application/json; charset=utf-8",j);
 }
 
@@ -4408,14 +4169,7 @@ void setup(){
 
   busaRemoteAlarmInit();
   keypadBackupOpen=keypadBackupPrefs.begin("busa-key20",false);
-  // User-approved ST7789 320x240 rotation 1 and software-drawn light theme.
-  if(!prefs.getBool("v14lightSt",false)){
-    prefs.putUChar("tft",1);
-    prefs.putUChar("tftRotate",1);
-    prefs.putBool("tftInvert",false);
-    prefs.putBool("v14lightSt",true);
-  }
-  tftProfile=1;tftRotation=1;tftInverted=false;
+  // Preserve saved theme and unrelated NVS keys; GUITION owns display setup.
   uint8_t themeSaved=prefs.getUChar("themeMode",255);
   tftThemeMode=themeSaved<=2?themeSaved:(prefs.getBool("tftDarkColor",false)?1:2);
   tftThemeDark=tftThemeMode==1;
@@ -4425,12 +4179,7 @@ void setup(){
   }
   snprintf(busaRmService,sizeof(busaRmService),"PROV_BUSA_%04X",(unsigned)(ESP.getEfuseMac()&0xFFFF));
   startedAt=millis();
-  tftProfile=1; // ST7789 only
-  // Preserve original V14.7 splash-first boot; time every operation.
-  busaReportStage("TFT_BEGIN");
-  screenAttempted=true;
-  startScreen();
-  busaReportStage("TFT_READY");
+  // GUITION starts independently and communicates via UART.
   stationSsid=prefs.getString("ssid","");
   stationPass=prefs.getString("pass","");
   wifiUiStaDisabled=prefs.getBool("staOff",false); // AP remains available even when STA is disabled
@@ -4460,7 +4209,6 @@ void setup(){
   const bool txSet=WiFi.setTxPower(WIFI_POWER_19_5dBm);
   Serial0.printf("Wi-Fi configured TX <=19.5 dBm: %s\n",txSet?"OK":"FAILED");
   busaReportStage(wifiRunning?"AP_READY":"AP_FAILED");
-  updateBootStage(1);
   Serial0.printf("AP=%d IP=%s SSID=BUSA-1M-001-R04 password hidden\n",
                  (int)wifiRunning,WiFi.softAPIP().toString().c_str());
   if(!wifiUiStaDisabled && stationSsid.length() && stationPass.length()>=8){
@@ -4497,8 +4245,6 @@ void setup(){
     prefs.putInt("clkTz",clockUtcOffsetMinutes);
     prefs.putBool("clkZone",true);
     Serial0.println("CLOCK: synchronized from phone, UTC offset stored");
-    // V14.6 live clock refreshes its own header strip; no full-screen flash.
-    if(screen && screen->width()<300)tftDirty=true;
     server.send(200,"application/json",String("{\"datetime\":")+quoteJson(clockStamp(false))+"}");
   });
   server.on("/api/status",HTTP_GET,[]{
@@ -4674,38 +4420,23 @@ void setup(){
     // Legacy browser callers must not alter TFT navigation.
     server.send(200,"application/json","{\"ok\":true,\"scope\":\"browser_only\"}");
   });
+  // Old callers get an explicit response, not a fabricated hardware success.
   server.on("/api/tft/profile",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){
-      server.send(403,"text/plain; charset=utf-8","Нужна локальная сеть БУСА");return;
-    }
-    if(server.arg("profile")!="1"||server.arg("rotation")!="1"){
-      server.send(400,"text/plain; charset=utf-8","Зафиксированы ST7789 и поворот 1");return;
-    }
-    prefs.putUChar("tft",1);prefs.putUChar("tftRotate",1);
-    server.send(200,"text/plain; charset=utf-8","ST7789 320×240 сохранён");
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только локальная сеть БУСА");return;}
+    server.send(410,"text/plain; charset=utf-8","GUITION имеет собственную конфигурацию");
   });
   server.on("/api/tft/screen",HTTP_POST,[]{
-    if(!apClient()){server.send(403,"text/plain; charset=utf-8","Только локальная сеть БУСА");return;}
+    if(!apClient()){server.send(403,"text/plain","Только локальная сеть БУСА");return;}
     String action=server.arg("action");
-    if(action=="wake"){
-      wakeTftDisplay();
-      server.send(200,"text/plain; charset=utf-8","TFT включён");
-    }else if(action=="sleep"){
-      darkenTftDisplay();
-      server.send(200,"text/plain; charset=utf-8","TFT погашен; ESP32 продолжает мониторинг");
-    }else server.send(400,"text/plain; charset=utf-8","Неверная команда");
+    if(action!="wake"&&action!="sleep"){server.send(400,"text/plain; charset=utf-8","Неверная команда");return;}
+    if(!(action=="wake"?wakeTftDisplay():darkenTftDisplay())){
+      server.send(409,"text/plain; charset=utf-8","GUITION не подтвердил поддержку команды");return;
+    }
+    server.send(202,"text/plain; charset=utf-8","Запрос передан в статус GUITION");
   });
   server.on("/api/tft/test",HTTP_POST,[]{
-    if(!apClient()||server.arg("confirm")!="YES"){
-      server.send(403,"text/plain; charset=utf-8","Нужна локальная Wi-Fi сеть БУСА");return;
-    }
-    if(!tftStarted||!screen){
-      server.send(409,"text/plain; charset=utf-8","Дисплей ещё не запускался");return;
-    }
-    drawBootSplash(5000);
-    lastRender=0;
-    server.send(200,"text/plain; charset=utf-8",
-      "Тест отправлен: 5 секунд чёрного фона и белой надписи BUSA 1M AI.");
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Только локальная сеть БУСА");return;}
+    server.send(410,"text/plain; charset=utf-8","Проверка изображения выполняется на GUITION");
   });
   server.on("/api/tft/theme",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_theme(request);
   });
@@ -4757,7 +4488,7 @@ void setup(){
       j+=String(waterPulseHistory[idx]);
     }
     j+="],\"water_interval_ms\":2000,\"water_calibrated\":";j+=(waterCalibrationVerified()?"true":"false");j+=",";
-    j+="\"collection_sensor\":"+String(collectionMeter.seen()?"true":"false")+",\"time_ms\":"+String(now)+",";
+    j+="\"collection_installed\":true,\"collection_sensor\":"+String(collectionMeter.seen()?"true":"false")+",\"time_ms\":"+String(now)+",";
     j+="\"temperature_samples\":"+String(v13HistoryCount)+"}";
     server.send(200,"application/json; charset=utf-8",j);
   });
@@ -4796,15 +4527,13 @@ void setup(){
   if(!busaI2cLastSda || !busaI2cLastScl)busaI2cRecover();
   busaI2cRunGpioSelfTest(); // bounded, non-destructive bus-level selftest
   i2cOnline=true;
-  updateBootStage(2);
   busaReportStage("I2C_READY");
-  updateBootStage(3);
   busa_display_link::begin();
   launchGoogleCloud();
   busaSetupDoneMs=millis()-busaBootAt;
   busaReportStage("SETUP_DONE");
   Serial.printf("BUSA SETUP DONE ms=%lu K1-K4 sound-only\n",(unsigned long)busaSetupDoneMs);
-  Serial0.println("BUSA CORE STABLE: local TFT + AP first; RainMaker explicit pairing; credentials hidden");
+  Serial0.println("BUSA: AP and UART GUITION; RainMaker explicit pairing; credentials hidden");
 }
 void loop(){
   if(busaRmBleBootMode){
@@ -4862,13 +4591,7 @@ void loop(){
   busaLoopProfile.mark(busa_perf::services,millis());
   {const uint32_t started=millis();sampleTemperatures(now);busaObserve("TEMP",started,busaTempWorstMs);}
   {const uint32_t started=millis();probeOneWire(now);busaObserve("ONEWIRE",started,busaOneWireWorstMs);} // Diagnose on idle 1-Wire bus only
-  // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
-  // Wi-Fi AP and HTTP server initialize during the splash.
-  // Missing sensors must not delay the user interface.
-  if(!bootSplashComplete && elapsed(now,splashStartedAt,2500)){
-    bootSplashComplete=true;
-    tftDirty=true;
-  }
+  // Missing sensors do not delay monitoring or the independent UART display.
     sampleFlow(now);
   collectionMeter.sample(now,collectionPulses());
   busaLoopProfile.mark(busa_perf::peripherals,millis());
@@ -4879,26 +4602,7 @@ void loop(){
   busaRainMakerPoll(now);
   v13Collect(now);
   busaLoopProfile.mark(busa_perf::cloud,millis()); // Shared graph sampling, including when TFT screen is asleep.
-  // TFT graph is repainted inside its own plot border by v14RefreshLive().
-  // Never set tftDirty here: that would erase the entire screen every 5 s.
-  // Landscape V14.7: repaint changed fields at 5 Hz; full frame only on page/theme change.
-  // TFT driver writes are kept in the main loop so no concurrent SPI transactions occur.
-  if(tftStarted && !tftDisplayOff && !otaActive && bootSplashComplete &&
-     elapsed(now,splashStartedAt,splashHoldMs) &&
-     (tftDirty||lastRender==0 || elapsed(now,lastRender,BUSA_TFT_LIVE_REFRESH_MS))){
-    const bool wholeFrame=tftDirty||lastRender==0;
-    lastRender=now;
-    const uint32_t started=millis();
-    if(screen->width()>=300 && !wholeFrame){
-      v14RefreshLive(now);
-      busaTftLiveRenderCount++;
-    }else{
-      renderScreen(now);
-      busaTftFullRenderCount++;
-    }
-    busaLastTftRenderMs=millis()-started;
-    busaObserve("TFT",started,busaTftWorstMs);
-  }
+  // No local SPI rendering: GUITION owns its framebuffer and touch interface.
   busaLoopProfile.mark(busa_perf::tft,millis());
   if(busa_display_ota::busy())busa_display_link::poll();
   busaLoopProfile.mark(busa_perf::uart,millis());
@@ -4959,10 +4663,10 @@ void loop(){
     lastUart=now;
     Serial.printf("BUSA ALIVE ms=%lu stage=%s AP=%d i2c=%d tft=%d worst_loop=%lu key_ms=%lu i2c_ms=%lu\n",
       (unsigned long)now,busaBootStage,(int)wifiRunning,(int)i2cOnline,
-      (int)tftStarted,(unsigned long)busaMaxLoopMs,(unsigned long)busaLastKeyScanMs,
+      (int)busa_display_link::lcdReady(),(unsigned long)busaMaxLoopMs,(unsigned long)busaLastKeyScanMs,
       (unsigned long)busaLastI2cStepMs);
     Serial0.printf("N16R8 HEARTBEAT ms=%lu wifi=%d i2c=%d tft=%d p=%lu flow=%.3f\n",
-      (unsigned long)now,(int)wifiRunning,(int)i2cOnline,(int)tftStarted,
+      (unsigned long)now,(int)wifiRunning,(int)i2cOnline,(int)busa_display_link::lcdReady(),
       (unsigned long)flowPulses(),(double)flowLpm);
   }
   busaLoopProfile.mark(busa_perf::logging,millis());
