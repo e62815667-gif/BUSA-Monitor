@@ -220,12 +220,12 @@ private:
         lv_obj_set_style_pad_column(o,3,0);return o;
     }
     lv_obj_t* field(lv_obj_t* parent,const char* title,const String& value,bool numeric,bool secret=false,int width=LV_PCT(100)){
-        auto* box=plain(parent,width,41);lv_obj_set_flex_flow(box,LV_FLEX_FLOW_COLUMN);lv_obj_set_style_pad_row(box,1,0);
+        auto* box=plain(parent,width,42);lv_obj_set_flex_flow(box,LV_FLEX_FLOW_COLUMN);lv_obj_set_style_pad_row(box,1,0);
         auto* caption=smallLabel(box,title);lv_obj_set_style_text_color(caption,color(muted()),0);
-        lv_obj_set_size(caption,LV_PCT(100),16);lv_label_set_long_mode(caption,LV_LABEL_LONG_CLIP);
+        lv_obj_set_size(caption,LV_PCT(100),17);lv_label_set_long_mode(caption,LV_LABEL_LONG_CLIP);
         auto* ta=lv_textarea_create(box);lv_obj_set_width(ta,LV_PCT(100));
         lv_obj_set_style_text_font(ta,&busa_font,0);lv_obj_set_style_text_color(ta,color(ink()),0);lv_obj_set_style_bg_color(ta,color(paper()),0);lv_obj_set_style_bg_opa(ta,LV_OPA_COVER,0);
-        lv_obj_set_style_border_color(ta,color(line()),0);lv_obj_set_style_border_width(ta,1,0);lv_obj_set_style_radius(ta,5,0);lv_obj_set_style_pad_all(ta,2,0);lv_textarea_set_one_line(ta,true);lv_obj_set_height(ta,24);lv_obj_set_scrollbar_mode(ta,LV_SCROLLBAR_MODE_OFF);
+        lv_obj_set_style_border_color(ta,color(line()),0);lv_obj_set_style_border_width(ta,1,0);lv_obj_set_style_radius(ta,5,0);lv_obj_set_style_pad_all(ta,1,0);lv_textarea_set_one_line(ta,true);lv_obj_set_height(ta,24);lv_obj_set_scrollbar_mode(ta,LV_SCROLLBAR_MODE_OFF);
         lv_textarea_set_max_length(ta,numeric?16:220);
         if(numeric)lv_textarea_set_accepted_chars(ta,"0123456789.-,");
         lv_textarea_set_password_mode(ta,secret);lv_textarea_set_text(ta,value.c_str());
@@ -334,7 +334,7 @@ private:
         for(int lineNo=0;lineNo<2;++lineNo){auto* r=row(body_,70);
             for(int col=0;col<2;++col){int i=order[lineNo*2+col];auto* p=panel(r,235,70);lv_obj_set_style_pad_all(p,2,0);auto* head=row(p,20);
                 label(head,i==3?"Авария":sensor(i));live_[i]=label(head,"—");lv_obj_set_style_text_font(live_[i],&busa_font,0);lv_obj_set_style_text_color(live_[i],color(colors_[i]),0);
-                auto* fields=row(p,41);fields_[2*i]=field(fields,"ВКЛ, °C",value(doc["display_references"][i]["target"]),true,false,110);
+                auto* fields=row(p,42);fields_[2*i]=field(fields,"ВКЛ, °C",value(doc["display_references"][i]["target"]),true,false,110);
                 fields_[2*i+1]=field(fields,"ВЫКЛ, °C",value(doc["display_references"][i]["notice"]),true,false,110);}}
         selected(button(body_,"Сохранить пороги",200),true);
     }
@@ -388,12 +388,12 @@ private:
         static const char* labels[4][5]={{"Объём жидкости, л","Начальная крепость, %","Требуемая крепость, %","",""},{"Температура, °C","Показание ареометра, %","","",""},{"Исходный объём, л","Начальная крепость, %","Крепость на выходе, %","Доля 1, %","Доля 2, %"},{"Внутренний диаметр, см","Внутренняя высота, см","Уровень жидкости, см","",""}};
         static const int counts[]={3,2,5,3};
         auto* r=row(body_,28);for(int i=0;i<4;++i){auto* b=button(r,calcTitle(i),320+i,i==1?143:i==0?125:i==2?105:92);auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);lv_obj_set_height(b,28);selected(b,i==calcMode_);}
-        for(int i=0;i<counts[calcMode_];){auto* inputs=row(body_,41);for(int col=0;col<3&&i<counts[calcMode_];++col,++i){fields_[i]=field(inputs,labels[calcMode_][i],calcInput_[calcMode_][i],true,false,153);lv_textarea_set_placeholder_text(fields_[i],"0,00");}}
+        for(int i=0;i<counts[calcMode_];){auto* inputs=row(body_,42);for(int col=0;col<3&&i<counts[calcMode_];++col,++i){fields_[i]=field(inputs,labels[calcMode_][i],calcInput_[calcMode_][i],true,false,153);lv_textarea_set_placeholder_text(fields_[i],"0,00");}}
         auto* buttons=row(body_,26);
         if(calcMode_==3){selected(button(buttons,"Рассчитать",330,154),true);button(buttons,"Очистить уровень",333,154);button(buttons,"Условия расчёта",334,154);}
         else{selected(button(buttons,"Рассчитать",330,154),true);button(buttons,"Очистить",333,154);button(buttons,"Условия расчёта",334,154);}
         if(calcMode_==3){auto* notes=row(body_,26);button(notes,"Загрузить размеры",331,235);button(notes,"Сохранить размеры",332,235);}
-        auto* p=panel(body_,LV_PCT(100),calcMode_==2?48:50);lv_obj_set_style_pad_all(p,2,0);resultLabel_=smallLabel(p,"—");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
+        auto* p=panel(body_,LV_PCT(100),calcMode_==2?46:50);lv_obj_set_style_pad_all(p,2,0);resultLabel_=smallLabel(p,"—");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
         pageStatus_=resultLabel_;
         calculate(false);
     }
@@ -425,13 +425,13 @@ private:
         static const char* title[]={"Температура","Wi-Fi","Экран","Google","О системе","Журнал событий","Диагностика","Bluetooth · RainMaker","Обновление ПО"};
         auto* top=row(body_,26);label(top,title[sub_]);button(top,"Все настройки",409,132);
         const auto& d=session_.snapshot();
-        if(sub_==0){static const int order[]={0,2,1,3};for(int i=0;i<4;){auto* r=row(body_,41);for(int col=0;col<2;++col,++i){int k=order[i];fields_[k]=field(r,k==3?"Авария":sensor(k),value(d["calibration_offsets"][k]),true,false,235);}}button(body_,"Сохранить поправки",202);}
+        if(sub_==0){static const int order[]={0,2,1,3};for(int i=0;i<4;){auto* r=row(body_,42);for(int col=0;col<2;++col,++i){int k=order[i];fields_[k]=field(r,k==3?"Авария":sensor(k),value(d["calibration_offsets"][k]),true,false,235);}}button(body_,"Сохранить поправки",202);}
         else if(sub_==1){auto* r=row(body_,26);live_[0]=smallLabel(r,"Wi-Fi —");lv_obj_set_width(live_[0],280);lv_label_set_long_mode(live_[0],LV_LABEL_LONG_DOT);button(r,"Обновить список",203,180);
             wifiList_=lv_dropdown_create(body_);lv_obj_set_size(wifiList_,LV_PCT(100),26);lv_obj_set_style_pad_ver(wifiList_,3,LV_PART_MAIN);lv_obj_set_style_text_font(wifiList_,&busa_font,LV_PART_MAIN);lv_obj_set_style_bg_color(wifiList_,color(surface()),LV_PART_MAIN);lv_obj_set_style_text_color(wifiList_,color(ink()),LV_PART_MAIN);lv_obj_set_style_border_color(wifiList_,color(line()),LV_PART_MAIN);lv_obj_set_style_text_font(wifiList_,LV_FONT_DEFAULT,LV_PART_INDICATOR);lv_dropdown_set_options(wifiList_,"Нет сетей");registerKey(wifiList_,2,0);
             lv_obj_add_event_cb(wifiList_,dropdownOpened,LV_EVENT_READY,this);fields_[0]=field(body_,"Пароль","",false,true);lv_textarea_set_max_length(fields_[0],63);
             auto* b=row(body_,26);button(b,"Подключить",204,235);button(b,"Отключить",205,235);}
         else if(sub_==2){auto* r=row(body_,26);selected(button(r,"Светлая",206,235),requestedTheme_==0);selected(button(r,"Тёмная",207,235),requestedTheme_==1);selected(button(body_,"Системная · утверждённые рисунки БУСА",208),requestedTheme_==2);selected(button(body_,"Применить и сохранить тему",221),true);button(body_,"Калибровка сенсора",209);}
-        else if(sub_==3){live_[0]=smallLabel(body_,"Google —");auto* r=row(body_,41);fields_[0]=field(r,"Адрес Apps Script (/exec)","",false,false,235);fields_[1]=field(r,"Секрет устройства","",false,true,235);
+        else if(sub_==3){live_[0]=smallLabel(body_,"Google —");auto* r=row(body_,42);fields_[0]=field(r,"Адрес Apps Script (/exec)","",false,false,235);fields_[1]=field(r,"Секрет устройства","",false,true,235);
             button(body_,"Сохранить подключение Google",210);auto* b=row(body_,26);button(b,"Проверить отправку диагностики",211,235);button(b,"Отключить передачу в Google",212,235);}
         else if(sub_==4){for(int i=0;i<5;++i){live_[i]=smallLabel(body_,"—");lv_obj_set_size(live_[i],LV_PCT(100),i==0?60:16);lv_label_set_long_mode(live_[i],LV_LABEL_LONG_WRAP);}}
         else if(sub_==5){button(body_,"Обновить журнал",213);pagedResult();}
