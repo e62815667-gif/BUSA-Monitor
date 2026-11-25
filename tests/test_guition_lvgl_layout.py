@@ -50,7 +50,7 @@ struct UiTest {
     static String value(JsonStub){return {};}
     void calculate(bool){}
     int graphKind_=0,graphMinutes_=5;bool graphDirty_=false;
-    lv_obj_t *chart_=nullptr,*graphRange_[5]={},*graphLegend_[4]={},*graphY_[4]={},*graphX_[4]={};lv_chart_series_t* series_[4]={};
+    lv_obj_t *chart_=nullptr,*graphNotice_=nullptr,*graphUnit_=nullptr,*graphRange_[5]={},*graphLegend_[4]={},*graphY_[4]={},*graphX_[4]={};lv_chart_series_t* series_[4]={};
     void requestGraph(){} void set(lv_obj_t* l,const String& s){if(l)lv_label_set_text(l,s.c_str());}
 '''
 checks=r'''
@@ -85,14 +85,20 @@ checks=r'''
     }
     void verifyGraphs(){
         for(int mode=0;mode<3;++mode){
-            init();graphKind_=mode;resultLabel_=nullptr;graphs();verify();assertFits(chart_);
+            init();graphKind_=mode;resultLabel_=nullptr;pageStatus_=nullptr;graphs();verify();assertFits(chart_);
             unsigned n=0;for(auto* s=lv_chart_get_series_next(chart_,nullptr);s;s=lv_chart_get_series_next(chart_,s))++n;
             assert(n==(mode==0?4u:1u));
             for(int k=0;k<4;++k){labelFits(graphY_[k]);labelFits(graphX_[k]);}
-            labelFits(pageStatus_);
+            assert(!pageStatus_);
+            assert(lv_obj_get_height(chart_)==(mode==0?104:123));
+            assert(lv_obj_get_style_line_width(chart_,LV_PART_ITEMS)==3);
+            labelFits(graphUnit_);
+            labelFits(graphNotice_);
+            graphNotice("");assert(lv_obj_has_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN));
+            graphNotice("Нет связи");assert(!lv_obj_has_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN));lv_obj_update_layout(chart_);labelFits(graphNotice_);
             if(mode==0)for(int i=0;i<4;++i)labelFits(graphLegend_[i]);
         }
-        std::puts("PASS native LVGL graph pages, distinct series and axis geometry");
+        std::puts("PASS native LVGL graph pages, distinct series, larger plot, axis geometry, unobtrusive status and trace width");
     }
     void verifyNavigation(){
         init();buildNavigation(lv_scr_act());lv_obj_update_layout(nav_);

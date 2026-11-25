@@ -330,7 +330,7 @@ private:
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;}
         hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
-        wifiList_=nullptr;chart_=nullptr;for(auto& s:series_)s=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
+        wifiList_=nullptr;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& s:series_)s=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
         for(int i=0;i<6;++i)selected(navButtons_[i],i==page_);
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
         lv_obj_set_style_pad_row(body_,page_==0?GAP:2,0);
@@ -409,44 +409,58 @@ private:
             lv_label_set_text(graphX_[i],b);
         }
     }
+    void graphNotice(const char* message){
+        if(!graphNotice_)return;
+        set(graphNotice_,message);
+        if(*message)lv_obj_clear_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN);
+    }
     void clearGraph(){
         if(!chart_)return;
         for(unsigned i=0;i<busa_graph::spec(graphKind_).series;++i)lv_chart_set_all_value(chart_,series_[i],LV_CHART_POINT_NONE);
         graphAxes(graphKind_==0?125:10);lv_chart_refresh(chart_);
     }
     void graphs(){
-        auto* r=row(body_,26);
+        auto* r=row(body_,24);
         static const char* names[]={"Температура","Отбор","Охлаждение"};
-        for(int i=0;i<3;++i)selected(button(r,names[i],300+i,156),graphKind_==i);
+        for(int i=0;i<3;++i){auto* b=button(r,names[i],300+i,156);lv_obj_set_height(b,24);lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);selected(b,graphKind_==i);}
         const auto spec=busa_graph::spec(graphKind_);
-        auto* head=row(body_,17);smallLabel(head,spec.title);pageStatus_=statusLabel(head,270,17);set(pageStatus_,"Ожидание данных");
         if(graphKind_==0){
             auto* legend=row(body_,17);static const int order[]={0,2,1,3};
             for(int i:order){auto* l=smallLabel(legend,i==3?"Авария":sensor(i));graphLegend_[i]=l;lv_obj_set_style_text_color(l,color(colors_[i]),0);}
         }
-        const int plotHeight=graphKind_==0?80:99;
+        const int plotHeight=graphKind_==0?104:123;
         auto* plot=row(body_,plotHeight);
         auto* y=plain(plot,48,plotHeight);lv_obj_set_flex_flow(y,LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(y,LV_FLEX_ALIGN_SPACE_BETWEEN,LV_FLEX_ALIGN_END,LV_FLEX_ALIGN_CENTER);
         for(int i=0;i<4;++i){graphY_[i]=smallLabel(y,"0");lv_obj_set_style_text_font(graphY_[i],&busa_font_nav,0);}
         chart_=lv_chart_create(plot);lv_obj_set_size(chart_,421,plotHeight);lv_chart_set_type(chart_,LV_CHART_TYPE_LINE);
         lv_obj_set_style_pad_all(chart_,0,0);
-        lv_chart_set_point_count(chart_,160);lv_obj_set_style_bg_color(chart_,color(surface()),0);lv_obj_set_style_border_color(chart_,color(line()),0);
-        lv_obj_set_style_line_color(chart_,color(line()),LV_PART_MAIN);lv_obj_set_style_line_width(chart_,2,LV_PART_ITEMS);
+        lv_chart_set_point_count(chart_,160);lv_obj_set_style_bg_color(chart_,color(theme_==0?0xeef4f7:theme_==1?0x101010:0x081822),0);lv_obj_set_style_border_color(chart_,color(line()),0);
+        lv_obj_set_style_bg_opa(chart_,LV_OPA_COVER,0);
+        lv_obj_set_style_line_color(chart_,color(theme_==0?0xc0ced6:theme_==1?0x353535:0x284451),LV_PART_MAIN);
+        lv_obj_set_style_line_width(chart_,1,LV_PART_MAIN);lv_obj_set_style_line_width(chart_,3,LV_PART_ITEMS);
+        lv_obj_set_style_line_opa(chart_,LV_OPA_COVER,LV_PART_ITEMS);
         lv_obj_set_style_size(chart_,2,LV_PART_INDICATOR);lv_chart_set_div_line_count(chart_,4,4);
         lv_chart_set_range(chart_,LV_CHART_AXIS_PRIMARY_Y,0,1000);
         for(unsigned i=0;i<spec.series;++i)series_[i]=lv_chart_add_series(chart_,color(graphKind_==0?colors_[i]:spec.color),LV_CHART_AXIS_PRIMARY_Y);
         clearGraph();
-        auto* times=row(body_,15);plain(times,44,1);
-        for(int i=0;i<4;++i){graphX_[i]=smallLabel(times,"—");lv_obj_set_style_text_font(graphX_[i],&busa_font_nav,0);}
-        auto* ranges=row(body_,26);
+        graphNotice_=smallLabel(chart_,"");lv_obj_set_style_bg_color(graphNotice_,color(paper()),0);lv_obj_set_style_bg_opa(graphNotice_,LV_OPA_COVER,0);
+        lv_obj_set_style_pad_hor(graphNotice_,3,0);lv_obj_align(graphNotice_,LV_ALIGN_TOP_MID,0,4);graphNotice("Ожидание данных");
+        auto* times=row(body_,15);auto* unitBox=plain(times,48,15);
+        static const char* units[]={"°C","мл/мин","л/ч"};graphUnit_=smallLabel(unitBox,units[graphKind_]);
+        lv_obj_set_style_text_font(graphUnit_,&busa_font_nav,0);lv_obj_align(graphUnit_,LV_ALIGN_LEFT_MID,0,0);
+        auto* timeAxis=row(times,15);lv_obj_set_width(timeAxis,421);
+        for(int i=0;i<4;++i){graphX_[i]=smallLabel(timeAxis,"—");lv_obj_set_style_text_font(graphX_[i],&busa_font_nav,0);}
+        auto* ranges=row(body_,24);
         for(int i=0;i<5;++i){static const char* names[]={"5 мин","10 мин","15 мин","30 мин","1 ч"};static const int mins[]={5,10,15,30,60};
-            graphRange_[i]=button(ranges,names[i],310+i,91);selected(graphRange_[i],graphMinutes_==mins[i]);}
+            graphRange_[i]=button(ranges,names[i],310+i,91);lv_obj_set_height(graphRange_[i],24);lv_obj_set_style_pad_top(graphRange_[i],0,0);lv_obj_set_style_pad_bottom(graphRange_[i],0,0);selected(graphRange_[i],graphMinutes_==mins[i]);}
         graphDirty_=true;requestGraph();
     }
     void requestGraph(){
         if(waiting_||!session_.connected())return;
-        graphDirty_=false;lastGraph_=millis();send(Route::chartHistory,{{"minutes",String(graphMinutes_)}});
+        graphDirty_=false;lastGraph_=millis();
+        if(!send(Route::chartHistory,{{"minutes",String(graphMinutes_)}}))graphNotice("Нет связи");
     }
     static const char* calcTitle(int mode){static const char* names[]={"Разбавление водой","Коррекция ареометра","Вторая перегонка","Объём куба"};return names[mode];}
     void rememberCalc(){if(page_!=4)return;for(int i=0;i<5;++i)if(fields_[i])calcInput_[calcMode_][i]=text(fields_[i]);}
@@ -556,7 +570,7 @@ private:
     }
     bool submit(Route route,const ApiBuilder& b,const uint8_t* bytes){
         if(waiting_||!session_.submitApi(bytes,b.size())){set(pageStatus_,"Нет связи или выполняется запрос");return false;}
-        waiting_=true;pendingRoute_=route;pendingPage_=page_;pendingSub_=sub_;pendingGeneration_=viewGeneration_;set(pageStatus_,"Выполняется…");return true;
+        waiting_=true;pendingRoute_=route;pendingPage_=page_;pendingSub_=sub_;pendingGeneration_=viewGeneration_;if(route!=Route::chartHistory)set(pageStatus_,"Выполняется…");return true;
     }
     void form(Route route,const char* key,int n){
         uint8_t bytes[apiMaxRequest]={};ApiBuilder b(bytes,sizeof(bytes),route);
@@ -635,8 +649,8 @@ private:
     }
     void handleResult(int code,const String& body){
         if(calibrating_||pendingPage_!=page_||pendingSub_!=sub_||pendingGeneration_!=viewGeneration_)return;
-        if(code<200||code>=300){if(pendingRoute_==Route::chartHistory)clearGraph();set(pageStatus_,code==0?String("Ответ не получен; проверьте состояние"):String("Ошибка ")+code+": "+body.substring(0,100));return;}
-        set(pageStatus_,"Выполнено");
+        if(code<200||code>=300){if(pendingRoute_==Route::chartHistory){clearGraph();graphNotice(code==0?"Нет связи":"Ошибка данных графика");return;}set(pageStatus_,code==0?String("Ответ не получен; проверьте состояние"):String("Ошибка ")+code+": "+body.substring(0,100));return;}
+        if(pendingRoute_!=Route::chartHistory)set(pageStatus_,"Выполнено");
         if(pendingRoute_==Route::geometryRead&&calcMode_==3){JsonDocument d;if(deserializeJson(d,body)){set(resultLabel_,"Ошибка загрузки размеров");return;}
             rememberCalc();for(int i=0;i<2;++i)calcInput_[3][i]=d[i?"height":"diameter"]|"";
             geometryExpanded_=!geometryValid();render();return;}
@@ -653,7 +667,7 @@ private:
         if(pendingRoute_==Route::chartHistory&&chart_){
             JsonDocument d;busa_graph::Scale scale;
             if(deserializeJson(d,body)||!busa_graph::analyze(d.as<JsonObjectConst>(),graphKind_,graphMinutes_,scale)){
-                clearGraph();set(pageStatus_,"Ошибка данных графика");return;
+                clearGraph();graphNotice("Ошибка данных графика");return;
             }
             lv_chart_set_point_count(chart_,scale.count);
             for(unsigned k=0;k<busa_graph::spec(graphKind_).series;++k){
@@ -663,7 +677,9 @@ private:
                     lv_chart_set_value_by_id(chart_,series_[k],i,busa_graph::valid(v)?lv_coord_t(busa_graph::coordinate(v.as<double>(),scale.high)):LV_CHART_POINT_NONE);
                 }
             }
-            graphAxes(scale.high);lv_chart_refresh(chart_);set(pageStatus_,busa_graph::state(d.as<JsonObjectConst>(),graphKind_,scale));return;}
+            graphAxes(scale.high);lv_chart_refresh(chart_);
+            const char* notice=busa_graph::state(d.as<JsonObjectConst>(),graphKind_,scale);
+            graphNotice(strcmp(notice,"Данные с включения")==0?"":notice);return;}
         if(pendingRoute_==Route::events){JsonDocument d;if(deserializeJson(d,body)){set(pageStatus_,"Ошибка журнала");return;}String s;
             for(JsonObjectConst e:d["events"].as<JsonArrayConst>()){s+=String((e["uptime_ms"]|0u)/1000)+" с  "+String(e["text"]|"")+"\n";if(s.length()>7000)break;}pageContent_=s.length()?s:"Нет событий";pageOffset_=0;pageText();}
         else if(pendingRoute_==Route::rainmakerStatus){JsonDocument d;if(!deserializeJson(d,body)){pageContent_=String("BLE: ")+(d["ble"]|"—")+"\n"+(d["feedback"]|"");pageOffset_=0;pageText();}}
@@ -798,7 +814,7 @@ private:
         const bool indicators[]={ok&&(d["station"]["connected"]|false),ok&&(d["network_indicators"]["internet"]|false),ok};
         for(int i=0;i<3;++i)setBg(statusDots_[i],indicators[i]?0x53d486:0x8297a1);
         String clock=ok?String(d["clock"]["datetime"]|"—"):String("—");set(clock_,"Дата и время: "+clock);
-        if(page_==3&&chart_){graphTimeLabels();if(!ok){clearGraph();set(pageStatus_,"Нет связи");}if(graphKind_==0)for(int i=0;i<4;++i){String s=i==3?"Авария":sensor(i);s+=" "+measured(d["temperatures"][i]["c"]," °C");set(graphLegend_[i],s);}}
+        if(page_==3&&chart_){graphTimeLabels();if(!ok){clearGraph();graphNotice("Нет связи");}if(graphKind_==0)for(int i=0;i<4;++i){String s=i==3?"Авария":sensor(i);s+=" "+measured(d["temperatures"][i]["c"]," °C");set(graphLegend_[i],s);}}
         if(page_==0){
             for(int i=0;i<4;++i){auto v=d["sound_alerts"]["channels"][i]["sound_on"];const bool on=ok&&!v.isNull()&&v.as<bool>();
                 set(live_[i],!ok||v.isNull()?"Нет связи":on?"Вкл.":"Выкл.");
@@ -849,7 +865,7 @@ private:
     busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1,previousPage_=0;
     lv_obj_t* keyEdit_=nullptr;String keyOriginal_;bool keyDropdown_=false,displaySleeping_=false;uint16_t keyOriginalChoice_=0;
     int lastTapKey_=-1,tapMode_=0;size_t tapIndex_=0;uint32_t lastTapAt_=0,lastTestSeq_=0,testUntil_=0;lv_obj_t* testOverlay_=nullptr;
-    lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphRange_[5]={};lv_obj_t* graphLegend_[4]={};lv_obj_t* graphY_[4]={};lv_obj_t* graphX_[4]={};bool graphDirty_=false;
+    lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphNotice_=nullptr,*graphUnit_=nullptr;lv_obj_t* graphRange_[5]={};lv_obj_t* graphLegend_[4]={};lv_obj_t* graphY_[4]={};lv_obj_t* graphX_[4]={};bool graphDirty_=false;
     lv_obj_t* navButtons_[6]={};lv_obj_t* fields_[8]={};lv_obj_t* live_[16]={};lv_obj_t* motion_[7]={};lv_chart_series_t* series_[4]={};
     lv_img_dsc_t art_{},navArt_[6]{};uint8_t* asset_=nullptr;
     lv_obj_t *calcNotes_=nullptr,*touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*touchTarget_=nullptr,*pageCounter_=nullptr;String pageContent_;unsigned pageOffset_=0,pageLines_=5;
