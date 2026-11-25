@@ -12,5 +12,6 @@ assert '\\"keypad_input\\"' not in status
 assert 'busaKeyEvents.begin(esp_random())' in m and 'publishPhysicalKey' in m
 assert 'keyCursor_.consume' in u and 'keyCursor_.reset()' in u and 'keySaveReference' in u
 assert 'storeTempReference(sensor,field[0]-' in m
-assert 'lv_obj_scroll_to_view_recursive(obj,LV_ANIM_OFF)' in u
+assert 'orderKeys();' in u and 'busa_focus::orderControls' in u
+assert 'lv_obj_scroll_to_view_recursive(obj,LV_ANIM_OFF)' not in u
 print('PASS: GUITION-only rendering, history and UART-only keypad contract')

@@ -16,5 +16,6 @@ assert 'Тихо' not in u
 assert 'lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE)' in u
 assert 'busa_font_small' in u and 'busa_font_value' in u
 assert 'for(int i=0;i<9;)' in u
-assert 'lv_obj_set_height(self->body_,HEIGHT-TOP-128)' in u
+assert 'lv_keyboard_set_textarea(self->keyboard_,self->touchEditor_)' in u
+assert 'lv_obj_set_height(self->body_,HEIGHT-TOP-128)' not in u
 print('PASS: native 480x272 layout contract, labels, fonts, and keyboard bounds')
