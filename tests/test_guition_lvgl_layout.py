@@ -221,11 +221,27 @@ constexpr uint32_t UiTest::colors_[4];
 static lv_color_t pixels[WIDTH*24];
 static lv_disp_draw_buf_t buf;
 static lv_disp_drv_t drv;
-static void flush(lv_disp_drv_t* d,const lv_area_t*,lv_color_t*){lv_disp_flush_ready(d);}
+static lv_color_t frame[WIDTH*HEIGHT];
+static void flush(lv_disp_drv_t* d,const lv_area_t* a,lv_color_t* p){
+    for(int y=a->y1;y<=a->y2;++y){
+        memcpy(frame+y*WIDTH+a->x1,p,(a->x2-a->x1+1)*sizeof(lv_color_t));
+        p+=a->x2-a->x1+1;
+    }
+    lv_disp_flush_ready(d);
+}
 int main(){
     lv_init();lv_disp_draw_buf_init(&buf,pixels,nullptr,WIDTH*24);lv_disp_drv_init(&drv);
     drv.hor_res=WIDTH;drv.ver_res=HEIGHT;drv.draw_buf=&buf;drv.flush_cb=flush;assert(lv_disp_drv_register(&drv));
     UiTest ui;
+    ui.theme_=2;ui.init();
+    auto* sample=ui.panel(ui.body_,220,90);
+    lv_obj_update_layout(ui.body_);lv_area_t area;lv_obj_get_coords(sample,&area);
+    lv_refr_now(nullptr);
+    assert(frame[(area.y1+12)*WIDTH+area.x1+20].full!=frame[(area.y2-12)*WIDTH+area.x1+20].full);
+    for(int y=area.y1+10;y<=area.y2-10;++y)
+        for(int x=area.x1+10;x<=area.x2-10;++x)
+            assert(frame[y*WIDTH+x].full==frame[y*WIDTH+area.x1+10].full);
+    std::puts("PASS rendered vertical gradient: uniform horizontal rows, different end colors, no checkerboard");
     for(int theme=0;theme<3;++theme){ui.theme_=theme;
         for(int mode=0;mode<4;++mode){ui.calcMode_=mode;ui.init();ui.calculator();ui.verify();
             {lv_area_t a,b,c,d;lv_obj_get_coords(ui.controls[0],&a);lv_obj_get_coords(ui.controls[1],&b);lv_obj_get_coords(ui.controls[2],&c);lv_obj_get_coords(ui.controls[3],&d);assert(a.y1==b.y1&&c.y1==d.y1&&a.y2<c.y1&&a.x1==c.x1&&b.x1==d.x1);}
@@ -246,7 +262,7 @@ if len(sys.argv)!=2: raise SystemExit('usage: test_guition_lvgl_layout.py /path/
 lvgl=Path(sys.argv[1]).resolve()
 assert (lvgl/'lvgl.h').is_file(),lvgl
 sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav')]
-flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-DLV_DITHER_GRADIENT=1','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
+flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-DLV_DITHER_GRADIENT=0','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
 with tempfile.TemporaryDirectory() as tmp:
     tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+between('    void homeTemperatures(', '    void home(){')+status+calc+between('    void graphAxes(', '    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
     def compile_one(item):

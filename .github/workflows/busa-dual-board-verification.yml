@@ -1,7 +1,7 @@
 name: BUSA dual-board COLL1 and display OTA build
 on:
   push:
-    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125, fix/busa-actual-hw1-20261125, fix/busa-latency-perf4-20261125, fix/busa-guition-ui2-20261125, fix/busa-guition-ui3-20261125, fix/busa-guition-ui4-20261125, fix/busa-guition-ui5-20261125, fix/busa-guition-ui6-20261125, fix/busa-guition-ui7-20261125, fix/busa-guition-ui8-20261125, fix/busa-guition-ui9-20261125, fix/busa-guition-ui10-20261125, fix/busa-main-name1-20261126, fix/busa-ai1v-time1-20261126, fix/busa-guition-graphs5-20261126, fix/busa-guition-graph-grid-history-20261126, fix/busa-liquid-settings-20261126, fix/busa-guition-home-align-20261126, fix/busa-guition-ultra-graphics-20261126]
+    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125, fix/busa-actual-hw1-20261125, fix/busa-latency-perf4-20261125, fix/busa-guition-ui2-20261125, fix/busa-guition-ui3-20261125, fix/busa-guition-ui4-20261125, fix/busa-guition-ui5-20261125, fix/busa-guition-ui6-20261125, fix/busa-guition-ui7-20261125, fix/busa-guition-ui8-20261125, fix/busa-guition-ui9-20261125, fix/busa-guition-ui10-20261125, fix/busa-main-name1-20261126, fix/busa-ai1v-time1-20261126, fix/busa-guition-graphs5-20261126, fix/busa-guition-graph-grid-history-20261126, fix/busa-liquid-settings-20261126, fix/busa-guition-home-align-20261126, fix/busa-guition-ultra-graphics-20261126, fix/busa-guition-clean-graphics-20261126]
   workflow_dispatch:
 permissions:
   contents: read
@@ -193,7 +193,7 @@ jobs:
       - name: Compile GUITION N4R8 native interface
         run: |
           set -euo pipefail
-          flags='-DLV_CONF_SKIP -DLV_MEM_SIZE=98304 -DLV_DITHER_GRADIENT=1'
+          flags='-DLV_CONF_SKIP -DLV_MEM_SIZE=98304 -DLV_DITHER_GRADIENT=0'
           if [ "$CORE_VERSION" = "3.0.0" ]; then flags="-MMD -c $flags"; fi
           arduino-cli compile --clean --library firmware/common --build-property "compiler.cpp.extra_flags=$flags" --build-property "compiler.c.extra_flags=$flags" --fqbn 'esp32:esp32:esp32s3:FlashSize=4M,PartitionScheme=huge_app,PSRAM=opi,CDCOnBoot=cdc,USBMode=hwcdc,FlashMode=dio,DebugLevel=none' --output-dir display_out firmware/BUSA_Display_N4R8
       - name: Package GUITION USB image and verify flash boundaries
@@ -220,7 +220,7 @@ jobs:
           assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
           assert 60000<len(app)<=0x1c0000 and len(data)<=0x1d0000
           major='5' if os.environ['CORE_VERSION']=='3.0.0' else '4'
-          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-UG-HW2').encode() in app
+          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-UH-HW2').encode() in app
           assert b'[BOOT] FIRST_FRAME OK' in app
           assert b'[BOOT] PSRAM ' in app
           assert b'[BOOT] LCD GEOMETRY ' in app
@@ -247,6 +247,6 @@ jobs:
           git rev-parse HEAD > display_delivery/SOURCE_COMMIT.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_SCREEN_ULTRA1_HW2_${{ matrix.core }}
+          name: BUSA_SCREEN_CLEAN1_HW2_${{ matrix.core }}
           path: display_delivery/
           if-no-files-found: error

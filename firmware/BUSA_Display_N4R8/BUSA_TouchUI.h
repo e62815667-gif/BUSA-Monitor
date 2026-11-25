@@ -97,7 +97,6 @@ private:
         if(!active)lv_obj_set_style_bg_color(o,color(0x153b4b),0);
         lv_obj_set_style_bg_grad_color(o,color(active?0x0088d3:0x081822),0);
         lv_obj_set_style_bg_grad_dir(o,LV_GRAD_DIR_VER,0);
-        lv_obj_set_style_bg_dither_mode(o,LV_DITHER_ORDERED,0);
     }
     static constexpr int TOP=30, NAV=44, PAD=3, GAP=3, SCENE=124, METRICS=32, RELAYS=30;
     static_assert(TOP+NAV+2*PAD+SCENE+METRICS+RELAYS+2*GAP==272,"Home must fit native display");
