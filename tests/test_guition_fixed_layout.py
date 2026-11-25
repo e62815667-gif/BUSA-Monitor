@@ -25,12 +25,12 @@ assert 'row(body_,70)' in u and 'panel(r,235,70)' in u and 'row(p,20)' in u and 
 assert 'row(body_,18)' in u and 'row(body_,134)' in u and 'lv_obj_set_size(c,width-axisWidth-3,height)' in u
 assert 'row(body_,42)' in u and 'panel(body_,LV_PCT(100),calcMode_==2?36:50)' in u
 assert 'pagedResult(int height=80,unsigned lines=5)' in u and 'pagedResult(60,4)' in u
-for page, heights in {'temperature':[18,70,70,26], 'water':[18,134,26], 'graph_temp':[24,83,83], 'graph_flow':[24,123,15], 'calc5':[42,42,42,22,36], 'calc_geometry_expanded':[42,26,42,22,50], 'calc_geometry_collapsed':[42,26,42,22,50], 'settings':[18,27,27,27,27,27], 'calibration':[26,42,42,26,24], 'wifi':[26,26,26,42,26,24], 'theme':[26,26,26,26,26,24], 'google':[26,17,42,26,26,24], 'about':[26,60,16,16,16,16,24], 'journal':[26,26,80,26,24], 'diagnostics':[26,16,16,16,16,16,26,26,14], 'ble':[26,26,26,60,26,14], 'ota':[26,40,24]}.items():
+for page, heights in {'temperature':[18,70,70,26], 'water':[18,134,26], 'graph_temp':[24,83,83], 'graph_flow':[24,15,149], 'calc5':[42,42,42,22,36], 'calc_geometry_expanded':[42,26,42,22,50], 'calc_geometry_collapsed':[42,26,42,22,50], 'settings':[18,27,27,27,27,27], 'calibration':[26,42,42,26,24], 'wifi':[26,26,26,42,26,24], 'theme':[26,26,26,26,26,24], 'google':[26,17,42,26,26,24], 'about':[26,60,16,16,16,16,24], 'journal':[26,26,80,26,24], 'diagnostics':[26,16,16,16,16,16,26,26,14], 'ble':[26,26,26,60,26,14], 'ota':[26,40,24]}.items():
     gap=1 if page=='graph_temp' else 2
     assert sum(heights)+gap*(len(heights)-1)<=body,(page,sum(heights)+gap*(len(heights)-1),body)
 for id in range(200,221): assert re.search(r'\bcase '+str(id)+r':',u),id
 for id in range(400,409): assert re.search(r'\b'+str(id)+r'\b',u),id
-assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-UC-HW2')+1<=40 for i in (4,5))
+assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-UD-HW2')+1<=40 for i in (4,5))
 print('PASS: fixed-height budgets for fixed page variants and preservation of existing actions')
 
 assert 'geometryExpanded_=!geometryValid();render();' in u
@@ -73,8 +73,11 @@ graphs=u[u.index('    void graphs(){'):u.index('    void requestGraph(){')]
 assert 'spec.title' not in graphs and 'pageStatus_=' not in graphs
 assert 'lv_obj_set_style_pad_row(body_,1,0)' in graphs
 assert 'lv_obj_set_style_text_align(graphLegend_[k],LV_TEXT_ALIGN_CENTER,0)' in graphs
-assert 'if(graphKind_!=0){\n            auto* times=row(body_,15);' in graphs
-assert 'makeGraph(body_,0,474,123,spec.color)' in graphs
+assert 'graphTimeLabels' not in u and 'graphX_' not in u
+assert 'color(0x000000)' in u and 'lv_chart_set_div_line_count(c,graphKind_==0?5:9,graphKind_==0?11:23)' in u
+assert 'graphKind_==0?"%.0f":"%.1f"' in u
+assert 'static String fmt(double v){String s(v,1);' in u
+assert 'makeGraph(body_,0,474,149,spec.color)' in graphs
 assert 'lv_obj_set_style_line_width(c,graphKind_==0?2:3,LV_PART_ITEMS)' in u
 assert 'if(route!=Route::chartHistory)set(pageStatus_,"Выполняется…")' in u
 print('PASS expanded plot, unobtrusive status and stronger traces')

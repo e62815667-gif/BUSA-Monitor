@@ -255,7 +255,7 @@ private:
     static String text(lv_obj_t* ta){String s=lv_textarea_get_text(ta);s.replace(',','.');return s;}
     static String value(JsonVariantConst v,int digits=1){
         if(v.isNull()||!v.is<double>())return "";
-        return String(v.as<double>(),digits);
+        String s(v.as<double>(),digits);s.replace('.',',');return s;
     }
     String measured(JsonVariantConst v,const char* unit,int digits=1)const{
         String s=session_.connected()?value(v,digits):String("");
@@ -335,7 +335,7 @@ private:
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;}
         hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
-        wifiList_=nullptr;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& p:graphPlots_)p=nullptr;for(auto& s:series_)s=nullptr;for(auto& y:graphY_)for(auto& l:y)l=nullptr;for(auto& l:graphLegend_)l=nullptr;for(auto& l:graphX_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
+        wifiList_=nullptr;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& p:graphPlots_)p=nullptr;for(auto& s:series_)s=nullptr;for(auto& y:graphY_)for(auto& l:y)l=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
         for(int i=0;i<6;++i)selected(navButtons_[i],i==page_);
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
         lv_obj_set_style_pad_row(body_,page_==0?GAP:2,0);
@@ -401,20 +401,9 @@ private:
     void graphAxes(unsigned k,double low,double high){
         const int ticks=graphKind_==0?2:4;
         for(int i=0;i<ticks;++i){
-            char b[32];snprintf(b,sizeof(b),"%.4g",high-(high-low)*i/(ticks-1));lv_label_set_text(graphY_[k][i],b);
-        }
-    }
-    void graphTimeLabels(){
-        if(graphKind_==0)return;
-        const char* clock=session_.snapshot()["clock"]["datetime"]|"";
-        int d,m,y,h,min;
-        const bool ok=session_.connected()&&sscanf(clock,"%d.%d.%d %d:%d",&d,&m,&y,&h,&min)==5&&h>=0&&h<24&&min>=0&&min<60;
-        for(int i=0;i<4;++i){
-            char b[16];
-            const int ago=(3-i)*graphMinutes_/3;
-            if(ok){int t=(h*60+min-ago+1440)%1440;snprintf(b,sizeof(b),"%02d:%02d",t/60,t%60);}
-            else snprintf(b,sizeof(b),"-%d мин",ago);
-            lv_label_set_text(graphX_[i],b);
+            char b[32];snprintf(b,sizeof(b),graphKind_==0?"%.0f":"%.1f",high-(high-low)*i/(ticks-1));
+            for(char* p=b;*p;++p)if(*p=='.')*p=',';
+            lv_label_set_text(graphY_[k][i],b);
         }
     }
     void graphNotice(const char* message){
@@ -432,13 +421,13 @@ private:
         auto* c=lv_chart_create(plot);graphPlots_[k]=c;lv_obj_set_size(c,width-axisWidth-3,height);
         lv_chart_set_type(c,LV_CHART_TYPE_LINE);lv_obj_set_style_pad_all(c,0,0);
         lv_chart_set_point_count(c,160);
-        lv_obj_set_style_bg_color(c,color(theme_==0?0xeef4f7:theme_==1?0x101010:0x081822),0);
+        lv_obj_set_style_bg_color(c,color(0x000000),0);
         lv_obj_set_style_border_color(c,color(line()),0);lv_obj_set_style_bg_opa(c,LV_OPA_COVER,0);
-        lv_obj_set_style_line_color(c,color(theme_==0?0xc0ced6:theme_==1?0x353535:0x284451),LV_PART_MAIN);
+        lv_obj_set_style_line_color(c,color(0x333333),LV_PART_MAIN);
         lv_obj_set_style_line_width(c,1,LV_PART_MAIN);lv_obj_set_style_line_width(c,graphKind_==0?2:3,LV_PART_ITEMS);
         lv_obj_set_style_line_opa(c,LV_OPA_COVER,LV_PART_ITEMS);
         lv_obj_set_style_size(c,0,LV_PART_INDICATOR);
-        lv_chart_set_div_line_count(c,graphKind_==0?3:4,4);lv_chart_set_range(c,LV_CHART_AXIS_PRIMARY_Y,0,1000);
+        lv_chart_set_div_line_count(c,graphKind_==0?5:9,graphKind_==0?11:23);lv_chart_set_range(c,LV_CHART_AXIS_PRIMARY_Y,0,1000);
         series_[k]=lv_chart_add_series(c,color(rgb),LV_CHART_AXIS_PRIMARY_Y);
         lv_chart_set_all_value(c,series_[k],LV_CHART_POINT_NONE);graphAxes(k,0,graphKind_==0?125:10);
     }
@@ -469,18 +458,17 @@ private:
                     makeGraph(p,k,235,65,colors_[k]);
                 }
             }
-        }else makeGraph(body_,0,474,123,spec.color);
+        }else{
+            static_assert(24+15+149+4==HEIGHT-TOP-NAV-2*PAD,"Flow graph must fit the screen");
+            auto* units=row(body_,15);
+            auto* unitBox=plain(units,48,15);
+            static const char* names[]={"°C","мл/мин","л/ч"};graphUnit_=smallLabel(unitBox,names[graphKind_]);
+            lv_obj_set_style_text_font(graphUnit_,&busa_font_nav,0);lv_obj_align(graphUnit_,LV_ALIGN_LEFT_MID,0,0);
+            makeGraph(body_,0,474,149,spec.color);
+        }
         chart_=graphPlots_[0];
         graphNotice_=smallLabel(chart_,"");lv_obj_set_style_bg_color(graphNotice_,color(paper()),0);lv_obj_set_style_bg_opa(graphNotice_,LV_OPA_COVER,0);
         lv_obj_set_style_pad_hor(graphNotice_,3,0);lv_obj_align(graphNotice_,LV_ALIGN_TOP_MID,0,4);graphNotice("Ожидание данных");
-        if(graphKind_!=0){
-            auto* times=row(body_,15);
-            auto* unitBox=plain(times,48,15);
-            static const char* units[]={"°C","мл/мин","л/ч"};graphUnit_=smallLabel(unitBox,units[graphKind_]);
-            lv_obj_set_style_text_font(graphUnit_,&busa_font_nav,0);lv_obj_align(graphUnit_,LV_ALIGN_LEFT_MID,0,0);
-            auto* timeAxis=row(times,15);lv_obj_set_width(timeAxis,421);
-            for(int i=0;i<4;++i){graphX_[i]=smallLabel(timeAxis,"—");lv_obj_set_style_text_font(graphX_[i],&busa_font_nav,0);}
-        }
         graphDirty_=true;requestGraph();
     }
     void requestGraph(){
@@ -497,7 +485,7 @@ private:
     }
     String geometrySummary()const{
         if(!geometryValid())return "Введите внутренние размеры куба";
-        String d=calcInput_[3][0],h=calcInput_[3][1];d.replace('.',',');h.replace('.',',');
+        String d=fmt(strtod(calcInput_[3][0].c_str(),nullptr)),h=fmt(strtod(calcInput_[3][1].c_str(),nullptr));
         return "Размеры куба: "+d+" × "+h+" см · изменить";
     }
     void clearCalc(){
@@ -652,7 +640,7 @@ private:
             case 335:if(calcMode_==3){rememberCalc();geometryExpanded_=true;render();}break;
         }
     }
-    static String fmt(double v){String s(v,2);s.replace('.',',');return s;}
+    static String fmt(double v){String s(v,1);s.replace('.',',');return s;}
     void calculate(bool explicitRequest=true){
         static const int counts[]={3,2,5,3};double v[5]={};
         for(int i=0;i<counts[calcMode_];++i){
@@ -840,7 +828,7 @@ private:
         const bool indicators[]={ok&&(d["station"]["connected"]|false),ok&&(d["network_indicators"]["internet"]|false),ok};
         for(int i=0;i<3;++i)setBg(statusDots_[i],indicators[i]?0x53d486:0x8297a1);
         String clock=ok?String(d["clock"]["datetime"]|"—"):String("—");set(clock_,"Дата и время: "+clock.substring(0,busa_presentation::clockLength(clock.c_str())));
-        if(page_==3&&chart_){graphTimeLabels();if(!ok){clearGraph();graphNotice("Нет связи");}if(graphKind_==0)for(int i=0;i<4;++i){String s=i==3?"Авария":sensor(i);s+=" "+measured(d["temperatures"][i]["c"]," °C");set(graphLegend_[i],s);}}
+        if(page_==3&&chart_){if(!ok){clearGraph();graphNotice("Нет связи");}if(graphKind_==0)for(int i=0;i<4;++i){String s=i==3?"Авария":sensor(i);s+=" "+measured(d["temperatures"][i]["c"]," °C");set(graphLegend_[i],s);}}
         if(page_==0){
             for(int i=0;i<4;++i){auto v=d["sound_alerts"]["channels"][i]["sound_on"];const bool on=ok&&!v.isNull()&&v.as<bool>();
                 set(live_[i],!ok||v.isNull()?"Нет связи":on?"Вкл.":"Выкл.");
@@ -848,13 +836,13 @@ private:
                 setInk(live_[i],on?(i==3?0xff6473:0x53d486):muted());
                 set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1));
                 set(live_[12+i],"ВКЛ "+measured(d["display_references"][i]["target"],"",1)+" · ВЫКЛ "+measured(d["display_references"][i]["notice"],"",1));}
-            auto rate=d["water"]["lpm"];metric(live_[8],ok&&!rate.isNull()?String(rate.as<double>()*60,1)+" л/ч":"—");
+            auto rate=d["water"]["lpm"];metric(live_[8],ok&&!rate.isNull()?fmt(rate.as<double>()*60)+" л/ч":"—");
             metric(live_[9],measured(d["water"]["total_l_estimate"]," л",1));
             metric(live_[10],measured(d["collection"]["ml_per_min"]," мл/мин",1));
             metric(live_[11],measured(d["collection"]["total_ml"]," мл",1));
         }else if(page_==1){for(int i=0;i<4;++i)set(live_[i],measured(d["temperatures"][i]["c"]," °C",1));}
-        else if(page_==2){auto rate=d["water"]["lpm"];set(live_[0],ok&&!rate.isNull()?String(rate.as<double>()*60,1)+" л/ч":"—");
-            set(live_[1],"Учтено: "+measured(d["water"]["total_l_estimate"]," л",2));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));
+        else if(page_==2){auto rate=d["water"]["lpm"];set(live_[0],ok&&!rate.isNull()?fmt(rate.as<double>()*60)+" л/ч":"—");
+            set(live_[1],"Учтено: "+measured(d["water"]["total_l_estimate"]," л",1));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));
             set(live_[3],measured(d["collection"]["ml_per_min"]," мл/мин",1));
             auto collectionRate=d["collection"]["ml_per_min"];set(live_[6],ok&&collectionRate.is<double>()?fmt(collectionRate.as<double>()*0.06)+" л/ч":"— л/ч");
             auto duration=d["collection"]["duration_ms"];if(duration.isNull())duration=d["collection"]["elapsed_ms"];
@@ -891,7 +879,7 @@ private:
     busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1,previousPage_=0;
     lv_obj_t* keyEdit_=nullptr;String keyOriginal_;bool keyDropdown_=false,displaySleeping_=false;uint16_t keyOriginalChoice_=0;
     int lastTapKey_=-1,tapMode_=0;size_t tapIndex_=0;uint32_t lastTapAt_=0,lastTestSeq_=0,testUntil_=0;lv_obj_t* testOverlay_=nullptr;
-    lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphNotice_=nullptr,*graphUnit_=nullptr;lv_obj_t* graphLegend_[4]={};lv_obj_t* graphPlots_[4]={};lv_obj_t* graphY_[4][4]={};lv_obj_t* graphX_[4]={};bool graphDirty_=false;
+    lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphNotice_=nullptr,*graphUnit_=nullptr;lv_obj_t* graphLegend_[4]={};lv_obj_t* graphPlots_[4]={};lv_obj_t* graphY_[4][4]={};bool graphDirty_=false;
     lv_obj_t* navButtons_[6]={};lv_obj_t* fields_[8]={};lv_obj_t* live_[16]={};lv_obj_t* motion_[7]={};lv_chart_series_t* series_[4]={};
     lv_img_dsc_t art_{},navArt_[6]{};uint8_t* asset_=nullptr;
     lv_obj_t *calcNotes_=nullptr,*touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*touchTarget_=nullptr,*pageCounter_=nullptr;String pageContent_;unsigned pageOffset_=0,pageLines_=5;

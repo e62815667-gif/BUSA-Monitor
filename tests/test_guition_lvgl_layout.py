@@ -50,7 +50,7 @@ struct UiTest {
     static String value(JsonStub){return {};}
     void calculate(bool){}
     int graphKind_=0;static constexpr int graphMinutes_=5;bool graphDirty_=false;
-    lv_obj_t *chart_=nullptr,*graphNotice_=nullptr,*graphUnit_=nullptr,*graphLegend_[4]={},*graphPlots_[4]={},*graphY_[4][4]={},*graphX_[4]={};lv_chart_series_t* series_[4]={};
+    lv_obj_t *chart_=nullptr,*graphNotice_=nullptr,*graphUnit_=nullptr,*graphLegend_[4]={},*graphPlots_[4]={},*graphY_[4][4]={};lv_chart_series_t* series_[4]={};
     void requestGraph(){} void set(lv_obj_t* l,const String& s){if(l)lv_label_set_text(l,s.c_str());}
 '''
 checks=r'''
@@ -86,7 +86,7 @@ checks=r'''
     void verifyGraphs(){
         for(int mode=0;mode<3;++mode){
             init();graphKind_=mode;resultLabel_=nullptr;pageStatus_=nullptr;graphUnit_=nullptr;
-            for(auto& p:graphPlots_)p=nullptr;for(auto& p:graphLegend_)p=nullptr;for(auto& p:graphX_)p=nullptr;
+            for(auto& p:graphPlots_)p=nullptr;for(auto& p:graphLegend_)p=nullptr;
             graphs();verify();
             assert(controls.size()==3);
             assert(lv_obj_get_child_cnt(body_)==3);
@@ -95,8 +95,10 @@ checks=r'''
                 assertFits(graphPlots_[k]);
                 assert(lv_chart_get_series_next(graphPlots_[k],nullptr)==series_[k]);
                 assert(!lv_chart_get_series_next(graphPlots_[k],series_[k]));
-                assert(lv_obj_get_height(graphPlots_[k])==(mode==0?65:123));
+                assert(lv_obj_get_height(graphPlots_[k])==(mode==0?65:149));
                 assert(lv_obj_get_style_line_width(graphPlots_[k],LV_PART_ITEMS)==(mode==0?2:3));
+                assert(lv_obj_get_style_bg_color(graphPlots_[k],0).full==color(0).full);
+                if(mode!=0){assert(!strcmp(lv_label_get_text(graphY_[k][0]),"10,0"));assert(!strcmp(lv_label_get_text(graphY_[k][1]),"6,7"));assert(!strcmp(lv_label_get_text(graphY_[k][2]),"3,3"));assert(!strcmp(lv_label_get_text(graphY_[k][3]),"0,0"));}
                 for(int j=0;j<(mode==0?2:4);++j)labelFits(graphY_[k][j]);
                 if(mode==0){lv_label_set_text(graphLegend_[k],k==3?"Авария 26,8 °C":k==0?"Вода 28,1 °C":k==1?"Колонна 26,6 °C":"Куб 30,9 °C");lv_obj_update_layout(body_);labelFits(graphLegend_[k]);
                     assert(lv_obj_get_style_text_align(graphLegend_[k],0)==LV_TEXT_ALIGN_CENTER);
@@ -108,7 +110,6 @@ checks=r'''
                 assert(a.y1==b.y1&&c.y1==d.y1&&a.y2<c.y1&&a.x2<b.x1&&a.x1==c.x1&&b.x1==d.x1);
             }else{assert(!graphPlots_[1]);labelFits(graphUnit_);}
             assert(!pageStatus_);
-            for(int k=0;k<4;++k){if(mode==0)assert(!graphX_[k]);else labelFits(graphX_[k]);}
             labelFits(graphNotice_);
             graphNotice("");assert(lv_obj_has_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN));
             graphNotice("Нет связи");assert(!lv_obj_has_flag(graphNotice_,LV_OBJ_FLAG_HIDDEN));lv_obj_update_layout(chart_);labelFits(graphNotice_);
@@ -210,7 +211,7 @@ assert (lvgl/'lvgl.h').is_file(),lvgl
 sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav')]
 flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
 with tempfile.TemporaryDirectory() as tmp:
-    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+between('    void graphAxes(', '    void graphTimeLabels()')+between('    void graphNotice(', '    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
+    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+between('    void graphAxes(', '    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
     def compile_one(item):
         i,s=item;o=tmp/f'{i}.o';subprocess.run(['gcc','-std=gnu99','-O0',*flags,'-c',str(s),'-o',str(o)],check=True);return str(o)
     with ThreadPoolExecutor(max_workers=2) as pool: objects=list(pool.map(compile_one,enumerate(sources)))

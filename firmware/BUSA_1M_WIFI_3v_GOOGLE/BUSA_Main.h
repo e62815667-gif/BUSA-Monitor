@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainTx && BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainRx,
   "Buzzer pin conflicts with I2C, UART or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF4-HW2-NAME1-TIME1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-PERF4-HW2-NAME1-TIME1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -959,7 +959,7 @@ extern volatile int googleInternet,googleHttp;
 #include "BUSA_ChartHistory.h"
 static BusaChart::History busaChartHistory;
 static bool busaChartReady=false,busaChartAttempted=false;
-static void busaCaptureChart(uint32_t now){
+static void busaCaptureChart(uint32_t now,uint32_t scheduledAt){
  if(!busaChartAttempted){
   busaChartAttempted=true;
   auto* memory=(BusaChart::Row*)heap_caps_malloc(sizeof(BusaChart::Row)*1801,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT);
@@ -969,7 +969,7 @@ static void busaCaptureChart(uint32_t now){
  float values[4];for(int k=0;k<4;k++)values[k]=hasTemp(k,now)?temperature[k]:NAN;
  // Use the vetted two-second sample, not independent raw pulse differences.
  const float cooling=flowReady?flowLpm*60.0f:NAN;
- busaChartHistory.capture(now,values,cooling,(float)collectionMeter.raw());
+ busaChartHistory.capture(scheduledAt,values,cooling,(float)collectionMeter.raw());
 }
 #include "BUSA_History.h"
 

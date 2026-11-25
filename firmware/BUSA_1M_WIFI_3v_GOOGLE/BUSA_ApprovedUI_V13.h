@@ -45,7 +45,7 @@ static void v13Collect(uint32_t now){
     // Keep the 2s schedule anchored; a slow loop must not accumulate drift.
     if(v13HistoryCount==0)v13LastCapture=now;
     else v13LastCapture+=((uint32_t)(now-v13LastCapture)/2000u)*2000u;
-    busaCaptureChart(now);
+    busaCaptureChart(now,v13LastCapture);
     for(int i=0;i<4;i++)v13History[i][v13HistoryHead]=hasTemp(i,now)?temperature[i]:NAN;
     v13HistoryHead=(v13HistoryHead+1)%48;
     if(v13HistoryCount<48)v13HistoryCount++;
