@@ -96,7 +96,7 @@ checks=r'''
                 assert(lv_obj_get_height(graphPlots_[k])==(mode==0?42:123));
                 assert(lv_obj_get_style_line_width(graphPlots_[k],LV_PART_ITEMS)==(mode==0?2:3));
                 for(int j=0;j<(mode==0?2:4);++j)labelFits(graphY_[k][j]);
-                if(mode==0){lv_label_set_text(graphLegend_[k],k==3?"Авария 26,8 °C":k==0?"Вода 28,1 °C":k==1?"Колонна 26,6 °C":"Куб 30,9 °C");labelFits(graphLegend_[k]);}
+                if(mode==0){lv_label_set_text(graphLegend_[k],k==3?"Авария 26,8 °C":k==0?"Вода 28,1 °C":k==1?"Колонна 26,6 °C":"Куб 30,9 °C");lv_obj_update_layout(body_);labelFits(graphLegend_[k]);}
             }
             if(mode==0){
                 lv_area_t a,b,c,d;lv_obj_get_coords(graphPlots_[0],&a);lv_obj_get_coords(graphPlots_[2],&b);lv_obj_get_coords(graphPlots_[1],&c);lv_obj_get_coords(graphPlots_[3],&d);

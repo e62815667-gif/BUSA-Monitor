@@ -456,6 +456,7 @@ private:
                     const int k=order[j*2+col];
                     auto* p=plain(lineRow,235,60);lv_obj_set_flex_flow(p,LV_FLEX_FLOW_COLUMN);lv_obj_set_style_pad_row(p,1,0);
                     graphLegend_[k]=smallLabel(p,k==3?"Авария":sensor(k));lv_obj_set_style_text_color(graphLegend_[k],color(colors_[k]),0);
+                    lv_obj_set_width(graphLegend_[k],LV_PCT(100));lv_obj_set_height(graphLegend_[k],17);lv_label_set_long_mode(graphLegend_[k],LV_LABEL_LONG_WRAP);
                     makeGraph(p,k,235,42,colors_[k]);
                 }
             }
