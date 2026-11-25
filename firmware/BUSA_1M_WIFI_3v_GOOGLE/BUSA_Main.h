@@ -32,6 +32,7 @@
 #include <BUSA_KeyEvents.h>
 #include "BUSA_DisplayLink.h"
 #include "BUSA_LocalRequest.h"
+#include "BUSA_HttpServer.h"
 
 constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
@@ -47,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainTx && BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainRx,
   "Buzzer pin conflicts with I2C, UART or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF3-HW2";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF4-HW2";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -105,41 +106,50 @@ uint32_t lastWireProbe=0;
 uint8_t wireProbeIndex=0;
 bool elapsed(uint32_t now,uint32_t then,uint32_t ms){return (uint32_t)(now-then)>=ms;}
 void sampleTemperatures(uint32_t now){
-  if(tempConverting && elapsed(now,tempRequestAt,825)){
-    for(int i=0;i<4;i++){
+  // Each invocation performs at most one DallasTemperature bus operation.
+  // The last conversion request gets the full 825 ms before any bus is read.
+  enum Phase {Idle,Discover,Address,Resolution,Request,Wait,Read};
+  static Phase phase=Idle;
+  static uint8_t index=0;
+  if(phase==Idle && (tempCycle==0||elapsed(now,tempCycle,2500))){
+    tempCycle=now;tempConverting=true;index=0;phase=Discover;
+  }
+  if(phase==Wait && elapsed(now,tempRequestAt,825)){index=0;phase=Read;}
+  switch(phase){
+    case Discover:
+      if(!tempInitialized[index]||(!tempPresent[index]&&elapsed(now,tempDiscoverAt[index],12000))){
+        sensors[index]->begin();tempInitialized[index]=true;tempDiscoverAt[index]=millis();phase=Address;
+      }else phase=Request;
+      break;
+    case Address:
+      tempPresent[index]=sensors[index]->getAddress(cachedTempRom[index],0);
+      cachedTempValid[index]=tempPresent[index];phase=tempPresent[index]?Resolution:Request;
+      break;
+    case Resolution:
+      sensors[index]->setResolution(cachedTempRom[index],12);
+      sensors[index]->setWaitForConversion(false);phase=Request;
+      break;
+    case Request:
+      if(tempPresent[index])sensors[index]->requestTemperatures();
+      else{temperature[index]=NAN;tempAt[index]=0;}
+      if(++index==4){tempRequestAt=millis();phase=Wait;}else phase=Discover;
+      break;
+    case Read:{
+      const int i=index;
       float v=cachedTempValid[i]?sensors[i]->getTempC(cachedTempRom[i]):DEVICE_DISCONNECTED_C;
       if(tempPresent[i] && isfinite(v) && v>=-55 && v<=125 && v!=DEVICE_DISCONNECTED_C){
-        temperature[i]=v+tempOffset[i];tempAt[i]=now;
+        temperature[i]=v+tempOffset[i];tempAt[i]=millis();
       }else{
         temperature[i]=NAN;tempAt[i]=0;
-        // Permit bounded rediscovery when a sensor is unplugged or replaced.
         tempPresent[i]=false;cachedTempValid[i]=false;
       }
+      if(++index==4){tempConverting=false;phase=Idle;}
+      break;
     }
-    tempConverting=false;
+    default:break;
   }
-  if(!tempConverting && (tempCycle==0||elapsed(now,tempCycle,2500))){
-    tempCycle=now;
-    for(int i=0;i<4;i++){
-      // Do not rediscover four OneWire buses every 2.5 seconds.
-      // A disconnected bus is retried every 12 seconds.
-      if(!tempInitialized[i] || (!tempPresent[i] && elapsed(now,tempDiscoverAt[i],12000))){
-        sensors[i]->begin();
-        tempInitialized[i]=true;
-        tempDiscoverAt[i]=now;
-        tempPresent[i]=sensors[i]->getAddress(cachedTempRom[i],0);
-        cachedTempValid[i]=tempPresent[i];
-        if(tempPresent[i]){
-          sensors[i]->setResolution(cachedTempRom[i],12);
-          sensors[i]->setWaitForConversion(false);
-        }
-      }
-      if(tempPresent[i])sensors[i]->requestTemperatures();
-      else{temperature[i]=NAN;tempAt[i]=0;}
-    }
-    tempConverting=true;tempRequestAt=now;
-  }
-  for(int i=0;i<4;i++)if(tempAt[i] && elapsed(now,tempAt[i],7000)){
+  const uint32_t freshNow=millis();
+  for(int i=0;i<4;i++)if(tempAt[i] && elapsed(freshNow,tempAt[i],7000)){
     temperature[i]=NAN;tempAt[i]=0;
   }
 }
@@ -963,7 +973,7 @@ static void busaCaptureChart(uint32_t now){
 }
 #include "BUSA_History.h"
 
-WebServer server(80);
+BusaHttpServer server(80);
 static esp_err_t busaOtaConfirmResult=ESP_ERR_NOT_FOUND;
 static esp_err_t busaOtaSelectResult=ESP_ERR_NOT_SUPPORTED;
 static String busaOtaRunning="unknown",busaOtaBoot="unknown";
@@ -1096,6 +1106,9 @@ String statusJSON(){
   s+=",\"temp_worst_ms\":"+String(busaTempWorstMs);
   s+=",\"onewire_worst_ms\":"+String(busaOneWireWorstMs);
   s+=",\"http_worst_ms\":"+String(busaHttpWorstMs);
+  s+=",\"http_worker_enabled\":"+(server.workerEnabled()?String("true"):String("false"));
+  s+=",\"http_worker_worst_ms\":"+String(server.workerWorstMs());
+  s+=",\"http_response_failures\":"+String(server.responseFailures());
   s+=",\"tft_worst_ms\":"+String(busaTftWorstMs);
   s+=",\"tft_last_ms\":"+String(busaLastTftRenderMs);
   s+=",\"tft_live_refresh_target_ms\":"+String(BUSA_TFT_LIVE_REFRESH_MS);
@@ -4372,6 +4385,9 @@ void setup(){
   const char *headers[]={"X-Busa-Token"};
   server.collectHeaders(headers,1);
   server.begin();
+  static_assert(sizeof(WEB_PAGE)+2048<=BusaHttpServer::responseCapacity,"HTTP page exceeds response buffer");
+  server.startWorker();
+  Serial.printf("HTTP worker %s\n",server.workerEnabled()?"OK":"FALLBACK");
   busaConfirmRunningImage(busaNvsReady&&wifiRunning);
   if(busaRmPairDeferred&&!busaOtaPendingVerification())busaRmStartRequested=true;
   busaReportStage("HTTP_READY");
@@ -4423,10 +4439,10 @@ void loop(){
   busaLoopProfile.mark(busa_perf::early,millis());
   if(!otaActive)busa_display_link::poll();
   busaLoopProfile.mark(busa_perf::uart,millis());
-  {const uint32_t started=millis();server.handleClient();busaObserve("HTTP",started,busaHttpWorstMs);}
+  {const uint32_t started=millis();server.pollApplication();busaObserve("HTTP",started,busaHttpWorstMs);}
   busaLoopProfile.mark(busa_perf::http,millis());
-  // Service pending UART immediately after the synchronous HTTP call, without
-  // changing HTTP handlers or accessing the application model from two tasks.
+  // The application owns every API callback; network waits occur on the worker.
+  now=millis();
   if(!otaActive)busa_display_link::poll();
   busaLoopProfile.mark(busa_perf::uart,millis());
   // One nonblocking driver scan serves both TFT and web UI. Every scan ends.
@@ -4445,7 +4461,9 @@ void loop(){
   if(googleRestart && elapsed(millis(),googleRestartAt,3500)){soundOutputsOff();ESP.restart();}
   busaRemoteAlarmApply(); // remote sound thresholds only; writes NVS in main loop
   busaLoopProfile.mark(busa_perf::services,millis());
+  now=millis();
   {const uint32_t started=millis();sampleTemperatures(now);busaObserve("TEMP",started,busaTempWorstMs);}
+  now=millis();
   {const uint32_t started=millis();probeOneWire(now);busaObserve("ONEWIRE",started,busaOneWireWorstMs);} // Diagnose on idle 1-Wire bus only
   // A missing sensor is a diagnostic error, not a reason to trap the UI on boot.
   // Wi-Fi AP and HTTP server initialize during the splash.

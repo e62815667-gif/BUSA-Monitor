@@ -57,6 +57,7 @@ int main(){
 # Actual four-bus discovery/conversion function, simulated disconnect/replacement.
 run(common+r'''
 using DeviceAddress=uint8_t[8];const float DEVICE_DISCONNECTED_C=-127;
+uint32_t nowMs=0;uint32_t millis(){return nowMs;}
 struct Sensor {
  bool attached=true;uint8_t rom=1;float value=20;int scans=0,requests=0;
  void begin(){++scans;}bool getAddress(uint8_t*out,int){out[0]=rom;return attached;}
@@ -69,18 +70,19 @@ uint32_t tempAt[4]={},tempCycle=0,tempRequestAt=0,tempDiscoverAt[4]={};DeviceAdd
 '''+function(main,'bool elapsed(')+function(main,'void sampleTemperatures(')+function(main,'bool hasTemp(int n,uint32_t now){')+r'''
 int main(){
  devices[1].attached=false;tempOffset[2]=1.2;
- sampleTemperatures(100);assert(!hasTemp(0,100));sampleTemperatures(924);assert(!hasTemp(0,924));
- sampleTemperatures(925);assert(hasTemp(0,925)&&fabs(temperature[2]-21.2)<.001&&!hasTemp(1,925));
- devices[0].attached=false;sampleTemperatures(2600);sampleTemperatures(3425);
- assert(!hasTemp(0,3425)&&!tempPresent[0]);
+ auto pump=[](uint32_t start,uint32_t end){for(uint32_t t=start;t<=end;++t){nowMs=t;sampleTemperatures(t);}};
+ pump(100,924);assert(!hasTemp(0,924));pump(925,1200);
+ assert(hasTemp(0,1200)&&fabs(temperature[2]-21.2)<.001&&!hasTemp(1,1200));
+ devices[0].attached=false;pump(1201,4200);
+ assert(!hasTemp(0,4200)&&!tempPresent[0]);
  devices[0].attached=true;devices[0].rom=9;devices[0].value=44.5;
  devices[1].attached=true;devices[1].value=33;
- for(uint32_t now=5000;now<=16000;now+=100)sampleTemperatures(now);
- assert(hasTemp(0,16000)&&fabs(temperature[0]-44.5)<.001&&cachedTempRom[0][0]==9);
- assert(hasTemp(1,16000)&&devices[0].scans==2&&devices[1].scans==2);
+ pump(4201,18000);
+ assert(hasTemp(0,18000)&&fabs(temperature[0]-44.5)<.001&&cachedTempRom[0][0]==9);
+ assert(hasTemp(1,18000)&&devices[0].scans==2&&devices[1].scans==2);
  devices[0].value=NAN;
- for(uint32_t now=16100;now<20000;now+=100)sampleTemperatures(now);
- assert(!hasTemp(0,20000));
+ pump(18001,22000);
+ assert(!hasTemp(0,22000));
 }
 ''','sensors')
 # Real mailbox, ownership and immutable payload under concurrent producer/consumer.

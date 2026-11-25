@@ -100,10 +100,12 @@ public:
     void noteDirtyRows(int16_t y1,int16_t y2){dirtyRows_.note(y1,y2);}
     void present(){
         int16_t first=0,count=0;
-        const bool valid=dirtyRows_.take(first,count);
-        if(firstFrame_||!valid||count==busa_guition::HEIGHT){canvas_.flush();firstFrame_=false;return;}
-        // The canvas is still authoritative; send only its contiguous dirty rows.
-        lcd_.draw16bitRGBBitmap(0,first,canvas_.getFramebuffer()+size_t(first)*busa_guition::WIDTH,busa_guition::WIDTH,count);
+        if(firstFrame_){canvas_.flush();firstFrame_=false;dirtyRows_.clear();return;}
+        // The existing full-frame canvas remains authoritative; send each
+        // dirty run once, not the clean rows between distant UI changes.
+        while(dirtyRows_.takeNext(first,count)){
+            lcd_.draw16bitRGBBitmap(0,first,canvas_.getFramebuffer()+size_t(first)*busa_guition::WIDTH,busa_guition::WIDTH,count);
+        }
     }
     void backlight(bool on){digitalWrite(BACKLIGHT,on&&panelReady_?HIGH:LOW);}
     bool readRawTouch(TS_Point& p){
