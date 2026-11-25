@@ -5,6 +5,12 @@ u=(r/'firmware/BUSA_Display_N4R8/BUSA_TouchUI.h').read_text()
 home=u[u.index('    void home(){'):u.index('    void temperatures(){')]
 assert '"Расход","Израсходовано","Отбор","Собрано"' in home, 'total belongs in the metrics strip, not temperature scene'
 assert 'live_[11]=at(scene' not in home
+homeTemps=u[u.index('    void homeTemperatures('):u.index('    void home(){')]
+assert 'homeTemperatures(scene)' in home
+assert 'ВКЛ' not in homeTemps and 'ВЫКЛ' not in homeTemps and 'live_[12+i]' not in u
+assert 'LV_TEXT_ALIGN_RIGHT' in homeTemps
+assert 'set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1))' in u
+assert 'ВКЛ, °C' in u and 'ВЫКЛ, °C' in u
 render=u[u.index('    void render(){'):u.index('    void home(){')]
 assert 'lv_obj_add_flag(body_,LV_OBJ_FLAG_SCROLLABLE)' not in render, 'normal pages must not scroll'
 assert 'orderKeys();' in render, 'physical traversal must be based on actual layout'
@@ -30,7 +36,7 @@ for page, heights in {'temperature':[18,70,70,26], 'water':[18,172], 'liquid_set
     assert sum(heights)+gap*(len(heights)-1)<=body,(page,sum(heights)+gap*(len(heights)-1),body)
 for id in range(200,221): assert re.search(r'\bcase '+str(id)+r':',u),id
 for id in list(range(400,409))+[412,413,414,222]: assert re.search(r'\b'+str(id)+r'\b',u),id
-assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-UE-HW2')+1<=40 for i in (4,5))
+assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-UF-HW2')+1<=40 for i in (4,5))
 print('PASS: fixed-height budgets for fixed page variants and preservation of existing actions')
 
 assert 'geometryExpanded_=!geometryValid();render();' in u

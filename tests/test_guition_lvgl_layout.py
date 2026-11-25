@@ -83,6 +83,28 @@ checks=r'''
             std::fprintf(stderr,"TEXT CLIPPED '%s' need %dpx high, have %dpx; width %d\n",text,size.y,height,width);std::abort();
         }
     }
+    void verifyHomeTemperatures(){
+        init();auto* scene=plain(body_,LV_PCT(100),SCENE);
+        homeTemperatures(scene);
+        lv_obj_update_layout(body_);
+        assert(lv_obj_get_child_cnt(scene)==8);
+        lv_area_t area;lv_obj_get_coords(scene,&area);
+        for(int i=0;i<4;++i){
+            auto* name=lv_obj_get_child(scene,2*i);auto* reading=live_[4+i];
+            assert(reading==lv_obj_get_child(scene,2*i+1));
+            assert(!strcmp(lv_label_get_text(name),i==0?"Вода":i==1?"Колонна":i==2?"Куб":"Авария"));
+            for(const char* value:{"—","-55,0 °C","125,0 °C","23,9 °C"}){
+                lv_label_set_text(reading,value);lv_obj_update_layout(body_);
+                labelFits(name);labelFits(reading);
+                lv_area_t a,b;lv_obj_get_coords(name,&a);lv_obj_get_coords(reading,&b);
+                assert(a.y2<b.y1);
+                if(i>=2){assert(a.x2==area.x2-10&&b.x2==area.x2-10);
+                    assert(lv_obj_get_style_text_align(name,0)==LV_TEXT_ALIGN_RIGHT&&lv_obj_get_style_text_align(reading,0)==LV_TEXT_ALIGN_RIGHT);}
+                else assert(a.x1==area.x1+10&&b.x1==area.x1+10);
+            }
+        }
+        std::puts("PASS main temperatures: four names/readings, no thresholds, aligned right edge and full value bounds");
+    }
     void verifyWater(){
         init();water();
         lv_obj_update_layout(body_);
@@ -212,7 +234,7 @@ int main(){
         assert(!ui.fields_[0]&&!ui.fields_[1]&&ui.fields_[2]);
         ui.geometryExpanded_=true;ui.init();ui.calculator();ui.verify();
         assert(ui.fields_[0]&&ui.fields_[1]&&ui.fields_[2]);
-        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();ui.verifyNavigation();ui.verifyWater();ui.verifyGraphs();
+        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();ui.verifyNavigation();ui.verifyHomeTemperatures();ui.verifyWater();ui.verifyGraphs();
     }
     ui.theme_=1;assert(ui.paper()==0x080808&&ui.surface()==0x202020);
     ui.theme_=2;assert(ui.paper()==0x060e15&&ui.surface()==0x0d2430);
@@ -226,7 +248,7 @@ assert (lvgl/'lvgl.h').is_file(),lvgl
 sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav')]
 flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
 with tempfile.TemporaryDirectory() as tmp:
-    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+between('    void graphAxes(', '    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
+    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+between('    void homeTemperatures(', '    void home(){')+status+calc+between('    void graphAxes(', '    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
     def compile_one(item):
         i,s=item;o=tmp/f'{i}.o';subprocess.run(['gcc','-std=gnu99','-O0',*flags,'-c',str(s),'-o',str(o)],check=True);return str(o)
     with ThreadPoolExecutor(max_workers=2) as pool: objects=list(pool.map(compile_one,enumerate(sources)))

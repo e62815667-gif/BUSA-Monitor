@@ -349,16 +349,23 @@ private:
             geometryReadAttempted_=send(Route::geometryRead,{});
         }
     }
+    void homeTemperatures(lv_obj_t* scene){
+        static const int xs[]={10,10,318,318},ys[]={65,7,65,7};
+        static constexpr int rightWidth=WIDTH-2*PAD-318-10;
+        for(int i=0;i<4;++i){
+            auto* name=at(scene,i==3?"Авария":sensor(i),xs[i],ys[i]);
+            auto* reading=live_[4+i]=at(scene,"—",xs[i],ys[i]+17,&busa_font_value);
+            lv_obj_set_style_text_color(reading,color(colors_[i]),0);
+            if(i>=2){for(auto* l:{name,reading}){lv_obj_set_width(l,rightWidth);lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_RIGHT,0);}}
+        }
+    }
     void home(){
         auto* scene=plain(body_,LV_PCT(100),SCENE);
         auto* center=plain(scene,BUSA_ASSET_W,BUSA_ASSET_H);lv_obj_align(center,LV_ALIGN_CENTER,0,0);
         auto* im=lv_img_create(center);lv_img_set_src(im,&art_);lv_img_set_antialias(im,true);lv_obj_center(im);
         for(unsigned i=0;i<7;++i){auto* dot=plain(center,3,3);
             lv_obj_set_style_bg_color(dot,color(i<4?0x38bdf8:0xc5fffa),0);lv_obj_set_style_bg_opa(dot,LV_OPA_COVER,0);lv_obj_set_style_radius(dot,LV_RADIUS_CIRCLE,0);motion_[i]=dot;}
-        static const int xs[]={10,10,318,318},ys[]={65,7,65,7};
-        for(int i=0;i<4;++i){at(scene,i==3?"Авария":sensor(i),xs[i],ys[i]);
-            live_[4+i]=at(scene,"—",xs[i],ys[i]+17,&busa_font_value);lv_obj_set_style_text_color(live_[4+i],color(colors_[i]),0);
-            live_[12+i]=at(scene,"ВКЛ — · ВЫКЛ —",xs[i],ys[i]+42,&busa_font_small);lv_obj_set_style_text_color(live_[12+i],color(muted()),0);}
+        homeTemperatures(scene);
         auto* m=plain(body_,LV_PCT(100),METRICS);
         lv_obj_set_style_bg_color(m,color(surface()),0);lv_obj_set_style_bg_opa(m,LV_OPA_COVER,0);glass(m);
         lv_obj_set_style_border_width(m,1,0);lv_obj_set_style_border_color(m,color(line()),0);lv_obj_set_style_radius(m,6,0);
@@ -845,8 +852,7 @@ private:
                 set(live_[i],!ok||v.isNull()?"Нет связи":on?"Вкл.":"Выкл.");
                 setBg(lv_obj_get_parent(live_[i]),on?(i==3?0x42232d:0x14382e):surface());
                 setInk(live_[i],on?(i==3?0xff6473:0x53d486):muted());
-                set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1));
-                set(live_[12+i],"ВКЛ "+measured(d["display_references"][i]["target"],"",1)+" · ВЫКЛ "+measured(d["display_references"][i]["notice"],"",1));}
+                set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1));}
             auto rate=d["water"]["lpm"];metric(live_[8],ok&&!rate.isNull()?fmt(rate.as<double>()*60)+" л/ч":"—");
             metric(live_[9],measured(d["water"]["total_l_estimate"]," л",1));
             metric(live_[10],measured(d["collection"]["ml_per_min"]," мл/мин",1));
