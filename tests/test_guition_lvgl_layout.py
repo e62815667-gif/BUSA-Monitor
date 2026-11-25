@@ -35,7 +35,8 @@ struct JsonStub { JsonStub operator[](const char*) const {return {};} JsonStub o
 struct SessionStub {JsonStub snapshot()const{return {};}};
 struct UiTest {
     static constexpr uint32_t colors_[4]={0x38bdf8,0x53d486,0xf4c84a,0xff6473};
-    uint8_t theme_=2; int calcMode_=0;
+    uint8_t theme_=2; int calcMode_=0; bool geometryExpanded_=true;
+    String geometrySummary()const{return "Размеры куба: 40 × 80 см · изменить";}
     lv_obj_t *body_=nullptr,*nav_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr;
     lv_obj_t *fields_[8]={},*live_[16]={}; String calcInput_[4][5]; SessionStub session_;
     lv_obj_t *touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*keyboard_=nullptr;
@@ -137,6 +138,10 @@ int main(){
     UiTest ui;
     for(int theme=0;theme<3;++theme){ui.theme_=theme;
         for(int mode=0;mode<4;++mode){ui.calcMode_=mode;ui.init();ui.calculator();ui.verify();}
+        ui.calcMode_=3;ui.geometryExpanded_=false;ui.init();ui.calculator();ui.verify();
+        assert(!ui.fields_[0]&&!ui.fields_[1]&&ui.fields_[2]);
+        ui.geometryExpanded_=true;ui.init();ui.calculator();ui.verify();
+        assert(ui.fields_[0]&&ui.fields_[1]&&ui.fields_[2]);
         ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();
     }
     ui.theme_=1;assert(ui.paper()==0x080808&&ui.surface()==0x202020);

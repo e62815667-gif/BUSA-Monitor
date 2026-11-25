@@ -1,7 +1,7 @@
 name: BUSA dual-board COLL1 and display OTA build
 on:
   push:
-    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125, fix/busa-actual-hw1-20261125, fix/busa-latency-perf4-20261125, fix/busa-guition-ui2-20261125, fix/busa-guition-ui3-20261125, fix/busa-guition-ui4-20261125]
+    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125, fix/busa-actual-hw1-20261125, fix/busa-latency-perf4-20261125, fix/busa-guition-ui2-20261125, fix/busa-guition-ui3-20261125, fix/busa-guition-ui4-20261125, fix/busa-guition-ui5-20261125]
   workflow_dispatch:
 permissions:
   contents: read
@@ -207,7 +207,7 @@ jobs:
           assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
           assert 60000<len(app)<=0x1c0000 and len(data)<=0x1d0000
           major='5' if os.environ['CORE_VERSION']=='3.0.0' else '4'
-          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-U4-HW2').encode() in app
+          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-U5-HW2').encode() in app
           assert b'[BOOT] FIRST_FRAME OK' in app
           assert b'[BOOT] PSRAM ' in app
           assert b'[BOOT] LCD GEOMETRY ' in app
@@ -234,6 +234,6 @@ jobs:
           git rev-parse HEAD > display_delivery/SOURCE_COMMIT.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: BUSA_SCREEN_U4_HW2_${{ matrix.core }}
+          name: BUSA_SCREEN_U5_HW2_${{ matrix.core }}
           path: display_delivery/
           if-no-files-found: error

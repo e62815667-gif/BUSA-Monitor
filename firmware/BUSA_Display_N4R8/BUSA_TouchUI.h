@@ -152,6 +152,7 @@ private:
     }
     static void textFocus(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));auto* ta=lv_event_get_target(e);
+        if(self->waiting_&&self->page_==4&&self->calcMode_==3)return;
         self->cancelKeyEdit(false);self->hideKeyboard();self->focusObject(ta);
         lv_textarea_set_accepted_chars(self->touchEditor_,lv_textarea_get_accepted_chars(ta));
         lv_textarea_set_max_length(self->touchEditor_,lv_textarea_get_max_length(ta));
@@ -331,6 +332,9 @@ private:
             if(a.x1<b.x1||a.x2>b.x2||a.y1<b.y1||a.y2>b.y2)Serial.printf("[UI] field bounds page=%d sub=%d\n",page_,sub_);}
         orderKeys();
         refresh();
+        if(page_==4&&calcMode_==3&&!geometryReadAttempted_&&!waiting_&&session_.connected()){
+            geometryReadAttempted_=send(Route::geometryRead,{});
+        }
     }
     void home(){
         auto* scene=plain(body_,LV_PCT(100),SCENE);
@@ -401,9 +405,19 @@ private:
     void requestGraph(){lastGraph_=millis();send(Route::chartHistory,{{"minutes",String(graphMinutes_)}});}
     static const char* calcTitle(int mode){static const char* names[]={"Разбавление водой","Коррекция ареометра","Расчёт выхода","Объём куба"};return names[mode];}
     void rememberCalc(){if(page_!=4)return;for(int i=0;i<5;++i)if(fields_[i])calcInput_[calcMode_][i]=text(fields_[i]);}
+    bool geometryValid()const{
+        const String& a=calcInput_[3][0];const String& b=calcInput_[3][1];char *ae=nullptr,*be=nullptr;
+        double d=strtod(a.c_str(),&ae),h=strtod(b.c_str(),&be);
+        return a.length()&&b.length()&&ae&&be&&!*ae&&!*be&&BusaCalc::cylinder(d,h).ok;
+    }
+    String geometrySummary()const{
+        if(!geometryValid())return "Введите внутренние размеры куба";
+        String d=calcInput_[3][0],h=calcInput_[3][1];d.replace('.',',');h.replace('.',',');
+        return "Размеры куба: "+d+" × "+h+" см · изменить";
+    }
     void clearCalc(){
         for(int i=0;i<5;++i)if(fields_[i]&&(calcMode_!=3||i==2)){calcInput_[calcMode_][i]="";lv_textarea_set_text(fields_[i],"");}
-        set(resultLabel_,"—");if(pageStatus_!=resultLabel_)set(pageStatus_,"");
+        if(calcMode_==3)calculate(false);else set(resultLabel_,"—");if(pageStatus_!=resultLabel_)set(pageStatus_,"");
     }
     void calcConditions(){
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;return;}
@@ -417,14 +431,22 @@ private:
         auto* close=button(calcNotes_,"Закрыть",334,120,false);lv_obj_align(close,LV_ALIGN_BOTTOM_MID,0,-8);
     }
     void calculator(){
-        static const char* labels[4][5]={{"Объём жидкости, л","Начальная крепость, %","Требуемая крепость, %","",""},{"Температура, °C","Показание ареометра, %","","",""},{"Исходный объём, л","Начальная крепость, %","Крепость на выходе, %","Доля 1, %","Доля 2, %"},{"Внутренний диаметр, см","Внутренняя высота, см","Уровень жидкости, см","",""}};
+        static const char* labels[4][5]={{"Объём жидкости, л","Начальная крепость, %","Требуемая крепость, %","",""},{"Температура жидкости, °C","Показание ареометра, %","","",""},{"Исходный объём, л","Начальная крепость, %","Крепость на выходе, %","Доля 1, %","Доля 2, %"},{"Внутренний диаметр, см","Внутренняя высота, см","Уровень жидкости, см","",""}};
         static const int counts[]={3,2,5,3};
         auto* r=row(body_,28);for(int i=0;i<4;++i){auto* b=button(r,calcTitle(i),320+i,i==1?143:i==0?125:i==2?105:92);auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);lv_obj_set_height(b,28);selected(b,i==calcMode_);}
-        for(int i=0;i<counts[calcMode_];){auto* inputs=row(body_,42);for(int col=0;col<3&&i<counts[calcMode_];++col,++i){fields_[i]=field(inputs,labels[calcMode_][i],calcInput_[calcMode_][i],true,false,153);lv_textarea_set_placeholder_text(fields_[i],"0,00");}}
+        if(calcMode_==3){
+            if(geometryExpanded_){
+                auto* controls=row(body_,26);button(controls,"Сохранить и свернуть",332,235);button(controls,"Загрузить размеры",331,235);
+                auto* inputs=row(body_,42);for(int i=0;i<3;++i){fields_[i]=field(inputs,labels[3][i],calcInput_[3][i],true,false,153);lv_textarea_set_placeholder_text(fields_[i],"0,00");}
+            }else{
+                button(body_,geometrySummary().c_str(),335);
+                fields_[2]=field(body_,labels[3][2],calcInput_[3][2],true);lv_textarea_set_placeholder_text(fields_[2],"0,00");
+            }
+        }else{
+            for(int i=0;i<counts[calcMode_];){auto* inputs=row(body_,42);const int n=counts[calcMode_]-i>3?3:counts[calcMode_]-i;for(int col=0;col<n;++col,++i){fields_[i]=field(inputs,labels[calcMode_][i],calcInput_[calcMode_][i],true,false,n==2?235:153);lv_textarea_set_placeholder_text(fields_[i],"0,00");}}
+        }
         auto* buttons=row(body_,26);
-        if(calcMode_==3){selected(button(buttons,"Рассчитать",330,154),true);button(buttons,"Очистить уровень",333,154);button(buttons,"Условия расчёта",334,154);}
-        else{selected(button(buttons,"Рассчитать",330,154),true);button(buttons,"Очистить",333,154);button(buttons,"Условия расчёта",334,154);}
-        if(calcMode_==3){auto* notes=row(body_,26);button(notes,"Загрузить размеры",331,235);button(notes,"Сохранить размеры",332,235);}
+        selected(button(buttons,"Рассчитать",330,154),true);button(buttons,calcMode_==3?"Очистить уровень":"Очистить",333,154);button(buttons,"Условия расчёта",334,154);
         auto* p=panel(body_,LV_PCT(100),calcMode_==2?46:50);lv_obj_set_style_pad_all(p,2,0);resultLabel_=smallLabel(p,"—");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
         pageStatus_=resultLabel_;
         calculate(false);
@@ -500,6 +522,7 @@ private:
     void action(int id){
         if(id==340||id==341){touchFinish(id==341);return;}
         if(touchTarget_)return;
+        if(waiting_&&page_==4&&calcMode_==3)return;
         if(id>=100&&id<106){rememberCalc();if(page_!=id-100)previousPage_=page_;page_=id-100;sub_=-1;render();return;}
         if(id>=400&&id<409){sub_=id-400;if(sub_==2)requestedTheme_=theme_;render();return;}
         if(id==409){sub_=-1;render();return;}
@@ -530,18 +553,20 @@ private:
             case 218:send(Route::keypadNext,{{"confirm","YES"}});break;
             case 219:send(Route::keypadUndo,{{"confirm","YES"}});break;
             case 220:send(Route::keypadCancel,{{"confirm","YES"}});break;
-            case 330:calculate();break;
+            case 330:calculate();if(calcMode_==3&&geometryExpanded_&&geometryValid())action(332);break;
             case 333:clearCalc();break;
             case 334:calcConditions();break;
-            case 331:send(Route::geometryRead,{});break;
-            case 332:send(Route::geometrySave,{{"confirm","YES"},{"diameter",text(fields_[0])},{"height",text(fields_[1])}});break;
+            case 331:if(calcMode_==3){rememberCalc();geometryReadAttempted_=send(Route::geometryRead,{});}break;
+            case 332:if(calcMode_==3&&geometryExpanded_){rememberCalc();if(!geometryValid()){set(resultLabel_,"Проверьте размеры");break;}send(Route::geometrySave,{{"confirm","YES"},{"diameter",calcInput_[3][0]},{"height",calcInput_[3][1]}});}break;
+            case 335:if(calcMode_==3){rememberCalc();geometryExpanded_=true;render();}break;
         }
     }
     static String fmt(double v){String s(v,2);s.replace('.',',');return s;}
     void calculate(bool explicitRequest=true){
         static const int counts[]={3,2,5,3};double v[5]={};
         for(int i=0;i<counts[calcMode_];++i){
-            String s=text(fields_[i]);calcInput_[calcMode_][i]=s;char* e=nullptr;v[i]=strtod(s.c_str(),&e);
+            if(fields_[i])calcInput_[calcMode_][i]=text(fields_[i]);
+            String s=calcInput_[calcMode_][i];char* e=nullptr;v[i]=strtod(s.c_str(),&e);
             if(calcMode_==3&&i==2&&s.isEmpty())continue;
             if(s.isEmpty()||*e||!std::isfinite(v[i])){set(resultLabel_,explicitRequest?"Проверьте значения":"—");return;}
         }
@@ -560,8 +585,10 @@ private:
         if(calibrating_||pendingPage_!=page_||pendingSub_!=sub_||pendingGeneration_!=viewGeneration_)return;
         if(code<200||code>=300){set(pageStatus_,code==0?String("Ответ не получен; проверьте состояние"):String("Ошибка ")+code+": "+body.substring(0,100));return;}
         set(pageStatus_,"Выполнено");
-        if(pendingRoute_==Route::geometryRead&&calcMode_==3){JsonDocument d;if(!deserializeJson(d,body)){for(int i=0;i<2;++i){calcInput_[3][i]=d[i?"height":"diameter"]|"";lv_textarea_set_text(fields_[i],calcInput_[3][i].c_str());}set(resultLabel_,"Размеры загружены");}return;}
-        if(pendingRoute_==Route::geometrySave){set(resultLabel_,"Размеры сохранены");return;}
+        if(pendingRoute_==Route::geometryRead&&calcMode_==3){JsonDocument d;if(deserializeJson(d,body)){set(resultLabel_,"Ошибка загрузки размеров");return;}
+            rememberCalc();for(int i=0;i<2;++i)calcInput_[3][i]=d[i?"height":"diameter"]|"";
+            geometryExpanded_=!geometryValid();render();return;}
+        if(pendingRoute_==Route::geometrySave&&calcMode_==3){geometryExpanded_=false;render();return;}
         if(pendingRoute_>=Route::keypadStart&&pendingRoute_<=Route::keypadCancel){set(pageStatus_,body);return;}
         if(pendingRoute_==Route::referenceEdit||pendingRoute_==Route::calibrationEdit){set(pageStatus_,body);return;}
         if(pendingRoute_==Route::theme){themeSynced_=true;theme_=requestedTheme_;prefs_.putUChar("theme",theme_);build();return;}
@@ -632,6 +659,7 @@ private:
     }
     void physicalKey(uint8_t k,uint32_t at){
         if(testOverlay_||displaySleeping_||calibrating_||!session_.connected()||k==2||k==3)return;
+        if(waiting_&&page_==4&&calcMode_==3)return;
         if(touchTarget_){if(k==15||k==19)touchFinish(k==19);return;}
         if(calcNotes_){if(k==15||k==19)calcConditions();return;}
         if(keyConfirm_>=0){
@@ -652,9 +680,7 @@ private:
             if(k==19){
                 if(page_==1||(page_==5&&sub_==0)){if(!keySaveReference(index,false)){keyHint("Не удалось отправить значение");return;}}
                 cancelKeyEdit(false);
-                if(page_==4){calculate();if(calcMode_==3&&index<2){String a=text(fields_[0]),b=text(fields_[1]);char *ae=nullptr,*be=nullptr;
-                    double av=strtod(a.c_str(),&ae),bv=strtod(b.c_str(),&be);
-                    if(a.length()&&b.length()&&ae&&be&&!*ae&&!*be&&BusaCalc::cylinder(av,bv).ok)action(332);}}
+                if(page_==4){calculate();}
                 else if(page_==5&&sub_==1)focusKey(keyFocus_+1);
                 return;
             }
@@ -775,6 +801,7 @@ private:
     int calIndex_=0,calSamples_=0,sumX_=0,sumY_=0,page_=0,sub_=-1,pendingPage_=0,pendingSub_=-1,graphKind_=0,graphMinutes_=5,calcMode_=0;
     uint32_t lastCalibrationRead_=0;
     bool themeSynced_=false;uint8_t theme_=2,requestedTheme_=2;uint32_t lastTick_=0,lastAnimation_=0,revision_=0,lastScan_=0,frameStart_=0,lastGraph_=0,viewGeneration_=0,pendingGeneration_=0;
+    bool geometryExpanded_=true,geometryReadAttempted_=false;
     Route pendingRoute_=Route::wifiScan;String networks_[32];unsigned networkCount_=0;String calcInput_[4][5];
 };
 constexpr uint32_t Interface::colors_[4];
