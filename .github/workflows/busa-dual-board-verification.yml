@@ -196,7 +196,7 @@ jobs:
           assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
           assert 60000<len(app)<=0x1c0000 and len(data)<=0x1d0000
           major='5' if os.environ['CORE_VERSION']=='3.0.0' else '4'
-          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-HQ1-HW1').encode() in app
+          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-HW1').encode() in app
           assert b'[BOOT] FIRST_FRAME OK' in app
           assert b'[BOOT] PSRAM ' in app
           assert b'[BOOT] LCD GEOMETRY ' in app
