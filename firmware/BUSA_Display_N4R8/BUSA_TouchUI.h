@@ -8,6 +8,8 @@
 #include "BUSA_Calculator.h"
 #include "BUSA_DisplayAsset.h"
 LV_FONT_DECLARE(busa_font);
+LV_FONT_DECLARE(busa_font_small);
+LV_FONT_DECLARE(busa_font_value);
 namespace busa_guition {
 class Interface {
 public:
@@ -70,6 +72,9 @@ private:
     uint32_t surface()const{return theme_==0?0xffffff:0x0d2430;}
     uint32_t line()const{return theme_==0?0xb6d2df:0x285064;}
     static constexpr uint32_t accent(){return 0x009fde;}
+    uint32_t muted()const{return theme_==0?0x527181:0x9bb6c4;}
+    static constexpr int TOP=28, NAV=42, PAD=3, GAP=3, SCENE=138, METRICS=27, RELAYS=25;
+    static_assert(TOP+NAV+2*PAD+SCENE+METRICS+RELAYS+2*GAP==272,"Home must fit native display");
     static void flush(lv_disp_drv_t* d,const lv_area_t* a,lv_color_t* p){
         auto* self=static_cast<Interface*>(d->user_data);
         if(!self->frameOpen_){self->frameStart_=millis();self->frameOpen_=true;}
@@ -130,42 +135,80 @@ private:
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));auto* ta=lv_event_get_target(e);
         lv_keyboard_set_textarea(self->keyboard_,ta);lv_keyboard_set_mode(self->keyboard_,lv_textarea_get_accepted_chars(ta)?LV_KEYBOARD_MODE_NUMBER:LV_KEYBOARD_MODE_TEXT_LOWER);
         lv_obj_clear_flag(self->keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_move_foreground(self->keyboard_);
-        lv_obj_set_height(self->body_,HEIGHT-28-43-112);
+        lv_obj_set_height(self->body_,HEIGHT-TOP-128);
+        lv_obj_update_layout(self->body_);
         lv_obj_scroll_to_view(ta,LV_ANIM_OFF);
     }
     static void keyboardEvent(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));
         if(lv_event_get_code(e)==LV_EVENT_READY||lv_event_get_code(e)==LV_EVENT_CANCEL)self->hideKeyboard();
     }
-    void hideKeyboard(){if(!keyboard_)return;lv_keyboard_set_textarea(keyboard_,nullptr);lv_obj_add_flag(keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_set_height(body_,HEIGHT-28-43);}
+    void hideKeyboard(){if(!keyboard_)return;lv_keyboard_set_textarea(keyboard_,nullptr);lv_obj_add_flag(keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_set_height(body_,HEIGHT-TOP-NAV);}
     lv_obj_t* label(lv_obj_t* parent,const char* text){
         auto* o=lv_label_create(parent);lv_obj_set_style_text_font(o,&busa_font,0);lv_obj_set_style_text_color(o,color(ink()),0);lv_label_set_text(o,text);return o;
     }
+    lv_obj_t* smallLabel(lv_obj_t* parent,const char* text){
+        auto* o=label(parent,text);lv_obj_set_style_text_font(o,&busa_font_small,0);return o;
+    }
+    lv_obj_t* plain(lv_obj_t* parent,int w,int h){
+        auto* o=lv_obj_create(parent);lv_obj_remove_style_all(o);lv_obj_set_size(o,w,h);
+        lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);return o;
+    }
+    lv_obj_t* at(lv_obj_t* parent,const char* text,int x,int y,const lv_font_t* font=&busa_font){
+        auto* o=label(parent,text);lv_obj_set_style_text_font(o,font,0);lv_obj_set_pos(o,x,y);return o;
+    }
     lv_obj_t* button(lv_obj_t* parent,const char* text,int id,int width=LV_PCT(100)){
-        auto* o=lv_btn_create(parent);lv_obj_set_size(o,width,34);lv_obj_set_style_radius(o,8,0);
-        lv_obj_set_style_bg_color(o,color(accent()),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);lv_obj_set_style_shadow_width(o,0,0);
-        auto* l=label(o,text);lv_obj_set_style_text_color(l,color(0xffffff),0);lv_obj_center(l);
+        auto* o=lv_btn_create(parent);lv_obj_set_size(o,width,28);lv_obj_set_style_radius(o,6,0);
+        lv_obj_set_style_bg_color(o,color(surface()),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);
+        lv_obj_set_style_shadow_width(o,0,0);lv_obj_set_style_border_width(o,1,0);
+        lv_obj_set_style_border_color(o,color(line()),0);lv_obj_set_style_pad_all(o,1,0);
+        lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);
+        auto* l=label(o,text);lv_obj_set_style_text_color(l,color(ink()),0);
+        lv_obj_set_width(l,LV_PCT(100));lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);
+        lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_center(l);
         lv_obj_set_user_data(o,reinterpret_cast<void*>(intptr_t(id)));lv_obj_add_event_cb(o,event,LV_EVENT_CLICKED,this);return o;
+    }
+    void selected(lv_obj_t* o,bool on){
+        lv_obj_set_style_bg_color(o,color(on?(theme_==0?0x007bb3:0x11455d):surface()),0);
+        lv_obj_set_style_border_color(o,color(on?accent():line()),0);
+        lv_obj_set_style_text_color(lv_obj_get_child(o,0),color(on?0xffffff:ink()),0);
     }
     lv_obj_t* panel(lv_obj_t* parent,int width=LV_PCT(100),int height=LV_SIZE_CONTENT){
         auto* o=lv_obj_create(parent);lv_obj_set_size(o,width,height);lv_obj_set_style_bg_color(o,color(surface()),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);
         lv_obj_set_style_border_color(o,color(line()),0);lv_obj_set_style_border_width(o,1,0);
-        lv_obj_set_style_radius(o,9,0);lv_obj_set_style_pad_all(o,6,0);lv_obj_set_style_pad_row(o,5,0);
+        lv_obj_set_style_radius(o,7,0);lv_obj_set_style_pad_all(o,3,0);lv_obj_set_style_pad_row(o,2,0);
         lv_obj_set_flex_flow(o,LV_FLEX_FLOW_COLUMN);lv_obj_clear_flag(o,LV_OBJ_FLAG_SCROLLABLE);return o;
     }
     lv_obj_t* row(lv_obj_t* parent,int height=LV_SIZE_CONTENT){
-        auto* o=lv_obj_create(parent);lv_obj_remove_style_all(o);lv_obj_set_size(o,LV_PCT(100),height);
+        auto* o=plain(parent,LV_PCT(100),height);
         lv_obj_set_flex_flow(o,LV_FLEX_FLOW_ROW);lv_obj_set_flex_align(o,LV_FLEX_ALIGN_SPACE_BETWEEN,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
-        lv_obj_set_style_pad_column(o,4,0);return o;
+        lv_obj_set_style_pad_column(o,3,0);return o;
     }
     lv_obj_t* field(lv_obj_t* parent,const char* title,const String& value,bool numeric,bool secret=false,int width=LV_PCT(100)){
-        auto* box=panel(parent,width);label(box,title);
-        auto* ta=lv_textarea_create(box);lv_obj_set_width(ta,LV_PCT(100));lv_obj_set_height(ta,34);
-        lv_obj_set_style_text_font(ta,&busa_font,0);lv_obj_set_style_text_color(ta,color(ink()),0);lv_obj_set_style_bg_color(ta,color(surface()),0);lv_obj_set_style_border_color(ta,color(line()),0);lv_obj_set_style_pad_all(ta,5,0);lv_textarea_set_one_line(ta,true);
+        auto* box=plain(parent,width,LV_SIZE_CONTENT);lv_obj_set_flex_flow(box,LV_FLEX_FLOW_COLUMN);lv_obj_set_style_pad_row(box,1,0);
+        auto* caption=smallLabel(box,title);lv_obj_set_style_text_color(caption,color(muted()),0);
+        lv_obj_set_width(caption,LV_PCT(100));lv_label_set_long_mode(caption,LV_LABEL_LONG_WRAP);
+        auto* ta=lv_textarea_create(box);lv_obj_set_width(ta,LV_PCT(100));lv_obj_set_height(ta,26);
+        lv_obj_set_style_text_font(ta,&busa_font,0);lv_obj_set_style_text_color(ta,color(ink()),0);lv_obj_set_style_bg_color(ta,color(surface()),0);
+        lv_obj_set_style_border_color(ta,color(line()),0);lv_obj_set_style_border_width(ta,1,0);lv_obj_set_style_radius(ta,5,0);lv_obj_set_style_pad_all(ta,3,0);lv_textarea_set_one_line(ta,true);
         lv_textarea_set_max_length(ta,numeric?14:220);
         if(numeric)lv_textarea_set_accepted_chars(ta,"0123456789.-,");
         lv_textarea_set_password_mode(ta,secret);lv_textarea_set_text(ta,value.c_str());
         lv_obj_add_event_cb(ta,textFocus,LV_EVENT_CLICKED,this);return ta;
+    }
+    void navIcon(lv_obj_t* parent,int i){
+        static const lv_point_t points[6][12]={
+            {{1,8},{10,1},{19,8},{16,8},{16,19},{11,19},{11,12},{7,12},{7,19},{3,19},{3,8},{1,8}},
+            {{7,13},{7,3},{9,1},{11,1},{13,3},{13,13},{16,16},{15,19},{12,21},{8,21},{5,18},{7,13}},
+            {{10,1},{4,9},{2,14},{4,18},{8,20},{12,20},{16,18},{18,14},{16,9},{10,1},{10,1},{10,1}},
+            {{2,2},{2,19},{19,19},{2,19},{2,15},{7,10},{11,13},{18,4},{18,4},{18,4},{18,4},{18,4}},
+            {{4,1},{16,1},{16,20},{4,20},{4,1},{4,7},{16,7},{4,7},{4,13},{16,13},{10,13},{10,20}},
+            {{7,1},{13,1},{14,5},{18,6},{20,11},{17,14},{17,18},{12,20},{8,18},{4,18},{1,12},{7,1}}
+        };
+        auto* icon=lv_line_create(parent);lv_line_set_points(icon,points[i],12);
+        lv_obj_set_style_line_width(icon,2,0);lv_obj_set_style_line_rounded(icon,true,0);
+        lv_obj_set_style_line_color(icon,color(theme_==0?0x007bb3:0xa5e8f5),0);lv_obj_align(icon,LV_ALIGN_TOP_MID,0,0);
+        lv_obj_clear_flag(icon,LV_OBJ_FLAG_CLICKABLE);
     }
     static String text(lv_obj_t* ta){String s=lv_textarea_get_text(ta);s.replace(',','.');return s;}
     static String value(JsonVariantConst v,int digits=1){
@@ -174,84 +217,120 @@ private:
     }
     String measured(JsonVariantConst v,const char* unit,int digits=1)const{
         String s=session_.connected()?value(v,digits):String("");
-        return s.isEmpty()?String("—"):s+unit;
+        if(s.isEmpty())return String("—");s.replace('.',',');return s+unit;
     }
     void set(lv_obj_t* o,const String& s){if(o&&strcmp(lv_label_get_text(o),s.c_str()))lv_label_set_text(o,s.c_str());}
     void build(){
         auto* root=lv_scr_act();lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
-        auto* top=lv_obj_create(root);lv_obj_remove_style_all(top);lv_obj_set_size(top,WIDTH,28);lv_obj_set_pos(top,0,0);
-        auto* title=label(top,"BUSA MONITOR");lv_obj_set_pos(title,8,5);
-        connection_=label(top,"UART —");lv_obj_align(connection_,LV_ALIGN_RIGHT_MID,-8,0);
-        body_=lv_obj_create(root);lv_obj_set_pos(body_,0,28);lv_obj_set_size(body_,WIDTH,HEIGHT-28-43);
+        auto* top=plain(root,WIDTH,TOP);lv_obj_set_pos(top,0,0);
+        at(top,"BUSA MONITOR",6,0);clock_=at(top,"Дата и время: —",6,15,&busa_font_small);
+        lv_obj_set_style_text_color(clock_,color(muted()),0);
+        for(int i=0;i<3;++i){static const char* names[]={"Wi-Fi","Google","ESP32"};auto* p=plain(top,65,18);lv_obj_set_pos(p,205+i*68,4);
+            lv_obj_set_style_radius(p,9,0);lv_obj_set_style_border_width(p,1,0);lv_obj_set_style_border_color(p,color(line()),0);
+            statusDots_[i]=plain(p,5,5);lv_obj_set_style_radius(statusDots_[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_opa(statusDots_[i],LV_OPA_COVER,0);lv_obj_set_pos(statusDots_[i],5,6);
+            at(p,names[i],15,2,&busa_font_small);}
+        connection_=at(top,"UART",430,7,&busa_font_small);
+        body_=lv_obj_create(root);lv_obj_set_pos(body_,0,TOP);lv_obj_set_size(body_,WIDTH,HEIGHT-TOP-NAV);
         lv_obj_set_style_bg_color(body_,color(paper()),0);lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
-        lv_obj_set_style_pad_all(body_,5,0);lv_obj_set_style_pad_row(body_,5,0);lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,GAP,0);lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);
         lv_obj_set_scroll_dir(body_,LV_DIR_VER);
-        nav_=lv_obj_create(root);lv_obj_remove_style_all(nav_);lv_obj_set_size(nav_,WIDTH,43);lv_obj_set_pos(nav_,0,HEIGHT-43);
-        lv_obj_set_style_bg_color(nav_,color(paper()),0);lv_obj_set_style_bg_opa(nav_,LV_OPA_COVER,0);
-        lv_obj_set_style_pad_all(nav_,3,0);lv_obj_set_style_pad_column(nav_,2,0);lv_obj_set_flex_flow(nav_,LV_FLEX_FLOW_ROW);
-        static const char* titles[]={"Главная","Темп.","Вода","Графики","Расчёт","Настройки"};
-        for(int i=0;i<6;++i){auto* b=button(nav_,titles[i],100+i,76);lv_obj_set_height(b,36);navButtons_[i]=b;}
-        keyboard_=lv_keyboard_create(root);lv_obj_set_size(keyboard_,WIDTH,155);lv_obj_align(keyboard_,LV_ALIGN_BOTTOM_MID,0,0);
+        nav_=plain(root,WIDTH-6,NAV-2);lv_obj_set_pos(nav_,3,HEIGHT-NAV);
+        lv_obj_set_style_radius(nav_,9,0);lv_obj_set_style_border_width(nav_,1,0);lv_obj_set_style_border_color(nav_,color(line()),0);
+        lv_obj_set_style_bg_color(nav_,color(surface()),0);lv_obj_set_style_bg_opa(nav_,LV_OPA_COVER,0);
+        lv_obj_set_style_pad_all(nav_,2,0);lv_obj_set_style_pad_column(nav_,2,0);lv_obj_set_flex_flow(nav_,LV_FLEX_FLOW_ROW);
+        static const char* titles[]={"Главная","Температуры","Вода и отбор","Графики","Калькулятор","Настройки"};
+        for(int i=0;i<6;++i){auto* b=button(nav_,titles[i],100+i,76);lv_obj_set_height(b,34);
+            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_obj_align(l,LV_ALIGN_BOTTOM_MID,0,0);
+            navIcon(b,i);navButtons_[i]=b;}
+        keyboard_=lv_keyboard_create(root);lv_obj_set_size(keyboard_,WIDTH,128);lv_obj_align(keyboard_,LV_ALIGN_BOTTOM_MID,0,0);
         lv_obj_add_flag(keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_add_event_cb(keyboard_,keyboardEvent,LV_EVENT_ALL,this);
         render();
     }
     void render(){
         hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
         wifiList_=nullptr;chart_=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;scanPending_=false;
-        for(int i=0;i<6;++i){lv_obj_set_style_bg_color(navButtons_[i],color(i==page_?accent():surface()),0);lv_obj_set_style_text_color(lv_obj_get_child(navButtons_[i],0),color(i==page_?0xffffff:ink()),0);}
+        for(int i=0;i<6;++i)selected(navButtons_[i],i==page_);
+        if(page_==0){lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);}
+        else{lv_obj_add_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_AUTO);}
         switch(page_){case 0:home();break;case 1:temperatures();break;case 2:water();break;case 3:graphs();break;case 4:calculator();break;case 5:settings();break;}
         refresh();
     }
     void home(){
-        auto* bar=row(body_,32);
-        for(int i=0;i<4;++i){auto* p=panel(bar,112,30);live_[i]=label(p,"К —");}
-        auto* middle=row(body_,144);auto* left=panel(middle,151,144);auto* center=lv_obj_create(middle);
-        lv_obj_remove_style_all(center);lv_obj_set_size(center,BUSA_ASSET_W,BUSA_ASSET_H);lv_obj_clear_flag(center,LV_OBJ_FLAG_SCROLLABLE);
-        auto* im=lv_img_create(center);lv_img_set_src(im,&art_);lv_obj_center(im);
-        for(unsigned i=0;i<7;++i){auto* dot=lv_obj_create(center);lv_obj_remove_style_all(dot);lv_obj_set_size(dot,3,3);
+        auto* scene=plain(body_,LV_PCT(100),SCENE);
+        auto* center=plain(scene,BUSA_ASSET_W,BUSA_ASSET_H);lv_obj_align(center,LV_ALIGN_CENTER,0,0);
+        auto* im=lv_img_create(center);lv_img_set_src(im,&art_);lv_img_set_antialias(im,true);lv_obj_center(im);
+        for(unsigned i=0;i<7;++i){auto* dot=plain(center,3,3);
             lv_obj_set_style_bg_color(dot,color(i<4?0x38bdf8:0xc5fffa),0);lv_obj_set_style_bg_opa(dot,LV_OPA_COVER,0);lv_obj_set_style_radius(dot,LV_RADIUS_CIRCLE,0);motion_[i]=dot;}
-        auto* right=panel(middle,151,144);
-        for(int i=0;i<4;++i){auto* p=i%2?right:left;auto* name=label(p,sensor(i));lv_obj_set_style_text_color(name,color(colors_[i]),0);live_[4+i]=label(p,"—");lv_obj_set_style_text_color(live_[4+i],color(colors_[i]),0);}
-        auto* r=row(body_);live_[8]=label(r,"Расход —");live_[9]=label(r,"Вода —");
+        static const int xs[]={10,10,318,318},ys[]={83,12,83,12};
+        for(int i=0;i<4;++i){at(scene,i==3?"Авария":sensor(i),xs[i],ys[i]);
+            live_[4+i]=at(scene,"—",xs[i],ys[i]+17,&busa_font_value);lv_obj_set_style_text_color(live_[4+i],color(colors_[i]),0);}
+        live_[11]=at(scene,"Собрано — мл",318,116,&busa_font_small);
+        auto* m=plain(body_,LV_PCT(100),METRICS);
+        lv_obj_set_style_bg_color(m,color(surface()),0);lv_obj_set_style_bg_opa(m,LV_OPA_COVER,0);
+        lv_obj_set_style_border_width(m,1,0);lv_obj_set_style_border_color(m,color(line()),0);lv_obj_set_style_radius(m,6,0);
+        static const char* headings[]={"Расход","Израсходовано","Отбор"};
+        for(int i=0;i<3;++i){auto* l=at(m,headings[i],7+i*156,0,&busa_font_small);lv_obj_set_style_text_color(l,color(muted()),0);
+            live_[8+i]=at(m,"—",7+i*156,11,&busa_font);}
+        auto* bar=row(body_,RELAYS);
+        static const char* relayNames[]={"ТЭН откл.","Кран закрыт","Кран открыт","Авария"};
+        for(int i=0;i<4;++i){auto* p=plain(bar,115,RELAYS);lv_obj_set_style_radius(p,6,0);
+            lv_obj_set_style_bg_color(p,color(surface()),0);lv_obj_set_style_bg_opa(p,LV_OPA_COVER,0);
+            lv_obj_set_style_border_color(p,color(line()),0);lv_obj_set_style_border_width(p,1,0);
+            at(p,relayNames[i],5,0,&busa_font_small);live_[i]=at(p,"Нет связи",5,12,&busa_font_small);}
     }
     void temperatures(){
-        const auto& doc=session_.snapshot();label(body_,"ТЕМПЕРАТУРЫ · пороги звука");
-        for(int i=0;i<4;++i){auto* r=row(body_);auto* p=panel(r,130);label(p,sensor(i));live_[i]=label(p,"—");
-            fields_[2*i]=field(r,"ВКЛ, °C",value(doc["display_references"][i]["target"]),true,false,155);
-            fields_[2*i+1]=field(r,"ВЫКЛ, °C",value(doc["display_references"][i]["notice"]),true,false,155);}
-        button(body_,"Сохранить пороги",200);pageStatus_=label(body_,"");
+        const auto& doc=session_.snapshot();label(body_,"ТЕМПЕРАТУРЫ");
+        static const int order[]={0,2,1,3};
+        for(int lineNo=0;lineNo<2;++lineNo){auto* r=row(body_,68);
+            for(int col=0;col<2;++col){int i=order[lineNo*2+col];auto* p=panel(r,235,68);auto* head=row(p,21);
+                label(head,i==3?"Авария":sensor(i));live_[i]=label(head,"—");lv_obj_set_style_text_font(live_[i],&busa_font_value,0);lv_obj_set_style_text_color(live_[i],color(colors_[i]),0);
+                auto* fields=row(p,39);fields_[2*i]=field(fields,"ВКЛ, °C",value(doc["display_references"][i]["target"]),true,false,110);
+                fields_[2*i+1]=field(fields,"ВЫКЛ, °C",value(doc["display_references"][i]["notice"]),true,false,110);}}
+        selected(button(body_,"Сохранить пороги",200),true);pageStatus_=smallLabel(body_,"");lv_obj_set_width(pageStatus_,LV_PCT(100));
     }
     void water(){
-        label(body_,"ВОДА И ОТБОР");
-        auto* p=panel(body_);label(p,"Охлаждение");live_[0]=label(p,"—");live_[1]=label(p,"—");live_[2]=label(p,"—");
-        const auto& d=session_.snapshot();
-        fields_[0]=field(body_,"Коэффициент, имп/л",value(d["water"]["pulses_per_litre"]),true);
-        button(body_,"Сохранить коэффициент",201);
-        auto* q=panel(body_);label(q,"Отбор жидкости");live_[3]=label(q,"Нет датчика");pageStatus_=label(body_,"");
+        label(body_,"ВОДА И ОТБОР");auto* r=row(body_,142);
+        auto* q=panel(r,235,142);label(q,"Отбор жидкости");live_[3]=label(q,"—");live_[4]=label(q,"—");live_[5]=label(q,"—");
+        lv_obj_set_style_text_font(live_[3],&busa_font_value,0);lv_obj_set_style_text_color(live_[3],color(colors_[0]),0);
+        auto* p=panel(r,235,142);label(p,"Охлаждение");live_[0]=label(p,"—");live_[1]=label(p,"—");live_[2]=smallLabel(p,"—");
+        lv_obj_set_style_text_font(live_[0],&busa_font_value,0);lv_obj_set_style_text_color(live_[0],color(colors_[0]),0);
+        const auto& d=session_.snapshot();fields_[0]=field(p,"Коэффициент, имп/л",value(d["water"]["pulses_per_litre"]),true);
+        selected(button(body_,"Сохранить коэффициент",201),true);pageStatus_=smallLabel(body_,"");lv_obj_set_width(pageStatus_,LV_PCT(100));
     }
     void graphs(){
-        label(body_,"ГРАФИКИ");auto* r=row(body_);
-        button(r,"Температуры",300,146);button(r,"Вода",301,146);button(r,"Отбор",302,146);
-        auto* ranges=row(body_);
-        for(int i=0;i<5;++i){static const char* names[]={"5 мин","10 мин","15 мин","30 мин","60 мин"};button(ranges,names[i],310+i,88);}
-        chart_=lv_chart_create(body_);lv_obj_set_size(chart_,LV_PCT(100),105);lv_chart_set_type(chart_,LV_CHART_TYPE_LINE);
-        lv_chart_set_point_count(chart_,160);lv_obj_set_style_bg_color(chart_,color(surface()),0);lv_chart_set_range(chart_,LV_CHART_AXIS_PRIMARY_Y,0,1250);
+        auto* r=row(body_,25);
+        selected(button(r,"Температура",300,156),graphKind_==0);
+        selected(button(r,"Отбор",302,156),graphKind_==2);selected(button(r,"Охлаждение",301,156),graphKind_==1);
+        auto* legend=row(body_,13);
+        for(int i=0;i<4;++i){auto* l=smallLabel(legend,i==3?"Авария":sensor(i));lv_obj_set_style_text_color(l,color(colors_[i]),0);}
+        chart_=lv_chart_create(body_);lv_obj_set_size(chart_,LV_PCT(100),115);lv_chart_set_type(chart_,LV_CHART_TYPE_LINE);
+        lv_chart_set_point_count(chart_,160);lv_obj_set_style_bg_color(chart_,color(surface()),0);lv_obj_set_style_border_color(chart_,color(line()),0);
+        lv_obj_set_style_line_color(chart_,color(line()),LV_PART_MAIN);lv_obj_set_style_line_width(chart_,2,LV_PART_ITEMS);
+        lv_obj_set_style_size(chart_,0,LV_PART_INDICATOR);lv_chart_set_div_line_count(chart_,4,5);
+        lv_chart_set_range(chart_,LV_CHART_AXIS_PRIMARY_Y,0,1250);
         for(int i=0;i<4;++i)series_[i]=lv_chart_add_series(chart_,color(colors_[i]),LV_CHART_AXIS_PRIMARY_Y);
-        pageStatus_=label(body_,"Выберите период");requestGraph();
+        auto* ranges=row(body_,28);
+        for(int i=0;i<5;++i){static const char* names[]={"5 мин","10 мин","15 мин","30 мин","1 ч"};static const int mins[]={5,10,15,30,60};
+            graphRange_[i]=button(ranges,names[i],310+i,91);selected(graphRange_[i],graphMinutes_==mins[i]);}
+        pageStatus_=smallLabel(body_,"Выберите период");lv_obj_set_width(pageStatus_,LV_PCT(100));requestGraph();
     }
     void requestGraph(){lastGraph_=millis();send(Route::chartHistory,{{"minutes",String(graphMinutes_)}});}
     void calculator(){
         static const char* names[]={"Разбавление","Ареометр","Расчёт выхода","Объём куба"};
         static const char* labels[4][5]={{"Объём, л","Исходная, %","Нужная, %","",""},{"Температура, °C","Показание, %","","",""},{"Объём, л","Исходная, %","На выходе, %","Доля 1, %","Доля 2, %"},{"Диаметр, см","Высота, см","Уровень, см","",""}};
         static const int counts[]={3,2,5,3};
-        auto* r=row(body_);for(int i=0;i<4;++i)button(r,names[i],320+i,112);
-        label(body_,names[calcMode_]);for(int i=0;i<counts[calcMode_];++i)fields_[i]=field(body_,labels[calcMode_][i],calcInput_[calcMode_][i],true);
-        button(body_,"Рассчитать",330);if(calcMode_==3){button(body_,"Загрузить размеры",331);button(body_,"Сохранить размеры",332);}resultLabel_=label(body_,"");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
+        auto* r=row(body_,28);for(int i=0;i<4;++i){auto* b=button(r,names[i],320+i,115);lv_obj_set_style_text_font(lv_obj_get_child(b,0),&busa_font_small,0);selected(b,i==calcMode_);}
+        label(body_,names[calcMode_]);
+        for(int i=0;i<counts[calcMode_];){auto* inputs=row(body_);for(int col=0;col<3&&i<counts[calcMode_];++col,++i)fields_[i]=field(inputs,labels[calcMode_][i],calcInput_[calcMode_][i],true,false,153);}
+        if(calcMode_==3){auto* buttons=row(body_,28);selected(button(buttons,"Рассчитать",330,153),true);button(buttons,"Загрузить размеры",331,153);button(buttons,"Сохранить размеры",332,153);}
+        else selected(button(body_,"Рассчитать",330),true);
+        auto* p=panel(body_);resultLabel_=label(p,"—");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
     }
     void settings(){
         label(body_,"НАСТРОЙКИ");
-        if(sub_<0){static const char* names[]={"Калибровка температуры","Wi-Fi","Экран","Google","О системе","Журнал событий","Диагностика","Bluetooth"};
-            for(int i=0;i<8;++i)button(body_,names[i],400+i);return;}
+        if(sub_<0){static const char* names[]={"Температура","Wi-Fi","Экран","Google","Bluetooth · RainMaker","Обновление ПО","Журнал событий","Диагностика","О системе"};
+            static const int ids[]={400,401,402,403,407,408,405,406,404};
+            for(int i=0;i<9;){auto* r=row(body_,29);for(int col=0;col<2&&i<9;++col,++i)button(r,names[i],ids[i],235);}return;}
         button(body_,"Назад",409);
         const auto& d=session_.snapshot();
         if(sub_==0){for(int i=0;i<4;++i)fields_[i]=field(body_,sensor(i),value(d["calibration_offsets"][i]),true);button(body_,"Сохранить поправки",202);}
@@ -263,6 +342,7 @@ private:
         else if(sub_==6){for(int i=0;i<10;++i){live_[i]=label(body_,"—");lv_obj_set_width(live_[i],LV_PCT(100));lv_label_set_long_mode(live_[i],LV_LABEL_LONG_WRAP);}
             button(body_,"Обучение клавиатуры",217);button(body_,"Считать и далее",218);button(body_,"Предыдущий шаг",219);button(body_,"Отмена обучения",220);}
         else if(sub_==7){button(body_,"Включить сопряжение",214);button(body_,"Отключить Bluetooth",215);button(body_,"Обновить состояние",216);resultLabel_=label(body_,"");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);}
+        else if(sub_==8){auto* l=label(body_,"Обновление через локальное приложение");lv_obj_set_width(l,LV_PCT(100));lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);}
         pageStatus_=label(body_,"");lv_obj_set_width(pageStatus_,LV_PCT(100));lv_label_set_long_mode(pageStatus_,LV_LABEL_LONG_WRAP);
     }
     bool send(Route route,std::initializer_list<Arg> args){
@@ -289,10 +369,10 @@ private:
     }
     void action(int id){
         if(id>=100&&id<106){page_=id-100;sub_=-1;render();return;}
-        if(id>=400&&id<408){sub_=id-400;render();return;}
+        if(id>=400&&id<409){sub_=id-400;render();return;}
         if(id==409){sub_=-1;render();return;}
         if(id>=300&&id<=302){graphKind_=id-300;render();return;}
-        if(id>=310&&id<=314){static const int minutes[]={5,10,15,30,60};graphMinutes_=minutes[id-310];requestGraph();return;}
+        if(id>=310&&id<=314){static const int minutes[]={5,10,15,30,60};graphMinutes_=minutes[id-310];for(int i=0;i<5;++i)selected(graphRange_[i],i==id-310);requestGraph();return;}
         if(id>=320&&id<=323){calcMode_=id-320;render();return;}
         hideKeyboard();
         if((id==200||id==201||id==202)&&(!formValid_||!session_.connected())){set(pageStatus_,"Нет актуальных настроек. Дождитесь связи.");return;}
@@ -372,16 +452,27 @@ private:
         const bool settingsForm=page_==1||page_==2||(page_==5&&sub_==0);
         if(settingsForm&&!ok)formValid_=false;
         if(settingsForm&&ok&&!formValid_){render();return;}
-        set(connection_,ok?String("UART · ") + ((d["wifi"]["sta_connected"]|false)?"Wi-Fi":"Локально"):"UART · нет связи");
+        set(connection_,ok?"UART":"Нет связи");
+        lv_obj_set_style_text_color(connection_,color(ok?accent():0xff6473),0);
+        const bool indicators[]={ok&&(d["station"]["connected"]|false),ok&&(d["network_indicators"]["internet"]|false),ok};
+        for(int i=0;i<3;++i)lv_obj_set_style_bg_color(statusDots_[i],color(indicators[i]?0x53d486:0x8297a1),0);
+        String clock=ok?String(d["clock"]["datetime"]|"—"):String("—");set(clock_,"Дата и время: "+clock);
         if(page_==0){
-            for(int i=0;i<4;++i){auto v=d["sound_alerts"]["channels"][i]["sound_on"];set(live_[i],String("К")+String(i+1)+"  "+(!ok||v.isNull()?"—":v.as<bool>()?"Звук":"Тихо"));
-                set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",2));}
-            auto rate=d["water"]["lpm"];set(live_[8],String("Расход ")+(ok&&!rate.isNull()?String(rate.as<double>()*60,1)+" л/ч":"—"));
-            set(live_[9],"Вода "+measured(d["water"]["total_l_estimate"]," л",2));
-        }else if(page_==1){for(int i=0;i<4;++i)set(live_[i],measured(d["temperatures"][i]["c"]," °C",2));}
-        else if(page_==2){auto rate=d["water"]["lpm"];set(live_[0],String("Расход: ")+(ok&&!rate.isNull()?String(rate.as<double>()*60,1)+" л/ч":"—"));
-            set(live_[1],"Израсходовано: "+measured(d["water"]["total_l_estimate"]," л",2));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));
-            set(live_[3],String("Отбор: ")+measured(d["collection"]["ml_per_min"]," мл/мин",1)+" · "+measured(d["collection"]["total_ml"]," мл",1));}
+            for(int i=0;i<4;++i){auto v=d["sound_alerts"]["channels"][i]["sound_on"];const bool on=ok&&!v.isNull()&&v.as<bool>();
+                set(live_[i],!ok||v.isNull()?"Нет связи":on?"Вкл.":"Выкл.");
+                lv_obj_set_style_bg_color(lv_obj_get_parent(live_[i]),color(on?(i==3?0x42232d:0x14382e):surface()),0);
+                lv_obj_set_style_text_color(live_[i],color(on?(i==3?0xff6473:0x53d486):muted()),0);
+                set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1));}
+            auto rate=d["water"]["lpm"];set(live_[8],ok&&!rate.isNull()?String(rate.as<double>()*60,1)+" л/ч":"—");
+            set(live_[9],measured(d["water"]["total_l_estimate"]," л",1));
+            set(live_[10],measured(d["collection"]["ml_per_min"]," мл/мин",1));
+            set(live_[11],"Собрано "+measured(d["collection"]["total_ml"]," мл",1));
+        }else if(page_==1){for(int i=0;i<4;++i)set(live_[i],measured(d["temperatures"][i]["c"]," °C",1));}
+        else if(page_==2){auto rate=d["water"]["lpm"];set(live_[0],ok&&!rate.isNull()?String(rate.as<double>()*60,1)+" л/ч":"—");
+            set(live_[1],"Учтено: "+measured(d["water"]["total_l_estimate"]," л",2));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));
+            set(live_[3],measured(d["collection"]["ml_per_min"]," мл/мин",1));
+            set(live_[4],"Собрано: "+measured(d["collection"]["total_ml"]," мл",1));
+            set(live_[5],ok&&(d["collection"]["sensor_present"]|false)?"Датчик подключён":"Нет датчика");}
         else if(page_==5){
             if(sub_==1)set(live_[0],ok?String("Wi-Fi: ")+(d["station"]["ssid"]|"—"):"Нет связи");
             else if(sub_==3)set(live_[0],ok?String("Google: ")+String(d["google"]["configured"].as<bool>()?"настроен":"не настроен")+" · код "+String(d["google"]["state"]|0):"Нет связи");
@@ -409,6 +500,7 @@ private:
     Hardware& hw_;DisplaySession& session_;Preferences prefs_;
     lv_disp_drv_t driver_{};lv_disp_draw_buf_t drawBuffer_{};lv_indev_drv_t input_{};
     lv_obj_t *connection_=nullptr,*body_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
+    lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphRange_[5]={};
     lv_obj_t* navButtons_[6]={};lv_obj_t* fields_[8]={};lv_obj_t* live_[12]={};lv_obj_t* motion_[7]={};lv_chart_series_t* series_[4]={};
     lv_img_dsc_t art_{};uint8_t* asset_=nullptr;
     busa_touch::Transform transform_{};busa_touch::Point raw_[3]{},screen_[3]{};

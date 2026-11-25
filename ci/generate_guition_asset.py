@@ -6,10 +6,10 @@ dest=Path('firmware/BUSA_Display_N4R8')
 sd=Path('display_delivery/microSD/busa')
 sd.mkdir(parents=True,exist_ok=True)
 im=Image.open(src).convert('RGBA')
-im.thumbnail((96,144),Image.Resampling.LANCZOS)
+im.thumbnail((110,138),Image.Resampling.LANCZOS)
 buf=bytearray()
 for r,g,b,a in im.getdata():
-    c=((r>>3)<<11)|((g>>2)<<5)|(b>>3)
+    c=(((r*31+127)//255)<<11)|(((g*63+127)//255)<<5)|((b*31+127)//255)
     buf.extend((c&255,c>>8,a))
 assert len(buf)==im.width*im.height*3
 (sd/'rig.rgb565a').write_bytes(buf)
