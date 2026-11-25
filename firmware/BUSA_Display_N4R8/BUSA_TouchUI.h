@@ -2,6 +2,7 @@
 #include <lvgl.h>
 #include <Preferences.h>
 #include <initializer_list>
+#include <BUSA_KeyEvents.h>
 #include "BUSA_GuitionHardware.h"
 #include "BUSA_DisplaySession.h"
 #include "BUSA_TouchCalibration.h"
@@ -49,11 +50,13 @@ public:
     void poll(){
         const uint32_t now=millis();lv_tick_inc(now-lastTick_);lastTick_=now;
         if(calibrating_)calibrationPoll();
+        if(testOverlay_&&int32_t(now-testUntil_)>=0){lv_obj_del(testOverlay_);testOverlay_=nullptr;}
+        if(!session_.connected()){keyCursor_.reset();if(displaySleeping_){hw_.backlight(true);displaySleeping_=false;}if(keyEdit_||keyConfirm_>=0)cancelKeyEdit(true);}
         int code;String body;
         if(session_.takeApiResult(code,body)){waiting_=false;handleResult(code,body);}
         if(!calibrating_){
             if(revision_!=session_.snapshotRevision()||wasConnected_!=session_.connected()){
-                revision_=session_.snapshotRevision();wasConnected_=session_.connected();refresh();
+                revision_=session_.snapshotRevision();wasConnected_=session_.connected();refresh();consumeKeys(now);
             }
             if(page_==0&&now-lastAnimation_>=60){lastAnimation_=now;animate(now);}
             if(page_==3&&!waiting_&&session_.connected()&&now-lastGraph_>=5000)requestGraph();
@@ -86,7 +89,7 @@ private:
     static void readTouch(lv_indev_drv_t* d,lv_indev_data_t* data){
         auto* self=static_cast<Interface*>(d->user_data);TS_Point raw;
         data->state=LV_INDEV_STATE_REL;
-        if(self->calibrating_||!self->calibrationValid_||!self->hw_.readRawTouch(raw))return;
+        if(self->calibrating_||self->displaySleeping_||!self->calibrationValid_||!self->hw_.readRawTouch(raw))return;
         auto p=busa_touch::apply(self->transform_,{raw.x,raw.y});
         data->point.x=constrain(p.x,0,WIDTH-1);data->point.y=constrain(p.y,0,HEIGHT-1);data->state=LV_INDEV_STATE_PR;
     }
@@ -97,6 +100,7 @@ private:
     }
     void rootStyle(lv_obj_t* o){lv_obj_set_style_bg_color(o,color(paper()),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);lv_obj_set_style_text_color(o,color(ink()),0);lv_obj_set_style_text_font(o,&busa_font,0);}
     void startCalibration(){
+        cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;keyCursor_.reset();
         calibrating_=true;calibrationValid_=false;calIndex_=0;held_=false;awaitRelease_=true;calSamples_=0;sumX_=sumY_=0;
         lastCalibrationRead_=millis()-busa_touch::readPeriodMs;
         auto* root=lv_scr_act();lv_obj_clean(root);rootStyle(root);
@@ -129,10 +133,11 @@ private:
     static void event(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));
         auto* o=lv_event_get_target(e);int id=int(reinterpret_cast<intptr_t>(lv_obj_get_user_data(o)));
-        self->action(id);
+        self->cancelKeyEdit(false);self->action(id);
     }
     static void textFocus(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));auto* ta=lv_event_get_target(e);
+        self->cancelKeyEdit(false);self->focusObject(ta);
         lv_keyboard_set_textarea(self->keyboard_,ta);lv_keyboard_set_mode(self->keyboard_,lv_textarea_get_accepted_chars(ta)?LV_KEYBOARD_MODE_NUMBER:LV_KEYBOARD_MODE_TEXT_LOWER);
         lv_obj_clear_flag(self->keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_move_foreground(self->keyboard_);
         lv_obj_set_height(self->body_,HEIGHT-TOP-128);
@@ -166,7 +171,7 @@ private:
         auto* l=label(o,text);lv_obj_set_style_text_color(l,color(ink()),0);
         lv_obj_set_width(l,LV_PCT(100));lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);
         lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_obj_center(l);
-        lv_obj_set_user_data(o,reinterpret_cast<void*>(intptr_t(id)));lv_obj_add_event_cb(o,event,LV_EVENT_CLICKED,this);return o;
+        lv_obj_set_user_data(o,reinterpret_cast<void*>(intptr_t(id)));lv_obj_add_event_cb(o,event,LV_EVENT_CLICKED,this);if(parent!=nav_)registerKey(o,0,id);return o;
     }
     void setBg(lv_obj_t* o,uint32_t c){if(lv_obj_get_style_bg_color(o,0).full!=color(c).full)lv_obj_set_style_bg_color(o,color(c),0);}
     void setInk(lv_obj_t* o,uint32_t c){if(lv_obj_get_style_text_color(o,0).full!=color(c).full)lv_obj_set_style_text_color(o,color(c),0);}
@@ -196,7 +201,7 @@ private:
         lv_textarea_set_max_length(ta,numeric?14:220);
         if(numeric)lv_textarea_set_accepted_chars(ta,"0123456789.-,");
         lv_textarea_set_password_mode(ta,secret);lv_textarea_set_text(ta,value.c_str());
-        lv_obj_add_event_cb(ta,textFocus,LV_EVENT_CLICKED,this);return ta;
+        lv_obj_add_event_cb(ta,textFocus,LV_EVENT_CLICKED,this);registerKey(ta,1,0);return ta;
     }
     void navIcon(lv_obj_t* parent,int i){
         static const lv_point_t points[6][12]={
@@ -223,6 +228,7 @@ private:
     }
     void set(lv_obj_t* o,const String& s){if(o&&strcmp(lv_label_get_text(o),s.c_str()))lv_label_set_text(o,s.c_str());}
     void build(){
+        cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
         auto* root=lv_scr_act();lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
         auto* top=plain(root,WIDTH,TOP);lv_obj_set_pos(top,0,0);
         at(top,"BUSA MONITOR",6,0);clock_=at(top,"Дата и время: —",6,15,&busa_font_small);
@@ -249,6 +255,7 @@ private:
         render();
     }
     void render(){
+        cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
         hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
         wifiList_=nullptr;chart_=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;scanPending_=false;
         for(int i=0;i<6;++i)selected(navButtons_[i],i==page_);
@@ -337,7 +344,7 @@ private:
         button(body_,"Назад",409);
         const auto& d=session_.snapshot();
         if(sub_==0){for(int i=0;i<4;++i)fields_[i]=field(body_,sensor(i),value(d["calibration_offsets"][i]),true);button(body_,"Сохранить поправки",202);}
-        else if(sub_==1){live_[0]=label(body_,"Wi-Fi —");button(body_,"Обновить список",203);wifiList_=lv_dropdown_create(body_);lv_obj_set_width(wifiList_,LV_PCT(100));lv_dropdown_set_options(wifiList_,"Нет сетей");fields_[0]=field(body_,"Пароль","",false,true);lv_textarea_set_max_length(fields_[0],63);button(body_,"Подключить",204);button(body_,"Отключить",205);}
+        else if(sub_==1){live_[0]=label(body_,"Wi-Fi —");button(body_,"Обновить список",203);wifiList_=lv_dropdown_create(body_);lv_obj_set_width(wifiList_,LV_PCT(100));lv_dropdown_set_options(wifiList_,"Нет сетей");registerKey(wifiList_,2,0);fields_[0]=field(body_,"Пароль","",false,true);lv_textarea_set_max_length(fields_[0],63);button(body_,"Подключить",204);button(body_,"Отключить",205);}
         else if(sub_==2){button(body_,"Светлая тема",206);button(body_,"Тёмная тема",207);button(body_,"Системная тема",208);button(body_,"Калибровка сенсора",209);}
         else if(sub_==3){live_[0]=label(body_,"Google —");fields_[0]=field(body_,"URL Apps Script","",false);fields_[1]=field(body_,"Токен","",false,true);button(body_,"Сохранить подключение",210);button(body_,"Проверить отправку",211);button(body_,"Отключить передачу",212);}
         else if(sub_==4){for(int i=0;i<5;++i){live_[i]=label(body_,"—");lv_obj_set_width(live_[i],LV_PCT(100));lv_label_set_long_mode(live_[i],LV_LABEL_LONG_WRAP);}}
@@ -371,7 +378,7 @@ private:
         submit(Route::temperatureAlarms,b,bytes);
     }
     void action(int id){
-        if(id>=100&&id<106){page_=id-100;sub_=-1;render();return;}
+        if(id>=100&&id<106){if(page_!=id-100)previousPage_=page_;page_=id-100;sub_=-1;render();return;}
         if(id>=400&&id<409){sub_=id-400;render();return;}
         if(id==409){sub_=-1;render();return;}
         if(id>=300&&id<=302){graphKind_=id-300;render();return;}
@@ -429,6 +436,7 @@ private:
         if(pendingRoute_==Route::geometryRead&&calcMode_==3){JsonDocument d;if(!deserializeJson(d,body)){for(int i=0;i<2;++i){calcInput_[3][i]=d[i?"height":"diameter"]|"";lv_textarea_set_text(fields_[i],calcInput_[3][i].c_str());}set(resultLabel_,"Размеры загружены");}return;}
         if(pendingRoute_==Route::geometrySave){set(resultLabel_,"Размеры сохранены");return;}
         if(pendingRoute_>=Route::keypadStart&&pendingRoute_<=Route::keypadCancel){set(pageStatus_,body);return;}
+        if(pendingRoute_==Route::referenceEdit||pendingRoute_==Route::calibrationEdit){set(pageStatus_,body);return;}
         if(pendingRoute_==Route::theme){theme_=requestedTheme_;prefs_.putUChar("theme",theme_);build();return;}
         if(pendingRoute_==Route::wifiConnect||pendingRoute_==Route::googleConfig){if(fields_[0]&&pendingRoute_==Route::wifiConnect)lv_textarea_set_text(fields_[0],"");if(fields_[1]&&pendingRoute_==Route::googleConfig)lv_textarea_set_text(fields_[1],"");}
         if(pendingRoute_==Route::wifiScan){JsonDocument d;if(deserializeJson(d,body)){set(pageStatus_,"Ошибка списка сетей");return;}scanPending_=d["scanning"]|false;
@@ -449,6 +457,119 @@ private:
         if(pendingRoute_==Route::events){JsonDocument d;if(deserializeJson(d,body)){set(pageStatus_,"Ошибка журнала");return;}String s;
             for(JsonObjectConst e:d["events"].as<JsonArrayConst>()){s+=String((e["uptime_ms"]|0u)/1000)+" с  "+String(e["text"]|"")+"\n";if(s.length()>7000)break;}set(resultLabel_,s.length()?s:"Нет событий");}
         else if(pendingRoute_==Route::rainmakerStatus){JsonDocument d;if(!deserializeJson(d,body))set(resultLabel_,String("BLE: ")+(d["ble"]|"—")+"\n"+(d["feedback"]|""));}
+    }
+    struct KeyControl {lv_obj_t* obj;uint8_t type;int id;};
+    void registerKey(lv_obj_t* obj,uint8_t type,int id){
+        if(keyCount_>=int(sizeof(keyControls_)/sizeof(keyControls_[0])))return;
+        keyControls_[keyCount_++]={obj,type,id};
+        lv_obj_set_style_outline_color(obj,color(accent()),LV_STATE_FOCUSED);
+        lv_obj_set_style_outline_width(obj,2,LV_STATE_FOCUSED);
+        lv_obj_set_style_outline_pad(obj,0,LV_STATE_FOCUSED);
+    }
+    void focusKey(int index){
+        if(!keyCount_)return;
+        if(keyFocus_>=0&&keyFocus_<keyCount_)lv_obj_clear_state(keyControls_[keyFocus_].obj,LV_STATE_FOCUSED);
+        keyFocus_=(index+keyCount_)%keyCount_;
+        auto* obj=keyControls_[keyFocus_].obj;lv_obj_add_state(obj,LV_STATE_FOCUSED);lv_obj_scroll_to_view_recursive(obj,LV_ANIM_OFF);
+    }
+    void focusObject(lv_obj_t* obj){for(int i=0;i<keyCount_;++i)if(keyControls_[i].obj==obj){focusKey(i);return;}}
+    int fieldIndex(lv_obj_t* obj)const{for(int i=0;i<8;++i)if(fields_[i]==obj)return i;return -1;}
+    void keyHint(const String& s){set(pageStatus_?pageStatus_:resultLabel_,s);}
+    void cancelKeyEdit(bool restore){
+        if(keyEdit_&&restore){if(keyDropdown_)lv_dropdown_set_selected(keyEdit_,keyOriginalChoice_);else lv_textarea_set_text(keyEdit_,keyOriginal_.c_str());}
+        keyEdit_=nullptr;keyDropdown_=false;keyOriginal_="";keyConfirm_=-1;lastTapKey_=-1;lastTapAt_=0;
+    }
+    void beginKeyEdit(const KeyControl& c){
+        hideKeyboard();keyEdit_=c.obj;keyDropdown_=c.type==2;lastTapKey_=-1;tapMode_=0;
+        if(keyDropdown_){keyOriginalChoice_=lv_dropdown_get_selected(keyEdit_);return;}
+        keyOriginal_=lv_textarea_get_text(keyEdit_);lv_textarea_set_cursor_pos(keyEdit_,LV_TEXTAREA_CURSOR_LAST);
+    }
+    static int keyDigit(uint8_t k){static const uint8_t map[]={17,4,5,6,8,9,10,12,13,14};for(int i=0;i<10;++i)if(map[i]==k)return i;return -1;}
+    static const char* tapLetters(int digit,int mode){
+        static const char* lower[]={"0",".,!?1","abc2","def3","ghi4","jkl5","mno6","pqrs7","tuv8","wxyz9"};
+        static const char* upper[]={"0",".,!?1","ABC2","DEF3","GHI4","JKL5","MNO6","PQRS7","TUV8","WXYZ9"};
+        static const char* symbols[]={"0"," .,!?:;1","@#_$2","%&*3","()-4","+={}5","[]~6","/\\|7","<>8","^'\"9"};
+        return mode==0?lower[digit]:mode==1?upper[digit]:symbols[digit];
+    }
+    bool keySaveReference(int index,bool clear){
+        if(index<0||index>=8||!formValid_||!session_.connected())return false;
+        if(page_==1)return send(Route::referenceEdit,{{"confirm","YES"},{"sensor",String(index/2)},{"field",String(index%2)},{"op",clear?"clear":"set"},{"value",clear?String(""):text(fields_[index])}});
+        if(page_==5&&sub_==0&&index<4)return send(Route::calibrationEdit,{{"confirm","YES"},{"sensor",String(index)},{"op",clear?"clear":"set"},{"value",clear?String("0"):text(fields_[index])}});
+        return false;
+    }
+    void physicalKey(uint8_t k,uint32_t at){
+        if(testOverlay_||displaySleeping_||calibrating_||!session_.connected()||k==2||k==3)return;
+        if(keyConfirm_>=0){
+            const int i=keyConfirm_;keyConfirm_=-1;
+            if(k==19){if(keySaveReference(i,true))lv_textarea_set_text(fields_[i],"");}
+            else keyHint("Удаление отменено");
+            return;
+        }
+        if(keyEdit_){
+            auto* obj=keyEdit_;const int index=fieldIndex(obj);
+            if(k==15){cancelKeyEdit(true);keyHint("Изменение отменено");return;}
+            if(keyDropdown_){
+                if(k==19){cancelKeyEdit(false);focusKey(keyFocus_+1);return;}
+                unsigned n=lv_dropdown_get_option_cnt(obj);if(n&&(k==7||k==11))lv_dropdown_set_selected(obj,(lv_dropdown_get_selected(obj)+n+(k==7?n-1:1))%n);
+                return;
+            }
+            const bool numeric=lv_textarea_get_accepted_chars(obj)!=nullptr;
+            if(k==19){
+                if(page_==1||(page_==5&&sub_==0)){if(!keySaveReference(index,false)){keyHint("Не удалось отправить значение");return;}}
+                cancelKeyEdit(false);
+                if(page_==4){calculate();if(calcMode_==3&&index<2){String a=text(fields_[0]),b=text(fields_[1]);char *ae=nullptr,*be=nullptr;
+                    double av=strtod(a.c_str(),&ae),bv=strtod(b.c_str(),&be);
+                    if(a.length()&&b.length()&&ae&&be&&!*ae&&!*be&&BusaCalc::cylinder(av,bv).ok)action(332);}}
+                else if(page_==5&&sub_==1)focusKey(keyFocus_+1);
+                return;
+            }
+            if(k==0){if(numeric)lv_textarea_set_text(obj,"");else lv_textarea_del_char(obj);lastTapKey_=-1;return;}
+            if(k==16||k==18){uint32_t p=lv_textarea_get_cursor_pos(obj);if(k==16&&p)lv_textarea_set_cursor_pos(obj,p-1);else if(k==18)lv_textarea_set_cursor_pos(obj,p+1);lastTapKey_=-1;return;}
+            if(k==7||k==11){
+                if(!numeric){tapMode_=(tapMode_+(k==7?3:1))%4;lastTapKey_=-1;static const char* modes[]={"abc","ABC","123","SYM"};keyHint(modes[tapMode_]);}
+                else if(page_==5&&sub_==0){String v=text(obj);float x=constrain(roundf((v.toFloat()+(k==7?.1f:-.1f))*10)/10,-10.0f,10.0f);lv_textarea_set_text(obj,String(x,1).c_str());}
+                else lv_textarea_set_cursor_pos(obj,k==7?0:LV_TEXTAREA_CURSOR_LAST);
+                return;
+            }
+            if(k==busa_keys::longZero){String v=lv_textarea_get_text(obj);if(!numeric||(v.indexOf(',')<0&&v.indexOf('.')<0))lv_textarea_add_char(obj,',');lastTapKey_=-1;return;}
+            int digit=keyDigit(k);if(digit<0)return;
+            if(numeric||tapMode_==2||digit==0){lv_textarea_add_char(obj,'0'+digit);lastTapKey_=-1;return;}
+            const char* letters=tapLetters(digit,tapMode_);const size_t n=strlen(letters);
+            if(lastTapKey_==k&&uint32_t(at-lastTapAt_)<950&&lv_textarea_get_cursor_pos(obj)>0){tapIndex_=(tapIndex_+1)%n;lv_textarea_del_char(obj);}
+            else tapIndex_=0;
+            lv_textarea_add_char(obj,letters[tapIndex_]);lastTapKey_=k;lastTapAt_=at;return;
+        }
+        if(k==16||k==18){action(100+(page_+6+(k==16?-1:1))%6);return;}
+        if(k==15){if(page_==5&&sub_>=0)action(409);else if(page_)action(100+(previousPage_==page_?0:previousPage_));return;}
+        if(k==7||k==11){if(keyCount_)focusKey(keyFocus_<0?(k==7?keyCount_-1:0):keyFocus_+(k==7?-1:1));return;}
+        if(k==19){if(!keyCount_){if(page_==0)action(101);return;}if(keyFocus_<0){focusKey(0);return;}
+            const KeyControl c=keyControls_[keyFocus_];if(c.type==0)action(c.id);else beginKeyEdit(c);return;}
+        if(k==0){
+            if(keyFocus_>=0&&keyControls_[keyFocus_].type==1){const int i=fieldIndex(keyControls_[keyFocus_].obj);
+                if(page_==1&&i>=0&&formValid_){keyConfirm_=i;keyHint("Удалить порог? ENT — да, ESC — нет");return;}
+                if(page_==5&&sub_==0&&i>=0&&keySaveReference(i,true)){lv_textarea_set_text(fields_[i],"0.0");return;}}
+            if(page_==4){if(calcMode_==3)lv_textarea_set_text(fields_[2],"");else for(auto* p:fields_)if(p)lv_textarea_set_text(p,"");set(resultLabel_,"—");}
+        }
+    }
+    void showDisplayTest(uint32_t now){
+        if(testOverlay_)lv_obj_del(testOverlay_);
+        auto* layer=lv_layer_top();testOverlay_=plain(layer,WIDTH,HEIGHT);
+        lv_obj_set_style_bg_color(testOverlay_,color(0),0);lv_obj_set_style_bg_opa(testOverlay_,LV_OPA_COVER,0);
+        lv_obj_add_flag(testOverlay_,LV_OBJ_FLAG_CLICKABLE);auto* l=label(testOverlay_,"BUSA MONITOR");
+        lv_obj_set_style_text_color(l,color(0xffffff),0);lv_obj_set_style_text_font(l,&busa_font_value,0);lv_obj_center(l);testUntil_=now+5000;
+    }
+    void consumeKeys(uint32_t now){
+        if(!session_.connected()){keyCursor_.reset();return;}
+        auto q=session_.snapshot()["keypad_input"];if(q.isNull()){keyCursor_.reset();return;}
+        auto a=q["events"].as<JsonArrayConst>();if(a.isNull()||a.size()>busa_keys::capacity){keyCursor_.reset();return;}
+        busa_keys::Event events[busa_keys::capacity]={};size_t n=0;
+        for(JsonArrayConst e:a){if(e.size()!=3||!e[0].is<uint32_t>()||!e[1].is<uint8_t>()||!e[2].is<uint32_t>()){keyCursor_.reset();return;}events[n++]={e[0].as<uint32_t>(),e[2].as<uint32_t>(),e[1].as<uint8_t>()};}
+        bool sleep=q["sleep"]|false;if(sleep!=displaySleeping_){displaySleeping_=sleep;hw_.backlight(!sleep);if(sleep)cancelKeyEdit(true);}
+        const uint32_t test=q["test_seq"]|0u;
+        const auto result=keyCursor_.consume(q["boot"]|0u,q["head"]|0u,events,n,[&](const busa_keys::Event& e){physicalKey(e.code,now-e.age);});
+        if(result==busa_keys::Result::lost){cancelKeyEdit(true);keyHint("Пропущен ввод клавиатуры; повтори нажатие");}
+        if(result!=busa_keys::Result::baseline&&test!=lastTestSeq_&&!sleep)showDisplayTest(now);
+        lastTestSeq_=test;
     }
     void refresh(){
         const auto& d=session_.snapshot();const bool ok=session_.connected();
@@ -503,6 +624,9 @@ private:
     Hardware& hw_;DisplaySession& session_;Preferences prefs_;
     lv_disp_drv_t driver_{};lv_disp_draw_buf_t drawBuffer_{};lv_indev_drv_t input_{};
     lv_obj_t *connection_=nullptr,*body_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
+    busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1,previousPage_=0;
+    lv_obj_t* keyEdit_=nullptr;String keyOriginal_;bool keyDropdown_=false,displaySleeping_=false;uint16_t keyOriginalChoice_=0;
+    int lastTapKey_=-1,tapMode_=0;size_t tapIndex_=0;uint32_t lastTapAt_=0,lastTestSeq_=0,testUntil_=0;lv_obj_t* testOverlay_=nullptr;
     lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphRange_[5]={};
     lv_obj_t* navButtons_[6]={};lv_obj_t* fields_[8]={};lv_obj_t* live_[12]={};lv_obj_t* motion_[7]={};lv_chart_series_t* series_[4]={};
     lv_img_dsc_t art_{};uint8_t* asset_=nullptr;

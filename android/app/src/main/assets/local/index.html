@@ -1213,14 +1213,11 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <button type="button" data-diag-btn="esp">ESP32</button>
 <button type="button" data-diag-btn="flow">Расходомер</button>
 </div></div>
-<div class="card" data-diag-panel="screen"><h2>Экран TFT</h2>
+<div class="card" data-diag-panel="screen"><h2>Экран GUITION</h2>
 <div class="row">Состояние <b id="displayState">—</b></div>
 <div class="row">Контроллер <b id="tft">—</b></div>
-<p class="hint">ST7789 инициализируется программой; правильность изображения проверяется визуально.</p>
+<p class="hint">GUITION JC4827W543R_I · 480×272 · UART. Правильность изображения проверяется визуально.</p>
 <div class="grid"><button id="screenSleep" type="button">Погасить экран</button><button id="screenWake" type="button">Разбудить экран</button></div>
-<label for="tftDriver">Контроллер</label><select id="tftDriver"><option value="1">ST7789 320×240</option></select>
-<label for="tftRotation">Ориентация</label><select id="tftRotation"><option value="1">Горизонтальная · 1</option></select>
-<button id="tftSave" type="button" class="full">Сохранить профиль TFT</button>
 <button id="tftTest" type="button" class="full">Тест изображения</button>
 <p id="tftProfileStatus" class="hint">—</p></div>
 <div class="card" data-diag-panel="keys" hidden><h2>Клавиатура 5×4</h2>
@@ -1265,7 +1262,7 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 const get=id=>document.getElementById(id),logs=[],tlog=[],flog=[],tlog4=[[],[],[],[]],waterPulseLog=[];
 let busaGraphData={temperature:[[],[],[],[]],water_pulses:[]},busaGraphFetchedAt=0,busaGraphLoading=false;
 let lastWaterPulse=null,themeInitialized=false,temperatureThresholdsInitialized=false,calInitialized=false;
-let active=0,connected=false,pollBusy=false,statusFailures=0,settingsActive=-1,lastLocalNav=0,lastClockPush=0,tftProfileLoaded=false;
+let active=0,connected=false,pollBusy=false,statusFailures=0,settingsActive=-1,lastLocalNav=0,lastClockPush=0;
 let eventRecords=[];
 function networkLeds(info,station,google){
  const wifi=station?.connected===true,local=info?.local_client===true;
@@ -1454,20 +1451,13 @@ async function setScreenPower(action){
  try{
   const resp=await fetch('/api/tft/screen',{method:'POST',body:new URLSearchParams({action})});
   if(!resp.ok)throw new Error(await resp.text());
-  get('displayState').textContent=action==='wake'?'РАБОТАЕТ':'ЭКРАН ПОГАШЕН';
+  get('displayState').textContent=await resp.text();
  }catch(e){get('displayState').textContent='ОШИБКА: '+e.message}
 }
 get('screenSleep').onclick=()=>setScreenPower('sleep');
 get('screenWake').onclick=()=>setScreenPower('wake');
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
 get('keyNext').onclick=()=>keyCommand('next');
-get('tftSave').onclick=async()=>{
- if(!confirm('Сохранить профиль TFT и перезапустить ESP32? Блок реле временно выключатся на перезагрузке.'))return;
- try{
-  const r=await fetch('/api/tft/profile',{method:'POST',body:new URLSearchParams({confirm:'YES',profile:get('tftDriver').value,rotation:get('tftRotation').value})});
-  get('tftProfileStatus').textContent=await r.text();
- }catch(e){get('tftProfileStatus').textContent='Ошибка: '+e.message}
-};
 get('tftTest').onclick=async()=>{
  try{
   const r=await fetch('/api/tft/test',{method:'POST',body:new URLSearchParams({confirm:'YES'})});
@@ -1651,7 +1641,7 @@ if(Number.isFinite(currentPulse)){
 }
 // The browser's SSID picker is never automatically populated with old iPhone.
 const cs=s.google;
-get('displayState').textContent=s.display_sleep?'ПОГАШЕН':'РАБОТАЕТ';
+get('displayState').textContent=s.display_diagnostics?.link==='CONNECTED'?(s.display_sleep?'Команда: погасить':'Связь есть'):'Нет подтверждённой связи';
 if(!themeInitialized && typeof s.tft_theme_mode==='number'){
   get('themeModeSelect').value=String(s.tft_theme_mode);
   document.documentElement.dataset.theme=s.tft_theme_mode===1?'dark':s.tft_theme_mode===2?'system':'light';
@@ -1728,7 +1718,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.modules.tft_attempted?('Контроллер '+s.modules.tft_profile+', поворот '+s.modules.tft_rotation+', загрузка '+(s.modules.tft_boot_complete?'завершена':'идёт')+' (проверка изображения визуальная)'):'Запуск ещё не выполнен';if(!tftProfileLoaded){get('tftDriver').value=String(s.modules.tft_profile_id||1);get('tftRotation').value=String(s.modules.tft_rotation===undefined?1:s.modules.tft_rotation);tftProfileLoaded=true}
+get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.display_diagnostics?.link==='CONNECTED'?(s.display_diagnostics.firmware||'GUITION'):'Нет актуальных данных';
 }catch(e){statusFailures++;if(statusFailures>=3){if(connected)message('Нет ответа ESP32: проверь локальный Wi-Fi');connected=false;networkLeds(null,'');updateRelayBadges(null);updateLiquidPanels(null);for(let i=0;i<4;i++){get('t'+i).textContent='Н/Д';get('tempLive'+i).textContent='Н/Д';}}}finally{pollBusy=false}}
 get('temperatureSave').onclick=async()=>{
  const button=get('temperatureSave'),result=get('temperatureSaveResult');
