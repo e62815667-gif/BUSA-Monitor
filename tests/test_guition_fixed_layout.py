@@ -36,7 +36,7 @@ for page, heights in {'temperature':[18,70,70,26], 'water':[18,172], 'liquid_set
     assert sum(heights)+gap*(len(heights)-1)<=body,(page,sum(heights)+gap*(len(heights)-1),body)
 for id in range(200,221): assert re.search(r'\bcase '+str(id)+r':',u),id
 for id in list(range(400,409))+[412,413,414,222]: assert re.search(r'\b'+str(id)+r'\b',u),id
-assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-UF-HW2')+1<=40 for i in (4,5))
+assert all(len(f'BUSA-DISPLAY-N4R8-OTA1-BD2-I{i}-P1-UG-HW2')+1<=40 for i in (4,5))
 print('PASS: fixed-height budgets for fixed page variants and preservation of existing actions')
 
 assert 'geometryExpanded_=!geometryValid();render();' in u

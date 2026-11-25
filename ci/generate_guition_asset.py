@@ -1,5 +1,5 @@
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageFilter
 import hashlib
 src=Path('web/assets/holographic-apparatus.webp')
 dest=Path('firmware/BUSA_Display_N4R8')
@@ -7,9 +7,19 @@ sd=Path('display_delivery/microSD/busa')
 sd.mkdir(parents=True,exist_ok=True)
 im=Image.open(src).convert('RGBA')
 im.thumbnail((110,124),Image.Resampling.LANCZOS)
+# Preserve approved dimensions and alpha silhouette; sharpen opaque details only.
+rgb=im.convert('RGB')
+sharp=rgb.filter(ImageFilter.UnsharpMask(radius=0.65,percent=70,threshold=3))
+mask=im.getchannel('A').filter(ImageFilter.MinFilter(3)).point(lambda a:255 if a>=224 else 0)
+rgb=Image.composite(sharp,rgb,mask)
+# Spatial ordered quantization, no temporal dither/flicker.
+bayer=((0,8,2,10),(12,4,14,6),(3,11,1,9),(15,7,13,5))
+def quant(v,levels,x,y):
+    return min(levels,max(0,(v*levels*16+bayer[y%4][x%4]*255+127)//(255*16)))
 buf=bytearray()
-for r,g,b,a in im.getdata():
-    c=(((r*31+127)//255)<<11)|(((g*63+127)//255)<<5)|((b*31+127)//255)
+for i,((r,g,b),a) in enumerate(zip(rgb.getdata(),im.getchannel('A').getdata())):
+    x,y=i%im.width,i//im.width
+    c=(quant(r,31,x,y)<<11)|(quant(g,63,x,y)<<5)|quant(b,31,x,y)
     buf.extend((c&255,c>>8,a))
 assert len(buf)==im.width*im.height*3
 (sd/'rig.rgb565a').write_bytes(buf)

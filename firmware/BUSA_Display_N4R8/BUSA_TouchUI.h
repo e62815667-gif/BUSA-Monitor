@@ -26,12 +26,17 @@ public:
         lv_init();
         Serial.println("[BOOT] LVGL INIT OK");
         static_assert(LV_COLOR_DEPTH==16 && LV_COLOR_16_SWAP==0,"Native RGB565 required");
-        auto* pixels=static_cast<lv_color_t*>(heap_caps_malloc(WIDTH*24*sizeof(lv_color_t),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));
+        unsigned rows=48;lv_color_t* pixels=nullptr;
+        if(canReserveGraphics(ESP.getPsramSize(),ESP.getFreePsram(),WIDTH*rows*sizeof(lv_color_t)+BUSA_ASSET_SIZE))
+            pixels=static_cast<lv_color_t*>(heap_caps_malloc(WIDTH*rows*sizeof(lv_color_t),MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
+        if(!pixels){rows=24;pixels=static_cast<lv_color_t*>(heap_caps_malloc(WIDTH*rows*sizeof(lv_color_t),MALLOC_CAP_INTERNAL|MALLOC_CAP_8BIT));}
         if(!pixels){Serial.println("[BOOT] LVGL BUFFER FAIL");return false;}
-        lv_disp_draw_buf_init(&drawBuffer_,pixels,nullptr,WIDTH*24);
+        lv_disp_draw_buf_init(&drawBuffer_,pixels,nullptr,WIDTH*rows);
         lv_disp_drv_init(&driver_);driver_.hor_res=WIDTH;driver_.ver_res=HEIGHT;driver_.draw_buf=&drawBuffer_;
-        driver_.flush_cb=flush;driver_.user_data=this;
-        if(!lv_disp_drv_register(&driver_)){Serial.println("[BOOT] LVGL DISPLAY FAIL");return false;}
+        driver_.flush_cb=flush;driver_.user_data=this;driver_.antialiasing=1;
+        auto* display=lv_disp_drv_register(&driver_);
+        if(!display){Serial.println("[BOOT] LVGL DISPLAY FAIL");return false;}
+        lv_timer_set_period(display->refr_timer,25);
         Serial.println("[BOOT] LVGL DISPLAY OK");
         lv_indev_drv_init(&input_);input_.type=LV_INDEV_TYPE_POINTER;input_.read_cb=readTouch;input_.user_data=this;
         if(!lv_indev_drv_register(&input_)||!input_.read_timer){Serial.println("[BOOT] LVGL INPUT FAIL");return false;}
@@ -40,7 +45,7 @@ public:
         prefs_.begin("busa-touch",false);
         calibrationValid_=prefs_.getBytesLength("affineC0")==sizeof(transform_)&&prefs_.getBytes("affineC0",&transform_,sizeof(transform_))==sizeof(transform_)&&validTransform();
         theme_=prefs_.getUChar("theme",2);if(theme_>2)theme_=2;
-        asset_=static_cast<uint8_t*>(heap_caps_malloc(BUSA_ASSET_SIZE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
+        if(canReserveGraphics(ESP.getPsramSize(),ESP.getFreePsram(),BUSA_ASSET_SIZE))asset_=static_cast<uint8_t*>(heap_caps_malloc(BUSA_ASSET_SIZE,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
         if(asset_){
             if(!hw_.readAsset("/busa/rig.rgb565a",asset_,BUSA_ASSET_SIZE))memcpy(asset_,BUSA_ASSET,BUSA_ASSET_SIZE);
             else if(memcmp(asset_,BUSA_ASSET,BUSA_ASSET_SIZE)!=0){hw_.invalidAsset();memcpy(asset_,BUSA_ASSET,BUSA_ASSET_SIZE);}
@@ -69,7 +74,7 @@ public:
                 }
                 refresh();consumeKeys(now);
             }
-            if(page_==0&&now-lastAnimation_>=60){lastAnimation_=now;animate(now);}
+            if(page_==0&&now-lastAnimation_>=33){lastAnimation_=now;animate(now);}
             if(page_==3&&!waiting_&&session_.connected()&&(graphDirty_||now-lastGraph_>=2000))requestGraph();
             if(scanPending_&&!waiting_&&now-lastScan_>=1200&&page_==5&&sub_==1){lastScan_=now;send(ApiRoute::wifiScan,{});}
         }
@@ -92,6 +97,7 @@ private:
         if(!active)lv_obj_set_style_bg_color(o,color(0x153b4b),0);
         lv_obj_set_style_bg_grad_color(o,color(active?0x0088d3:0x081822),0);
         lv_obj_set_style_bg_grad_dir(o,LV_GRAD_DIR_VER,0);
+        lv_obj_set_style_bg_dither_mode(o,LV_DITHER_ORDERED,0);
     }
     static constexpr int TOP=30, NAV=44, PAD=3, GAP=3, SCENE=124, METRICS=32, RELAYS=30;
     static_assert(TOP+NAV+2*PAD+SCENE+METRICS+RELAYS+2*GAP==272,"Home must fit native display");
@@ -327,7 +333,7 @@ private:
         lv_obj_set_style_bg_color(body_,color(paper()),0);lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
         lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,GAP,0);lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
-        buildNavigation(root);
+        buildNavigation(root);lastNav_=-1;
         buildTouchModal(root);
         render();
     }
@@ -336,7 +342,11 @@ private:
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;}
         hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
         wifiList_=nullptr;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& p:graphPlots_)p=nullptr;for(auto& s:series_)s=nullptr;for(auto& y:graphY_)for(auto& l:y)l=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
-        for(int i=0;i<6;++i)selected(navButtons_[i],i==page_);
+        if(lastNav_!=page_){
+            if(lastNav_<0){for(int i=0;i<6;++i)selected(navButtons_[i],i==page_);}
+            else{selected(navButtons_[lastNav_],false);selected(navButtons_[page_],true);}
+            lastNav_=page_;
+        }
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
         lv_obj_set_style_pad_row(body_,page_==0?GAP:2,0);
         switch(page_){case 0:home();break;case 1:temperatures();break;case 2:water();break;case 3:graphs();break;case 4:calculator();break;case 5:settings();break;}
@@ -882,9 +892,9 @@ private:
         for(int i=0;i<7;++i){if(!motion_[i])continue;bool active=i<4?water:temp;
             if(!active){if(!lv_obj_has_flag(motion_[i],LV_OBJ_FLAG_HIDDEN))lv_obj_add_flag(motion_[i],LV_OBJ_FLAG_HIDDEN);continue;}
             if(lv_obj_has_flag(motion_[i],LV_OBJ_FLAG_HIDDEN))lv_obj_clear_flag(motion_[i],LV_OBJ_FLAG_HIDDEN);
-            int t=(now/40+i*23)%100,x=0,y=0;
-            if(i<2){x=142;y=1144-t*8;}else if(i==2){x=684+t*2;y=367;}else if(i==3){x=788+t*2;y=913;}
-            else{x=300+(i-4)*90;y=1420-t;}
+            const int t=int((now%4000u+unsigned(i)*920u)%4000u);int x=0,y=0;
+            if(i<2){x=142;y=1144-t*8/40;}else if(i==2){x=684+t*2/40;y=367;}else if(i==3){x=788+t*2/40;y=913;}
+            else{x=300+(i-4)*90;y=1420-t/40;}
             // LVGL invalidation only when the quantized display position changes.
             const int16_t px=x*BUSA_ASSET_W/1024,py=y*BUSA_ASSET_H/1536;
             if(lv_obj_get_x(motion_[i])!=px||lv_obj_get_y(motion_[i])!=py)lv_obj_set_pos(motion_[i],px,py);}
@@ -901,6 +911,7 @@ private:
     lv_obj_t *calcNotes_=nullptr,*touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*touchTarget_=nullptr,*pageCounter_=nullptr;String pageContent_;unsigned pageOffset_=0,pageLines_=5;
     busa_touch::Transform transform_{};busa_touch::Point raw_[3]{},screen_[3]{};
     bool collectionConfig_=true;
+    int lastNav_=-1;
     bool calibrationValid_=false,calibrating_=false,held_=false,wasConnected_=false,waiting_=false,scanPending_=false,frameOpen_=false,awaitRelease_=false,formValid_=false;
     int calIndex_=0,calSamples_=0,sumX_=0,sumY_=0,page_=0,sub_=-1,pendingPage_=0,pendingSub_=-1,graphKind_=0,calcMode_=0;
     static constexpr int graphMinutes_=5;

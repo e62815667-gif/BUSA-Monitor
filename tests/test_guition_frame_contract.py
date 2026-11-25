@@ -13,7 +13,12 @@ assert 'Arduino_GFX& panel(){return canvas_;}' in h, 'LVGL bypasses framebuffer'
 flush = u[u.index('static void flush('):u.index('static void readTouch(')]
 assert re.search(r'if\(lv_disp_flush_is_last\(d\)\)\{self->hw_\.present\(\);', flush), 'Full frame not presented at final LVGL flush'
 assert flush.index('hw_.panel().draw16bitRGBBitmap') < flush.index('hw_.noteDirtyRows') < flush.index('hw_.present()') < flush.index('lv_disp_flush_ready(d)')
-assert 'if(firstFrame_){canvas_.flush();firstFrame_=false;dirtyRows_.clear();return;}' in h
+assert 'if(firstFrame_){canvas_.flush();firstFrame_=false;dirtyRows_.clear();' in h
+assert 'if(sent_)memcpy(sent_,canvas_.getFramebuffer()' in h
+assert 'if(!sent_||!packed_)' in h
+assert 'changedBounds(pixels,sent_,WIDTH,HEIGHT,first,count)' in h
+assert h.index('packDelta(pixels,packed_,WIDTH,r)')<h.index('rememberDelta(pixels,sent_,WIDTH,r)')
+assert 'canReserveGraphics(ESP.getPsramSize(),ESP.getFreePsram(),2*bytes)' in h
 assert 'while(dirtyRows_.takeNext(first,count))' in h
 assert 'canvas_.getFramebuffer()+size_t(first)*busa_guition::WIDTH' in h
 assert 'lcd_.draw16bitRGBBitmap(0,first,' in h

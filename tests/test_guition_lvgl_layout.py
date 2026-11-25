@@ -246,7 +246,7 @@ if len(sys.argv)!=2: raise SystemExit('usage: test_guition_lvgl_layout.py /path/
 lvgl=Path(sys.argv[1]).resolve()
 assert (lvgl/'lvgl.h').is_file(),lvgl
 sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav')]
-flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
+flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-DLV_DITHER_GRADIENT=1','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
 with tempfile.TemporaryDirectory() as tmp:
     tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+between('    void homeTemperatures(', '    void home(){')+status+calc+between('    void graphAxes(', '    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
     def compile_one(item):

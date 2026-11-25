@@ -1,7 +1,7 @@
 """Antialiased 20x20 square native RGB565A navigation icons; no new dependencies."""
 from pathlib import Path
 from PIL import Image, ImageDraw
-W,H,S=20,20,4
+W,H,S=20,20,8
 SCALE=0.83
 def point(x,y):return (round((10+(x-11)*SCALE)*S),round((10+(y-10)*SCALE)*S))
 icons=[]

@@ -9,6 +9,7 @@
 #include "BUSA_GuitionPins.h"
 #include "BUSA_GuitionFactoryInit.h"
 #include "BUSA_DirtyRows.h"
+#include "BUSA_FrameDelta.h"
 
 namespace busa_guition {
 // The original device uses Arduino_GFX QSPI and the exact extracted register
@@ -76,7 +77,16 @@ public:
                       unsigned(heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT)));
         lcdReady_=panelReady_&&ramReady&&canvas_.begin(GFX_SKIP_OUTPUT_BEGIN);
         Serial.printf("[BOOT] CANVAS %s\n",lcdReady_?"OK":"FAIL");
-        if(lcdReady_){canvas_.fillScreen(BLACK);canvas_.flush();}
+        if(lcdReady_){
+            canvas_.fillScreen(BLACK);canvas_.flush();
+            constexpr size_t bytes=size_t(WIDTH)*HEIGHT*sizeof(uint16_t);
+            if(canReserveGraphics(ESP.getPsramSize(),ESP.getFreePsram(),2*bytes)){
+                sent_=static_cast<uint16_t*>(heap_caps_malloc(bytes,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
+                packed_=static_cast<uint16_t*>(heap_caps_malloc(bytes,MALLOC_CAP_SPIRAM|MALLOC_CAP_8BIT));
+                if(!sent_||!packed_){free(sent_);free(packed_);sent_=packed_=nullptr;}
+            }
+            Serial.printf("[BOOT] GRAPHICS DELTA %s bytes=%u\n",sent_?"ON":"FALLBACK",sent_?unsigned(2*bytes):0u);
+        }
         if(!lcdReady_)lastError_=1;
     }
     void beginPeripherals() {
@@ -100,11 +110,22 @@ public:
     void noteDirtyRows(int16_t y1,int16_t y2){dirtyRows_.note(y1,y2);}
     void present(){
         int16_t first=0,count=0;
-        if(firstFrame_){canvas_.flush();firstFrame_=false;dirtyRows_.clear();return;}
+        if(firstFrame_){canvas_.flush();firstFrame_=false;dirtyRows_.clear();
+            if(sent_)memcpy(sent_,canvas_.getFramebuffer(),size_t(WIDTH)*HEIGHT*sizeof(uint16_t));
+            return;}
         // The existing full-frame canvas remains authoritative; send each
         // dirty run once, not the clean rows between distant UI changes.
         while(dirtyRows_.takeNext(first,count)){
-            lcd_.draw16bitRGBBitmap(0,first,canvas_.getFramebuffer()+size_t(first)*busa_guition::WIDTH,busa_guition::WIDTH,count);
+            if(!sent_||!packed_){
+                lcd_.draw16bitRGBBitmap(0,first,canvas_.getFramebuffer()+size_t(first)*busa_guition::WIDTH,busa_guition::WIDTH,count);
+                continue;
+            }
+            auto* pixels=canvas_.getFramebuffer();
+            const auto r=changedBounds(pixels,sent_,WIDTH,HEIGHT,first,count);
+            if(!r.valid())continue;
+            if(r.w==WIDTH)lcd_.draw16bitRGBBitmap(0,r.y,pixels+size_t(r.y)*WIDTH,r.w,r.h);
+            else {packDelta(pixels,packed_,WIDTH,r);lcd_.draw16bitRGBBitmap(r.x,r.y,packed_,r.w,r.h);}
+            rememberDelta(pixels,sent_,WIDTH,r);
         }
     }
     void backlight(bool on){digitalWrite(BACKLIGHT,on&&panelReady_?HIGH:LOW);}
@@ -169,6 +190,7 @@ private:
     PsramCanvas canvas_;
     DirtyRows dirtyRows_{busa_guition::HEIGHT};
     bool firstFrame_=true;
+    uint16_t *sent_=nullptr,*packed_=nullptr;
     SPIClass shared_;
     XPT2046_Touchscreen touch_;
     bool panelReady_=false,lcdReady_=false,touchReady_=false,sdReady_=false,capacityKnown_=false;
