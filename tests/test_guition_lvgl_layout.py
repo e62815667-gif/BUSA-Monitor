@@ -18,6 +18,7 @@ status=between('    lv_obj_t* statusLabel(', '    void water()')
 calc=between('    static const char* calcTitle(', '    void rememberCalc()')+between('    void calculator(){','    void pageText(){')
 prelude=r'''
 #include <lvgl.h>
+#include "BUSA_TouchKeys.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -37,6 +38,8 @@ struct UiTest {
     uint8_t theme_=2; int calcMode_=0;
     lv_obj_t *body_=nullptr,*nav_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr;
     lv_obj_t *fields_[8]={},*live_[16]={}; String calcInput_[4][5]; SessionStub session_;
+    lv_obj_t *touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*keyboard_=nullptr;
+    static void keyboardEvent(lv_event_t*){}
     std::vector<lv_obj_t*> controls;
     static void event(lv_event_t*){} static void textFocus(lv_event_t*){}
     void registerKey(lv_obj_t* o,int,int){controls.push_back(o);}
@@ -73,6 +76,41 @@ checks=r'''
             std::fprintf(stderr,"TEXT CLIPPED '%s' need %dpx high, have %dpx; width %d\n",text,size.y,height,width);std::abort();
         }
     }
+    void verifyKeyboard(){
+        init();buildTouchModal(lv_scr_act());lv_obj_clear_flag(touchModal_,LV_OBJ_FLAG_HIDDEN);
+        lv_obj_update_layout(touchModal_);
+        for(unsigned m=0;m<4;++m){
+            auto mode=lv_keyboard_mode_t(m);
+            lv_keyboard_set_mode(keyboard_,mode);
+            const auto* f=mode==LV_KEYBOARD_MODE_NUMBER?&busa_font_value:&busa_font;
+            lv_obj_set_style_text_font(keyboard_,f,LV_PART_ITEMS);
+            lv_obj_update_layout(keyboard_);
+            auto* matrix=reinterpret_cast<lv_btnmatrix_t*>(keyboard_);
+            assert(matrix->btn_cnt>0);
+            for(unsigned i=0;i<matrix->btn_cnt;++i){
+                const char* key=lv_btnmatrix_get_btn_text(keyboard_,i);assert(key);
+                uint32_t at=0;while(key[at]){uint32_t cp=_lv_txt_encoded_next(key,&at);lv_font_glyph_dsc_t d;assert(lv_font_get_glyph_dsc(f,&d,cp,0));}
+                const auto& a=matrix->button_areas[i];
+                assert(lv_txt_get_width(key,strlen(key),f,0,LV_TEXT_FLAG_NONE)<=a.x2-a.x1+1);
+                assert(lv_font_get_line_height(f)<=a.y2-a.y1+1);
+            }
+        }
+        lv_keyboard_set_mode(keyboard_,LV_KEYBOARD_MODE_NUMBER);
+        lv_textarea_set_accepted_chars(touchEditor_,"0123456789.-,");
+        lv_textarea_set_text(touchEditor_,"");
+        for(auto* k:{"4","0",",","5",","})busa_touch_keys::apply(keyboard_,touchEditor_,k);
+        assert(!strcmp(lv_textarea_get_text(touchEditor_),"40,5"));
+        busa_touch_keys::apply(keyboard_,touchEditor_,"+/-");assert(!strcmp(lv_textarea_get_text(touchEditor_),"-40,5"));
+        busa_touch_keys::apply(keyboard_,touchEditor_,"+/-");assert(!strcmp(lv_textarea_get_text(touchEditor_),"40,5"));
+        busa_touch_keys::apply(keyboard_,touchEditor_,"Удалить");assert(!strcmp(lv_textarea_get_text(touchEditor_),"40,"));
+        busa_touch_keys::apply(keyboard_,touchEditor_,"Очистить");assert(!strlen(lv_textarea_get_text(touchEditor_)));
+        lv_textarea_set_accepted_chars(touchEditor_,nullptr);lv_keyboard_set_mode(keyboard_,LV_KEYBOARD_MODE_TEXT_LOWER);
+        for(auto* k:{"a","ABC","B","123","@","Пробел","7"})busa_touch_keys::apply(keyboard_,touchEditor_,k);
+        assert(!strcmp(lv_textarea_get_text(touchEditor_),"aB@ 7"));
+        assert(lv_obj_get_height(touchModal_)==HEIGHT-TOP);
+        assert(lv_obj_get_height(touchEditor_)==36);
+        std::puts("PASS modal keyboard: all modes, glyph coverage, key bounds, decimal, sign, deletion and text");
+    }
     void verify(){
         lv_obj_update_layout(body_);
         for(auto* o:controls){
@@ -99,7 +137,7 @@ int main(){
     UiTest ui;
     for(int theme=0;theme<3;++theme){ui.theme_=theme;
         for(int mode=0;mode<4;++mode){ui.calcMode_=mode;ui.init();ui.calculator();ui.verify();}
-        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();
+        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();
     }
     ui.theme_=1;assert(ui.paper()==0x080808&&ui.surface()==0x202020);
     ui.theme_=2;assert(ui.paper()==0x060e15&&ui.surface()==0x0d2430);
@@ -111,9 +149,9 @@ if len(sys.argv)!=2: raise SystemExit('usage: test_guition_lvgl_layout.py /path/
 lvgl=Path(sys.argv[1]).resolve()
 assert (lvgl/'lvgl.h').is_file(),lvgl
 sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav')]
-flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-I'+str(lvgl),'-I'+str(lvgl/'src')]
+flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch)]
 with tempfile.TemporaryDirectory() as tmp:
-    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+checks)
+    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+between('    void buildTouchModal(', '    void build(){')+checks)
     def compile_one(item):
         i,s=item;o=tmp/f'{i}.o';subprocess.run(['gcc','-std=gnu99','-O0',*flags,'-c',str(s),'-o',str(o)],check=True);return str(o)
     with ThreadPoolExecutor(max_workers=2) as pool: objects=list(pool.map(compile_one,enumerate(sources)))

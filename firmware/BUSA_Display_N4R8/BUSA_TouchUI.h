@@ -9,6 +9,7 @@
 #include "BUSA_Calculator.h"
 #include "BUSA_DisplayAsset.h"
 #include "BUSA_FocusOrder.h"
+#include "BUSA_TouchKeys.h"
 #include "BUSA_NavIcons.h"
 LV_FONT_DECLARE(busa_font);
 LV_FONT_DECLARE(busa_font_small);
@@ -117,7 +118,7 @@ private:
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;keyCursor_.reset();
         calibrating_=true;calibrationValid_=false;calIndex_=0;held_=false;awaitRelease_=true;calSamples_=0;sumX_=sumY_=0;
         lastCalibrationRead_=millis()-busa_touch::readPeriodMs;
-        auto* root=lv_scr_act();calcNotes_=nullptr;lv_obj_clean(root);rootStyle(root);
+        auto* root=lv_scr_act();hideKeyboard();calcNotes_=nullptr;touchModal_=nullptr;touchTitle_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);
         auto* msg=lv_label_create(root);lv_label_set_text(msg,"Калибровка: нажмите и отпустите метку");lv_obj_align(msg,LV_ALIGN_CENTER,0,0);
         calMark_=lv_obj_create(root);lv_obj_remove_style_all(calMark_);lv_obj_set_size(calMark_,18,18);
         lv_obj_set_style_radius(calMark_,LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_color(calMark_,color(0x2087ed),0);lv_obj_set_style_bg_opa(calMark_,LV_OPA_COVER,0);placeMark();
@@ -155,26 +156,33 @@ private:
         lv_textarea_set_accepted_chars(self->touchEditor_,lv_textarea_get_accepted_chars(ta));
         lv_textarea_set_max_length(self->touchEditor_,lv_textarea_get_max_length(ta));
         lv_textarea_set_password_mode(self->touchEditor_,lv_textarea_get_password_mode(ta));
+        lv_textarea_set_password_show_time(self->touchEditor_,0);
         lv_textarea_set_text(self->touchEditor_,lv_textarea_get_text(ta));
         self->touchTarget_=ta;
+        auto* caption=lv_obj_get_child(lv_obj_get_parent(ta),0);
+        lv_label_set_text(self->touchTitle_,lv_label_get_text(caption));
         lv_textarea_set_cursor_pos(self->touchEditor_,LV_TEXTAREA_CURSOR_LAST);
         lv_keyboard_set_textarea(self->keyboard_,self->touchEditor_);
-        lv_keyboard_set_mode(self->keyboard_,lv_textarea_get_accepted_chars(ta)?LV_KEYBOARD_MODE_NUMBER:LV_KEYBOARD_MODE_TEXT_LOWER);
-        lv_obj_clear_flag(self->touchEditor_,LV_OBJ_FLAG_HIDDEN);lv_obj_move_foreground(self->touchEditor_);
-        lv_obj_clear_flag(self->keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_move_foreground(self->keyboard_);
-    }
-    static void editorEvent(lv_event_t* e){
-        auto* self=static_cast<Interface*>(lv_event_get_user_data(e));
-        if(self->touchTarget_)lv_textarea_set_text(self->touchTarget_,lv_textarea_get_text(self->touchEditor_));
+        const bool numeric=lv_textarea_get_accepted_chars(ta)!=nullptr;
+        lv_keyboard_set_mode(self->keyboard_,numeric?LV_KEYBOARD_MODE_NUMBER:LV_KEYBOARD_MODE_TEXT_LOWER);
+        lv_obj_set_style_text_font(self->keyboard_,numeric?&busa_font_value:&busa_font,LV_PART_ITEMS);
+        lv_obj_clear_flag(self->touchModal_,LV_OBJ_FLAG_HIDDEN);lv_obj_move_foreground(self->touchModal_);
     }
     static void keyboardEvent(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));
-        if(lv_event_get_code(e)==LV_EVENT_READY||lv_event_get_code(e)==LV_EVENT_CANCEL){self->hideKeyboard();if(self->page_==4)self->calculate(false);}
+        if(!self->touchTarget_)return;
+        const auto id=lv_btnmatrix_get_selected_btn(self->keyboard_);
+        if(id!=LV_BTNMATRIX_BTN_NONE)busa_touch_keys::apply(self->keyboard_,self->touchEditor_,lv_btnmatrix_get_btn_text(self->keyboard_,id));
+    }
+    void touchFinish(bool accept){
+        if(!touchTarget_)return;
+        if(accept)lv_textarea_set_text(touchTarget_,lv_textarea_get_text(touchEditor_));
+        hideKeyboard();
+        if(accept&&page_==4)calculate(false);
     }
     void hideKeyboard(){
         if(!keyboard_)return;touchTarget_=nullptr;lv_keyboard_set_textarea(keyboard_,nullptr);
-        lv_obj_add_flag(keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_add_flag(touchEditor_,LV_OBJ_FLAG_HIDDEN);
-        lv_textarea_set_text(touchEditor_,"");
+        lv_obj_add_flag(touchModal_,LV_OBJ_FLAG_HIDDEN);lv_textarea_set_text(touchEditor_,"");
     }
     lv_obj_t* label(lv_obj_t* parent,const char* text){
         auto* o=lv_label_create(parent);lv_obj_set_style_text_font(o,&busa_font,0);lv_obj_set_style_text_color(o,color(ink()),0);lv_label_set_text(o,text);return o;
@@ -253,9 +261,39 @@ private:
         const auto* font=lv_txt_get_width(s.c_str(),s.length(),&busa_font,0,LV_TEXT_FLAG_NONE)>112?&busa_font_small:&busa_font;
         if(lv_obj_get_style_text_font(o,0)!=font)lv_obj_set_style_text_font(o,font,0);set(o,s);
     }
+    void buildTouchModal(lv_obj_t* root){
+        touchModal_=plain(root,WIDTH,HEIGHT-TOP);lv_obj_set_pos(touchModal_,0,TOP);
+        lv_obj_set_style_bg_color(touchModal_,color(paper()),0);lv_obj_set_style_bg_opa(touchModal_,LV_OPA_COVER,0);
+        lv_obj_add_flag(touchModal_,LV_OBJ_FLAG_CLICKABLE);
+        touchTitle_=at(touchModal_,"Ввод значения",8,1);lv_obj_set_width(touchTitle_,WIDTH-16);
+        lv_label_set_long_mode(touchTitle_,LV_LABEL_LONG_DOT);
+        touchEditor_=lv_textarea_create(touchModal_);lv_obj_set_width(touchEditor_,WIDTH-12);lv_obj_set_pos(touchEditor_,6,22);
+        lv_textarea_set_one_line(touchEditor_,true);lv_obj_set_height(touchEditor_,36);lv_obj_set_style_text_font(touchEditor_,&busa_font_value,0);
+        lv_obj_set_style_bg_color(touchEditor_,color(surface()),0);lv_obj_set_style_bg_opa(touchEditor_,LV_OPA_COVER,0);
+        lv_obj_set_style_text_color(touchEditor_,color(ink()),0);lv_obj_set_style_border_color(touchEditor_,color(line()),0);
+        lv_obj_set_style_border_width(touchEditor_,1,0);lv_obj_set_style_pad_all(touchEditor_,2,0);lv_obj_set_scrollbar_mode(touchEditor_,LV_SCROLLBAR_MODE_OFF);
+        keyboard_=lv_keyboard_create(touchModal_);lv_obj_set_size(keyboard_,WIDTH-8,140);lv_obj_align(keyboard_,LV_ALIGN_TOP_LEFT,4,62);
+        busa_touch_keys::configure(keyboard_);
+        lv_obj_set_style_bg_color(keyboard_,color(paper()),LV_PART_MAIN);lv_obj_set_style_bg_opa(keyboard_,LV_OPA_COVER,LV_PART_MAIN);
+        lv_obj_set_style_border_width(keyboard_,0,LV_PART_MAIN);lv_obj_set_style_pad_all(keyboard_,2,LV_PART_MAIN);
+        lv_obj_set_style_pad_row(keyboard_,3,LV_PART_MAIN);lv_obj_set_style_pad_column(keyboard_,3,LV_PART_MAIN);
+        lv_obj_set_style_radius(keyboard_,5,LV_PART_ITEMS);
+        lv_obj_set_style_bg_color(keyboard_,color(surface()),LV_PART_ITEMS);
+        lv_obj_set_style_bg_color(keyboard_,color(theme_==0?0xd9eaf2:theme_==1?0x424242:0x17445a),LV_PART_ITEMS|LV_STATE_PRESSED);
+        lv_obj_set_style_bg_color(keyboard_,color(surface()),LV_PART_ITEMS|LV_STATE_CHECKED);
+        lv_obj_set_style_bg_opa(keyboard_,LV_OPA_COVER,LV_PART_ITEMS);
+        lv_obj_set_style_text_color(keyboard_,color(ink()),LV_PART_ITEMS);
+        lv_obj_set_style_text_color(keyboard_,color(ink()),LV_PART_ITEMS|LV_STATE_PRESSED);
+        lv_obj_set_style_text_color(keyboard_,color(ink()),LV_PART_ITEMS|LV_STATE_CHECKED);
+        lv_obj_set_style_border_width(keyboard_,1,LV_PART_ITEMS);lv_obj_set_style_border_color(keyboard_,color(line()),LV_PART_ITEMS);
+        lv_obj_add_event_cb(keyboard_,keyboardEvent,LV_EVENT_VALUE_CHANGED,this);
+        auto* cancel=button(touchModal_,"Отмена",340,231,false);lv_obj_set_pos(cancel,6,205);lv_obj_set_height(cancel,32);
+        auto* ready=button(touchModal_,"Готово",341,231,false);lv_obj_set_pos(ready,243,205);lv_obj_set_height(ready,32);selected(ready,true);
+        lv_obj_add_flag(touchModal_,LV_OBJ_FLAG_HIDDEN);
+    }
     void build(){
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
-        auto* root=lv_scr_act();calcNotes_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
+        auto* root=lv_scr_act();calcNotes_=nullptr;touchModal_=nullptr;touchTitle_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
         auto* top=plain(root,WIDTH,TOP);lv_obj_set_pos(top,0,0);
         at(top,"BUSA MONITOR",6,0);clock_=at(top,"Дата и время: —",6,16,&busa_font_nav);
         lv_obj_set_style_text_color(clock_,color(muted()),0);
@@ -276,13 +314,7 @@ private:
         for(int i=0;i<6;++i){auto* b=button(nav_,titles[i],100+i,76);lv_obj_set_height(b,38);
             auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_nav,0);lv_obj_set_style_text_letter_space(l,0,0);lv_obj_set_width(l,72);lv_obj_align(l,LV_ALIGN_BOTTOM_MID,0,0);
             navIcon(b,i);navButtons_[i]=b;}
-        touchEditor_=lv_textarea_create(root);lv_obj_set_size(touchEditor_,WIDTH-12,40);lv_obj_set_pos(touchEditor_,6,TOP+4);
-        lv_textarea_set_one_line(touchEditor_,true);lv_obj_set_height(touchEditor_,40);lv_obj_set_style_text_font(touchEditor_,&busa_font,0);
-        lv_obj_set_style_bg_color(touchEditor_,color(paper()),0);lv_obj_set_style_text_color(touchEditor_,color(ink()),0);lv_obj_set_style_border_color(touchEditor_,color(line()),0);
-        lv_obj_add_flag(touchEditor_,LV_OBJ_FLAG_HIDDEN);lv_obj_add_event_cb(touchEditor_,editorEvent,LV_EVENT_VALUE_CHANGED,this);
-        keyboard_=lv_keyboard_create(root);lv_obj_set_size(keyboard_,WIDTH,128);lv_obj_align(keyboard_,LV_ALIGN_BOTTOM_MID,0,0);
-        lv_obj_set_style_bg_color(keyboard_,color(paper()),LV_PART_MAIN);lv_obj_set_style_bg_color(keyboard_,color(surface()),LV_PART_ITEMS);lv_obj_set_style_text_color(keyboard_,color(ink()),LV_PART_ITEMS);
-        lv_obj_add_flag(keyboard_,LV_OBJ_FLAG_HIDDEN);lv_obj_add_event_cb(keyboard_,keyboardEvent,LV_EVENT_ALL,this);
+        buildTouchModal(root);
         render();
     }
     void render(){
@@ -466,6 +498,8 @@ private:
         submit(Route::temperatureAlarms,b,bytes);
     }
     void action(int id){
+        if(id==340||id==341){touchFinish(id==341);return;}
+        if(touchTarget_)return;
         if(id>=100&&id<106){rememberCalc();if(page_!=id-100)previousPage_=page_;page_=id-100;sub_=-1;render();return;}
         if(id>=400&&id<409){sub_=id-400;if(sub_==2)requestedTheme_=theme_;render();return;}
         if(id==409){sub_=-1;render();return;}
@@ -598,6 +632,7 @@ private:
     }
     void physicalKey(uint8_t k,uint32_t at){
         if(testOverlay_||displaySleeping_||calibrating_||!session_.connected()||k==2||k==3)return;
+        if(touchTarget_){if(k==15||k==19)touchFinish(k==19);return;}
         if(calcNotes_){if(k==15||k==19)calcConditions();return;}
         if(keyConfirm_>=0){
             const int i=keyConfirm_;keyConfirm_=-1;
@@ -734,7 +769,7 @@ private:
     lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphRange_[5]={};
     lv_obj_t* navButtons_[6]={};lv_obj_t* fields_[8]={};lv_obj_t* live_[16]={};lv_obj_t* motion_[7]={};lv_chart_series_t* series_[4]={};
     lv_img_dsc_t art_{},navArt_[6]{};uint8_t* asset_=nullptr;
-    lv_obj_t *calcNotes_=nullptr,*touchEditor_=nullptr,*touchTarget_=nullptr,*pageCounter_=nullptr;String pageContent_;unsigned pageOffset_=0,pageLines_=5;
+    lv_obj_t *calcNotes_=nullptr,*touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*touchTarget_=nullptr,*pageCounter_=nullptr;String pageContent_;unsigned pageOffset_=0,pageLines_=5;
     busa_touch::Transform transform_{};busa_touch::Point raw_[3]{},screen_[3]{};
     bool calibrationValid_=false,calibrating_=false,held_=false,wasConnected_=false,waiting_=false,scanPending_=false,frameOpen_=false,awaitRelease_=false,formValid_=false;
     int calIndex_=0,calSamples_=0,sumX_=0,sumY_=0,page_=0,sub_=-1,pendingPage_=0,pendingSub_=-1,graphKind_=0,graphMinutes_=5,calcMode_=0;
