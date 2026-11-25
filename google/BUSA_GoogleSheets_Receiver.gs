@@ -9,7 +9,7 @@ const BUSA_HEADERS = [
   'Получено (UTC)', 'Устройство', 'Прошивка', 'Время ESP32 (UTC)',
   'T1 Вода, °C', 'T2 Колонна, °C', 'T3 Куб, °C', 'T4 Верх, °C',
   'Ошибка T1', 'Ошибка T2', 'Ошибка T3', 'Ошибка T4',
-  'PCF8575 онлайн', 'Ошибка клавиатуры', 'I2C адреса', 'PCA9685 онлайн',
+  'PCF8575 онлайн', 'Ошибка клавиатуры', 'I2C адреса', 'Резерв (архив)',
   'YF-S401 импульсы', 'YF-S401 калиброван', 'Wi-Fi STA', 'Свободная память',
   'Общий статус', 'Диагностика (JSON)'
 ];
@@ -149,13 +149,12 @@ function doPost(e) {
     const modules = payload.modules || {};
     const water = payload.water || {};
     const wifi = diag.wifi || {};
-    const pca = diag.pca9685 || {};
     const chip = diag.esp32 || {};
     const clock = payload.clock || {};
     const errs = [0,1,2,3].map(i => String(oneWire[i]?.result || 'NO_DATA'));
     const hasErrors = errs.some(x => x !== 'OK') ||
       Number(keyboard.scan_error || 0) !== 0 ||
-      !Boolean(modules.pcf8575) || !Boolean(pca.ack);
+      !Boolean(modules.pcf8575);
     const row = [
       new Date(), payload.device, String(payload.firmware || ''),
       String(clock.datetime || ''),
@@ -163,7 +162,7 @@ function doPost(e) {
       ...errs,
       Boolean(modules.pcf8575), Number(keyboard.scan_error || 0),
       (diag.i2c?.addresses || []).join(','),
-      Boolean(pca.ack),
+      '', // Preserve historical column P; no absent module check.
       Number(water.pulses || 0), Boolean(water.calibrated),
       Boolean(wifi.sta_connected),
       Number(chip.free_heap_bytes || 0),

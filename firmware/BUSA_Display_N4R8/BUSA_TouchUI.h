@@ -475,7 +475,7 @@ private:
             set(live_[1],"Учтено: "+measured(d["water"]["total_l_estimate"]," л",2));set(live_[2],String("Импульсы: ")+measured(d["water"]["pulses"],"",0));
             set(live_[3],measured(d["collection"]["ml_per_min"]," мл/мин",1));
             set(live_[4],"Собрано: "+measured(d["collection"]["total_ml"]," мл",1));
-            set(live_[5],ok&&(d["collection"]["sensor_present"]|false)?"Датчик подключён":"Нет датчика");}
+            set(live_[5],!ok?"Нет связи":(d["collection"]["pulse_seen"]|(d["collection"]["sensor_present"]|false))?((d["collection"]["calibrated"]|false)?"Импульсы зарегистрированы":"Импульсы · нет калибровки"):"Нет импульсов");}
         else if(page_==5){
             if(sub_==1)set(live_[0],ok?String("Wi-Fi: ")+(d["station"]["ssid"]|"—"):"Нет связи");
             else if(sub_==3)set(live_[0],ok?String("Google: ")+String(d["google"]["configured"].as<bool>()?"настроен":"не настроен")+" · код "+String(d["google"]["state"]|0):"Нет связи");

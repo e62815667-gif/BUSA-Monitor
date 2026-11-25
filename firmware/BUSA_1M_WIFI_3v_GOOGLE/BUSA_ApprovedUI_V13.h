@@ -10,7 +10,7 @@ static uint8_t v13HistoryCount=0,v13HistoryHead=0;
 static uint32_t v13LastCapture=0;
 static String v13Events[7];
 static uint8_t v13EventCount=0;
-static bool v13EventBoot=false,v13OldWifi=false,v13OldPcf=false,v13OldPca=false,v13OldTemps[4]={false,false,false,false},v13OldFlow=false;
+static bool v13EventBoot=false,v13OldWifi=false,v13OldPcf=false,v13OldTemps[4]={false,false,false,false},v13OldFlow=false;
 static void v13Log(const String &msg){
   if(v13EventCount<7)v13EventCount++;
   for(int i=(int)v13EventCount-1;i>0;i--)v13Events[i]=v13Events[i-1];
@@ -27,14 +27,13 @@ static void v13Collect(uint32_t now){
     v13EventBoot=true;
     v13Log("Устройство включено");
     v13OldWifi=WiFi.status()==WL_CONNECTED;
-    v13OldPcf=pcfDetected;v13OldPca=pcaDetected;
+    v13OldPcf=pcfDetected;
     for(int i=0;i<4;i++)v13OldTemps[i]=tempPresent[i];
     v13OldFlow=flowSeen;
   }
   const bool wifi=WiFi.status()==WL_CONNECTED;
   if(wifi!=v13OldWifi){v13Log(wifi?"Wi-Fi STA подключен":"Wi-Fi STA отключен");v13OldWifi=wifi;}
   if(pcfDetected!=v13OldPcf){v13Log(pcfDetected?"PCF8575 найден":"PCF8575 недоступен");v13OldPcf=pcfDetected;}
-  if(pcaDetected!=v13OldPca){v13Log(pcaDetected?"PCA9685 найден":"PCA9685 недоступен");v13OldPca=pcaDetected;}
   for(int i=0;i<4;i++){
     if(tempPresent[i]!=v13OldTemps[i]){
       v13Log(String("T")+String(i+1)+(tempPresent[i]?" обнаружен":" не отвечает"));

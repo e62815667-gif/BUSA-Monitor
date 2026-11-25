@@ -1071,8 +1071,8 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 </div>
 <details class="card approvedAdditional"><summary>Охлаждающая вода</summary>
   <div class="row">YF-S401 <b>GPIO15</b></div><div class="row">Импульсы <b id="pulses">—</b></div>
-  <div class="row">Расход воды (не калиброван) <b id="flow">—</b></div>
-  <p class="hint">Датчик на линии охлаждающей воды, а не на линии отбора. Его расчётный расход не подтверждён калибровкой.</p>
+  <div class="row">Расход воды <b id="flow">—</b></div>
+  <p class="hint" id="waterCalibrationHint">Ожидание показаний расходомера</p>
   
   
 </details></section>
@@ -1100,11 +1100,11 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
   </details></div></div>
 <div class="temperatureSaveRow"><button id="temperatureSave" type="button" class="full">Сохранить пороги</button><p id="temperatureSaveResult" class="hint"></p></div></section>
 <section class="page" data-section="2" hidden><div class="approvedPageTitle"><svg class="uiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><strong>ВОДА И ОТБОР</strong></div>
-<article class="liquidPanel collectionPanel"><div class="liquidPanelHeading"><h2>Отбор жидкости</h2><span id="collectionAvailability">Нет датчика</span></div>
+<article class="liquidPanel collectionPanel"><div class="liquidPanelHeading"><h2>Отбор жидкости</h2><span id="collectionAvailability">Нет данных</span></div>
 <p class="liquidRateLabel">Текущий отбор</p><div class="liquidRateGrid"><div><strong id="collectionMlMin">—</strong><small>мл/мин</small></div><div><strong id="collectionLph">—</strong><small>л/ч</small></div></div>
 <div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div></article>
 <article class="liquidPanel coolingPanel"><div class="liquidPanelHeading"><h2>Охлаждение</h2><span id="coolingAvailability">Нет данных</span></div>
-<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Израсходовано воды</small><strong id="coolingTotal">—</strong><small>л</small></div></div></article>
+<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Учтено воды</small><strong id="coolingTotal">—</strong><small>л</small></div></div></article>
 </section>
 <section class="page" data-section="3" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><strong>ГРАФИКИ</strong></div>
 <div class="chartCard"><div class="chartTabs" role="tablist" aria-label="Вид графика">
@@ -1187,6 +1187,8 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <div class="row">Время работы <b id="aboutUptime">—</b></div></div>
 
 <div class="card settingCard" data-stab="5" hidden><h2>Обновление ПО</h2>
+<div class="settingsTabs" role="tablist" aria-label="Плата для обновления"><button id="otaMainTab" type="button" class="on" role="tab" aria-selected="true">Основная плата</button><button id="otaScreenTab" type="button" role="tab" aria-selected="false">Обновление экрана</button></div>
+<div id="otaMainPanel">
 <div class="row">Установленная прошивка <b id="otaFirmware">—</b></div>
 <p class="hint">Обновление только локально по Wi-Fi БУСА. Выбирайте APP_OTA.bin, настройки и раскладку клавиш не стирайте.</p>
 <h3>Обновление прошивки</h3>
@@ -1194,6 +1196,13 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <input type="file" accept=".bin" id="firmwareFile">
 <button type="button" class="full" id="manualUpdate">Выбрать и обновить</button>
 <p id="updateResult" role="status">Ожидание подтверждения</p></div>
+<div id="otaScreenPanel" hidden><h3>Обновление экрана GUITION N4R8</h3>
+<div class="row">Прошивка экрана <b id="displayOtaVersion">—</b></div>
+<p class="hint">Выбирайте только DISPLAY_OTA.bin. Передача выполняется через основную плату по UART.</p>
+<input type="file" accept=".bin" id="displayFirmwareFile">
+<button type="button" class="full" id="displayManualUpdate" disabled>Обновить экран</button>
+<progress id="displayOtaProgress" max="100" value="0" style="width:100%"></progress>
+<p id="displayUpdateResult" role="status">Проверка связи с экраном</p></div></div>
 <div class="settingCard" data-stab="6" hidden><div class="card"><h2>Диагностика</h2>
 <div class="settingsTabs diagTabs">
 <button type="button" data-diag-btn="screen" class="on">Экран</button>
@@ -1244,7 +1253,11 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 </div>
 <div class="card" data-diag-panel="flow" hidden><h2>Расходомер охлаждающей воды</h2>
 <pre id="diagFlow" style="white-space:pre-wrap;word-break:break-word">Ожидание импульсов...</pre>
-<p class="hint">Пока не откалиброван; значения расхода и объёма оценочные.</p></div>
+<p class="hint">Паспорт YF-S401: 5880 имп/л (98 Гц при 1 л/мин). Изменённый коэффициент не устраняет ошибки сигнала.</p>
+ <div class="wifiField"><label for="waterPplInput">Импульсов на 1 литр</label><input id="waterPplInput" type="number" min="1" max="100000" step="0.1" value="5880" inputmode="decimal"></div>
+ <button id="waterPplSave" type="button" class="full">Сохранить коэффициент</button>
+ <button id="waterPplPassport" type="button" class="full">Вернуть паспортные 5880</button>
+ <p id="waterPplResult" role="status" class="hint"></p></div>
 </div>
 </section>
 <section class="page" data-section="7" hidden><div id="busaCalculator"></div></section></main>
@@ -1324,7 +1337,7 @@ async function refreshWebEvents(){
 const nativeWebFetch=window.fetch.bind(window);
 window.fetch=async function(input,options){
  const url=typeof input==='string'?input:input.url,method=(options?.method||input?.method||'GET').toUpperCase();
- const names={'/api/time/sync':'Синхронизация времени','/api/wifi':'Настройки Wi-Fi','/api/wifi/disconnect':'Отключение Wi-Fi','/api/temperature-alarms':'Пороги сигнализации','/api/temperature/calibration':'Поправки датчиков','/api/display/power':'Экран','/api/theme':'Тема экрана'};
+ const names={'/api/water/coefficient':'Коэффициент расходомера','/api/time/sync':'Синхронизация времени','/api/wifi':'Настройки Wi-Fi','/api/wifi/disconnect':'Отключение Wi-Fi','/api/temperature-alarms':'Пороги сигнализации','/api/temperature/calibration':'Поправки датчиков','/api/display/power':'Экран','/api/theme':'Тема экрана'};
  const label=names[url.split('?')[0]]||'Действие';
  try{const r=await nativeWebFetch(input,options);if(method==='POST')message(label+(r.ok?': выполнено':': ошибка'),r.ok?'system':'warn');return r;}
  catch(e){if(method==='POST')message(label+': нет связи','warn');throw e;}
@@ -1373,23 +1386,24 @@ const DISPLAY_ORDER=[0,2,1,3];
 const SENSOR_NAMES=['Вода','Колонна','Куб','Авария'];
 const SENSOR_COLORS=['#38bdf8','#53d486','#f4c84a','#ff6473'];
 const decimal1=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
-let previousWater=null;
+let previousWater=null,waterPplInitialized=false;
 function measured(v){return typeof v==='number'&&Number.isFinite(v)&&v>=0;}
 function formatVolumeMl(v){if(!measured(v))return '—';return v<1000?decimal1.format(v)+' мл':decimal1.format(v/1000)+' л';}
 function formatNumeric(v){return typeof v==='number'&&Number.isFinite(v)?decimal1.format(v):'—';}
 function formatRunTime(ms){if(!measured(ms))return '—';const minutes=Math.floor(ms/60000);return String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(minutes%60).padStart(2,'0');}
 function setMeasured(id,v){get(id).textContent=measured(v)?decimal1.format(v):'—';}
 function updateLiquidPanels(s){
- const c=s?.collection,collection=!!c?.sensor_present;
+ const c=s?.collection,collection=!!(c?.pulse_seen??c?.sensor_present);
  const mlMin=collection&&measured(c.ml_per_min)?c.ml_per_min:null,total=collection&&measured(c.total_ml)?c.total_ml:null;
  setMeasured('collectionMlMin',mlMin);setMeasured('collectionLph',measured(mlMin)?mlMin*.06:null);
  get('collectionTotal').textContent=formatVolumeMl(total);
  get('collectionTime').textContent=formatRunTime(collection?c.duration_ms??c.elapsed_ms:null);
- get('collectionAvailability').textContent=!s?'Нет связи':collection?'Данные датчика':'Нет датчика';
+ get('collectionAvailability').textContent=!s?'Нет связи':collection?(c.calibrated===false?'Импульсы · нет калибровки':'Данные датчика'):'Нет импульсов';
  setMeasured('homeCollectionRate',mlMin);
  const volume=formatVolumeMl(total),split=volume.lastIndexOf(' ');
  get('homeCollectionTotal').textContent=split<0?volume:volume.slice(0,split);get('homeCollectionUnit').textContent=split<0?'мл':volume.slice(split+1);
- const w=s?.water,ready=w?.seen_pulses===true&&measured(w?.total_l_estimate),uptime=s?.uptime_ms;
+ const w=s?.water,ready=w?.credible===true&&w?.seen_pulses===true&&measured(w?.total_l_estimate),uptime=s?.uptime_ms;
+ get('waterCalibrationHint').textContent=!s?'Нет связи':w?.calibrated?'Калибровка по мерной ёмкости подтверждена':'Коэффициент не подтверждён мерной ёмкостью';
  let lph=null;
  if(ready&&previousWater&&measured(uptime)&&uptime>previousWater.at&&w.total_l_estimate>=previousWater.total)
   lph=(w.total_l_estimate-previousWater.total)*3600000/(uptime-previousWater.at);
@@ -1397,7 +1411,7 @@ function updateLiquidPanels(s){
  setMeasured('coolingLph',lph);setMeasured('coolingTotal',ready?w.total_l_estimate:null);
  get('homeCoolingRate').textContent=(measured(lph)?decimal1.format(lph):'—')+' л/ч';
  get('homeWaterUsed').textContent=(ready?decimal1.format(w.total_l_estimate):'—')+' л';
- get('coolingAvailability').textContent=!s?'Нет связи':ready?(w.calibrated?'Данные датчика':'Расчётно · без калибровки'):'Нет импульсов';
+ get('coolingAvailability').textContent=!s?'Нет связи':w?.credible===false?'Недостоверные импульсы':ready?(w.volume_complete===false?'Учтено частично · были помехи':w.calibrated?'Данные датчика':'Расчётно · без калибровки'):'Нет импульсов';
  get('rigArtStage').classList.toggle('hasCollection',measured(mlMin)&&mlMin>0);
  get('rigArtStage').classList.toggle('hasCooling',measured(lph)&&lph>0);
 }
@@ -1525,6 +1539,25 @@ get('rmStop').onclick=async function(){
  await rainmakerRefreshStatus();
 };
 get('rmCheck').onclick=()=>rainmakerRefreshStatus();
+async function saveWaterPpl(value){
+  const status=get('waterPplResult'),button=get('waterPplSave'),reset=get('waterPplPassport');
+  const numeric=Number(value);
+  if(!String(value).trim()||!Number.isFinite(numeric)||numeric<1||numeric>100000){
+    status.textContent='Укажите от 1 до 100000 имп/л';return;
+  }
+  button.disabled=true;reset.disabled=true;
+  try{
+    const response=await fetch('/api/water/coefficient',{method:'POST',body:new URLSearchParams({confirm:'YES',pulses_per_litre:String(numeric)})});
+    if(!response.ok)throw Error(await response.text());
+    const data=await response.json();
+    get('waterPplInput').value=Number(data.pulses_per_litre).toFixed(1);
+    status.textContent='Сохранено: '+data.pulses_per_litre+' имп/л';
+    waterPplInitialized=true;
+  }catch(err){status.textContent='Ошибка: '+err.message;}
+  finally{button.disabled=false;reset.disabled=false;}
+}
+get('waterPplSave').onclick=()=>saveWaterPpl(get('waterPplInput').value);
+get('waterPplPassport').onclick=()=>saveWaterPpl('5880');
 get('tempCalSave').onclick=async()=>{
  const button=get('tempCalSave'),data=new URLSearchParams({confirm:'YES'});
  for(let i=0;i<4;i++){
@@ -1564,7 +1597,7 @@ function graphs(){
   values.forEach((v,i)=>{if(Number.isFinite(v)){ctx.beginPath();ctx.arc(x0+pw*(i+.5)/values.length,y0+ph-Math.max(0,Math.min(high,v))*ph/high,2.7,0,Math.PI*2);ctx.fill();}});
  }
  if(chartView===0)DISPLAY_ORDER.forEach(k=>line(temp[k]||[],SENSOR_COLORS[k]));else line(chosen,chartView===1?'#f4c84a':'#38bdf8');
- const note=chartView===1&&!data.collection_sensor?'Нет датчика отбора':points?'':chartView===2?'Нет импульсов охлаждения':'Ожидание измерений';
+ const note=chartView===1&&!data.collection_sensor?'Нет импульсов отбора':points?'':chartView===2?'Нет импульсов охлаждения':'Ожидание измерений';
  get('chartState').textContent=note||(chartView===2&&!data.cooling_calibrated?'Расчётно · без калибровки':'Данные с включения');
  if(note){ctx.fillStyle='#a6c2d5';ctx.font='21px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(note,x0+pw/2,y0+ph/2);}
 }
@@ -1582,7 +1615,8 @@ async function refreshGraphHistory(force=false){
  }catch(e){if(token===chartFetchToken&&active===3)get('chartState').textContent='Нет связи';}
  finally{clearTimeout(timeout);if(chartRequestController===controller)chartRequestController=null;}
 }
-async function update(){if(pollBusy)return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;statusFailures=0;
+function displayOtaOwnsStatusPoll(){const p=get('otaScreenPanel');return document.busaOtaUploading||document.busaOtaStatusPolling||(document.busaOtaTransfer&&p&&!p.hidden&&!p.closest('[data-stab]').hidden);}
+async function update(){if(pollBusy||document.hidden||displayOtaOwnsStatusPoll())return;pollBusy=true;try{let r=await fetch('/api/status',{cache:'no-store',signal:AbortSignal.timeout(6000)});if(!r.ok)throw Error(r.status);let s=await r.json();if(!connected)message('Связь с ESP32 восстановлена');connected=true;statusFailures=0;
 networkLeds(s.network_indicators,s.station,s.google);refreshWebEvents();
  // Physical buttons and browser navigation are independent.
  let names=['Вода','Колонна','Куб','Авария'];
@@ -1603,7 +1637,11 @@ if(s.sound_alerts?.channels?.length===4 && s.sound_alerts?.buzzer?.sensors?.leng
  temperatureThresholdsInitialized=true;
 }
 updateRelayBadges(s.sound_alerts?.channels);
-let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?'НЕТ ДАННЫХ':formatNumeric(f);get('pulses').textContent=s.water.pulses;updateLiquidPanels(s);
+if(!waterPplInitialized && Number.isFinite(s.water?.pulses_per_litre)){
+ get('waterPplInput').value=Number(s.water.pulses_per_litre).toFixed(1);
+ waterPplInitialized=true;
+}
+let f=s.water.lpm===null?null:Number(s.water.lpm);get('flow').textContent=f===null?(s.water.sample_ready?'НЕДОСТОВЕРНО':'НЕТ ДАННЫХ'):formatNumeric(f);get('pulses').textContent=s.water.pulses;updateLiquidPanels(s);
 flog.push(f);if(flog.length>80)flog.shift();
 const currentPulse=Number(s.water.pulses);
 if(Number.isFinite(currentPulse)){
@@ -1649,8 +1687,7 @@ if(s.keypad){
    get('diagI2c').textContent='I2C GPIO40/41 · клавиатура | ACK total='+d.i2c?.ack_total+
      ' | addresses='+addresses.map(a=>'0x'+Number(a).toString(16).padStart(2,'0')).join(', ')+
      '\nPCF8575: ACK='+d.pcf8575?.online+' read='+d.pcf8575?.read_ok+
-     ' idle=0x'+d.pcf8575?.idle_pins_hex+
-     '\nPCA9685: отключён, не опрашивается';
+     ' idle=0x'+d.pcf8575?.idle_pins_hex;
    get('diagNetwork').textContent='Wi-Fi STA: '+(s.station.connected?'подключен':'нет связи')+
       '\nAP: '+(s.ap?.enabled?'работает':'нет')+' · '+(s.ap?.ip||'—')+
       '\nМощность TX: '+(s.performance?.wifi_tx_power_dbm??'—')+' dBm'+
@@ -1663,8 +1700,14 @@ if(s.keypad){
      '\nЗуммер T1/T2: '+(s.sound_alerts?.buzzer?.sound_on?'ЗВУК':'ОЖИДАНИЕ');
    get('diagFlow').textContent='GPIO15 · '+d.water_flow?.status+
      '\nИмпульсы: '+d.water_flow?.pulses+
-     '\nКалибровка: отсутствует'+
-     '\nРасход (оценка): '+formatNumeric(s.water?.lpm)+' л/мин';
+     '\nОтброшенные фронты: '+d.water_flow?.rejected_edges+
+     '\nПоследние '+(s.water?.sample_window_ms??0)+' мс: '+(s.water?.pulses_window??0)+' имп / '+(s.water?.rejected_edges_window??0)+' отброшено'+
+     '\nКоэффициент: '+(s.water?.pulses_per_litre??5880)+' имп/л ('+(s.water?.coefficient_source==='manual'?'ручной':'паспортный')+')'+
+      '\nКалибровка по мерной ёмкости: '+(s.water?.calibrated?'подтверждена':'не подтверждена')+
+      '\nУчтённый объём: '+formatNumeric(s.water?.total_l_estimate)+' л'+
+      (s.water?.volume_complete===false?' (неполный, были помехи)':'')+
+     '\nРасход (оценка): '+formatNumeric(s.water?.lpm)+' л/мин'+
+     (s.water?.credible===false?'\nИЗМЕРЕНИЕ НЕДОСТОВЕРНО':'');
    get('diagOther').textContent=
      'TFT: '+d.tft?.profile+' rotation='+d.tft?.rotation+
        ' init='+d.tft?.init_sent+' (pixels not verified by software)'+
@@ -1842,7 +1885,7 @@ syncClock();setInterval(syncClock,300000);
 update();setInterval(update,3000);
 // Graph cadence is fixed and independent of status polling and selected time range.
 setInterval(()=>{if(active===3&&!document.hidden)refreshGraphHistory();},CHART_REFRESH_MS);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&active===3)refreshGraphHistory(true);});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){update();if(active===3)refreshGraphHistory(true);}});
 </script><script src="/calculator.js?v=CALC1"></script><script>
 /* BUSA_VIEWPORT_JS_BEGIN */
 /* One-screen navigation; long content scrolls within its own panel. */
@@ -2040,4 +2083,58 @@ request();
 })();
 
 /* BUSA_DESIGN_JS_END */
+</script><script>
+(()=>{
+ const el=id=>document.getElementById(id),main=el('otaMainTab'),screen=el('otaScreenTab'),mainPanel=el('otaMainPanel'),screenPanel=el('otaScreenPanel');
+ const button=el('displayManualUpdate'),message=el('displayUpdateResult'),progress=el('displayOtaProgress');
+ let uploading=false,polling=false,uploadError='';
+ const active=new Set(['receiving','ready','sending','waiting_boot']);
+ const messages={idle:'Выберите OTA-файл экрана',receiving:'Загрузка файла на основную плату',ready:'Файл проверен. Ожидается экран',sending:'Передача по UART',waiting_boot:'Записано. Проверка запуска экрана',success:'Экран успешно обновлён',error:'Обновление не подтверждено. Проверьте связь и версию'};
+ async function refresh(){
+  if(uploading||polling||document.hidden||screenPanel.hidden||screenPanel.closest('[data-stab]').hidden||(typeof pollBusy!=='undefined'&&pollBusy))return;
+  polling=true;document.busaOtaStatusPolling=true;
+  try{
+   const options={cache:'no-store'};
+   if(typeof AbortSignal!=='undefined'&&typeof AbortSignal.timeout==='function')options.signal=AbortSignal.timeout(6000);
+   const response=await fetch('/api/display-ota/status',options);
+   if(!response.ok)throw Error('HTTP '+response.status);
+   const data=await response.json();
+   document.busaOtaTransfer=active.has(data.state);
+   el('displayOtaVersion').textContent=data.firmware||'—';
+   button.disabled=!data.capable||active.has(data.state);
+   progress.value=data.size?Math.min(100,Math.floor(100*data.confirmed/data.size)):0;
+   message.textContent=active.has(data.state)?messages[data.state]:uploadError||((data.state==='success'||data.state==='error')?messages[data.state]:data.capable?messages.idle:'Нет связи или экран не поддерживает OTA');
+  }catch(e){button.disabled=true;message.textContent='Нет связи с основной платой. Результат не подтверждён';}
+  finally{polling=false;document.busaOtaStatusPolling=false;}
+ }
+ function select(display){
+  mainPanel.hidden=display;screenPanel.hidden=!display;
+  main.classList.toggle('on',!display);screen.classList.toggle('on',display);
+  main.setAttribute('aria-selected',String(!display));screen.setAttribute('aria-selected',String(display));
+  if(display)refresh();
+ }
+ main.onclick=()=>select(false);screen.onclick=()=>select(true);
+ button.onclick=async()=>{
+  if(uploading)return;
+  const file=el('displayFirmwareFile').files[0];
+  if(!file||!file.name.endsWith('.bin')||file.size<60000||file.size>0x1c0000){message.textContent='Выберите подходящий OTA BIN экрана';return;}
+  if(!confirm('Подтвердите обновление экрана GUITION N4R8. Не отключайте питание.'))return;
+  uploading=true;document.busaOtaUploading=true;uploadError='';button.disabled=true;progress.value=0;
+  try{
+   const r=await fetch('/api/display-ota/prepare',{method:'POST',body:new URLSearchParams({confirm:'YES',size:String(file.size)})});
+   if(!r.ok)throw Error(await r.text());
+   const grant=await r.json(),body=new FormData();body.append('firmware',file,file.name);
+   await new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();xhr.open('POST','/api/display-ota/upload',true);xhr.setRequestHeader('X-Busa-Token',grant.token);
+    xhr.timeout=180000;xhr.upload.onprogress=e=>{if(e.lengthComputable)message.textContent='Wi-Fi: '+Math.round(e.loaded*100/e.total)+'%';};
+    xhr.onload=()=>xhr.status===200?resolve():reject(Error(xhr.responseText||'HTTP '+xhr.status));
+    xhr.onerror=()=>reject(Error('Связь прервана'));xhr.ontimeout=()=>reject(Error('Истекло время передачи'));xhr.send(body);
+   });
+   document.busaOtaTransfer=true;
+   message.textContent='Файл принят. Ожидается подтверждение экрана';
+  }catch(e){uploadError='Ошибка: '+e.message;message.textContent=uploadError;}
+  finally{uploading=false;document.busaOtaUploading=false;refresh();}
+ };
+ setInterval(refresh,2000);
+})();
 </script></body></html>

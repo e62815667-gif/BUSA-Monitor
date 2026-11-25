@@ -45,8 +45,8 @@ constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr uint8_t COLLECTION_GPIO=1; // Input, verified 3.3 V logic required
 static_assert(COLLECTION_GPIO==1 && COLLECTION_GPIO!=FLOW_GPIO,"Collection GPIO changed");
 constexpr uint8_t BUSA_RESERVED_BUZZER_GPIO=2; // active 3.3V logic buzzer input, T1/T2
-constexpr bool RELAY_PHYSICAL_OUTPUTS=true,LED_PHYSICAL_OUTPUTS=false;
-static_assert(RELAY_PHYSICAL_OUTPUTS && !LED_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
+constexpr bool RELAY_PHYSICAL_OUTPUTS=true;
+static_assert(RELAY_PHYSICAL_OUTPUTS,"K1-K4 sound-only relays; no PWM equipment outputs");
 static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!=BUS_SDA &&
   BUSA_RESERVED_BUZZER_GPIO!=BUS_SCL && BUSA_RESERVED_BUZZER_GPIO!=TFT_CS &&
   BUSA_RESERVED_BUZZER_GPIO!=TFT_DC && BUSA_RESERVED_BUZZER_GPIO!=TFT_RST &&
@@ -54,7 +54,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   "Buzzer pin conflicts with I2C, TFT or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
 static_assert(TFT_CS==10 && TFT_DC==11 && TFT_RST==12 && TFT_MOSI==13 && TFT_SCK==14,"TFT GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF3";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF3-HW1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -279,17 +279,17 @@ static String collectionDisplay(double value){
  return "Н/Д";
 }
 
-// Isolated 3.3V I2C keypad PCF8575/PCF8575A only; PCA9685 LED board detached.
-bool i2cOnline=false,pcfDetected=false,pcaDetected=false;
-uint8_t pcfAddr=0,pcaAddr=0x40;uint32_t lastBusProbe=0;
+// Isolated 3.3V I2C keypad PCF8575/PCF8575A only.
+bool i2cOnline=false,pcfDetected=false;
+uint8_t pcfAddr=0;uint32_t lastBusProbe=0;
 uint8_t i2cFound[24]={0},i2cFoundCount=0;
 uint16_t i2cAckCount=0;
 uint32_t i2cFullScanAt=0;
 // A probe is a sample, not a state change. Keep each device's most recent
 // confirmed ACK, but report "online" only while confirmation is fresh.
-uint32_t busaI2cLastPcfAckMs=0,busaI2cLastPcaAckMs=0;
-uint32_t busaI2cPcfAcks=0,busaI2cPcaAcks=0;
-uint32_t busaI2cLastPcfNackMs=0,busaI2cLastPcaNackMs=0;
+uint32_t busaI2cLastPcfAckMs=0;
+uint32_t busaI2cPcfAcks=0;
+uint32_t busaI2cLastPcfNackMs=0;
 constexpr uint32_t BUSA_I2C_ACK_FRESH_MS=30000;
 // GPIO-only, open-drain I2C. ESP32-S3 hardware controller previously blocked for
 // 1000ms even with Wire.setTimeOut(25). This avoids the controller entirely.
@@ -490,7 +490,6 @@ bool busaI2cExchange(uint8_t address,const uint8_t* tx,size_t txLen,uint8_t* rx,
   return ok;
 }
 
-int pcaMode1=-1,pcaMode2=-1;
 bool pcfIdleReadOk=false;
 uint16_t pcfIdleDirect=0xffff;
 uint32_t keyCount=0,lastKeyScan=0,pendingAt=0;
@@ -536,7 +535,6 @@ bool ack(uint8_t address){
   return busaI2cExchange(address,nullptr,0,nullptr,0);
 }
 // Only scan the PCF8575 (0x20..0x27) or PCF8575A (0x38..0x3F) address sets.
-// LED driver PCA9685 is disconnected and must not be addressed.
 constexpr uint8_t BUSA_I2C_SCAN_START=0x20,BUSA_I2C_SCAN_END=0x3F;
 constexpr uint8_t BUSA_I2C_PRIORITY_ADDRS[]={0x20,0x38};
 uint8_t busaI2cScanNext=0x20,busaI2cPriorityNext=0;
@@ -588,14 +586,13 @@ void scanI2cAddresses(uint32_t now){
 void probeI2c(uint32_t now){
   if(!i2cOnline || busaI2cSuspended(now))return;
   busaI2cRebuildAddressCache(millis());
-  pcfDetected=false;pcfAddr=0;pcaDetected=false;pcaAddr=0;
+  pcfDetected=false;pcfAddr=0;
   // Only PCF8575 keypad is installed; no LED driver discovery or reads.
   for(uint8_t j=0;j<i2cFoundCount;j++){
     const uint8_t address=i2cFound[j];
     if(busaI2cIsPcfAddress(address) &&
        (!pcfDetected || address==0x20)){pcfDetected=true;pcfAddr=address;}
   }
-  pcaMode1=-1;pcaMode2=-1;
   pcfIdleReadOk=false;
   if(pcfDetected){
     uint8_t allHigh[2]={0xff,0xff},received[2]={};
@@ -1521,13 +1518,14 @@ String statusJSON(){
   s+=",\"rejected_edges_window\":"+String(waterRejectDelta);
   s+=",\"sample_window_ms\":"+String(waterSampleDurationMs);
   s+=",\"sample_ready\":";s+=(waterSampleReady?"true":"false");s+="}";
-  s+=",\"collection\":{\"gpio\":1,\"sensor_present\":"+String(collectionMeter.seen()?"true":"false");
+  s+=",\"collection\":{\"gpio\":1,\"model\":\"YF-S401\",\"installed\":true,\"pulse_seen\":"+String(collectionMeter.seen()?"true":"false");
+  // Historical field retained for older clients: evidence of pulses, not physical presence.
+  s+=",\"sensor_present\":"+String(collectionMeter.seen()?"true":"false");
   char collectionCount[24];snprintf(collectionCount,sizeof(collectionCount),"%llu",(unsigned long long)collectionPulses());
   s+=",\"pulses\":"+String(collectionCount)+",\"calibrated\":"+String(collectionMeter.calibrated()?"true":"false");
   s+=",\"pulses_per_ml\":"+collectionNumber(collectionMeter.calibration());
   s+=",\"ml_per_min\":"+collectionNumber(collectionMeter.rate())+",\"total_ml\":"+collectionNumber(collectionMeter.total())+"}";
   s+=",\"modules\":{\"pcf8575\":"+(pcfDetected?String("true"):String("false"));
-  s+=",\"pca9685_ack_only\":false,\"pca9685_enabled\":false";
   s+=",\"tft_attempted\":"+(tftStarted?String("true"):String("false"));
   s+=",\"tft_rotation\":"+String(tftRotation);
   s+=",\"tft_boot_complete\":"+(bootSplashComplete?String("true"):String("false"));
@@ -1578,14 +1576,10 @@ String statusJSON(){
   s+=",\"scan_range\":\"PCF_ONLY_0x20_0x27_0x38_0x3F\"";
   s+=",\"scan_next\":"+String(busaI2cScanNext);
   s+=",\"pcf_address\":"+String(pcfAddr);
-  s+=",\"pca_address\":null";
   s+=",\"ack_fresh_ms\":"+String(BUSA_I2C_ACK_FRESH_MS);
   s+=",\"pcf_last_ack_ms\":"+String(busaI2cLastPcfAckMs);
-  s+=",\"pca_last_ack_ms\":0";
   s+=",\"pcf_ack_total\":"+String(busaI2cPcfAcks);
-  s+=",\"pca_ack_total\":0";
   s+=",\"pcf_last_nack_ms\":"+String(busaI2cLastPcfNackMs);
-  s+=",\"pca_last_nack_ms\":0";
   s+=",\"driver\":\"IDF_INPUT_OUTPUT_OPEN_DRAIN\"";
   s+=",\"electrical_fault\":"+(busaI2cElectricalFault?String("true"):String("false"));
   s+=",\"scan_suppressed\":"+(busaI2cElectricalFault?String("true"):String("false"));
@@ -1631,9 +1625,6 @@ String statusJSON(){
   s+=",\"read_ok\":"+(pcfIdleReadOk?String("true"):String("false"));
   s+=",\"idle_pins_hex\":"+quoteJson(String(pcfIdleDirect,HEX));
   s+=",\"keyscan_error\":"+String(pcfScanError)+"}";
-  s+=",\"pca9685\":{\"expected_address\":64,\"installed\":false,\"address\":0,\"ack\":false";
-  s+=",\"mode1\":"+String(pcaMode1)+",\"mode2\":"+String(pcaMode2);
-  s+=",\"outputs_enabled\":false}";
   s+=",\"tft\":{\"spi_cs\":"+String(TFT_CS)+",\"spi_mosi\":"+String(TFT_MOSI)+",\"spi_sck\":"+String(TFT_SCK)+",\"dc\":"+String(TFT_DC)+",\"rst\":"+String(TFT_RST);
   s+=",\"profile\":"+quoteJson(tftProfileName())+",\"rotation\":"+String(tftRotation);
   s+=",\"init_sent\":"+(tftStarted?String("true"):String("false"));
@@ -2865,7 +2856,7 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
   </details></div></div>
 <div class="temperatureSaveRow"><button id="temperatureSave" type="button" class="full">Сохранить пороги</button><p id="temperatureSaveResult" class="hint"></p></div></section>
 <section class="page" data-section="2" hidden><div class="approvedPageTitle"><svg class="uiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><strong>ВОДА И ОТБОР</strong></div>
-<article class="liquidPanel collectionPanel"><div class="liquidPanelHeading"><h2>Отбор жидкости</h2><span id="collectionAvailability">Нет датчика</span></div>
+<article class="liquidPanel collectionPanel"><div class="liquidPanelHeading"><h2>Отбор жидкости</h2><span id="collectionAvailability">Нет данных</span></div>
 <p class="liquidRateLabel">Текущий отбор</p><div class="liquidRateGrid"><div><strong id="collectionMlMin">—</strong><small>мл/мин</small></div><div><strong id="collectionLph">—</strong><small>л/ч</small></div></div>
 <div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div></article>
 <article class="liquidPanel coolingPanel"><div class="liquidPanelHeading"><h2>Охлаждение</h2><span id="coolingAvailability">Нет данных</span></div>
@@ -3158,12 +3149,12 @@ function formatNumeric(v){return typeof v==='number'&&Number.isFinite(v)?decimal
 function formatRunTime(ms){if(!measured(ms))return '—';const minutes=Math.floor(ms/60000);return String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(minutes%60).padStart(2,'0');}
 function setMeasured(id,v){get(id).textContent=measured(v)?decimal1.format(v):'—';}
 function updateLiquidPanels(s){
- const c=s?.collection,collection=!!c?.sensor_present;
+ const c=s?.collection,collection=!!(c?.pulse_seen??c?.sensor_present);
  const mlMin=collection&&measured(c.ml_per_min)?c.ml_per_min:null,total=collection&&measured(c.total_ml)?c.total_ml:null;
  setMeasured('collectionMlMin',mlMin);setMeasured('collectionLph',measured(mlMin)?mlMin*.06:null);
  get('collectionTotal').textContent=formatVolumeMl(total);
  get('collectionTime').textContent=formatRunTime(collection?c.duration_ms??c.elapsed_ms:null);
- get('collectionAvailability').textContent=!s?'Нет связи':collection?'Данные датчика':'Нет датчика';
+ get('collectionAvailability').textContent=!s?'Нет связи':collection?(c.calibrated===false?'Импульсы · нет калибровки':'Данные датчика'):'Нет импульсов';
  setMeasured('homeCollectionRate',mlMin);
  const volume=formatVolumeMl(total),split=volume.lastIndexOf(' ');
  get('homeCollectionTotal').textContent=split<0?volume:volume.slice(0,split);get('homeCollectionUnit').textContent=split<0?'мл':volume.slice(split+1);
@@ -3362,7 +3353,7 @@ function graphs(){
   values.forEach((v,i)=>{if(Number.isFinite(v)){ctx.beginPath();ctx.arc(x0+pw*(i+.5)/values.length,y0+ph-Math.max(0,Math.min(high,v))*ph/high,2.7,0,Math.PI*2);ctx.fill();}});
  }
  if(chartView===0)DISPLAY_ORDER.forEach(k=>line(temp[k]||[],SENSOR_COLORS[k]));else line(chosen,chartView===1?'#f4c84a':'#38bdf8');
- const note=chartView===1&&!data.collection_sensor?'Нет датчика отбора':points?'':chartView===2?'Нет импульсов охлаждения':'Ожидание измерений';
+ const note=chartView===1&&!data.collection_sensor?'Нет импульсов отбора':points?'':chartView===2?'Нет импульсов охлаждения':'Ожидание измерений';
  get('chartState').textContent=note||(chartView===2&&!data.cooling_calibrated?'Расчётно · без калибровки':'Данные с включения');
  if(note){ctx.fillStyle='#a6c2d5';ctx.font='21px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(note,x0+pw/2,y0+ph/2);}
 }
@@ -3452,8 +3443,7 @@ if(s.keypad){
    get('diagI2c').textContent='I2C GPIO40/41 · клавиатура | ACK total='+d.i2c?.ack_total+
      ' | addresses='+addresses.map(a=>'0x'+Number(a).toString(16).padStart(2,'0')).join(', ')+
      '\nPCF8575: ACK='+d.pcf8575?.online+' read='+d.pcf8575?.read_ok+
-     ' idle=0x'+d.pcf8575?.idle_pins_hex+
-     '\nPCA9685: отключён, не опрашивается';
+     ' idle=0x'+d.pcf8575?.idle_pins_hex;
    get('diagNetwork').textContent='Wi-Fi STA: '+(s.station.connected?'подключен':'нет связи')+
       '\nAP: '+(s.ap?.enabled?'работает':'нет')+' · '+(s.ap?.ip||'—')+
       '\nМощность TX: '+(s.performance?.wifi_tx_power_dbm??'—')+' dBm'+

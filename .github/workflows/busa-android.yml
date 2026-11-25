@@ -2,7 +2,7 @@ name: BUSA Android UI parity and APK build
 on:
   workflow_dispatch:
   push:
-    branches: [feat/busa-android-ui16, fix/busa-android-release-20261116, feat/busa-cylinder-calculator-20261121, feat/busa-cylinder-geometry-persist-20261121, feat/busa-approved-home-motion-20261122]
+    branches: [feat/busa-android-ui16, fix/busa-android-release-20261116, feat/busa-cylinder-calculator-20261121, feat/busa-cylinder-geometry-persist-20261121, feat/busa-approved-home-motion-20261122, fix/busa-actual-hw1-20261125]
     paths: ['android/**', 'ci/generate_android_assets.py', 'ci/generate_design.py', '.github/workflows/busa-android.yml', 'firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_Main.h', 'calculator.js', 'calculator.css']
 permissions:
   contents: read
