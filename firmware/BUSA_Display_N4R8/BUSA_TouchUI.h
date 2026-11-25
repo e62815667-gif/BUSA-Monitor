@@ -244,6 +244,8 @@ private:
         auto& art=navArt_[i];art.header.always_zero=0;art.header.cf=LV_IMG_CF_TRUE_COLOR_ALPHA;
         art.header.w=BUSA_NAV_W;art.header.h=BUSA_NAV_H;art.data_size=BUSA_NAV_W*BUSA_NAV_H*3;art.data=BUSA_NAV_ICONS[i];
         auto* icon=lv_img_create(parent);lv_img_set_src(icon,&art);lv_img_set_antialias(icon,true);
+        static_assert(BUSA_NAV_W==BUSA_NAV_H,"Navigation art must be square");
+        lv_obj_set_size(icon,BUSA_NAV_W,BUSA_NAV_H);
         lv_obj_set_style_img_recolor(icon,color(theme_==0?0x007bb3:theme_==1?0xdddddd:0x91ecf4),0);
         lv_obj_set_style_img_recolor_opa(icon,LV_OPA_COVER,0);lv_obj_align(icon,LV_ALIGN_TOP_MID,0,0);
         lv_obj_clear_flag(icon,LV_OBJ_FLAG_CLICKABLE);
@@ -292,6 +294,18 @@ private:
         auto* ready=button(touchModal_,"Готово",341,231,false);lv_obj_set_pos(ready,243,205);lv_obj_set_height(ready,32);selected(ready,true);
         lv_obj_add_flag(touchModal_,LV_OBJ_FLAG_HIDDEN);
     }
+    void buildNavigation(lv_obj_t* root){
+        nav_=plain(root,WIDTH-6,NAV-2);lv_obj_set_pos(nav_,3,HEIGHT-NAV);
+        lv_obj_set_style_radius(nav_,9,0);lv_obj_set_style_border_width(nav_,1,0);lv_obj_set_style_border_color(nav_,color(line()),0);
+        lv_obj_set_style_bg_color(nav_,color(surface()),0);lv_obj_set_style_bg_opa(nav_,LV_OPA_COVER,0);glass(nav_);
+        lv_obj_set_style_pad_all(nav_,1,0);lv_obj_set_style_pad_column(nav_,4,0);lv_obj_set_flex_flow(nav_,LV_FLEX_FLOW_ROW);
+        lv_obj_set_flex_align(nav_,LV_FLEX_ALIGN_SPACE_BETWEEN,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
+        static const char* titles[]={"Главная","Температуры","Вода и отбор","Графики","Калькулятор","Настройки"};
+        for(int i=0;i<6;++i){auto* b=button(nav_,titles[i],100+i,74);lv_obj_set_height(b,38);
+            lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);
+            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_nav,0);lv_obj_set_style_text_letter_space(l,0,0);lv_obj_set_width(l,70);lv_obj_align(l,LV_ALIGN_BOTTOM_MID,0,0);
+            navIcon(b,i);navButtons_[i]=b;}
+    }
     void build(){
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
         auto* root=lv_scr_act();calcNotes_=nullptr;touchModal_=nullptr;touchTitle_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
@@ -307,14 +321,7 @@ private:
         lv_obj_set_style_bg_color(body_,color(paper()),0);lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
         lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,GAP,0);lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
-        nav_=plain(root,WIDTH-6,NAV-2);lv_obj_set_pos(nav_,3,HEIGHT-NAV);
-        lv_obj_set_style_radius(nav_,9,0);lv_obj_set_style_border_width(nav_,1,0);lv_obj_set_style_border_color(nav_,color(line()),0);
-        lv_obj_set_style_bg_color(nav_,color(surface()),0);lv_obj_set_style_bg_opa(nav_,LV_OPA_COVER,0);glass(nav_);
-        lv_obj_set_style_pad_all(nav_,1,0);lv_obj_set_style_pad_column(nav_,2,0);lv_obj_set_flex_flow(nav_,LV_FLEX_FLOW_ROW);
-        static const char* titles[]={"Главная","Температуры","Вода и отбор","Графики","Калькулятор","Настройки"};
-        for(int i=0;i<6;++i){auto* b=button(nav_,titles[i],100+i,76);lv_obj_set_height(b,38);
-            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_nav,0);lv_obj_set_style_text_letter_space(l,0,0);lv_obj_set_width(l,72);lv_obj_align(l,LV_ALIGN_BOTTOM_MID,0,0);
-            navIcon(b,i);navButtons_[i]=b;}
+        buildNavigation(root);
         buildTouchModal(root);
         render();
     }
@@ -433,7 +440,12 @@ private:
     void calculator(){
         static const char* labels[4][5]={{"Объём спирта, л","Начальная крепость, %","Требуемая крепость, %","",""},{"Температура спирта, °C","Показание ареометра, %","","",""},{"Объём спирта-сырца, л","Крепость спирта-сырца, %","Крепость на выходе, %","Доля голов от АС, %","Доля хвостов от АС, %"},{"Внутренний диаметр, см","Внутренняя высота, см","Уровень жидкости, см","",""}};
         static const int counts[]={3,2,5,3};
-        auto* r=row(body_,28);for(int i=0;i<4;++i){auto* b=button(r,calcTitle(i),320+i,i==1?143:i==0?125:i==2?112:85);auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);lv_obj_set_height(b,28);selected(b,i==calcMode_);}
+        lv_obj_set_style_pad_row(body_,calcMode_<2?6:2,0);
+        auto* tabs=plain(body_,LV_PCT(100),42);lv_obj_set_flex_flow(tabs,LV_FLEX_FLOW_COLUMN);lv_obj_set_style_pad_row(tabs,2,0);
+        for(int n=0;n<2;++n){auto* r=row(tabs,20);for(int col=0;col<2;++col){int i=n*2+col;
+            auto* b=button(r,calcTitle(i),320+i,234);lv_obj_set_height(b,20);
+            lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);
+            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);selected(b,i==calcMode_);}}
         if(calcMode_==3){
             if(geometryExpanded_){
                 auto* controls=row(body_,26);button(controls,"Сохранить и свернуть",332,235);button(controls,"Загрузить размеры",331,235);
@@ -445,9 +457,11 @@ private:
         }else{
             for(int i=0;i<counts[calcMode_];){auto* inputs=row(body_,42);const int n=calcMode_==2&&i==0?2:counts[calcMode_]-i;for(int col=0;col<n;++col,++i){fields_[i]=field(inputs,labels[calcMode_][i],calcInput_[calcMode_][i],true,false,n==2?235:153);lv_textarea_set_placeholder_text(fields_[i],"0,00");}}
         }
-        auto* buttons=row(body_,26);
-        selected(button(buttons,"Рассчитать",330,154),true);button(buttons,calcMode_==3?"Очистить уровень":"Очистить",333,154);button(buttons,"Условия расчёта",334,154);
-        auto* p=panel(body_,LV_PCT(100),calcMode_==2?46:50);lv_obj_set_style_pad_all(p,2,0);resultLabel_=smallLabel(p,"—");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
+        auto* buttons=row(body_,22);
+        selected(button(buttons,"Рассчитать",330,153),true);button(buttons,calcMode_==3?"Очистить уровень":"Очистить",333,153);button(buttons,"Условия расчёта",334,153);
+        for(int i=0;i<3;++i){auto* b=lv_obj_get_child(buttons,i);lv_obj_set_height(b,22);
+            lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);lv_obj_set_style_text_font(lv_obj_get_child(b,0),&busa_font_small,0);}
+        auto* p=panel(body_,LV_PCT(100),calcMode_==2?36:50);lv_obj_set_style_pad_all(p,calcMode_==2?0:2,0);resultLabel_=smallLabel(p,"—");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
         pageStatus_=resultLabel_;
         calculate(false);
     }

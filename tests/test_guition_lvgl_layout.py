@@ -19,6 +19,7 @@ calc=between('    static const char* calcTitle(', '    void rememberCalc()')+bet
 prelude=r'''
 #include <lvgl.h>
 #include "BUSA_TouchKeys.h"
+#include "BUSA_NavIcons.h"
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -41,6 +42,7 @@ struct UiTest {
     lv_obj_t *fields_[8]={},*live_[16]={}; String calcInput_[4][5]; SessionStub session_;
     lv_obj_t *touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*keyboard_=nullptr;
     static void keyboardEvent(lv_event_t*){}
+    lv_img_dsc_t navArt_[6]{};lv_obj_t* navButtons_[6]={};
     std::vector<lv_obj_t*> controls;
     static void event(lv_event_t*){} static void textFocus(lv_event_t*){}
     void registerKey(lv_obj_t* o,int,int){controls.push_back(o);}
@@ -56,7 +58,7 @@ checks=r'''
         lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
         lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,2,0);
         lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);
-        controls.clear();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;
+        nav_=nullptr;controls.clear();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;
     }
     void assertFits(lv_obj_t* o){
         lv_area_t a;lv_obj_get_coords(o,&a);
@@ -76,6 +78,20 @@ checks=r'''
         if(size.y>height||std::strstr(text,"...")!=nullptr){
             std::fprintf(stderr,"TEXT CLIPPED '%s' need %dpx high, have %dpx; width %d\n",text,size.y,height,width);std::abort();
         }
+    }
+    void verifyNavigation(){
+        init();buildNavigation(lv_scr_act());lv_obj_update_layout(nav_);
+        for(int i=0;i<6;++i){
+            auto* b=navButtons_[i];auto* l=lv_obj_get_child(b,0);auto* im=lv_obj_get_child(b,1);
+            assertFits(b);labelFits(l);assertFits(im);
+            assert(lv_obj_get_width(im)==20&&lv_obj_get_height(im)==20);
+            assert(lv_img_get_zoom(im)==LV_IMG_ZOOM_NONE);
+            lv_area_t x,y,z;lv_obj_get_coords(im,&x);lv_obj_get_coords(l,&y);lv_obj_get_coords(b,&z);
+            assert(y.y1>x.y2);
+            assert(abs((x.x1+x.x2)-(z.x1+z.x2))<=2);
+            if(i){lv_area_t prev;lv_obj_get_coords(navButtons_[i-1],&prev);assert(z.x1-prev.x2>=4);}
+        }
+        std::puts("PASS native navigation: six equal controls, square images, text separation and gaps");
     }
     void verifyKeyboard(){
         init();buildTouchModal(lv_scr_act());lv_obj_clear_flag(touchModal_,LV_OBJ_FLAG_HIDDEN);
@@ -138,12 +154,13 @@ int main(){
     UiTest ui;
     for(int theme=0;theme<3;++theme){ui.theme_=theme;
         for(int mode=0;mode<4;++mode){ui.calcMode_=mode;ui.init();ui.calculator();ui.verify();
+            {lv_area_t a,b,c,d;lv_obj_get_coords(ui.controls[0],&a);lv_obj_get_coords(ui.controls[1],&b);lv_obj_get_coords(ui.controls[2],&c);lv_obj_get_coords(ui.controls[3],&d);assert(a.y1==b.y1&&c.y1==d.y1&&a.y2<c.y1&&a.x1==c.x1&&b.x1==d.x1);}
             if(mode==2){lv_label_set_text(ui.resultLabel_,"Абсолютный спирт: 100,00 л АС   Головы: 10,00 л АС\nХвосты: 10,00 л АС   Выход продукта: 100,00 л");lv_obj_update_layout(ui.body_);ui.labelFits(ui.resultLabel_);}}
         ui.calcMode_=3;ui.geometryExpanded_=false;ui.init();ui.calculator();ui.verify();
         assert(!ui.fields_[0]&&!ui.fields_[1]&&ui.fields_[2]);
         ui.geometryExpanded_=true;ui.init();ui.calculator();ui.verify();
         assert(ui.fields_[0]&&ui.fields_[1]&&ui.fields_[2]);
-        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();
+        ui.init();ui.resultLabel_=nullptr;ui.temperatures();ui.verify();ui.verifyKeyboard();ui.verifyNavigation();
     }
     ui.theme_=1;assert(ui.paper()==0x080808&&ui.surface()==0x202020);
     ui.theme_=2;assert(ui.paper()==0x060e15&&ui.surface()==0x0d2430);
@@ -157,7 +174,7 @@ assert (lvgl/'lvgl.h').is_file(),lvgl
 sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav')]
 flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch)]
 with tempfile.TemporaryDirectory() as tmp:
-    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+between('    void buildTouchModal(', '    void build(){')+checks)
+    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+status+calc+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
     def compile_one(item):
         i,s=item;o=tmp/f'{i}.o';subprocess.run(['gcc','-std=gnu99','-O0',*flags,'-c',str(s),'-o',str(o)],check=True);return str(o)
     with ThreadPoolExecutor(max_workers=2) as pool: objects=list(pool.map(compile_one,enumerate(sources)))
