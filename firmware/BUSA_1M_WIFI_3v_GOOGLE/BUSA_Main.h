@@ -48,7 +48,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainTx && BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainRx,
   "Buzzer pin conflicts with I2C, UART or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF4-HW2-NAME1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-PERF4-HW2-NAME1-TIME1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -2782,6 +2782,7 @@ function measured(v){return typeof v==='number'&&Number.isFinite(v)&&v>=0;}
 function formatVolumeMl(v){if(!measured(v))return '—';return v<1000?decimal1.format(v)+' мл':decimal1.format(v/1000)+' л';}
 function formatNumeric(v){return typeof v==='number'&&Number.isFinite(v)?decimal1.format(v):'—';}
 function formatRunTime(ms){if(!measured(ms))return '—';const minutes=Math.floor(ms/60000);return String(Math.floor(minutes/60)).padStart(2,'0')+':'+String(minutes%60).padStart(2,'0');}
+function formatUptime(ms){if(!measured(ms))return '—';const minutes=Math.floor(ms/60000);return Math.floor(minutes/60)+'ч'+String(minutes%60).padStart(2,'0')+'мин';}
 function setMeasured(id,v){get(id).textContent=measured(v)?decimal1.format(v):'—';}
 function updateLiquidPanels(s){
  const c=s?.collection,collection=!!(c?.pulse_seen??c?.sensor_present);
@@ -3047,10 +3048,10 @@ if(!calInitialized&&Array.isArray(s.calibration_offsets)){
 }
 get('aboutWifi').textContent=s.station.connected?'Подключён':'Нет связи';
 get('aboutGoogle').textContent=!s.google.configured?'Не настроена':s.google.state===6?'Ошибка':'Настроена';
-const firmwareLabel=s.firmware.endsWith('-PERF4-HW2-NAME1')?'BUSA 1M AI 1v':s.firmware.replace(/^БУСА\s*1М\s*WiFi\s*/, '');
+const firmwareLabel=/-PERF4-HW2-NAME1(?:-TIME1)?$/.test(s.firmware)?'BUSA 1M AI 1v':s.firmware.replace(/^БУСА\s*1М\s*WiFi\s*/, '');
 get('aboutFirmware').textContent=firmwareLabel;
 get('otaFirmware').textContent=firmwareLabel;
-get('aboutUptime').textContent=Math.floor(s.uptime_ms/3600000)+' ч '+Math.floor((s.uptime_ms%3600000)/60000)+' мин';
+get('aboutUptime').textContent=formatUptime(s.uptime_ms);
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent+' · DNS '+(cs.dns??'?')+' · TLS '+(cs.tls_error??'?')+' · этап '+(cs.error_stage??'?');
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
@@ -3113,7 +3114,7 @@ if(s.keypad){
  }
  if(s.keypad.message)get('keyInfo').textContent=s.keypad.message;
 }
-get('ver').textContent=s.firmware;get('uptime').textContent=Math.floor(s.uptime_ms/60000)+' мин';get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.display_diagnostics?.link==='CONNECTED'?(s.display_diagnostics.firmware||'GUITION'):'Нет актуальных данных';
+get('ver').textContent=s.firmware;get('uptime').textContent=formatUptime(s.uptime_ms);get('pcf').textContent=s.modules.pcf8575?'Найден':'Не найден';get('tft').textContent=s.display_diagnostics?.link==='CONNECTED'?(s.display_diagnostics.firmware||'GUITION'):'Нет актуальных данных';
 }catch(e){statusFailures++;if(statusFailures>=3){if(connected)message('Нет ответа ESP32: проверь локальный Wi-Fi');connected=false;networkLeds(null,'');updateRelayBadges(null);updateLiquidPanels(null);for(let i=0;i<4;i++){get('t'+i).textContent='Н/Д';get('tempLive'+i).textContent='Н/Д';}}}finally{pollBusy=false}}
 get('temperatureSave').onclick=async()=>{
  const button=get('temperatureSave'),result=get('temperatureSaveResult');

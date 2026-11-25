@@ -3,6 +3,7 @@
 #include <Preferences.h>
 #include <initializer_list>
 #include <BUSA_KeyEvents.h>
+#include <BUSA_Presentation.h>
 #include "BUSA_GuitionHardware.h"
 #include "BUSA_DisplaySession.h"
 #include "BUSA_TouchCalibration.h"
@@ -259,6 +260,10 @@ private:
     String measured(JsonVariantConst v,const char* unit,int digits=1)const{
         String s=session_.connected()?value(v,digits):String("");
         if(s.isEmpty())return String("—");s.replace('.',',');return s+unit;
+    }
+    static String durationText(JsonVariantConst v){
+        if(!v.is<uint32_t>())return String("—");
+        char out[32];busa_presentation::duration(out,sizeof(out),v.as<uint32_t>());return String(out);
     }
     void set(lv_obj_t* o,const String& s){if(o&&strcmp(lv_label_get_text(o),s.c_str()))lv_label_set_text(o,s.c_str());}
     void metric(lv_obj_t* o,const String& s){
@@ -705,7 +710,7 @@ private:
             const char* notice=busa_graph::state(d.as<JsonObjectConst>(),graphKind_,scale);
             graphNotice(strcmp(notice,"Данные с включения")==0?"":notice);return;}
         if(pendingRoute_==Route::events){JsonDocument d;if(deserializeJson(d,body)){set(pageStatus_,"Ошибка журнала");return;}String s;
-            for(JsonObjectConst e:d["events"].as<JsonArrayConst>()){s+=String((e["uptime_ms"]|0u)/1000)+" с  "+String(e["text"]|"")+"\n";if(s.length()>7000)break;}pageContent_=s.length()?s:"Нет событий";pageOffset_=0;pageText();}
+            for(JsonObjectConst e:d["events"].as<JsonArrayConst>()){s+=durationText(e["uptime_ms"])+"  "+String(e["text"]|"")+"\n";if(s.length()>7000)break;}pageContent_=s.length()?s:"Нет событий";pageOffset_=0;pageText();}
         else if(pendingRoute_==Route::rainmakerStatus){JsonDocument d;if(!deserializeJson(d,body)){pageContent_=String("BLE: ")+(d["ble"]|"—")+"\n"+(d["feedback"]|"");pageOffset_=0;pageText();}}
     }
     struct KeyControl {lv_obj_t* obj;uint8_t type;int id;};
@@ -837,7 +842,7 @@ private:
         setInk(connection_,ok?accent():0xff6473);
         const bool indicators[]={ok&&(d["station"]["connected"]|false),ok&&(d["network_indicators"]["internet"]|false),ok};
         for(int i=0;i<3;++i)setBg(statusDots_[i],indicators[i]?0x53d486:0x8297a1);
-        String clock=ok?String(d["clock"]["datetime"]|"—"):String("—");set(clock_,"Дата и время: "+clock);
+        String clock=ok?String(d["clock"]["datetime"]|"—"):String("—");set(clock_,"Дата и время: "+clock.substring(0,busa_presentation::clockLength(clock.c_str())));
         if(page_==3&&chart_){graphTimeLabels();if(!ok){clearGraph();graphNotice("Нет связи");}if(graphKind_==0)for(int i=0;i<4;++i){String s=i==3?"Авария":sensor(i);s+=" "+measured(d["temperatures"][i]["c"]," °C");set(graphLegend_[i],s);}}
         if(page_==0){
             for(int i=0;i<4;++i){auto v=d["sound_alerts"]["channels"][i]["sound_on"];const bool on=ok&&!v.isNull()&&v.as<bool>();
@@ -856,13 +861,13 @@ private:
             set(live_[3],measured(d["collection"]["ml_per_min"]," мл/мин",1));
             auto collectionRate=d["collection"]["ml_per_min"];set(live_[6],ok&&collectionRate.is<double>()?fmt(collectionRate.as<double>()*0.06)+" л/ч":"— л/ч");
             auto duration=d["collection"]["duration_ms"];if(duration.isNull())duration=d["collection"]["elapsed_ms"];
-            set(live_[7],ok&&duration.is<uint32_t>()?"Время отбора: "+String(duration.as<uint32_t>()/1000)+" с":"Время отбора: —");
+            set(live_[7],String("Время отбора: ")+(ok?durationText(duration):String("—")));
             set(live_[4],"Собрано: "+measured(d["collection"]["total_ml"]," мл",1));
             set(live_[5],!ok?"Нет связи":(d["collection"]["pulse_seen"]|(d["collection"]["sensor_present"]|false))?((d["collection"]["calibrated"]|false)?"Импульсы зарегистрированы":"Импульсы · нет калибровки"):"Нет импульсов");}
         else if(page_==5){
             if(sub_==1)set(live_[0],ok?String("Wi-Fi: ")+(d["station"]["ssid"]|"—"):"Нет связи");
             else if(sub_==3)set(live_[0],ok?String("Google: ")+String(d["google"]["configured"].as<bool>()?"настроен":"не настроен")+" · код "+String(d["google"]["state"]|0):"Нет связи");
-            else if(sub_==4){set(live_[0],ok?String(d["firmware"]|"—"):"Нет связи");set(live_[1],"Время работы: "+measured(d["uptime_ms"]," мс",0));
+            else if(sub_==4){set(live_[0],ok?String(busa_presentation::firmwareLabel(d["firmware"]|"—")):"Нет связи");set(live_[1],String("Время работы: ")+(ok?durationText(d["uptime_ms"]):String("—")));
                 set(live_[2],"Wi-Fi: "+String(ok&&(d["wifi"]["sta_connected"]|false)?"подключён":"—"));set(live_[3],"RAM: "+measured(d["esp32"]["free_heap_bytes"]," байт",0));set(live_[4],"PSRAM: "+measured(d["performance"]["psram_total_bytes"]," байт",0));}
             else if(sub_==6){set(live_[0],"UART: "+String(ok?"связь есть":"нет связи"));set(live_[1],"LCD: "+String(hw_.lcdReady()?"инициализирован":"ошибка"));set(live_[2],"Сенсор: "+String(calibrationValid_?"калиброван":"нет"));set(live_[3],"microSD: "+String(hw_.sdReady()?"доступна":"нет"));
                 set(live_[4],"GPIO15: "+String(ok?(d["diagnostics"]["water_flow"]["status"]|"—"):"—"));set(live_[5],"PCF8575: "+String(ok&&(d["modules"]["pcf8575"]|false)?"доступен":"—"));
