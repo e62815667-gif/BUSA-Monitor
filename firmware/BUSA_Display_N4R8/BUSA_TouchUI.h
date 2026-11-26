@@ -155,7 +155,11 @@ private:
     static void event(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));
         auto* o=lv_event_get_target(e);int id=int(reinterpret_cast<intptr_t>(lv_obj_get_user_data(o)));
-        self->cancelKeyEdit(false);if(id<100||id>=106)self->sectionEntered_=true;self->action(id);
+        self->cancelKeyEdit(false);
+        const uint32_t generation=self->viewGeneration_;
+        if(id<100||id>=106){self->sectionEntered_=true;self->focusObject(o);}
+        self->action(id);
+        if(self->sectionEntered_&&generation!=self->viewGeneration_)self->focusAction(id);
     }
     static void textFocus(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));auto* ta=lv_event_get_target(e);
@@ -353,6 +357,7 @@ private:
         for(auto* fieldObj:fields_)if(fieldObj){lv_area_t a,b;lv_obj_get_coords(fieldObj,&a);lv_obj_get_coords(lv_obj_get_parent(fieldObj),&b);
             if(a.x1<b.x1||a.x2>b.x2||a.y1<b.y1||a.y2>b.y2)Serial.printf("[UI] field bounds page=%d sub=%d\n",page_,sub_);}
         orderKeys();
+        if(sectionEntered_){if(keyCount_)focusKey(0);else sectionEntered_=false;}
         refresh();
         if(page_==4&&calcMode_==3&&!geometryReadAttempted_&&!waiting_&&session_.connected()){
             geometryReadAttempted_=send(Route::geometryRead,{});
@@ -750,6 +755,8 @@ private:
         focusKey(0);
     }
     void moveKeyFocus(busa_focus::Direction direction){
+        if(!keyCount_)return;
+        if(!sectionEntered_||keyFocus_<0){focusKey(direction==busa_focus::Direction::up?keyCount_-1:0);return;}
         busa_focus::Rect bounds[64];
         for(int i=0;i<keyCount_;++i){lv_area_t a;lv_obj_get_coords(keyControls_[i].obj,&a);bounds[i]={a.x1,a.y1,a.x2-a.x1+1,a.y2-a.y1+1};}
         const int next=busa_focus::neighbor(bounds,keyCount_,keyFocus_,direction);
@@ -827,7 +834,7 @@ private:
         switch(busa_focus::route(k,sectionEntered_,page_==5&&sub_>=0)){
             case Nav::previousSection:action(100+(page_+5)%6);return;
             case Nav::nextSection:action(100+(page_+1)%6);return;
-            case Nav::enter:sectionEntered_=true;focusKey(0);return;
+            case Nav::enter:focusKey(0);return;
             case Nav::leave:
                 if(keyFocus_>=0&&keyFocus_<keyCount_)lv_obj_clear_state(keyControls_[keyFocus_].obj,LV_STATE_FOCUSED);
                 keyFocus_=-1;sectionEntered_=false;return;
