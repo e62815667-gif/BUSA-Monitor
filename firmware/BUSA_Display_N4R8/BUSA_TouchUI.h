@@ -421,20 +421,20 @@ private:
             lv_obj_set_style_bg_opa(dot,LV_OPA_COVER,0);
             lv_obj_set_style_radius(dot,LV_RADIUS_CIRCLE,0);motion_[i]=dot;}
         homeTemperatures(scene);
-        live_[0]=at(scene,"—",10,137,&busa_font_small);
+        live_[0]=at(scene,"—",10,135,&busa_font);
         lv_obj_set_width(live_[0],152);
-        homeAlarm_=plain(scene,106,18);
-        lv_obj_set_pos(homeAlarm_,366,113);
+        homeAlarm_=plain(scene,106,22);
+        lv_obj_set_pos(homeAlarm_,366,110);
         lv_obj_set_style_radius(homeAlarm_,4,0);
         lv_obj_set_style_bg_opa(homeAlarm_,LV_OPA_TRANSP,0);
         lv_obj_set_style_border_width(homeAlarm_,1,0);
         lv_obj_set_style_border_color(homeAlarm_,color(0xff6473),0);
-        auto* alert=at(homeAlarm_,"АВАРИЯ",2,1,&busa_font_small);
+        auto* alert=at(homeAlarm_,"АВАРИЯ",2,1,&busa_font);
         lv_obj_set_width(alert,102);
         lv_obj_set_style_text_color(alert,color(0xff6473),0);
         lv_obj_set_style_text_align(alert,LV_TEXT_ALIGN_CENTER,0);
         lv_obj_add_flag(homeAlarm_,LV_OBJ_FLAG_HIDDEN);
-        live_[1]=at(scene,"—",337,137,&busa_font_small);
+        live_[1]=at(scene,"—",337,135,&busa_font);
         lv_obj_set_width(live_[1],136);
         lv_obj_set_style_text_align(live_[1],LV_TEXT_ALIGN_RIGHT,0);
         auto* m=plain(body_,LV_PCT(100),METRICS);
