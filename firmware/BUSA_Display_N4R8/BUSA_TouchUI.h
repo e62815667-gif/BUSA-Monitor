@@ -395,7 +395,7 @@ private:
     void homeTemperatures(lv_obj_t* scene){
         static const int xs[]={8,8,362,362},ys[]={61,2,61,2};
         for(int i=0;i<4;++i){
-            auto* frame=homeTempFrames_[i]=plain(scene,i<2?118:110,50);
+            auto* frame=homeTempFrames_[i]=plain(scene,i<2?118:110,56);
             lv_obj_set_pos(frame,xs[i],ys[i]);
             lv_obj_set_style_radius(frame,5,0);
             lv_obj_set_style_bg_opa(frame,LV_OPA_TRANSP,0);
