@@ -231,6 +231,9 @@ private:
         lv_obj_set_style_text_color(lv_obj_get_child(o,0),color(on?0xffffff:ink()),0);
     }
     void focusStyle(lv_obj_t* o,uint8_t type){
+        // Navigation feedback must be immediate, not a theme transition.
+        lv_obj_set_style_transition(o,nullptr,LV_STATE_DEFAULT);
+        lv_obj_set_style_transition(o,nullptr,LV_STATE_FOCUSED);
         lv_obj_set_style_outline_color(o,color(selectionEdge()),LV_STATE_FOCUSED);
         lv_obj_set_style_outline_width(o,2,LV_STATE_FOCUSED);
         lv_obj_set_style_outline_pad(o,0,LV_STATE_FOCUSED);
