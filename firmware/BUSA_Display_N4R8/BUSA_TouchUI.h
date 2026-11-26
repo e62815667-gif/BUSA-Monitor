@@ -233,7 +233,7 @@ private:
     void focusStyle(lv_obj_t* o,uint8_t type){
         // LVGL 8.4 reads every transition descriptor, so nullptr is invalid.
         // Override the default theme's animated properties with a zero-duration transition.
-        static const lv_style_prop_t props[]={LV_STYLE_BG_OPA,LV_STYLE_BG_COLOR,LV_STYLE_TRANSFORM_WIDTH,LV_STYLE_TRANSFORM_HEIGHT,LV_STYLE_TRANSLATE_Y,LV_STYLE_TRANSLATE_X,LV_STYLE_TRANSFORM_ZOOM,LV_STYLE_TRANSFORM_ANGLE,LV_STYLE_COLOR_FILTER_OPA,LV_STYLE_COLOR_FILTER_DSC,0};
+        static const lv_style_prop_t props[]={LV_STYLE_BG_OPA,LV_STYLE_BG_COLOR,LV_STYLE_TRANSFORM_WIDTH,LV_STYLE_TRANSFORM_HEIGHT,LV_STYLE_TRANSLATE_Y,LV_STYLE_TRANSLATE_X,LV_STYLE_TRANSFORM_ZOOM,LV_STYLE_TRANSFORM_ANGLE,LV_STYLE_COLOR_FILTER_OPA,LV_STYLE_COLOR_FILTER_DSC,static_cast<lv_style_prop_t>(0)};
         static lv_style_transition_dsc_t instant;
         static bool initialized=false;
         if(!initialized){lv_style_transition_dsc_init(&instant,props,lv_anim_path_linear,0,0,nullptr);initialized=true;}
