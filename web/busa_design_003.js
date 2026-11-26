@@ -36,16 +36,17 @@
    const topValid=!!(top?.sample_valid&&typeof top.on_c==='number'&&typeof top.off_c==='number'&&Number.isFinite(top.on_c)&&Number.isFinite(top.off_c));
    const cubeOn=cubeValid&&cube.t3_condition===true;
    const topOn=topValid&&top.t4_condition===true;
-   const normal=cubeValid&&cubeOn&&!topOn;
+   const known=cubeValid&&topValid;
+   const normal=known&&cubeOn&&!topOn;
    const ordinaryOff=cubeValid&&!cubeOn&&!topOn&&Number(sound?.t3_off_events)>0;
    const marks=[sound?.buzzer?.sensors?.[0]?.condition_active===true,
                 sound?.buzzer?.sensors?.[1]?.condition_active===true,ordinaryOff,topOn];
    for(let i=0;i<4;i++)home.querySelector('.approvedTemp.temp'+i)?.classList.toggle('busaAlert',marks[i]);
-   heater.textContent=!cubeValid?'ТЭН —':normal?'ТЭН вкл.':'ТЭН откл.';
-   valve.textContent=!cubeValid?'Кран —':normal?'Кран открыт':'Кран закрыт';
+   heater.textContent=!known?'ТЭН —':normal?'ТЭН вкл.':'ТЭН откл.';
+   valve.textContent=!known?'Кран —':normal?'Кран открыт':'Кран закрыт';
    for(const label of [heater,valve]){
-     label.classList.toggle('busaStatusOff',cubeValid&&!normal);
-     label.classList.toggle('busaStatusUnknown',!cubeValid);
+     label.classList.toggle('busaStatusOff',known&&!normal);
+     label.classList.toggle('busaStatusUnknown',!known);
    }
    alarm.hidden=!topOn;
    // Never mutate, replace, redraw, or reencode the local application's original rig image.
