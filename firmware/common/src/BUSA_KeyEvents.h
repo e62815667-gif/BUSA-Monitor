@@ -4,8 +4,8 @@
 namespace busa_keys {
 constexpr size_t capacity=16;
 constexpr uint32_t maxAgeMs=2500;
-constexpr uint8_t longZero=20;
-inline bool valid(uint8_t code){return code<=longZero&&code!=1&&code!=2&&code!=3;}
+constexpr uint8_t longZero=20,deleteChar=21;
+inline bool valid(uint8_t code){return code<=deleteChar&&code!=1&&code!=2&&code!=3;}
 struct Key {uint32_t seq,time;uint8_t code;};
 class Ring {
 public:

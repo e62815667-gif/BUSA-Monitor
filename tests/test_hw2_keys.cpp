@@ -18,5 +18,6 @@ int main(){
  assert(r.size()==capacity&&r.oldest(0).seq==r.head()-capacity+1);
  c.reset();assert(c.consume(88,UINT32_MAX,nullptr,0,take)==Result::baseline);
  Event wrap[]={{0,0,17}};assert(c.consume(88,0,wrap,1,take)==Result::applied&&calls==4);
- assert(busa_uart::validRoute(22)&&busa_uart::validRoute(23)&&busa_uart::validRoute(24)&&!busa_uart::validRoute(25));
+ assert(valid(deleteChar)&&!valid(22));
+ assert(busa_uart::validRoute(22)&&busa_uart::validRoute(23)&&busa_uart::validRoute(24)&&busa_uart::validRoute(25)&&!busa_uart::validRoute(26));
 }

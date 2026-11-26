@@ -13,12 +13,14 @@ def function(s, signature):
         p+=1
     return s[a:p]
 water=ui[ui.index('    void water(){'):ui.index('    void graphAxes(')]
-assert 'Израсходовано' in water and 'fields_' not in water and 'Импульс' not in water and 'button(' not in water
+assert 'Израсходовано' in water and 'fields_' not in water and 'Импульс' not in water and water.count('button(')==2
+assert 'button(q,"Сбросить собрано",224)' in water and 'button(p,"Сбросить израсходовано",223)' in water
 assert 'sub_==9' in ui and 'Route::collectionCoefficient' in ui and 'Route::waterCoefficient' in ui
 assert 'collectionConfig_?222:201' in ui
 html=main.split('R"HTMLBUSA(',1)[1].split(')HTMLBUSA"',1)[0]
 monitor=html.split('<section class="page" data-section="2"',1)[1].split('</section>',1)[0]
 assert 'Израсходовано' in monitor and 'Импульс' not in monitor and '<input' not in monitor
+assert 'id="waterResetTotal"' in monitor and 'id="collectionResetTotal"' in monitor
 settings=html.split('<div class="card settingCard" data-stab="9"',1)[1].split('<div class="settingCard" data-stab="6"',1)[0]
 for key in ['waterPplInput','waterPplSave','waterPplPassport','collectionPplInput','collectionPplSave']:
     assert 'id="'+key+'"' in settings and html.count('id="'+key+'"')==1
@@ -33,6 +35,7 @@ code=r'''
 #include <string>
 #include <algorithm>
 #include "BUSA_Collection.h"
+#include "BUSA_WaterFlowMath.h"
 class String: public std::string{
  public:using std::string::string;String(const std::string& s):std::string(s){}
  void trim(){auto a=find_first_not_of(" \r\n\t");if(a==npos){clear();return;}*this=substr(a,find_last_not_of(" \r\n\t")-a+1);}
@@ -42,10 +45,20 @@ class String: public std::string{
 struct BusaLocalRequest{
  bool allowed=true;String confirm="YES",value="4.71",body;int status=0;
  bool local()const{return allowed;}
- String arg(const char* k){return std::string(k)=="confirm"?confirm:value;}
+ String target="water";
+ String arg(const char* k){return std::string(k)=="confirm"?confirm:std::string(k)=="target"?target:value;}
  void send(int c,const char*,const String& b){status=c;body=b;}
 };
 BusaCollection::Meter collectionMeter;
+BusaWater::VolumeAccumulator waterVolume;
+bool otaActive=false;
+namespace busa_display_ota {bool busy(){return false;}}
+int flowMux=0;
+uint32_t pulseCounter=100,flowRejectedCounter=2,flowLastCount=90,flowLastRejected=1,flowCycle=10;
+uint32_t millis(){return 2000;}
+void portENTER_CRITICAL(int*){} void portEXIT_CRITICAL(int*){}
+uint64_t collectionPulses(){return 40;}
+void busaWebRecord(const String&){}
 bool busaNvsReady=true;
 struct Preferences{
  float factor=NAN,water=4710;bool fail=false;unsigned writes=0;
@@ -53,7 +66,7 @@ struct Preferences{
  size_t putFloat(const char* key,float f){assert(std::string(key)=="collPulseMl");if(fail)return 0;factor=f;++writes;return sizeof(float);}
 }prefs;
 '''
-code+=function(main,'static String collectionNumber(')+'\n'+function(main,'static void loadCollectionCalibration(')+'\n'+function(main,'static bool saveCollectionCalibration(')+'\n'+function(main,'static void busaApi_collectionCoefficient(')+r'''
+code+=function(main,'static String collectionNumber(')+'\n'+function(main,'static void loadCollectionCalibration(')+'\n'+function(main,'static bool saveCollectionCalibration(')+'\n'+function(main,'static void busaApi_collectionCoefficient(')+'\n'+function(main,'static void busaApi_resetVolume(')+r'''
 int main(){
  BusaLocalRequest q;
  q.allowed=false;busaApi_collectionCoefficient(q);assert(q.status==403&&prefs.writes==0);
@@ -63,7 +76,17 @@ int main(){
  q.value="4,71";busaApi_collectionCoefficient(q);assert(q.status==200&&prefs.writes==1&&fabs(collectionMeter.calibration()-4.71)<0.00001&&prefs.water==4710);
  collectionMeter=BusaCollection::Meter();loadCollectionCalibration();assert(fabs(collectionMeter.calibration()-4.71)<0.00001);
  prefs.fail=true;q.value="5";busaApi_collectionCoefficient(q);assert(q.status==500&&prefs.writes==1&&fabs(collectionMeter.calibration()-4.71)<0.00001);
- std::puts("PASS collection handler, AP/confirm, invalid input, comma, NVS failure, reload and water isolation");
+ prefs.fail=false;q.confirm="YES";q.allowed=true;
+ collectionMeter.begin(0);collectionMeter.sample(2000,40);const double before=collectionMeter.total();
+ waterVolume.record(4710,0,true,4710);assert(waterVolume.countedLitres==1);
+ q.allowed=false;busaApi_resetVolume(q);assert(q.status==403&&waterVolume.countedLitres==1);
+ q.allowed=true;q.confirm="NO";busaApi_resetVolume(q);assert(q.status==403&&waterVolume.countedLitres==1);
+ q.confirm="YES";otaActive=true;busaApi_resetVolume(q);assert(q.status==409&&waterVolume.countedLitres==1);
+ otaActive=false;q.target="bad";busaApi_resetVolume(q);assert(q.status==400&&waterVolume.countedLitres==1);
+ q.target="water";busaApi_resetVolume(q);assert(q.status==200&&waterVolume.countedLitres==0&&collectionMeter.total()==before&&flowLastCount==100&&flowLastRejected==2&&flowCycle==2000);
+ waterVolume.record(471,0,true,4710);q.target="collection";busaApi_resetVolume(q);assert(q.status==200&&collectionMeter.total()==0&&fabs(waterVolume.countedLitres-.1)<.0001&&fabs(collectionMeter.calibration()-4.71)<.0001);
+ collectionMeter.sample(4000,45);assert(fabs(collectionMeter.total()-5/4.71)<.0001);
+ std::puts("PASS collection configuration, reset isolation, confirmation, busy rejection, retained calibration and next pulses");
 }
 '''
 with tempfile.TemporaryDirectory() as d:
@@ -75,11 +98,12 @@ b=main.index("get('tempCalSave').onclick",a)
 js=r'''
 const assert=require('node:assert/strict'), nodes={},calls=[];
 const get=id=>nodes[id]??=( {value:'',textContent:'',disabled:false});
-let waterPplInitialized=false,collectionPplInitialized=false,failed=false;
+let waterPplInitialized=false,collectionPplInitialized=false,failed=false,previousWater={at:10,total:1},approved=true;
+const window={confirm:()=>approved};
 const fetch=async (url,opts)=>{
  calls.push([url,Object.fromEntries(opts.body)]);
  if(failed)return {ok:false,text:async()=>'NVS'};
- return {ok:true,json:async()=>url.includes('/water/')?{pulses_per_litre:4710}:{pulses_per_ml:4.71}};
+ return {ok:true,json:async()=>url.includes('/volume/reset')?{ok:true}:url.includes('/water/')?{pulses_per_litre:4710}:{pulses_per_ml:4.71}};
 };
 '''+main[a:b]+r'''
 (async()=>{
@@ -93,7 +117,11 @@ const fetch=async (url,opts)=>{
  failed=true;get('collectionPplInput').value='5';await get('collectionPplSave').onclick();
  assert.match(get('collectionPplResult').textContent,/NVS/);
  assert.equal(get('collectionPplSave').disabled,false);
- console.log('PASS real browser save functions, independent endpoints and error recovery');
+ failed=false;approved=false;const n=calls.length;await get('waterResetTotal').onclick();assert.equal(calls.length,n);
+ approved=true;await get('waterResetTotal').onclick();assert.deepEqual(calls[n],['/api/volume/reset',{confirm:'YES',target:'water'}]);assert.equal(previousWater,null);
+ await get('collectionResetTotal').onclick();assert.deepEqual(calls[n+1],['/api/volume/reset',{confirm:'YES',target:'collection'}]);assert.equal(get('collectionResetResult').textContent,'Объём сброшен');
+ failed=true;await get('collectionResetTotal').onclick();assert.match(get('collectionResetResult').textContent,/NVS/);assert.equal(get('collectionResetTotal').disabled,false);
+ console.log('PASS actual local browser independent reset/save, cancellation and error recovery');
 })().catch(e=>{console.error(e);process.exit(1)});
 '''
 subprocess.run(['node','-e',js],check=True)

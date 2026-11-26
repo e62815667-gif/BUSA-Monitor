@@ -33,6 +33,7 @@ LV_FONT_DECLARE(busa_font);
 LV_FONT_DECLARE(busa_font_small);
 LV_FONT_DECLARE(busa_font_value);
 LV_FONT_DECLARE(busa_font_nav);
+LV_FONT_DECLARE(busa_font_nav_fit);
 struct JsonStub { JsonStub operator[](const char*) const {return {};} JsonStub operator[](int) const {return {};} };
 struct SessionStub {JsonStub snapshot()const{return {};}};
 struct UiTest {
@@ -109,7 +110,7 @@ checks=r'''
         init();water();
         lv_obj_update_layout(body_);
         assert(lv_obj_get_child_cnt(body_)==2);
-        assert(controls.empty());
+        assert(controls.size()==2);
         lv_label_set_text(live_[0],"0,0 л/ч");lv_label_set_text(live_[1],"1234,5 л");
         lv_label_set_text(live_[3],"999,9 мл/мин");lv_label_set_text(live_[4],"Собрано: 1234,5 мл");
         lv_label_set_text(live_[6],"60,0 л/ч");lv_label_set_text(live_[7],"Время отбора: 1ч30мин");
@@ -117,8 +118,8 @@ checks=r'''
         auto* row=lv_obj_get_child(body_,1);assertFits(row);
         assert(lv_obj_get_child_cnt(row)==2);
         for(unsigned k=0;k<2;++k){auto* card=lv_obj_get_child(row,k);assertFits(card);
-            assert(lv_obj_get_height(card)==172);for(unsigned j=0;j<lv_obj_get_child_cnt(card);++j)labelFits(lv_obj_get_child(card,j));}
-        std::puts("PASS native water page: two monitoring cards, no edit controls, all labels fit");
+            assert(lv_obj_get_height(card)==172);for(unsigned j=0;j<lv_obj_get_child_cnt(card);++j){auto* o=lv_obj_get_child(card,j);if(lv_obj_get_child_cnt(o)){assertFits(o);labelFits(lv_obj_get_child(o,0));}else labelFits(o);}}
+        std::puts("PASS native water page: two monitoring cards, two reset controls, all labels fit");
     }
     void verifyGraphs(){
         for(int mode=0;mode<3;++mode){
@@ -157,7 +158,7 @@ checks=r'''
         init();buildNavigation(lv_scr_act());lv_obj_update_layout(nav_);
         for(int i=0;i<6;++i){
             auto* b=navButtons_[i];auto* l=lv_obj_get_child(b,0);auto* im=lv_obj_get_child(b,1);
-            assertFits(b);labelFits(l);assertFits(im);
+            assertFits(b);labelFits(l);assertFits(im);assert(lv_txt_get_width(lv_label_get_text(l),strlen(lv_label_get_text(l)),lv_obj_get_style_text_font(l,0),0,LV_TEXT_FLAG_NONE)<=lv_obj_get_content_width(l));
             selected(b,true);assert(lv_obj_get_style_bg_color(b,0).full==color(0x16763e).full);
             selected(b,false);focusStyle(b,0);lv_obj_add_state(b,LV_STATE_FOCUSED);
             // Check the actual color at the first animation/render cycle, not before LVGL processes transitions.
@@ -269,7 +270,7 @@ int main(){
 if len(sys.argv)!=2: raise SystemExit('usage: test_guition_lvgl_layout.py /path/to/lvgl')
 lvgl=Path(sys.argv[1]).resolve()
 assert (lvgl/'lvgl.h').is_file(),lvgl
-sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav')]
+sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav','busa_font_nav_fit')]
 flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-DLV_DITHER_GRADIENT=0','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
 with tempfile.TemporaryDirectory() as tmp:
     tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+between('    void homeTemperatures(', '    void home(){')+status+calc+between('    void graphAxes(', '    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)

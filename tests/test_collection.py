@@ -18,6 +18,7 @@ int main(){
  m.sample(4100,25);assert(m.pulses()==25&&fabs(m.rate()-15)<.001&&fabs(m.total()-2.5)<.001);
  m.sample(6100,25);assert(m.rate()==0&&fabs(m.total()-2.5)<.001);
  assert(!other.seen()&&isnan(other.total()));assert(m.setCalibration(5));assert(fabs(m.total()-5)<.001);
+ m.resetTotal(30);assert(m.total()==0&&m.rate()==0&&m.calibration()==5);m.sample(8100,35);assert(fabs(m.total()-1)<.001&&m.pulses()==35);assert(!other.seen()&&isnan(other.total()));
  BusaCollection::Meter wrap;wrap.begin(UINT32_MAX-999);wrap.setCalibration(2);wrap.sample(1000,4);
  assert(fabs(wrap.rate()-60)<.001&&wrap.total()==2);
  BusaCollection::Meter idle;idle.begin(0);idle.setCalibration(10);idle.sample(2000,0);assert(!idle.seen()&&isnan(idle.rate())&&isnan(idle.total()));
