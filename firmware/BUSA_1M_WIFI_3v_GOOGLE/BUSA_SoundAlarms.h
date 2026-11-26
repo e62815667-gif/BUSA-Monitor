@@ -1,9 +1,10 @@
 #pragma once
 // BUSA-1M: monitoring and sound alerts ONLY. No valve, power or motor commands.
-// T3 (cube) ON: K1 steady sound + K2 90-second closing notification.
-// T3 OFF: K3 90-second opening notification; K1 is silenced.
-// T4 (top) ON: K4 steady warning + K2 90-second closing notification.
-// T4 OFF: K4 off + K3 90-second opening notification; K1 unchanged.
+// T3 (cube) ON: K1 steady sound + K2 60-second closing notification.
+// T3 OFF: K3 60-second opening notification; K1 is silenced.
+// T4 (top) ON: K4 steady warning + K2 60-second closing notification.
+// T4 has priority: K1 off, T3 transitions do not route sounds while T4 is active.
+// T4 OFF: K1/K2/K4 off + K3 60-second notification.
 // T3 and T4 each have configurable T_ON/T_OFF thresholds.
 #include "BUSA_SoundAlarmLogic.h"
 // A separate active-3.3V logic buzzer input on GPIO2. Use a compatible
@@ -18,7 +19,7 @@ uint32_t buzzerLastStartMs=0,buzzerActivationCount=0;
 int buzzerPinLevel(bool active){return active==BUSA_BUZZER_ACTIVE_HIGH?HIGH:LOW;}
 constexpr bool BUSA_SOUND_ACTIVE_LOW=true;
 constexpr uint32_t BUSA_SOUND_POLL_MS=200U;
-constexpr uint32_t BUSA_SOUND_TIMED_MS=90000UL;
+constexpr uint32_t BUSA_SOUND_TIMED_MS=60000UL;
 BusaSound::Routed soundRoute;
 BusaSound::Channel soundChannels[4];
 bool soundEnabled[4]={true,true,true,true};
@@ -29,8 +30,8 @@ uint32_t soundLastPoll=0,soundSignalCount[4]={0},soundLastStartMs[4]={0};
 uint32_t soundT3OnEvents=0,soundT3OffEvents=0,soundT4OnEvents=0,soundT4OffEvents=0;
 int soundPinLevel(bool on){return BUSA_SOUND_ACTIVE_LOW?(on?LOW:HIGH):(on?HIGH:LOW);}
 const char* soundRoleName(uint8_t i){
-  const char* names[]={"K1_T3_CUBE_NORMAL_SOUND","K2_T3_OR_T4_ON_90S_SOUND",
-    "K3_T3_OR_T4_OFF_90S_SOUND","K4_T4_TOP_WARNING_SOUND"};
+  const char* names[]={"K1_T3_CUBE_NORMAL_SOUND","K2_T3_OR_T4_ON_60S_SOUND",
+    "K3_T3_OR_T4_OFF_60S_SOUND","K4_T4_TOP_WARNING_SOUND"};
   return i<4?names[i]:"UNKNOWN";
 }
 bool soundIsTimed(uint8_t i){return i==1||i==2;}
@@ -93,6 +94,8 @@ void soundPoll(uint32_t now){
   if(soundRoute.t3OffEvent)++soundT3OffEvents;
   if(soundRoute.t4OnEvent)++soundT4OnEvents;
   if(soundRoute.t4OffEvent)++soundT4OffEvents;
+  // Stop inactive sound channels before starting any newly active channel.
+  for(int i=0;i<4;i++)if(!soundRoute.k[i])digitalWrite(KPIN[i],soundPinLevel(false));
   for(int i=0;i<4;i++){
     const bool old=soundChannels[i].on;
     const bool on=soundRoute.k[i];
@@ -103,7 +106,7 @@ void soundPoll(uint32_t now){
       !known?BusaSound::MissingThreshold:!hasTemp(sensor,now)?BusaSound::SensorInvalid:
       on?BusaSound::Sounding:BusaSound::Waiting;
     if(on&&!old){soundLastStartMs[i]=now;++soundSignalCount[i];}
-    digitalWrite(KPIN[i],soundPinLevel(on));
+    if(on)digitalWrite(KPIN[i],soundPinLevel(true));
   }
   const bool previousBuzzer=buzzerSoundOn;
   bool sum=false;
@@ -121,7 +124,7 @@ String soundJSON(uint32_t now){
   String s="{\"purpose\":\"12V_SOUND_ONLY\",\"active_low\":";
   s+=(BUSA_SOUND_ACTIVE_LOW?String("true"):String("false"));
   s+=",\"control_of_valve_or_power\":false";
-  s+=",\"mapping\":\"T3_ON=K1+K2;T3_OFF=K3+K1_OFF;T4_ON=K4+K2;T4_OFF=K4_OFF+K3\"";
+  s+=",\"mapping\":\"T3_ON=K1+K2;T3_OFF=K3+K1_K2_OFF;T4_PRIORITY;T4_ON=K4+K2+K1_K3_OFF;T4_OFF=K3+K1_K2_K4_OFF\"";
   s+=",\"t3_on_events\":"+String(soundT3OnEvents);
   s+=",\"t3_off_events\":"+String(soundT3OffEvents);
   s+=",\"t4_on_events\":"+String(soundT4OnEvents);
@@ -161,7 +164,7 @@ String soundJSON(uint32_t now){
     s+=",\"sound_on\":"+(soundChannels[i].on?String("true"):String("false"));
     s+=",\"sample_valid\":"+(hasTemp(sensor,now)?String("true"):String("false"));
     s+=",\"timed\":"+(timed?String("true"):String("false"));
-    s+=",\"duration_seconds\":"+String(timed?90:0);
+    s+=",\"duration_seconds\":"+String(timed?BUSA_SOUND_TIMED_MS/1000UL:0);
     s+=",\"remaining_seconds\":"+String((remaining+999UL)/1000UL);
     s+=",\"t3_condition\":"+(soundRoute.t3.on?String("true"):String("false"));
     s+=",\"t4_condition\":"+(soundRoute.t4.on?String("true"):String("false"));

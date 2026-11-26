@@ -105,7 +105,7 @@ int main(){
 google=(fw/'BUSA_Google.h').read_text();worker=google[google.index('void googleWorker('):google.index('void addGoogleRoutes()')]
 assert 'statusJSON(' not in worker and 'snapshot->json' in worker
 assert 'busaGoogleSnapshotPoll();' in main[main.index('void loop(){'):]
-# Actual sound state machine: hysteresis, independent pulses, expiry, rollover.
+# Actual sound state machine: hysteresis, T4 priority, mutually exclusive 60s sounds, expiry, rollover.
 run(common+r'''
 #include "BUSA_SoundAlarmLogic.h"
 int main(){
@@ -120,20 +120,41 @@ int main(){
  for(uint32_t start:{100u,UINT32_MAX-1000u}){
   BusaSound::Routed r;bool en[4]={true,true,true,true};
   auto tick=[&](float t3,float t4,uint32_t at){BusaSound::evaluateRouted(r,en,true,t3,96,94,true,t4,85,80,at);};
-  tick(96,70,start);assert(r.k[0]&&r.k[1]&&!r.k[2]&&!r.k[3]);
-  tick(95,70,start+1);assert(r.k[0]&&r.k[1]&&!r.t3OnEvent);
-  tick(94,70,start+100);assert(!r.k[0]&&r.k[1]&&r.k[2]);
-  // Expired K3 cannot suppress a fresh K2 event during the same poll.
-  tick(96,70,start+90100);assert(r.t3OnEvent&&r.k[0]&&r.k[1]&&!r.k[2]);
-  tick(96,85,start+90200);assert(r.k[3]&&r.t4OnEvent);
-  tick(96,80,start+90300);assert(r.k[0]&&!r.k[3]&&r.k[2]&&r.k[1]);
-  tick(96,80,start+180199);assert(r.k[0]&&!r.k[3]&&r.k[2]&&r.k[1]);
-  tick(96,80,start+180200);assert(r.k[0]&&!r.k[3]&&r.k[2]&&!r.k[1]);
-  tick(96,80,start+180300);assert(!r.k[2]);
-  en[0]=en[1]=en[2]=en[3]=false;tick(96,90,start+180301);
+  auto expect=[&](bool k1,bool k2,bool k3,bool k4){
+    assert(r.k[0]==k1&&r.k[1]==k2&&r.k[2]==k3&&r.k[3]==k4);
+    assert(!(r.k[1]&&r.k[2]));
+  };
+  tick(96,70,start);expect(true,true,false,false);
+  tick(95,70,start+1);expect(true,true,false,false);assert(!r.t3OnEvent);
+  tick(94,70,start+100);expect(false,false,true,false);
+  tick(94,70,start+60099);expect(false,false,true,false);
+  tick(94,70,start+60100);expect(false,false,false,false);
+  tick(96,70,start+60200);expect(true,true,false,false);
+  tick(96,85,start+60300);expect(false,true,false,true);assert(r.t4OnEvent);
+  tick(94,85,start+60400);expect(false,true,false,true);assert(r.t3OffEvent);
+  tick(96,85,start+60500);expect(false,true,false,true);assert(r.t3OnEvent);
+  tick(96,85,start+120299);expect(false,true,false,true);
+  tick(96,85,start+120300);expect(false,false,false,true);
+  tick(96,80,start+120400);expect(false,false,true,false);assert(r.t4OffEvent);
+  tick(96,80,start+180399);expect(false,false,true,false);
+  tick(96,80,start+180400);expect(false,false,false,false);
+  tick(94,70,start+180401);expect(false,false,true,false);
+  tick(96,70,start+180402);expect(true,true,false,false);
+  tick(96,70,start+240401);expect(true,true,false,false);
+  tick(96,70,start+240402);expect(true,false,false,false);
+  // An emergency interrupts an already sounding K3, including simultaneous edges.
+  tick(94,85,start+240403);expect(false,true,false,true);
+  tick(96,80,start+240404);expect(false,false,true,false);
+  tick(96,80,start+240405);expect(false,false,true,false);
+  en[0]=en[1]=en[2]=en[3]=false;tick(96,90,start+240406);
   for(bool on:r.k)assert(!on);
   BusaSound::Routed invalid;BusaSound::evaluateRouted(invalid,en,false,NAN,96,94,false,NAN,85,80,start);
   assert(!invalid.t3OffEvent&&!invalid.t4OffEvent);
+  BusaSound::Routed lost;bool all[4]={true,true,true,true};
+  BusaSound::evaluateRouted(lost,all,true,96,96,94,true,85,85,80,start);
+  assert(!lost.k[0]&&lost.k[1]&&!lost.k[2]&&lost.k[3]);
+  BusaSound::evaluateRouted(lost,all,true,96,96,94,false,NAN,85,80,start+1);
+  assert(!lost.t4OffEvent&&!lost.k[2]&&!lost.k[0]);
  }
 }
 ''','sound')
@@ -178,4 +199,4 @@ int main(){
  }
 }
 ''','remote_nvs')
-print('PASS audit: all JSON control bytes/UTF-8 roundtrip; real restart predicates including rollover; DS18B20 hot replacement/missing/invalid conversion; 50k concurrent immutable snapshots without leaks; sound hysteresis/90s expiry/rollover; NVS failures at 15 writes and NaN readback roll back enable flags/thresholds/command ID')
+print('PASS audit: all JSON control bytes/UTF-8 roundtrip; real restart predicates including rollover; DS18B20 hot replacement/missing/invalid conversion; 50k concurrent immutable snapshots without leaks; sound hysteresis/T4 priority/exclusive 60s expiry/rollover; NVS failures at 15 writes and NaN readback roll back enable flags/thresholds/command ID')
