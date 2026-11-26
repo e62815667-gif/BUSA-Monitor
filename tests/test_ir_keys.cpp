@@ -20,6 +20,11 @@ int main(){
  assert(!m.finish(false)&&m.action(values[0])==4);
  m.start(0xfffffff0);assert(m.expire(0xfffffff0+learnTimeoutMs)&&!m.learning());
  Press p;std::vector<int> out;auto emit=[&](int k){out.push_back(k);};
+ for(size_t i=0;i<count;++i){
+  p.clear();out.clear();p.frame(values[i],m.action(values[i]),false,100,emit);p.expire(451,emit);
+  assert(out.size()==1&&out[0]==expected[i]);
+ }
+ p.clear();out.clear();
  p.frame(values[0],4,false,10,emit);for(uint32_t n=110;n<1000;n+=100)p.frame(values[0],4,true,n,emit);
  assert((out==std::vector<int>{4}));
  p.clear();out.clear();p.frame(values[9],17,false,1000,emit);p.expire(1351,emit);assert((out==std::vector<int>{17}));
