@@ -231,9 +231,14 @@ private:
         lv_obj_set_style_text_color(lv_obj_get_child(o,0),color(on?0xffffff:ink()),0);
     }
     void focusStyle(lv_obj_t* o,uint8_t type){
-        // Navigation feedback must be immediate, not a theme transition.
-        lv_obj_set_style_transition(o,nullptr,LV_STATE_DEFAULT);
-        lv_obj_set_style_transition(o,nullptr,LV_STATE_FOCUSED);
+        // LVGL 8.4 reads every transition descriptor, so nullptr is invalid.
+        // Override the default theme's animated properties with a zero-duration transition.
+        static const lv_style_prop_t props[]={LV_STYLE_BG_OPA,LV_STYLE_BG_COLOR,LV_STYLE_TRANSFORM_WIDTH,LV_STYLE_TRANSFORM_HEIGHT,LV_STYLE_TRANSLATE_Y,LV_STYLE_TRANSLATE_X,LV_STYLE_TRANSFORM_ZOOM,LV_STYLE_TRANSFORM_ANGLE,LV_STYLE_COLOR_FILTER_OPA,LV_STYLE_COLOR_FILTER_DSC,0};
+        static lv_style_transition_dsc_t instant;
+        static bool initialized=false;
+        if(!initialized){lv_style_transition_dsc_init(&instant,props,lv_anim_path_linear,0,0,nullptr);initialized=true;}
+        lv_obj_set_style_transition(o,&instant,LV_STATE_DEFAULT);
+        lv_obj_set_style_transition(o,&instant,LV_STATE_FOCUSED);
         lv_obj_set_style_outline_color(o,color(selectionEdge()),LV_STATE_FOCUSED);
         lv_obj_set_style_outline_width(o,2,LV_STATE_FOCUSED);
         lv_obj_set_style_outline_pad(o,0,LV_STATE_FOCUSED);

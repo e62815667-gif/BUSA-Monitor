@@ -160,9 +160,12 @@ checks=r'''
             assertFits(b);labelFits(l);assertFits(im);
             selected(b,true);assert(lv_obj_get_style_bg_color(b,0).full==color(0x16763e).full);
             selected(b,false);focusStyle(b,0);lv_obj_add_state(b,LV_STATE_FOCUSED);
+            // Check the actual color at the first animation/render cycle, not before LVGL processes transitions.
+            lv_anim_refr_now();
             assert(lv_obj_get_style_outline_color(b,0).full==color(0x53d486).full);
             assert(lv_obj_get_style_bg_color(b,0).full==color(theme_==0?0xcbeed7:0x16763e).full);
             lv_obj_clear_state(b,LV_STATE_FOCUSED);
+            lv_anim_refr_now();assert(lv_obj_get_style_bg_color(b,0).full==color(theme_==2?0x153b4b:surface()).full);
             assert(lv_obj_get_width(im)==20&&lv_obj_get_height(im)==20);
             assert(lv_img_get_zoom(im)==LV_IMG_ZOOM_NONE);
             lv_area_t x,y,z;lv_obj_get_coords(im,&x);lv_obj_get_coords(l,&y);lv_obj_get_coords(b,&z);
