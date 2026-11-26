@@ -5,6 +5,8 @@ namespace busa_keys {
 constexpr size_t capacity=16;
 constexpr uint32_t maxAgeMs=2500;
 constexpr uint8_t longZero=20,deleteChar=21;
+// The learned 20-position matrix retains F1/F2; # and * share the IR commands.
+inline uint8_t matrixCode(uint8_t position){return position==2?deleteChar:position==3?15:position;}
 inline bool valid(uint8_t code){return code<=deleteChar&&code!=1&&code!=2&&code!=3;}
 struct Key {uint32_t seq,time;uint8_t code;};
 class Ring {

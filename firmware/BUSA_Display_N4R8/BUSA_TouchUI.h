@@ -173,7 +173,7 @@ private:
         lv_textarea_set_password_mode(self->touchEditor_,lv_textarea_get_password_mode(ta));
         lv_textarea_set_password_show_time(self->touchEditor_,0);
         lv_textarea_set_text(self->touchEditor_,lv_textarea_get_text(ta));
-        self->touchTarget_=ta;
+        self->touchTarget_=ta;self->tapMode_=0;self->lastTapKey_=-1;
         auto* caption=lv_obj_get_child(lv_obj_get_parent(ta),0);
         lv_label_set_text(self->touchTitle_,lv_label_get_text(caption));
         lv_textarea_set_cursor_pos(self->touchEditor_,LV_TEXTAREA_CURSOR_LAST);
@@ -187,7 +187,13 @@ private:
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));
         if(!self->touchTarget_)return;
         const auto id=lv_btnmatrix_get_selected_btn(self->keyboard_);
-        if(id!=LV_BTNMATRIX_BTN_NONE)busa_touch_keys::apply(self->keyboard_,self->touchEditor_,lv_btnmatrix_get_btn_text(self->keyboard_,id));
+        if(id==LV_BTNMATRIX_BTN_NONE)return;
+        const char* key=lv_btnmatrix_get_btn_text(self->keyboard_,id);
+        self->lastTapKey_=-1;
+        busa_touch_keys::apply(self->keyboard_,self->touchEditor_,key);
+        if(busa_touch_keys::same(key,"ABC"))self->tapMode_=1;
+        else if(busa_touch_keys::same(key,"abc"))self->tapMode_=0;
+        else if(busa_touch_keys::same(key,"123"))self->tapMode_=2;
     }
     void touchFinish(bool accept){
         if(!touchTarget_)return;
@@ -196,7 +202,7 @@ private:
         if(accept&&page_==4)calculate(false);
     }
     void hideKeyboard(){
-        if(!keyboard_)return;touchTarget_=nullptr;lv_keyboard_set_textarea(keyboard_,nullptr);
+        if(!keyboard_)return;touchTarget_=nullptr;lastTapKey_=-1;lv_keyboard_set_textarea(keyboard_,nullptr);
         lv_obj_add_flag(touchModal_,LV_OBJ_FLAG_HIDDEN);lv_textarea_set_text(touchEditor_,"");
     }
     lv_obj_t* label(lv_obj_t* parent,const char* text){
@@ -815,11 +821,38 @@ private:
         if(page_==5&&sub_==0&&index<4)return send(Route::calibrationEdit,{{"confirm","YES"},{"sensor",String(index)},{"op",clear?"clear":"set"},{"value",clear?String("0"):text(fields_[index])}});
         return false;
     }
+    void adjustCalibrationKey(lv_obj_t* obj,uint8_t k){
+        String v=text(obj);float x=constrain(roundf((v.toFloat()+(k==7?.1f:-.1f))*10)/10,-10.0f,10.0f);
+        lv_textarea_set_text(obj,String(x,1).c_str());
+    }
+    void editTextKey(lv_obj_t* obj,uint8_t k,uint32_t at){
+        const bool numeric=lv_textarea_get_accepted_chars(obj)!=nullptr;
+        if(k==busa_keys::deleteChar){lv_textarea_del_char(obj);lastTapKey_=-1;return;}
+        if(k==0){if(numeric)lv_textarea_set_text(obj,"");else lv_textarea_del_char(obj);lastTapKey_=-1;return;}
+        if(k==16||k==18){if(k==16)lv_textarea_cursor_left(obj);else lv_textarea_cursor_right(obj);lastTapKey_=-1;return;}
+        if(k==7||k==11){
+            if(!numeric){tapMode_=(tapMode_+(k==7?3:1))%4;lastTapKey_=-1;static const char* modes[]={"abc","ABC","123","SYM"};keyHint(modes[tapMode_]);if(touchTarget_)lv_keyboard_set_mode(keyboard_,tapMode_==0?LV_KEYBOARD_MODE_TEXT_LOWER:tapMode_==1?LV_KEYBOARD_MODE_TEXT_UPPER:LV_KEYBOARD_MODE_SPECIAL);}
+            else if(page_==5&&sub_==0)adjustCalibrationKey(obj,k);
+            else lv_textarea_set_cursor_pos(obj,k==7?0:LV_TEXTAREA_CURSOR_LAST);
+            return;
+        }
+        if(k==busa_keys::longZero){const char* v=lv_textarea_get_text(obj);if(!numeric||(!strchr(v,',')&&!strchr(v,'.')))lv_textarea_add_char(obj,',');lastTapKey_=-1;return;}
+        int digit=keyDigit(k);if(digit<0)return;
+        if(numeric||tapMode_==2||digit==0){lv_textarea_add_char(obj,'0'+digit);lastTapKey_=-1;return;}
+        const char* letters=tapLetters(digit,tapMode_);const size_t n=strlen(letters);
+        if(lastTapKey_==k&&uint32_t(at-lastTapAt_)<950&&lv_textarea_get_cursor_pos(obj)>0){tapIndex_=(tapIndex_+1)%n;lv_textarea_del_char(obj);}
+        else tapIndex_=0;
+        lv_textarea_add_char(obj,letters[tapIndex_]);lastTapKey_=k;lastTapAt_=at;return;
+    }
     void physicalKey(uint8_t k,uint32_t at){
         if(testOverlay_||displaySleeping_||calibrating_||!session_.connected()||k==2||k==3)return;
         if(waiting_&&page_==4&&calcMode_==3)return;
         if(k!=19)volumeResetPending_=0;
-        if(touchTarget_){if(k==busa_keys::deleteChar&&touchEditor_)lv_textarea_del_char(touchEditor_);else if(k==15||k==19)touchFinish(k==19);return;}
+        if(touchTarget_){
+            if(k==15||k==19)touchFinish(k==19);
+            else editTextKey(touchEditor_,k,at);
+            return;
+        }
         if(calcNotes_){if(k==15||k==19)calcConditions();return;}
         if(keyConfirm_>=0){
             const int i=keyConfirm_;keyConfirm_=-1;
@@ -835,7 +868,6 @@ private:
                 unsigned n=lv_dropdown_get_option_cnt(obj);if(n&&(k==7||k==11))lv_dropdown_set_selected(obj,(lv_dropdown_get_selected(obj)+n+(k==7?n-1:1))%n);
                 return;
             }
-            const bool numeric=lv_textarea_get_accepted_chars(obj)!=nullptr;
             if(k==19){
                 if(page_==1||(page_==5&&sub_==0)){if(!keySaveReference(index,false)){keyHint("Не удалось отправить значение");return;}}
                 cancelKeyEdit(false);
@@ -843,22 +875,11 @@ private:
                 else if(page_==5&&sub_==1)focusKey(keyFocus_+1);
                 return;
             }
-            if(k==busa_keys::deleteChar){lv_textarea_del_char(obj);lastTapKey_=-1;return;}
-            if(k==0){if(numeric)lv_textarea_set_text(obj,"");else lv_textarea_del_char(obj);lastTapKey_=-1;return;}
-            if(k==16||k==18){uint32_t p=lv_textarea_get_cursor_pos(obj);if(k==16&&p)lv_textarea_set_cursor_pos(obj,p-1);else if(k==18)lv_textarea_set_cursor_pos(obj,p+1);lastTapKey_=-1;return;}
-            if(k==7||k==11){
-                if(!numeric){tapMode_=(tapMode_+(k==7?3:1))%4;lastTapKey_=-1;static const char* modes[]={"abc","ABC","123","SYM"};keyHint(modes[tapMode_]);}
-                else if(page_==5&&sub_==0){String v=text(obj);float x=constrain(roundf((v.toFloat()+(k==7?.1f:-.1f))*10)/10,-10.0f,10.0f);lv_textarea_set_text(obj,String(x,1).c_str());}
-                else lv_textarea_set_cursor_pos(obj,k==7?0:LV_TEXTAREA_CURSOR_LAST);
-                return;
-            }
-            if(k==busa_keys::longZero){String v=lv_textarea_get_text(obj);if(!numeric||(v.indexOf(',')<0&&v.indexOf('.')<0))lv_textarea_add_char(obj,',');lastTapKey_=-1;return;}
-            int digit=keyDigit(k);if(digit<0)return;
-            if(numeric||tapMode_==2||digit==0){lv_textarea_add_char(obj,'0'+digit);lastTapKey_=-1;return;}
-            const char* letters=tapLetters(digit,tapMode_);const size_t n=strlen(letters);
-            if(lastTapKey_==k&&uint32_t(at-lastTapAt_)<950&&lv_textarea_get_cursor_pos(obj)>0){tapIndex_=(tapIndex_+1)%n;lv_textarea_del_char(obj);}
-            else tapIndex_=0;
-            lv_textarea_add_char(obj,letters[tapIndex_]);lastTapKey_=k;lastTapAt_=at;return;
+            editTextKey(obj,k,at);return;
+        }
+        if(sectionEntered_&&keyFocus_>=0&&keyFocus_<keyCount_&&keyControls_[keyFocus_].type==1&&
+           (keyDigit(k)>=0||k==busa_keys::deleteChar||k==busa_keys::longZero)){
+            beginKeyEdit(keyControls_[keyFocus_]);editTextKey(keyEdit_,k,at);return;
         }
         using busa_focus::Nav;
         switch(busa_focus::route(k,sectionEntered_,page_==5&&sub_>=0)){

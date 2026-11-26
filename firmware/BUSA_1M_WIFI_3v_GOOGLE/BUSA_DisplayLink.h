@@ -78,7 +78,8 @@ static void handleApi(const Frame& f){
 static bool linkActive(){return ready&&haveDiagnostic&&uint32_t(millis()-lastDiagnostic)<=staleMs;}
 static bool lcdInitialized(){return linkActive()&&metrics[lcdInit]==1;}
 static bool keypadCapable(){const size_t n=strlen(displayFirmware);return linkActive()&&n>=4&&!strcmp(displayFirmware+n-4,"-HW2");}
-static bool nav4Capable(){const size_t n=strlen(displayFirmware);return keypadCapable()&&n>=7&&!strcmp(displayFirmware+n-7,"-N4-HW2");}
+static bool nav5Capable(){const size_t n=strlen(displayFirmware);return keypadCapable()&&n>=7&&!strcmp(displayFirmware+n-7,"-N5-HW2");}
+static bool nav4Capable(){const size_t n=strlen(displayFirmware);return nav5Capable()||(keypadCapable()&&n>=7&&!strcmp(displayFirmware+n-7,"-N4-HW2"));}
 static bool compactStatusCapable(){const size_t n=strlen(displayFirmware);return nav4Capable()||(keypadCapable()&&n>=7&&!strcmp(displayFirmware+n-7,"-N3-HW2"));}
 static bool otaCapable(){return ready&&haveDiagnostic&&uint32_t(millis()-lastDiagnostic)<=staleMs&&strncmp(displayFirmware,busa_ota::displayFamily,strlen(busa_ota::displayFamily))==0;}
 static void poll(){

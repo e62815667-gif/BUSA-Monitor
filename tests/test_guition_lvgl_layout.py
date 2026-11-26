@@ -19,6 +19,9 @@ calc=between('    static const char* calcTitle(', '    void rememberCalc()')+bet
 prelude=r'''
 #include <lvgl.h>
 #include "BUSA_TouchKeys.h"
+#include "BUSA_FocusOrder.h"
+#include <BUSA_KeyEvents.h>
+#include <BUSA_IrKeys.h>
 #include "BUSA_NavIcons.h"
 #include "BUSA_GraphView.h"
 #include <cassert>
@@ -54,6 +57,77 @@ struct UiTest {
     lv_obj_t *chart_=nullptr,*graphNotice_=nullptr,*graphUnit_=nullptr,*graphLegend_[4]={},*graphPlots_[4]={},*graphY_[4][4]={};lv_chart_series_t* series_[4]={};
     void requestGraph(){} void set(lv_obj_t* l,const String& s){if(l)lv_label_set_text(l,s.c_str());}
 '''
+
+input_harness=r'''
+struct InputTest {
+    struct Session {bool connected()const{return true;}} session_;
+    lv_obj_t *touchTarget_=nullptr,*touchEditor_=nullptr,*touchModal_=nullptr,*touchTitle_=nullptr,*keyboard_=nullptr,*keyEdit_=nullptr,*testOverlay_=nullptr;
+    lv_obj_t* fields_[8]={};
+    bool displaySleeping_=false,calibrating_=false,waiting_=false,formValid_=true,keyDropdown_=false,sectionEntered_=true;
+    int page_=4,sub_=-1,calcMode_=0,volumeResetPending_=0,keyConfirm_=-1,keyFocus_=-1,keyCount_=0,lastTapKey_=-1,tapMode_=0;
+    size_t tapIndex_=0;uint32_t lastTapAt_=0,viewGeneration_=0;uint16_t keyOriginalChoice_=0;
+    String keyOriginal_;lv_obj_t* calcNotes_=nullptr;unsigned calculates=0;int lastAction=-1;
+    void focusStyle(lv_obj_t*,uint8_t){}
+    void keyHint(const String&){}
+    void adjustCalibrationKey(lv_obj_t*,uint8_t){assert(false);}
+    bool keySaveReference(int,bool){return true;}
+    void calculate(bool=true){++calculates;}
+    void calcConditions(){calcNotes_=nullptr;}
+    void clearCalc(){lv_textarea_set_text(fields_[0],"");}
+    void action(int id){lastAction=id;}
+''' + between('    struct KeyControl', '    void keyHint(') + r'''
+    KeyControl keyControls_[64]={};
+''' + between('    void cancelKeyEdit(', '    bool keySaveReference(') + between('    void editTextKey(', '    void showDisplayTest(') + between('    static void textFocus(', '    lv_obj_t* label(').replace('static_cast<Interface*>','static_cast<InputTest*>') + r'''
+    void verify(){
+        lv_obj_clean(lv_scr_act());auto* parent=lv_obj_create(lv_scr_act());
+        auto* caption=lv_label_create(parent);lv_label_set_text(caption,"Input");
+        fields_[0]=lv_textarea_create(parent);lv_textarea_set_one_line(fields_[0],true);
+        lv_textarea_set_accepted_chars(fields_[0],"0123456789.-,");
+        touchModal_=lv_obj_create(lv_scr_act());touchTitle_=lv_label_create(touchModal_);touchEditor_=lv_textarea_create(touchModal_);
+        keyboard_=lv_keyboard_create(touchModal_);busa_touch_keys::configure(keyboard_);
+        lv_obj_add_event_cb(fields_[0],textFocus,LV_EVENT_CLICKED,this);
+        lv_obj_add_event_cb(keyboard_,keyboardEvent,LV_EVENT_VALUE_CHANGED,this);
+        registerKey(fields_[0],1,0);focusKey(0);
+        busa_ir::Map map;uint64_t codes[busa_ir::count];for(size_t i=0;i<busa_ir::count;++i)codes[i]=busa_ir::identity(1,42,uint16_t(i+1));assert(map.load(codes));
+        busa_ir::Press press;busa_keys::Ring ring;ring.begin(123);busa_keys::Cursor cursor;
+        uint32_t now=0;assert(cursor.consume(123,0,nullptr,0,[&](const busa_keys::Event&){assert(false);})==busa_keys::Result::baseline);
+        auto deliver=[&](uint8_t code){ring.push(code,now);const auto& key=ring.oldest(ring.size()-1);busa_keys::Event ev={key.seq,0,key.code};assert(cursor.consume(123,ring.head(),&ev,1,[&](const busa_keys::Event& e){physicalKey(e.code,now);})==busa_keys::Result::applied);};
+        auto ir=[&](size_t i){now+=500;auto emit=[&](int k){deliver(uint8_t(k));};press.frame(codes[i],map.action(codes[i]),false,now,emit);press.expire(now+351,emit);};
+        auto matrix=[&](uint8_t pos){now+=500;deliver(busa_keys::matrixCode(pos));};
+        lv_textarea_set_text(fields_[0],"");
+        ir(0);assert(keyEdit_==fields_[0]); // a digit on a focused field enters edit immediately
+        for(size_t i=1;i<10;++i)ir(i);
+        assert(!strcmp(lv_textarea_get_text(fields_[0]),"1234567890"));
+        ir(16);assert(!strcmp(lv_textarea_get_text(fields_[0]),"123456789"));
+        ir(12);ir(13);ir(10);ir(11);ir(14);assert(!keyEdit_&&calculates==1);
+        lv_event_send(fields_[0],LV_EVENT_CLICKED,nullptr);assert(touchTarget_==fields_[0]);
+        busa_touch_keys::apply(keyboard_,touchEditor_,"Очистить");
+        for(size_t i=0;i<10;++i)ir(i);
+        assert(!strcmp(lv_textarea_get_text(touchEditor_),"1234567890"));
+        ir(12);ir(16);assert(!strcmp(lv_textarea_get_text(touchEditor_),"123456780"));
+        ir(13);ir(10);ir(11);
+        busa_touch_keys::apply(keyboard_,touchEditor_,",");matrix(4);
+        assert(!strcmp(lv_textarea_get_text(touchEditor_),"123456780,1"));
+        ir(14);assert(!touchTarget_&&!strcmp(lv_textarea_get_text(fields_[0]),"123456780,1"));
+        lv_event_send(fields_[0],LV_EVENT_CLICKED,nullptr);
+        matrix(0);for(uint8_t p:{4,5,6,8,9,10,12,13,14,17})matrix(p);
+        assert(!strcmp(lv_textarea_get_text(touchEditor_),"1234567890"));
+        matrix(16);matrix(18);matrix(7);matrix(11);matrix(2);assert(!strcmp(lv_textarea_get_text(touchEditor_),"123456789"));
+        matrix(3);assert(!touchTarget_&&!strcmp(lv_textarea_get_text(fields_[0]),"123456780,1"));
+        lv_event_send(fields_[0],LV_EVENT_CLICKED,nullptr);matrix(0);matrix(4);matrix(19);assert(!touchTarget_&&!strcmp(lv_textarea_get_text(fields_[0]),"1"));
+        lv_event_send(fields_[0],LV_EVENT_CLICKED,nullptr);ir(0);ir(15);assert(!touchTarget_&&!strcmp(lv_textarea_get_text(fields_[0]),"1"));
+        lv_event_send(fields_[0],LV_EVENT_CLICKED,nullptr);matrix(15);assert(!touchTarget_);
+        // Text entry uses the same editor and switches between modes without swallowing digits.
+        lv_textarea_set_accepted_chars(fields_[0],nullptr);lv_textarea_set_text(fields_[0],"");
+        lv_event_send(fields_[0],LV_EVENT_CLICKED,nullptr);ir(1);assert(!strcmp(lv_textarea_get_text(touchEditor_),"a"));
+        ir(11);ir(11);ir(1);assert(!strcmp(lv_textarea_get_text(touchEditor_),"a2"));
+        busa_touch_keys::apply(keyboard_,touchEditor_,"B");ir(16);assert(!strcmp(lv_textarea_get_text(touchEditor_),"a2"));
+        ir(14);assert(!strcmp(lv_textarea_get_text(fields_[0]),"a2"));
+        std::puts("PASS native mixed input: real physicalKey and modal lifecycle, 17 IR buttons, 19 matrix UART actions, F2 local separately, numeric/text/delete/cancel/commit");
+    }
+};
+'''
+
 checks=r'''
     void init(){
         lv_obj_t* root=lv_scr_act();lv_obj_clean(root);lv_obj_remove_style_all(root);
@@ -241,6 +315,7 @@ static void flush(lv_disp_drv_t* d,const lv_area_t* a,lv_color_t* p){
 int main(){
     lv_init();lv_disp_draw_buf_init(&buf,pixels,nullptr,WIDTH*24);lv_disp_drv_init(&drv);
     drv.hor_res=WIDTH;drv.ver_res=HEIGHT;drv.draw_buf=&buf;drv.flush_cb=flush;assert(lv_disp_drv_register(&drv));
+    InputTest input;input.verify();
     UiTest ui;
     ui.theme_=2;ui.init();
     auto* sample=ui.panel(ui.body_,220,90);
@@ -271,9 +346,9 @@ if len(sys.argv)!=2: raise SystemExit('usage: test_guition_lvgl_layout.py /path/
 lvgl=Path(sys.argv[1]).resolve()
 assert (lvgl/'lvgl.h').is_file(),lvgl
 sources=sorted((lvgl/'src').rglob('*.c'))+[sketch/f'{name}.c' for name in ('busa_font','busa_font_small','busa_font_value','busa_font_nav','busa_font_nav_fit')]
-flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-DLV_DITHER_GRADIENT=0','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
+flags=['-DLV_CONF_SKIP','-DLV_MEM_SIZE=98304','-DLV_DITHER_GRADIENT=0','-I'+str(lvgl),'-I'+str(lvgl/'src'),'-I'+str(sketch),'-I'+str(root/'firmware/common/src'),'-I'+str(root/'firmware/BUSA_1M_WIFI_3v_GOOGLE'),'-I'+str(lvgl.parent/'ArduinoJson'/'src')]
 with tempfile.TemporaryDirectory() as tmp:
-    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+between('    void homeTemperatures(', '    void home(){')+status+calc+between('    void graphAxes(', '    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks)
+    tmp=Path(tmp);cpp=tmp/'layout.cpp';cpp.write_text(prelude+helpers+widgets+between('    void homeTemperatures(', '    void home(){')+status+calc+between('    void graphAxes(', '    void requestGraph(){')+between('    void navIcon(', '    static String text(')+between('    void buildTouchModal(', '    void build(){')+checks.replace('int main(){',input_harness+'\nint main(){'))
     def compile_one(item):
         i,s=item;o=tmp/f'{i}.o';subprocess.run(['gcc','-std=gnu99','-O0',*flags,'-c',str(s),'-o',str(o)],check=True);return str(o)
     with ThreadPoolExecutor(max_workers=2) as pool: objects=list(pool.map(compile_one,enumerate(sources)))

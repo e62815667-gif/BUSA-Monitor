@@ -19,5 +19,16 @@ int main(){
  c.reset();assert(c.consume(88,UINT32_MAX,nullptr,0,take)==Result::baseline);
  Event wrap[]={{0,0,17}};assert(c.consume(88,0,wrap,1,take)==Result::applied&&calls==4);
  assert(valid(deleteChar)&&!valid(22));
+ const uint8_t expected[20]={0,1,21,15,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19};
+ Ring matrix;matrix.begin(99);Cursor mc;size_t delivered=0;
+ assert(mc.consume(99,0,nullptr,0,[&](const Event&){assert(false);})==Result::baseline);
+ for(uint8_t p=0;p<20;++p){
+  const uint8_t code=matrixCode(p);assert(code==expected[p]);
+  if(p==1){assert(!valid(code));continue;} // F2 is handled locally on the main board.
+  matrix.push(code,p);const Key& k=matrix.oldest(matrix.size()-1);
+  Event e={k.seq,0,k.code};
+  assert(mc.consume(99,matrix.head(),&e,1,[&](const Event& got){assert(got.code==expected[p]);++delivered;})==Result::applied);
+ }
+ assert(delivered==19);
  assert(busa_uart::validRoute(22)&&busa_uart::validRoute(23)&&busa_uart::validRoute(24)&&busa_uart::validRoute(25)&&!busa_uart::validRoute(26));
 }
