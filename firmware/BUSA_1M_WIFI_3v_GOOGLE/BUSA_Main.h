@@ -60,7 +60,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainTx && BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainRx,
   "Buzzer pin conflicts with I2C, UART or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-RESET1-KEY1-PERF4-HW2-NAME1-TIME1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-RESET1-KEY1-FLOWUI1-PERF4-HW2-NAME1-TIME1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -2878,7 +2878,7 @@ const DISPLAY_ORDER=[0,2,1,3];
 const SENSOR_NAMES=['Вода','Колонна','Куб','Авария'];
 const SENSOR_COLORS=['#38bdf8','#53d486','#f4c84a','#ff6473'];
 const decimal1=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
-let previousWater=null,waterPplInitialized=false,collectionPplInitialized=false;
+let waterPplInitialized=false,collectionPplInitialized=false;
 function liquidTab(kind){
  document.querySelectorAll('[data-liquid-panel]').forEach(p=>p.hidden=p.dataset.liquidPanel!==kind);
  document.querySelectorAll('[data-liquid-tab]').forEach(b=>{const on=b.dataset.liquidTab===kind;b.classList.toggle('on',on);b.setAttribute('aria-selected',String(on));});
@@ -2900,12 +2900,9 @@ function updateLiquidPanels(s){
  setMeasured('homeCollectionRate',mlMin);
  const volume=formatVolumeMl(total),split=volume.lastIndexOf(' ');
  get('homeCollectionTotal').textContent=split<0?volume:volume.slice(0,split);get('homeCollectionUnit').textContent=split<0?'мл':volume.slice(split+1);
- const w=s?.water,ready=w?.credible===true&&w?.seen_pulses===true&&measured(w?.total_l_estimate),uptime=s?.uptime_ms;
+ const w=s?.water,ready=w?.credible===true&&w?.seen_pulses===true&&measured(w?.total_l_estimate);
  get('waterCalibrationHint').textContent=!s?'Нет связи':w?.calibrated?'Калибровка по мерной ёмкости подтверждена':'Коэффициент не подтверждён мерной ёмкостью';
- let lph=null;
- if(ready&&previousWater&&measured(uptime)&&uptime>previousWater.at&&w.total_l_estimate>=previousWater.total)
-  lph=(w.total_l_estimate-previousWater.total)*3600000/(uptime-previousWater.at);
- if(ready&&measured(uptime))previousWater={at:uptime,total:w.total_l_estimate};else previousWater=null;
+ const lph=measured(w?.lpm)?w.lpm*60:null;
  setMeasured('coolingLph',lph);setMeasured('coolingTotal',ready?w.total_l_estimate:null);
  get('homeCoolingRate').textContent=(measured(lph)?decimal1.format(lph):'—')+' л/ч';
  get('homeWaterUsed').textContent=(ready?decimal1.format(w.total_l_estimate):'—')+' л';
@@ -3076,7 +3073,6 @@ async function resetVolume(target,button,status){
   const response=await fetch('/api/volume/reset',{method:'POST',body:new URLSearchParams({confirm:'YES',target}),cache:'no-store'});
   if(!response.ok)throw Error(await response.text());
   if(!(await response.json()).ok)throw Error('Некорректный ответ');
-  if(target==='water')previousWater=null;
   status.textContent='Объём сброшен';
  }catch(err){status.textContent='Ошибка: '+err.message;}
  finally{button.disabled=false;}
