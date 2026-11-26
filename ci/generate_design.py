@@ -12,6 +12,8 @@ if asset.exists():
 for kind,tag,name in [('CSS','style','design.css'),('JS','script','design.js')]:
     start='/* BUSA_DESIGN_'+kind+'_BEGIN */';end='/* BUSA_DESIGN_'+kind+'_END */'
     content=(root/'web'/name).read_text()
+    if kind=='CSS':content+='\n'+(root/'web/busa_design_003.css').read_text()
+    else:content+='\n'+(root/'web/busa_design_003.js').read_text()
     if kind=='CSS':content+='\n'+(root/'web/holographic.css').read_text()+'\n'+(root/'web/home-motion.css').read_text()
     else:content+='\n'+(root/'web/home-motion.js').read_text()
     block=start+'\n'+content+'\n'+end
