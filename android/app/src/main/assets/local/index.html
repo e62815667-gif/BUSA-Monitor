@@ -1242,7 +1242,12 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
 <div class="grid"><button id="keyUndo" type="button">Назад на шаг</button>
-<button id="keyCancel" type="button">Отмена</button></div></div>
+<button id="keyCancel" type="button">Отмена</button></div>
+<h2>ИК-пульт</h2><div class="row">Состояние <b id="irState">—</b></div>
+<div class="row">Следующая кнопка <b id="irExpected">—</b></div>
+<p id="irInfo" class="hint">—</p>
+<button id="irStart" type="button" class="full">Обучить пульт — 17 кнопок</button>
+<button id="irCancel" type="button" class="full">Отменить обучение пульта</button></div>
 <div class="card" data-diag-panel="relays" hidden><h2>Блок реле</h2>
 <pre id="diagRelay" style="white-space:pre-wrap;word-break:break-word">Ожидание статуса...</pre>
 <p class="hint">Показано состояние выходов ESP32.</p></div>
@@ -1472,6 +1477,12 @@ async function setScreenPower(action){
 get('screenSleep').onclick=()=>setScreenPower('sleep');
 get('screenWake').onclick=()=>setScreenPower('wake');
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
+async function irCommand(action){
+ try{const r=await fetch('/api/ir/'+action,{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+ get('irInfo').textContent=await r.text();}catch(e){get('irInfo').textContent='Ошибка: '+e.message;}
+}
+get('irStart').onclick=()=>{if(confirm('Обучить ИК-пульт?'))irCommand('start')};
+get('irCancel').onclick=()=>irCommand('cancel');
 get('keyNext').onclick=()=>keyCommand('next');
 get('tftTest').onclick=async()=>{
  try{
@@ -1693,6 +1704,10 @@ get('aboutUptime').textContent=formatUptime(s.uptime_ms);
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent+' · DNS '+(cs.dns??'?')+' · TLS '+(cs.tls_error??'?')+' · этап '+(cs.error_stage??'?');
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
+if(s.ir_remote){const q=s.ir_remote;
+ get('irState').textContent=q.learning?('Обучение '+q.step+'/17'):(q.ready?'Сохранён':'Не обучен');
+ get('irExpected').textContent=q.expected||'—';get('irInfo').textContent=q.message||'—';
+}
 if(s.keypad){
  get('keyState').textContent=s.keypad.learning?
    ('Обучение '+s.keypad.step+'/20'):(s.keypad.ready?'Сохранена':'НЕТ');

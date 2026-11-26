@@ -33,10 +33,20 @@
 #include "BUSA_DisplayLink.h"
 #include "BUSA_LocalRequest.h"
 #include "BUSA_HttpServer.h"
+#define DECODE_NEC
+#define DECODE_SAMSUNG
+#define DECODE_SONY
+#define DECODE_RC5
+#define DECODE_RC6
+#define NO_LED_FEEDBACK_CODE
+#include <IRremote.hpp>
+#include "BUSA_IrKeys.h"
 
 constexpr uint8_t TPIN[4]={16,17,18,21};
 constexpr uint8_t KPIN[4]={7,6,5,4}; // Four 12 V sound-annunciator relay driver inputs ONLY
 constexpr uint8_t BUS_SDA=40,BUS_SCL=41; // Isolated PCF8575 keypad only
+constexpr uint8_t IR_GPIO=42; // input only; proposed and approved for IR receiver
+static_assert(IR_GPIO!=BUS_SDA&&IR_GPIO!=BUS_SCL&&IR_GPIO!=busa_uart::mainRx&&IR_GPIO!=busa_uart::mainTx,"IR GPIO conflict");
 constexpr uint8_t FLOW_GPIO=15; // INPUT ONLY, signal level must be <=3.3 V
 constexpr uint8_t COLLECTION_GPIO=1; // Input, verified 3.3 V logic required
 static_assert(COLLECTION_GPIO==1 && COLLECTION_GPIO!=FLOW_GPIO,"Collection GPIO changed");
@@ -48,7 +58,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainTx && BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainRx,
   "Buzzer pin conflicts with I2C, UART or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-PERF4-HW2-NAME1-TIME1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-PERF4-HW2-NAME1-TIME1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -861,6 +871,55 @@ bool keypadDeferredZero=false;
 static busa_keys::Ring busaKeyEvents;
 static uint32_t busaDisplayTestSeq=0;
 static void publishPhysicalKey(uint8_t code){if(busa_display_link::keypadCapable())busaKeyEvents.push(code,millis());}
+static busa_ir::Map irMap;
+static busa_ir::Press irPress;
+static const char* irMessage="Пульт не обучен";
+static bool irPaused=false;
+static void busaIrInit(){
+  uint64_t saved[busa_ir::count]={};
+  if(busaNvsReady&&prefs.getBytesLength("irKeys1")==sizeof(saved)&&prefs.getBytes("irKeys1",saved,sizeof(saved))==sizeof(saved)&&irMap.load(saved))irMessage="Пульт готов";
+  IrReceiver.begin(IR_GPIO);
+  pinMode(IR_GPIO,INPUT_PULLUP);
+}
+static void busaIrPause(){
+  if(!irPaused){IrReceiver.stop();irPaused=true;}
+  irPress.clear();
+  if(irMap.learning()){irMap.cancel();irMessage="Обучение отменено: обновление";}
+}
+static void busaIrEmit(int key){
+  if(key<0||!busa_display_link::keypadCapable()||tftDisplayOff||keypadLearning||irMap.learning())return;
+  ++keyCount;tftDisplayActivityMs=millis();
+  if(key==1){darkenTftDisplay();keyMessage="ИК: экран погашен";}
+  else {publishPhysicalKey(uint8_t(key));keyMessage="ИК: клавиша принята";}
+  tftDirty=true;
+}
+static void busaIrPoll(uint32_t now){
+  if(irPaused){IrReceiver.start();pinMode(IR_GPIO,INPUT_PULLUP);irPaused=false;}
+  if(irMap.expire(now)){irPress.clear();irMessage="Время обучения истекло";}
+  if(!busa_display_link::keypadCapable()||tftDisplayOff||keypadLearning||irMap.learning())irPress.clear();
+  if(!IrReceiver.decode()){irPress.expire(now,busaIrEmit);return;}
+  const auto data=IrReceiver.decodedIRData;
+  IrReceiver.resume();
+  if(data.protocol==UNKNOWN||(data.flags&(IRDATA_FLAGS_PARITY_FAILED|IRDATA_FLAGS_WAS_OVERFLOW)))return;
+  const uint64_t token=busa_ir::identity(uint8_t(data.protocol==NEC2?NEC:data.protocol),data.address,data.command);
+  const bool repeat=(data.flags&(IRDATA_FLAGS_IS_REPEAT|IRDATA_FLAGS_IS_AUTO_REPEAT))!=0;
+  if(irMap.learning()){
+    const auto result=irMap.capture(token,repeat);
+    if(result==busa_ir::LearnResult::duplicate)irMessage="Эта кнопка уже записана";
+    else if(result==busa_ir::LearnResult::accepted)irMessage="Нажмите следующую кнопку";
+    else if(result==busa_ir::LearnResult::complete){
+      uint64_t check[busa_ir::count]={};
+      const size_t bytes=sizeof(check);
+      const bool saved=busaNvsReady&&prefs.putBytes("irKeys1",irMap.staged(),bytes)==bytes&&prefs.getBytes("irKeys1",check,bytes)==bytes&&!memcmp(check,irMap.staged(),bytes);
+      irMessage=irMap.finish(saved)?"Пульт обучен и сохранён":"Ошибка сохранения; прежняя раскладка в работе";
+    }
+    irPress.suppress(token,now);return;
+  }
+  const int key=irMap.action(token);
+  if(keypadLearning||!busa_display_link::keypadCapable()||key==busa_ir::none)return;
+  if(tftDisplayOff){if(!repeat){wakeTftDisplay();keyMessage="ИК: экран пробуждён";}irPress.suppress(token,now);return;}
+  irPress.frame(token,key,repeat,now,busaIrEmit);
+}
 String busaUartStatusJSON(){
   String s=statusJSON();
   if(!busa_display_link::keypadCapable()||!s.endsWith("}"))return s;
@@ -1186,6 +1245,9 @@ String statusJSON(){
   s+=",\"storage\":"+quoteJson(keypadStorageStatus);
   s+=",\"primary_bytes\":"+String(prefs.getBytesLength("keys20"));
   s+=",\"backup_bytes\":"+String(keypadBackupOpen?keypadBackupPrefs.getBytesLength("keys20"):0)+"}";
+  s+=",\"ir_remote\":{\"ready\":"+String(irMap.ready()?"true":"false")+",\"learning\":"+String(irMap.learning()?"true":"false");
+  s+=",\"step\":"+String(unsigned(irMap.step()))+",\"expected\":"+quoteJson(irMap.learning()&&irMap.step()<busa_ir::count?String(busa_ir::bindings[irMap.step()].label):String(""));
+  s+=",\"message\":"+quoteJson(String(irMessage))+"}";
   s+=",\"diagnostics\":{\"onewire\":[";
   for(int i=0;i<4;i++){
     if(i)s+=",";
@@ -2636,7 +2698,12 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <button id="keyStart" type="button" class="full">Начать обучение 20 клавиш</button>
 <button id="keyNext" type="button" class="full">Считать и далее →</button>
 <div class="grid"><button id="keyUndo" type="button">Назад на шаг</button>
-<button id="keyCancel" type="button">Отмена</button></div></div>
+<button id="keyCancel" type="button">Отмена</button></div>
+<h2>ИК-пульт</h2><div class="row">Состояние <b id="irState">—</b></div>
+<div class="row">Следующая кнопка <b id="irExpected">—</b></div>
+<p id="irInfo" class="hint">—</p>
+<button id="irStart" type="button" class="full">Обучить пульт — 17 кнопок</button>
+<button id="irCancel" type="button" class="full">Отменить обучение пульта</button></div>
 <div class="card" data-diag-panel="relays" hidden><h2>Блок реле</h2>
 <pre id="diagRelay" style="white-space:pre-wrap;word-break:break-word">Ожидание статуса...</pre>
 <p class="hint">Показано состояние выходов ESP32.</p></div>
@@ -2866,6 +2933,12 @@ async function setScreenPower(action){
 get('screenSleep').onclick=()=>setScreenPower('sleep');
 get('screenWake').onclick=()=>setScreenPower('wake');
 get('keyStart').onclick=()=>{if(confirm('Обучить клавиатуру, начиная с F1?'))keyCommand('start')};
+async function irCommand(action){
+ try{const r=await fetch('/api/ir/'+action,{method:'POST',body:new URLSearchParams({confirm:'YES'})});
+ get('irInfo').textContent=await r.text();}catch(e){get('irInfo').textContent='Ошибка: '+e.message;}
+}
+get('irStart').onclick=()=>{if(confirm('Обучить ИК-пульт?'))irCommand('start')};
+get('irCancel').onclick=()=>irCommand('cancel');
 get('keyNext').onclick=()=>keyCommand('next');
 get('tftTest').onclick=async()=>{
  try{
@@ -3087,6 +3160,10 @@ get('aboutUptime').textContent=formatUptime(s.uptime_ms);
 get('googleState').textContent=!cs.configured?'НЕ НАСТРОЕН':cs.state===5?'ОТВЕТ ПОЛУЧЕН':cs.state===4?'ПЕРЕДАНО, ПРОВЕРЬТЕ ТАБЛИЦУ':cs.state===3?'ОТПРАВКА':cs.state===2?'ВРЕМЯ':cs.state===1?'НЕТ ИНТЕРНЕТА':cs.state===6?'ОШИБКА':cs.state===7?'ОТКЛОНЕНО':'ОЖИДАНИЕ';
 get('googleResult').textContent='HTTP '+cs.http+' · удачных подтверждений '+cs.sent+' · DNS '+(cs.dns??'?')+' · TLS '+(cs.tls_error??'?')+' · этап '+(cs.error_stage??'?');
 get('updateResult').textContent=s.ota.message+(s.ota.active?' '+s.ota.bytes+' байт':'');
+if(s.ir_remote){const q=s.ir_remote;
+ get('irState').textContent=q.learning?('Обучение '+q.step+'/17'):(q.ready?'Сохранён':'Не обучен');
+ get('irExpected').textContent=q.expected||'—';get('irInfo').textContent=q.message||'—';
+}
 if(s.keypad){
  get('keyState').textContent=s.keypad.learning?
    ('Обучение '+s.keypad.step+'/20'):(s.keypad.ready?'Сохранена':'НЕТ');
@@ -3903,6 +3980,7 @@ static void busaApi_rainmakerStatus(BusaLocalRequest& server){
 static void busaApi_keypadStart(BusaLocalRequest& server){
   const auto apClient=[&server](){return server.local();};
     if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
+    if(irMap.learning()){server.send(409,"text/plain; charset=utf-8","Сначала завершите обучение пульта");return;}
     if(!pcfDetected){server.send(409,"text/plain","PCF8575 not found");return;}
     startKeyLearning();
     server.send(200,"text/plain; charset=utf-8","Обучение: нажми F1 и отпусти");
@@ -4098,6 +4176,7 @@ void setup(){
   stationPass=prefs.getString("pass","");
   wifiUiStaDisabled=prefs.getBool("staOff",false); // AP remains available even when STA is disabled
   loadKeymap();
+  busaIrInit();
   clockZoneKnown=prefs.getBool("clkZone",false);
   clockUtcOffsetMinutes=prefs.getInt("clkTz",0);
   if(clockUtcOffsetMinutes<(-12*60)||clockUtcOffsetMinutes>14*60)clockZoneKnown=false;
@@ -4358,6 +4437,17 @@ void setup(){
   server.on("/api/collection/calibration",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_collectionCoefficient(request);});
   server.on("/api/temperature/calibration",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_calibration(request);
   });
+  server.on("/api/ir/start",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
+    if(!busaNvsReady||keypadLearning||otaActive||busa_display_ota::busy()){server.send(409,"text/plain; charset=utf-8","Устройство занято");return;}
+    irPress.clear();IrReceiver.resume();irMap.start(millis());irMessage="Нажмите кнопку 1 и отпустите";
+    server.send(200,"text/plain; charset=utf-8",irMessage);
+  });
+  server.on("/api/ir/cancel",HTTP_POST,[]{
+    if(!apClient()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Local AP only");return;}
+    irMap.cancel();irPress.clear();IrReceiver.resume();irMessage="Обучение отменено; прежняя раскладка сохранена";
+    server.send(200,"text/plain; charset=utf-8",irMessage);
+  });
   server.on("/api/keypad/start",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_keypadStart(request);
   });
   server.on("/api/keypad/next",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_keypadNext(request);
@@ -4493,7 +4583,8 @@ void loop(){
   if(otaRestart && elapsed(millis(),otaRestartAt,4000)){soundOutputsOff();ESP.restart();}
   // Avoid I2C/1-Wire/SPI scanning while Wi-Fi OTA flash chunks arrive.
   // Flash throughput remains hardware/network limited.
-  if(otaActive){soundOutputsOff();delay(0);return;}
+  if(otaActive){busaIrPause();soundOutputsOff();delay(0);return;}
+  if(busa_display_ota::busy())busaIrPause();else busaIrPoll(millis());
   if(tftRebootPending && elapsed(millis(),tftRebootAt,3000)){soundOutputsOff();ESP.restart();}
   if(googleRestart && elapsed(millis(),googleRestartAt,3500)){soundOutputsOff();ESP.restart();}
   busaRemoteAlarmApply(); // remote sound thresholds only; writes NVS in main loop
