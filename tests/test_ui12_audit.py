@@ -105,7 +105,7 @@ int main(){
 google=(fw/'BUSA_Google.h').read_text();worker=google[google.index('void googleWorker('):google.index('void addGoogleRoutes()')]
 assert 'statusJSON(' not in worker and 'snapshot->json' in worker
 assert 'busaGoogleSnapshotPoll();' in main[main.index('void loop(){'):]
-# Actual sound state machine: hysteresis, T4 priority, mutually exclusive 60s sounds, expiry, rollover.
+# Actual sound state machine: hysteresis, T4 priority and return to T3, exclusive 30s sounds, expiry, rollover.
 run(common+r'''
 #include "BUSA_SoundAlarmLogic.h"
 int main(){
@@ -127,29 +127,50 @@ int main(){
   tick(96,70,start);expect(true,true,false,false);
   tick(95,70,start+1);expect(true,true,false,false);assert(!r.t3OnEvent);
   tick(94,70,start+100);expect(false,false,true,false);
-  tick(94,70,start+60099);expect(false,false,true,false);
-  tick(94,70,start+60100);expect(false,false,false,false);
-  tick(96,70,start+60200);expect(true,true,false,false);
-  tick(96,85,start+60300);expect(false,true,false,true);assert(r.t4OnEvent);
-  tick(94,85,start+60400);expect(false,true,false,true);assert(r.t3OffEvent);
-  tick(96,85,start+60500);expect(false,true,false,true);assert(r.t3OnEvent);
-  tick(96,85,start+120299);expect(false,true,false,true);
-  tick(96,85,start+120300);expect(false,false,false,true);
-  tick(96,80,start+120400);expect(false,false,true,false);assert(r.t4OffEvent);
-  tick(96,80,start+180399);expect(false,false,true,false);
-  tick(96,80,start+180400);expect(false,false,false,false);
-  tick(94,70,start+180401);expect(false,false,true,false);
-  tick(96,70,start+180402);expect(true,true,false,false);
-  tick(96,70,start+240401);expect(true,true,false,false);
-  tick(96,70,start+240402);expect(true,false,false,false);
-  // An emergency interrupts an already sounding K3, including simultaneous edges.
-  tick(94,85,start+240403);expect(false,true,false,true);
-  tick(96,80,start+240404);expect(false,false,true,false);
-  tick(96,80,start+240405);expect(false,false,true,false);
-  en[0]=en[1]=en[2]=en[3]=false;tick(96,90,start+240406);
+  tick(94,70,start+30099);expect(false,false,true,false);
+  tick(94,70,start+30100);expect(false,false,false,false);
+  tick(96,70,start+30200);expect(true,true,false,false);
+  tick(96,85,start+30300);expect(false,true,false,true);assert(r.t4OnEvent);
+  tick(94,85,start+30400);expect(false,true,false,true);assert(r.t3OffEvent);
+  tick(96,85,start+30500);expect(false,true,false,true);assert(r.t3OnEvent);
+  tick(96,85,start+60299);expect(false,true,false,true);
+  tick(96,85,start+60300);expect(false,false,false,true);
+  // T3 already active: T4 OFF must start a fresh K2 pulse, not K3.
+  tick(96,80,start+60400);expect(true,true,false,false);assert(r.t4OffEvent&&!r.t3OnEvent);
+  tick(95,80,start+90399);expect(true,true,false,false);
+  tick(95,80,start+90400);expect(true,false,false,false);
+  // Simultaneous T3 OFF + T4 ON: emergency wins.
+  tick(94,85,start+90500);expect(false,true,false,true);
+  // T3 still inactive: T4 OFF gives K3 for exactly 30 seconds.
+  tick(94,80,start+90600);expect(false,false,true,false);
+  tick(94,80,start+120599);expect(false,false,true,false);
+  tick(94,80,start+120600);expect(false,false,false,false);
+  // T3 ON interrupts K3 and starts K2. T4 ON interrupts normal signals.
+  tick(96,70,start+120700);expect(true,true,false,false);
+  tick(94,70,start+120800);expect(false,false,true,false);
+  tick(94,85,start+120900);expect(false,true,false,true);
+  // Simultaneous T3 ON + T4 OFF: return to T3, restart K2.
+  tick(96,80,start+121000);expect(true,true,false,false);
+  tick(96,80,start+150999);expect(true,true,false,false);
+  tick(96,80,start+151000);expect(true,false,false,false);
+  // T3 remains active in hysteresis band after emergency.
+  tick(95,85,start+151100);expect(false,true,false,true);
+  tick(95,80,start+151200);expect(true,true,false,false);
+  tick(94,80,start+151300);expect(false,false,true,false);
+  en[0]=en[1]=en[2]=en[3]=false;tick(96,90,start+151400);
   for(bool on:r.k)assert(!on);
   BusaSound::Routed invalid;BusaSound::evaluateRouted(invalid,en,false,NAN,96,94,false,NAN,85,80,start);
   assert(!invalid.t3OffEvent&&!invalid.t4OffEvent);
+  // Owner's exact 30/29 C scenario, with T3 crossing during emergency.
+  BusaSound::Routed example;bool enabled[4]={true,true,true,true};
+  BusaSound::evaluateRouted(example,enabled,true,28,30,29,true,31,30,29,start);
+  BusaSound::evaluateRouted(example,enabled,true,31,30,29,true,31,30,29,start+100);
+  assert(!example.k[0]&&example.k[1]&&!example.k[2]&&example.k[3]);
+  BusaSound::evaluateRouted(example,enabled,true,31,30,29,true,29,30,29,start+200);
+  assert(example.k[0]&&example.k[1]&&!example.k[2]&&!example.k[3]);
+  assert(BusaSound::remainingMs(example.k2,start+200,BusaSound::ROUTED_PULSE_MS)==30000);
+  BusaSound::evaluateRouted(example,enabled,true,31,30,29,true,29,30,29,start+30200);
+  assert(example.k[0]&&!example.k[1]&&!example.k[2]&&!example.k[3]);
   BusaSound::Routed lost;bool all[4]={true,true,true,true};
   BusaSound::evaluateRouted(lost,all,true,96,96,94,true,85,85,80,start);
   assert(!lost.k[0]&&lost.k[1]&&!lost.k[2]&&lost.k[3]);
@@ -199,4 +220,4 @@ int main(){
  }
 }
 ''','remote_nvs')
-print('PASS audit: all JSON control bytes/UTF-8 roundtrip; real restart predicates including rollover; DS18B20 hot replacement/missing/invalid conversion; 50k concurrent immutable snapshots without leaks; sound hysteresis/T4 priority/exclusive 60s expiry/rollover; NVS failures at 15 writes and NaN readback roll back enable flags/thresholds/command ID')
+print('PASS audit: all JSON control bytes/UTF-8 roundtrip; real restart predicates including rollover; DS18B20 hot replacement/missing/invalid conversion; 50k concurrent immutable snapshots without leaks; sound hysteresis/T4 priority/return to T3/exclusive 30s expiry/rollover; NVS failures at 15 writes and NaN readback roll back enable flags/thresholds/command ID')

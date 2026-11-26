@@ -3,7 +3,7 @@ on:
   push:
     branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125, fix/busa-actual-hw1-20261125, fix/busa-latency-perf4-20261125, fix/busa-guition-ui2-20261125, fix/busa-guition-ui3-20261125, fix/busa-guition-ui4-20261125, fix/busa-guition-ui5-20261125, fix/busa-guition-ui6-20261125, fix/busa-guition-ui7-20261125, fix/busa-guition-ui8-20261125, fix/busa-guition-ui9-20261125, fix/busa-guition-ui10-20261125, fix/busa-main-name1-20261126, fix/busa-ai1v-time1-20261126, fix/busa-guition-graphs5-20261126, fix/busa-guition-graph-grid-history-20261126, fix/busa-liquid-settings-20261126, fix/busa-guition-home-align-20261126, fix/busa-guition-ultra-graphics-20261126, fix/busa-guition-clean-graphics-20261126, fix/busa-ir-remote-20261126]
   pull_request:
-    branches: [fix/busa-ir-remote-20261126, fix/busa-guition-nav1-20261126, fix/busa-guition-nav2-20261126, fix/busa-guition-nav3-20261126, fix/busa-guition-nav4-20261126, fix/busa-guition-nav5-20261126, fix/busa-flowui1-20261126, fix/busa-guition-focus1-20261126]
+    branches: [fix/busa-ir-remote-20261126, fix/busa-guition-nav1-20261126, fix/busa-guition-nav2-20261126, fix/busa-guition-nav3-20261126, fix/busa-guition-nav4-20261126, fix/busa-guition-nav5-20261126, fix/busa-flowui1-20261126, fix/busa-guition-focus1-20261126, fix/busa-sound60-20261126]
   workflow_dispatch:
 permissions:
   contents: read
@@ -118,7 +118,7 @@ jobs:
           assert usb.read_bytes()[0x10000:]==ota.read_bytes()
           assert b'display_diagnostics' in ota.read_bytes()
           assert b'UNRELIABLE_PULSES' in ota.read_bytes()
-          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-RESET1-KEY1-FLOWUI1-SOUND60-PERF4-HW2-NAME1-TIME1' in ota.read_bytes()
+          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-RESET1-KEY1-FLOWUI1-SOUND30-PERF4-HW2-NAME1-TIME1' in ota.read_bytes()
           assert b'BUSA 1M AI 1v' in ota.read_bytes()
           assert b'main_uart_tx_worker_max_ms' in ota.read_bytes()
           assert b'loop_profile' in ota.read_bytes()
