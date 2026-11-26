@@ -8,10 +8,10 @@ assert 'panel(middle,151,144)' not in home, 'legacy opaque temperature cards'
 nums=dict((k,int(v)) for k,v in re.findall(r'\b(TOP|NAV|PAD|GAP|SCENE|METRICS|RELAYS)=(\d+)',u))
 assert nums['TOP']+nums['NAV']+2*nums['PAD']+nums['SCENE']+nums['METRICS']+nums['RELAYS']+2*nums['GAP']==272
 assert 'lv_img_set_antialias(im,true)' in home
-assert nums['METRICS']>=30 and nums['RELAYS']>=28
-assert 'setBg(statusDots_[i]' in u and 'setBg(lv_obj_get_parent(live_[i])' in u
-for text in ('ТЭН откл.','Кран закрыт','Кран открыт','Авария','Израсходовано','Отбор'):
-    assert text in home
+assert nums['METRICS']>=30 and nums['RELAYS']==0 and nums['SCENE']>=150
+assert 'setBg(statusDots_[i]' in u and 'homeTempFrames_[i]' in u and 'homeAlarm_' in u
+for text in ('ТЭН откл.','ТЭН вкл.','Кран закрыт','Кран открыт','Авария','Объём','Отбор'):
+    assert text in u
 assert 'Тихо' not in u
 assert 'lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE)' in u
 assert 'busa_font_small' in u and 'busa_font_value' in u
