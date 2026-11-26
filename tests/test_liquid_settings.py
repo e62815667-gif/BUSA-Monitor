@@ -98,7 +98,7 @@ b=main.index("get('tempCalSave').onclick",a)
 js=r'''
 const assert=require('node:assert/strict'), nodes={},calls=[];
 const get=id=>nodes[id]??=( {value:'',textContent:'',disabled:false});
-let waterPplInitialized=false,collectionPplInitialized=false,failed=false,previousWater={at:10,total:1},approved=true;
+let waterPplInitialized=false,collectionPplInitialized=false,failed=false,approved=true;
 const window={confirm:()=>approved};
 const fetch=async (url,opts)=>{
  calls.push([url,Object.fromEntries(opts.body)]);
@@ -118,10 +118,31 @@ const fetch=async (url,opts)=>{
  assert.match(get('collectionPplResult').textContent,/NVS/);
  assert.equal(get('collectionPplSave').disabled,false);
  failed=false;approved=false;const n=calls.length;await get('waterResetTotal').onclick();assert.equal(calls.length,n);
- approved=true;await get('waterResetTotal').onclick();assert.deepEqual(calls[n],['/api/volume/reset',{confirm:'YES',target:'water'}]);assert.equal(previousWater,null);
+ approved=true;await get('waterResetTotal').onclick();assert.deepEqual(calls[n],['/api/volume/reset',{confirm:'YES',target:'water'}]);
  await get('collectionResetTotal').onclick();assert.deepEqual(calls[n+1],['/api/volume/reset',{confirm:'YES',target:'collection'}]);assert.equal(get('collectionResetResult').textContent,'Объём сброшен');
  failed=true;await get('collectionResetTotal').onclick();assert.match(get('collectionResetResult').textContent,/NVS/);assert.equal(get('collectionResetTotal').disabled,false);
  console.log('PASS actual local browser independent reset/save, cancellation and error recovery');
 })().catch(e=>{console.error(e);process.exit(1)});
 '''
 subprocess.run(['node','-e',js],check=True)
+# Live rate is an ESP32 measurement, not a derivative of rounded cumulative volume.
+rate_js=r'''
+const assert=require('node:assert/strict'),nodes={};
+const get=id=>nodes[id]??=({textContent:'',classList:{toggle(){}}});
+const decimal1=new Intl.NumberFormat('ru-RU',{minimumFractionDigits:1,maximumFractionDigits:1});
+let previousWater=null;
+'''+main[main.index('function measured('):main.index('function renderHomeThresholds(')]+r'''
+const water={credible:true,seen_pulses:true,calibrated:true,total_l_estimate:1.457,lpm:0.639};
+const sample=(overrides={},uptime=10000)=>updateLiquidPanels({water:{...water,...overrides},uptime_ms:uptime});
+const rate=(value)=>{assert.equal(get('coolingLph').textContent,value);assert.equal(get('homeCoolingRate').textContent,value+' л/ч');};
+sample();rate('38,3');
+sample({total_l_estimate:1.457},10001);rate('38,3');
+sample({total_l_estimate:3.12,lpm:0.711},10002);rate('42,7');
+sample({total_l_estimate:0},10003);rate('38,3');assert.equal(get('coolingTotal').textContent,'0,0');
+sample({lpm:0},10004);rate('0,0');
+for(const v of [null,undefined,-1,NaN,Infinity,'0.639']){sample({lpm:v});rate('—');}
+updateLiquidPanels(null);rate('—');
+sample({},1);rate('38,3');
+console.log('PASS ESP32 rate on first sample, arbitrary polling intervals, reset, zero, invalid values and reconnect');
+'''
+subprocess.run(['node','-e',rate_js],check=True)
