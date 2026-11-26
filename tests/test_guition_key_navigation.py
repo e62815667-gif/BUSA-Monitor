@@ -32,7 +32,7 @@ void lv_obj_clear_state(lv_obj_t* o,int){o->focused=false;}
 void lv_obj_add_state(lv_obj_t* o,int){o->focused=true;}
 struct Harness {
     static int color(int c){return c;}
-    static int accent(){return 1;}
+    void focusStyle(lv_obj_t*,uint8_t){}
 ''' + focus + r'''
     KeyControl keyControls_[64]={};
     lv_obj_t controls[10]={};

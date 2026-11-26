@@ -158,6 +158,11 @@ checks=r'''
         for(int i=0;i<6;++i){
             auto* b=navButtons_[i];auto* l=lv_obj_get_child(b,0);auto* im=lv_obj_get_child(b,1);
             assertFits(b);labelFits(l);assertFits(im);
+            selected(b,true);assert(lv_obj_get_style_bg_color(b,0).full==color(0x16763e).full);
+            selected(b,false);focusStyle(b,0);lv_obj_add_state(b,LV_STATE_FOCUSED);
+            assert(lv_obj_get_style_outline_color(b,0).full==color(0x53d486).full);
+            assert(lv_obj_get_style_bg_color(b,0).full==color(theme_==0?0xcbeed7:0x16763e).full);
+            lv_obj_clear_state(b,LV_STATE_FOCUSED);
             assert(lv_obj_get_width(im)==20&&lv_obj_get_height(im)==20);
             assert(lv_img_get_zoom(im)==LV_IMG_ZOOM_NONE);
             lv_area_t x,y,z;lv_obj_get_coords(im,&x);lv_obj_get_coords(l,&y);lv_obj_get_coords(b,&z);
