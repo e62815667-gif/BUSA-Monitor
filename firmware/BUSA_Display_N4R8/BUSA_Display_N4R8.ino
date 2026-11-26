@@ -6,9 +6,9 @@ static busa_guition::DisplaySession displaySession;
 static busa_guition::Interface interface(displayHardware,displaySession);
 static bool uiReady=false,uartReady=false;
 #if ESP_ARDUINO_VERSION_MAJOR >= 3
-static constexpr char displayVersion[]="BUSA-DISPLAY-N4R8-OTA1-BD2-I5-P1-N1-HW2";
+static constexpr char displayVersion[]="BUSA-DISPLAY-N4R8-OTA1-BD2-I5-P1-N2-HW2";
 #else
-static constexpr char displayVersion[]="BUSA-DISPLAY-N4R8-OTA1-BD2-I4-P1-N1-HW2";
+static constexpr char displayVersion[]="BUSA-DISPLAY-N4R8-OTA1-BD2-I4-P1-N2-HW2";
 #endif
 static_assert(sizeof(displayVersion)<=busa_uart::versionBytes,"Diagnostic version does not fit UART contract");
 // The receiver, not the Arduino core, validates the new image after health checks.

@@ -12,8 +12,8 @@ inline Nav route(uint8_t k,bool entered,bool child){
         case 19:return entered?Nav::activate:Nav::enter;
         case 16:return entered?Nav::left:Nav::previousSection;
         case 18:return entered?Nav::right:Nav::nextSection;
-        case 7:return entered?Nav::up:Nav::none;
-        case 11:return entered?Nav::down:Nav::none;
+        case 7:return Nav::up;
+        case 11:return Nav::down;
         default:return Nav::none;
     }
 }

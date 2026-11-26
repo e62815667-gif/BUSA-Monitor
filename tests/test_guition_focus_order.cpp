@@ -27,8 +27,8 @@ int main(){
     assert(neighbor(temps,9,7,Direction::down)==8);
     assert(route(16,false,false)==Nav::previousSection);
     assert(route(18,false,false)==Nav::nextSection);
-    assert(route(7,false,false)==Nav::none);
-    assert(route(11,false,false)==Nav::none);
+    assert(route(7,false,false)==Nav::up);
+    assert(route(11,false,false)==Nav::down);
     assert(route(19,false,false)==Nav::enter);
     assert(route(16,true,false)==Nav::left);
     assert(route(18,true,false)==Nav::right);
