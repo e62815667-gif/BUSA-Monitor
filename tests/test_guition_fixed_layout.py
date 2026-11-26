@@ -3,7 +3,7 @@ import re
 r=Path(__file__).resolve().parents[1]
 u=(r/'firmware/BUSA_Display_N4R8/BUSA_TouchUI.h').read_text()
 home=u[u.index('    void home(){'):u.index('    void temperatures(){')]
-assert '"Расход","Израсходовано","Отбор","Собрано"' in home, 'total belongs in the metrics strip, not temperature scene'
+assert all('String("'+x+' ")' in u for x in ('Расход','Объём','Отбор','Собрано')), 'four single-line metric readings required'
 assert 'live_[11]=at(scene' not in home
 homeTemps=u[u.index('    void homeTemperatures('):u.index('    void home(){')]
 assert 'homeTemperatures(scene)' in home
@@ -25,6 +25,7 @@ nums={k:int(v) for k,v in re.findall(r'\b(TOP|NAV|PAD|GAP|SCENE|METRICS|RELAYS)=
 body=272-nums['TOP']-nums['NAV']-2*nums['PAD']
 assert body==192
 assert nums['SCENE']+nums['METRICS']+nums['RELAYS']+2*nums['GAP']==body
+assert nums['RELAYS']==0 and nums['SCENE']>=150, 'approved statuses must be placed inside temperature scene'
 # Geometry of all dense screens; bounds of fixed-height children, plus flex row gaps.
 # Label font generation uses 12px condensed (measured line height 17 px); host LVGL tests check actual glyph bounds.
 assert 'row(body_,70)' in u and 'panel(r,235,70)' in u and 'row(p,20)' in u and 'row(p,42)' in u
