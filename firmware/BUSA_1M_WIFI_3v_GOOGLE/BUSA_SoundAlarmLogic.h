@@ -24,7 +24,7 @@ inline bool evaluate(Channel& c,bool enabled,bool fresh,float t,float on,float o
   c.reason=c.on?Sounding:Waiting;
   return c.on;
 }
-// Sound-only pulse logic for K2 and K3. 90 s once on each new
+// Sound-only pulse logic for K2 and K3. 60 s once on each new
 // temperature-condition transition; rearm only after T_OFF is reached.
 struct TimedSignal {
   bool armed=true;
@@ -60,7 +60,7 @@ inline uint32_t remainingMs(const TimedSignal& pulse,uint32_t now,uint32_t durat
 // Pure state machine for temperature-driven 12V SOUND signals only.
 // T3: K1 continuous and K2 on T_ON; K3 on T_OFF.
 // T4: K4 continuous and K2 on T_ON; K3 on T_OFF.
-// Only T3 OFF silences K1. T4 OFF leaves K1 unchanged.
+// T4 has priority over T3. T4 OFF leaves K1 silent until a fresh T3 ON.
 // No output can operate a valve or disconnect power.
 struct Routed {
   Channel t3,t4;
@@ -81,7 +81,7 @@ inline bool tickPulse(TimedSignal& p,uint32_t now,uint32_t durationMs){
 inline void evaluateRouted(Routed& r,const bool enable[4],
     bool t3Fresh,float t3,float t3On,float t3Off,
     bool t4Fresh,float t4,float t4On,float t4Off,
-    uint32_t now,uint32_t pulseDurationMs=90000UL){
+    uint32_t now,uint32_t pulseDurationMs=60000UL){
   const bool valid3=t3Fresh&&std::isfinite(t3)&&valid(t3On,t3Off);
   const bool valid4=t4Fresh&&std::isfinite(t4)&&valid(t4On,t4Off);
   const bool prev3=r.t3.on,prev4=r.t4.on;
@@ -91,22 +91,24 @@ inline void evaluateRouted(Routed& r,const bool enable[4],
   r.t3OffEvent=valid3&&prev3&&!active3;
   r.t4OnEvent=valid4&&!prev4&&active4;
   r.t4OffEvent=valid4&&prev4&&!active4;
-  // Prevent an invalid sensor from generating false "open" signals.
-  // Temperature telemetry remains independent and unchanged.
-  if(!valid3||!valid4){
-    // Do not turn ongoing pulses into new events. Missing data on one
-    // temperature source does not disable the *other* source.
-  }
-  // Expire old pulses before deciding whether they block a new signal.
+  // Expire pulses; the latest eligible transition selects exactly one sound.
   tickPulse(r.k2,now,pulseDurationMs);
   tickPulse(r.k3,now,pulseDurationMs);
-  const bool openingEvent=r.t3OffEvent||r.t4OffEvent;
-  const bool closingEvent=r.t3OnEvent||r.t4OnEvent;
-  if(r.t3OnEvent)r.k1Hold=false;
-  if(r.t3OffEvent)r.k1Hold=true;
-  if(openingEvent && enable[2])startPulse(r.k3,now);
-  if(closingEvent && enable[1])startPulse(r.k2,now);
-  r.k[0]=enable[0]&&valid3&&active3&&!r.k1Hold;
+  // Valid T4 transitions override simultaneous T3 transitions.
+  // While T4 is active, T3 edges are observed but do not route sounds.
+  if(active4||r.t4OffEvent)r.k1Hold=true;
+  else if(r.t3OffEvent)r.k1Hold=true;
+  else if(r.t3OnEvent)r.k1Hold=false;
+  const bool closingEvent=r.t4OnEvent||(!active4&&!r.t4OffEvent&&r.t3OnEvent);
+  const bool openingEvent=r.t4OffEvent||(!active4&&!r.t4OnEvent&&r.t3OffEvent);
+  if(closingEvent){
+    resetTimed(r.k3);
+    if(enable[1])startPulse(r.k2,now);
+  }else if(openingEvent){
+    resetTimed(r.k2);
+    if(enable[2])startPulse(r.k3,now);
+  }
+  r.k[0]=enable[0]&&valid3&&active3&&!active4&&!r.k1Hold;
   r.k[1]=enable[1]&&tickPulse(r.k2,now,pulseDurationMs);
   r.k[2]=enable[2]&&tickPulse(r.k3,now,pulseDurationMs);
   r.k[3]=enable[3]&&valid4&&active4;
