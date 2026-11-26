@@ -1,0 +1,23 @@
+/* DESIGN-003 approved 27.11.2026: HOME ONLY. The existing rig image is unchanged. */
+html:root.busaDesign section.holoHome.busaApprovedHome003 .relayIndicators{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedDashboard{position:relative;padding-bottom:52px!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTempTitle{font-size:14px!important;line-height:1.15!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp strong{font-size:clamp(18px,4.7vw,24px)!important;line-height:1.15!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp{outline:1px solid transparent;outline-offset:2px;border-radius:5px}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.busaAlert{outline-color:#ffc76d}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp3.busaAlert{outline-color:#ff6473}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2{left:auto!important;right:calc(var(--scene-left) + var(--scene-w) - var(--panel-w) + 3px)!important;top:58%!important;width:var(--temp-label-width)!important;text-align:right!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempTitle{font-size:14px!important;color:var(--ink)!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp0{top:58%!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .collectedOnGlass{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003{position:absolute;bottom:7px;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-end;gap:10px;pointer-events:none;color:#8cf5a9;font-size:14px;font-weight:700;line-height:1.25;z-index:6}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003 .busaStatusValve{text-align:right;margin-left:auto}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003 .busaStatusOff{color:#ff6976}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003 .busaStatusUnknown{color:var(--muted)}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedAlarm003{position:absolute;right:0;bottom:32px;border:1px solid #ff6473;border-radius:4px;color:#ff6473;font:700 14px/1.2 Arial,sans-serif;padding:3px 16px;pointer-events:none;z-index:6}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedAlarm003[hidden]{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetrics{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;min-height:40px;gap:0;margin-top:5px}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:4px;padding:3px 4px;min-width:0;white-space:nowrap}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span{font-size:clamp(9px,2.3vw,12px);line-height:1.1;color:#d0eaf6}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b,html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>strong{font:700 clamp(9px,2.3vw,12px)/1.1 Arial,sans-serif;color:#7de9f4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric small{font-size:inherit}
