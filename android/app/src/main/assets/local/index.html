@@ -1041,6 +1041,30 @@ html:root.busaDesign section.holoHome .hasTemperature .boilerBoil>*,html:root.bu
 html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:root.busaDesign section.holoHome .homeMotionPaused .boilerBoil>*,html:root.busaDesign section.holoHome .homeMotionPaused .collectionLiquid>*{animation-play-state:paused!important}
 @media(prefers-reduced-motion:reduce){html:root.busaDesign section.holoHome .waterMotion path{animation:none!important}}
 
+/* DESIGN-003 approved 27.11.2026: HOME ONLY. The existing rig image is unchanged. */
+html:root.busaDesign section.holoHome.busaApprovedHome003 .relayIndicators{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedDashboard{position:relative;padding-bottom:52px!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTempTitle{font-size:14px!important;line-height:1.15!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp strong{font-size:clamp(18px,4.7vw,24px)!important;line-height:1.15!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp{outline:1px solid transparent;outline-offset:2px;border-radius:5px}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.busaAlert{outline-color:#ffc76d}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp3.busaAlert{outline-color:#ff6473}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2{left:auto!important;right:calc(var(--scene-left) + var(--scene-w) - var(--panel-w) + 3px)!important;top:58%!important;width:var(--temp-label-width)!important;text-align:right!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempTitle{font-size:14px!important;color:var(--ink)!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp0{top:58%!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .collectedOnGlass{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003{position:absolute;bottom:7px;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-end;gap:10px;pointer-events:none;color:#8cf5a9;font-size:14px;font-weight:700;line-height:1.25;z-index:6}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003 .busaStatusValve{text-align:right;margin-left:auto}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003 .busaStatusOff{color:#ff6976}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003 .busaStatusUnknown{color:var(--muted)}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedAlarm003{position:absolute;right:0;bottom:32px;border:1px solid #ff6473;border-radius:4px;color:#ff6473;font:700 14px/1.2 Arial,sans-serif;padding:3px 16px;pointer-events:none;z-index:6}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedAlarm003[hidden]{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetrics{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;min-height:40px;gap:0;margin-top:5px}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:4px;padding:3px 4px;min-width:0;white-space:nowrap}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span{font-size:clamp(9px,2.3vw,12px);line-height:1.1;color:#d0eaf6}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b,html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>strong{font:700 clamp(9px,2.3vw,12px)/1.1 Arial,sans-serif;color:#7de9f4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric small{font-size:inherit}
+
 /* BUSA_DESIGN_CSS_END */
 </style><link rel="stylesheet" href="/calculator.css?v=CALC1"></head><body>
 <header class="appHeader"><div class="headerRow"><div>
@@ -1677,6 +1701,7 @@ if(s.sound_alerts?.channels?.length===4 && s.sound_alerts?.buzzer?.sensors?.leng
  temperatureThresholdsInitialized=true;
 }
 updateRelayBadges(s.sound_alerts?.channels);
+window.busaApprovedHomeUpdate?.(s);
 if(!waterPplInitialized && Number.isFinite(s.water?.pulses_per_litre)){
  get('waterPplInput').value=Number(s.water.pulses_per_litre).toFixed(1);
  waterPplInitialized=true;
@@ -2129,6 +2154,62 @@ request();
  const syncVisibility=()=>stage.classList.toggle('homeMotionPaused',document.hidden);
  document.addEventListener('visibilitychange',syncVisibility);
  syncVisibility();
+})();
+
+/* DESIGN-003: only compose the approved home display; all readings remain original DOM bindings. */
+(()=>{
+ 'use strict';
+ const home=document.querySelector('section[data-section="0"]');
+ if(!home || !home.querySelector('#rigArtStage'))return;
+ const dashboard=home.querySelector('.approvedDashboard');
+ const existingArt=home.querySelector('#rigArtStage .approvedRigArt');
+ const originalArtSource=existingArt?.getAttribute('src');
+ home.classList.add('busaApprovedHome003');
+ const statuses=document.createElement('div');
+ statuses.className='busaApprovedStatus003';
+ const heater=document.createElement('span');heater.className='busaStatusHeater';heater.textContent='ТЭН —';
+ const valve=document.createElement('span');valve.className='busaStatusValve';valve.textContent='Кран —';
+ statuses.append(heater,valve);dashboard.append(statuses);
+ const alarm=document.createElement('span');alarm.className='busaApprovedAlarm003';alarm.textContent='АВАРИЯ';alarm.hidden=true;dashboard.append(alarm);
+ const metrics=home.querySelector('.holoMetrics');
+ if(metrics){
+   const values=[['Расход','homeCoolingRate'],['Объём','homeWaterUsed'],['Отбор','homeCollectionRate'],['Собрано','homeCollectionTotal']];
+   const originalReadings=values.map(([,id])=>document.getElementById(id));
+   metrics.replaceChildren();
+   for(const [index,[name,id]] of values.entries()){
+     const original=originalReadings[index];
+     const cell=document.createElement('div');cell.className='holoMetric';
+     const title=document.createElement('span');title.textContent=name;
+     const reading=document.createElement('b');
+     if(original)reading.append(original);else reading.textContent='—';
+     if(id==='homeCollectionRate')reading.append(document.createTextNode(' мл/мин'));
+     if(id==='homeCollectionTotal')reading.append(document.getElementById('homeCollectionUnit')||document.createTextNode(' мл'));
+     cell.append(title,reading);metrics.append(cell);
+   }
+ }
+ window.busaApprovedHomeUpdate=function(s){
+   const sound=s?.sound_alerts;
+   const cube=sound?.channels?.[0],top=sound?.channels?.[3];
+   const cubeValid=!!(cube?.sample_valid&&typeof cube.on_c==='number'&&typeof cube.off_c==='number'&&Number.isFinite(cube.on_c)&&Number.isFinite(cube.off_c));
+   const topValid=!!(top?.sample_valid&&typeof top.on_c==='number'&&typeof top.off_c==='number'&&Number.isFinite(top.on_c)&&Number.isFinite(top.off_c));
+   const cubeOn=cubeValid&&cube.t3_condition===true;
+   const topOn=topValid&&top.t4_condition===true;
+   const normal=cubeValid&&cubeOn&&!topOn;
+   const ordinaryOff=cubeValid&&!cubeOn&&!topOn&&Number(sound?.t3_off_events)>0;
+   const marks=[sound?.buzzer?.sensors?.[0]?.condition_active===true,
+                sound?.buzzer?.sensors?.[1]?.condition_active===true,ordinaryOff,topOn];
+   for(let i=0;i<4;i++)home.querySelector('.approvedTemp.temp'+i)?.classList.toggle('busaAlert',marks[i]);
+   heater.textContent=!cubeValid?'ТЭН —':normal?'ТЭН вкл.':'ТЭН откл.';
+   valve.textContent=!cubeValid?'Кран —':normal?'Кран открыт':'Кран закрыт';
+   for(const label of [heater,valve]){
+     label.classList.toggle('busaStatusOff',cubeValid&&!normal);
+     label.classList.toggle('busaStatusUnknown',!cubeValid);
+   }
+   alarm.hidden=!topOn;
+   // Never mutate, replace, redraw, or reencode the local application's original rig image.
+   if(existingArt && existingArt.getAttribute('src')!==originalArtSource)
+     console.error('[DESIGN-003] Rig artwork was changed outside home presentation');
+ };
 })();
 
 /* BUSA_DESIGN_JS_END */
