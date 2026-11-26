@@ -155,7 +155,7 @@ private:
     static void event(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));
         auto* o=lv_event_get_target(e);int id=int(reinterpret_cast<intptr_t>(lv_obj_get_user_data(o)));
-        self->cancelKeyEdit(false);self->action(id);
+        self->cancelKeyEdit(false);if(id<100||id>=106)self->sectionEntered_=true;self->action(id);
     }
     static void textFocus(lv_event_t* e){
         auto* self=static_cast<Interface*>(lv_event_get_user_data(e));auto* ta=lv_event_get_target(e);
@@ -627,7 +627,7 @@ private:
         if(id==340||id==341){touchFinish(id==341);return;}
         if(touchTarget_)return;
         if(waiting_&&page_==4&&calcMode_==3)return;
-        if(id>=100&&id<106){rememberCalc();if(page_!=id-100)previousPage_=page_;page_=id-100;sub_=-1;render();return;}
+        if(id>=100&&id<106){rememberCalc();sectionEntered_=false;page_=id-100;sub_=-1;render();return;}
         if(id>=400&&id<409){sub_=id-400;if(sub_==2)requestedTheme_=theme_;render();return;}
         if(id==409){sub_=-1;render();return;}
         if(page_==5&&id==412){sub_=9;collectionConfig_=true;render();return;}
@@ -742,8 +742,18 @@ private:
     void focusKey(int index){
         if(!keyCount_)return;
         if(keyFocus_>=0&&keyFocus_<keyCount_)lv_obj_clear_state(keyControls_[keyFocus_].obj,LV_STATE_FOCUSED);
-        keyFocus_=(index+keyCount_)%keyCount_;
+        sectionEntered_=true;keyFocus_=(index+keyCount_)%keyCount_;
         auto* obj=keyControls_[keyFocus_].obj;lv_obj_add_state(obj,LV_STATE_FOCUSED);
+    }
+    void focusAction(int id){
+        for(int i=0;i<keyCount_;++i)if(keyControls_[i].type==0&&keyControls_[i].id==id){focusKey(i);return;}
+        focusKey(0);
+    }
+    void moveKeyFocus(busa_focus::Direction direction){
+        busa_focus::Rect bounds[64];
+        for(int i=0;i<keyCount_;++i){lv_area_t a;lv_obj_get_coords(keyControls_[i].obj,&a);bounds[i]={a.x1,a.y1,a.x2-a.x1+1,a.y2-a.y1+1};}
+        const int next=busa_focus::neighbor(bounds,keyCount_,keyFocus_,direction);
+        if(next>=0&&next!=keyFocus_)focusKey(next);
     }
     void focusObject(lv_obj_t* obj){for(int i=0;i<keyCount_;++i)if(keyControls_[i].obj==obj){focusKey(i);return;}}
     int fieldIndex(lv_obj_t* obj)const{for(int i=0;i<8;++i)if(fields_[i]==obj)return i;return -1;}
@@ -813,11 +823,29 @@ private:
             else tapIndex_=0;
             lv_textarea_add_char(obj,letters[tapIndex_]);lastTapKey_=k;lastTapAt_=at;return;
         }
-        if(k==16||k==18){action(100+(page_+6+(k==16?-1:1))%6);return;}
-        if(k==15){if(page_==5&&sub_>=0)action(409);else if(page_)action(100+(previousPage_==page_?0:previousPage_));return;}
-        if(k==7||k==11){if(keyCount_)focusKey(keyFocus_<0?(k==7?keyCount_-1:0):keyFocus_+(k==7?-1:1));return;}
-        if(k==19){if(!keyCount_){if(page_==0)action(101);return;}if(keyFocus_<0){focusKey(0);return;}
-            const KeyControl c=keyControls_[keyFocus_];if(c.type==0)action(c.id);else beginKeyEdit(c);return;}
+        using busa_focus::Nav;
+        switch(busa_focus::route(k,sectionEntered_,page_==5&&sub_>=0)){
+            case Nav::previousSection:action(100+(page_+5)%6);return;
+            case Nav::nextSection:action(100+(page_+1)%6);return;
+            case Nav::enter:sectionEntered_=true;focusKey(0);return;
+            case Nav::leave:
+                if(keyFocus_>=0&&keyFocus_<keyCount_)lv_obj_clear_state(keyControls_[keyFocus_].obj,LV_STATE_FOCUSED);
+                keyFocus_=-1;sectionEntered_=false;return;
+            case Nav::backChild:{const int id=sub_==9?412:400+sub_;action(409);sectionEntered_=true;focusAction(id);return;}
+            case Nav::up:moveKeyFocus(busa_focus::Direction::up);return;
+            case Nav::down:moveKeyFocus(busa_focus::Direction::down);return;
+            case Nav::left:moveKeyFocus(busa_focus::Direction::left);return;
+            case Nav::right:moveKeyFocus(busa_focus::Direction::right);return;
+            case Nav::activate:{
+                if(!keyCount_)return;
+                if(keyFocus_<0){focusKey(0);return;}
+                const KeyControl c=keyControls_[keyFocus_];
+                if(c.type==0){const uint32_t generation=viewGeneration_;action(c.id);
+                    if(sectionEntered_&&generation!=viewGeneration_)focusAction(c.id);}
+                else beginKeyEdit(c);
+                return;}
+            case Nav::none:break;
+        }
         if(k==0){
             if(keyFocus_>=0&&keyControls_[keyFocus_].type==1){const int i=fieldIndex(keyControls_[keyFocus_].obj);
                 if(page_==1&&i>=0&&formValid_){keyConfirm_=i;keyHint("Удалить порог? ENT — да, ESC — нет");return;}
@@ -901,7 +929,8 @@ private:
     Hardware& hw_;DisplaySession& session_;Preferences prefs_;
     lv_disp_drv_t driver_{};lv_disp_draw_buf_t drawBuffer_{};lv_indev_drv_t input_{};
     lv_obj_t *connection_=nullptr,*body_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
-    busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1,previousPage_=0;
+    busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1;
+    bool sectionEntered_=false;
     lv_obj_t* keyEdit_=nullptr;String keyOriginal_;bool keyDropdown_=false,displaySleeping_=false;uint16_t keyOriginalChoice_=0;
     int lastTapKey_=-1,tapMode_=0;size_t tapIndex_=0;uint32_t lastTapAt_=0,lastTestSeq_=0,testUntil_=0;lv_obj_t* testOverlay_=nullptr;
     lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphNotice_=nullptr,*graphUnit_=nullptr;lv_obj_t* graphLegend_[4]={};lv_obj_t* graphPlots_[4]={};lv_obj_t* graphY_[4][4]={};bool graphDirty_=false;
