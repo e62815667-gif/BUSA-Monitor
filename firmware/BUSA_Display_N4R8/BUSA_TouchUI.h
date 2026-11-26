@@ -17,6 +17,7 @@ LV_FONT_DECLARE(busa_font);
 LV_FONT_DECLARE(busa_font_small);
 LV_FONT_DECLARE(busa_font_value);
 LV_FONT_DECLARE(busa_font_nav);
+LV_FONT_DECLARE(busa_font_nav_fit);
 namespace busa_guition {
 class Interface {
 public:
@@ -62,7 +63,7 @@ public:
         const uint32_t now=millis();lv_tick_inc(now-lastTick_);lastTick_=now;
         if(calibrating_)calibrationPoll();
         if(testOverlay_&&int32_t(now-testUntil_)>=0){lv_obj_del(testOverlay_);testOverlay_=nullptr;}
-        if(!session_.connected()){keyCursor_.reset();if(touchTarget_)hideKeyboard();if(displaySleeping_){hw_.backlight(true);displaySleeping_=false;}if(keyEdit_||keyConfirm_>=0)cancelKeyEdit(true);}
+        if(!session_.connected()){volumeResetPending_=0;keyCursor_.reset();if(touchTarget_)hideKeyboard();if(displaySleeping_){hw_.backlight(true);displaySleeping_=false;}if(keyEdit_||keyConfirm_>=0)cancelKeyEdit(true);}
         int code;String body;
         if(session_.takeApiResult(code,body)){waiting_=false;handleResult(code,body);}
         if(!calibrating_){
@@ -336,7 +337,7 @@ private:
         static const char* titles[]={"Главная","Температуры","Вода и отбор","Графики","Калькулятор","Настройки"};
         for(int i=0;i<6;++i){auto* b=button(nav_,titles[i],100+i,74);lv_obj_set_height(b,38);
             lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);
-            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_nav,0);lv_obj_set_style_text_letter_space(l,0,0);lv_obj_set_width(l,70);lv_obj_align(l,LV_ALIGN_BOTTOM_MID,0,0);
+            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,lv_txt_get_width(titles[i],strlen(titles[i]),&busa_font_nav,0,LV_TEXT_FLAG_NONE)>70?&busa_font_nav_fit:&busa_font_nav,0);lv_obj_set_style_text_letter_space(l,0,0);lv_obj_set_width(l,70);lv_label_set_long_mode(l,LV_LABEL_LONG_CLIP);lv_obj_align(l,LV_ALIGN_BOTTOM_MID,0,0);
             navIcon(b,i);navButtons_[i]=b;}
     }
     void build(){
@@ -360,7 +361,7 @@ private:
         render();
     }
     void render(){
-        cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
+        cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;volumeResetPending_=0;
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;}
         hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
         wifiList_=nullptr;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& p:graphPlots_)p=nullptr;for(auto& s:series_)s=nullptr;for(auto& y:graphY_)for(auto& l:y)l=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
@@ -436,6 +437,7 @@ private:
         for(auto* card:{q,p}){lv_obj_set_flex_align(card,LV_FLEX_ALIGN_SPACE_EVENLY,LV_FLEX_ALIGN_CENTER,LV_FLEX_ALIGN_CENTER);
             for(unsigned i=0;i<lv_obj_get_child_cnt(card);++i){auto* l=lv_obj_get_child(card,i);lv_obj_set_width(l,LV_PCT(100));lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_CENTER,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);}}
         for(int i:{0,1,3}){lv_obj_set_style_text_font(live_[i],&busa_font_value,0);lv_obj_set_style_text_color(live_[i],color(colors_[0]),0);}
+        button(q,"Сбросить собрано",224);button(p,"Сбросить израсходовано",223);
     }
     void graphAxes(unsigned k,double low,double high){
         const int ticks=graphKind_==0?2:4;
@@ -649,6 +651,7 @@ private:
         submit(Route::temperatureAlarms,b,bytes);
     }
     void action(int id){
+        if(id!=223&&id!=224)volumeResetPending_=0;
         if(id==340||id==341){touchFinish(id==341);return;}
         if(touchTarget_)return;
         if(waiting_&&page_==4&&calcMode_==3)return;
@@ -663,6 +666,13 @@ private:
         hideKeyboard();
         if((id==200||id==201||id==202||id==222)&&(!formValid_||!session_.connected())){set(pageStatus_,"Нет актуальных настроек. Дождитесь связи.");return;}
         switch(id){
+            case 223:case 224:{
+                if(page_!=2||waiting_||!session_.connected()){volumeResetPending_=0;set(pageStatus_,"Нет связи или выполняется запрос");break;}
+                if(volumeResetPending_!=id||uint32_t(millis()-volumeResetAt_)>5000){
+                    volumeResetPending_=id;volumeResetAt_=millis();set(pageStatus_,"Повторите нажатие для сброса");break;
+                }
+                volumeResetPending_=0;send(Route::resetVolume,{{"confirm","YES"},{"target",id==223?"water":"collection"}});break;
+            }
             case 200:alarms();break;
             case 201:if(page_==5&&sub_==9&&!collectionConfig_&&fields_[0])send(Route::waterCoefficient,{{"confirm","YES"},{"pulses_per_litre",text(fields_[0])}});break;
             case 222:if(page_==5&&sub_==9&&collectionConfig_&&fields_[0])send(Route::collectionCoefficient,{{"confirm","YES"},{"pulses_per_ml",text(fields_[0])}});break;
@@ -808,7 +818,8 @@ private:
     void physicalKey(uint8_t k,uint32_t at){
         if(testOverlay_||displaySleeping_||calibrating_||!session_.connected()||k==2||k==3)return;
         if(waiting_&&page_==4&&calcMode_==3)return;
-        if(touchTarget_){if(k==15||k==19)touchFinish(k==19);return;}
+        if(k!=19)volumeResetPending_=0;
+        if(touchTarget_){if(k==busa_keys::deleteChar&&touchEditor_)lv_textarea_del_char(touchEditor_);else if(k==15||k==19)touchFinish(k==19);return;}
         if(calcNotes_){if(k==15||k==19)calcConditions();return;}
         if(keyConfirm_>=0){
             const int i=keyConfirm_;keyConfirm_=-1;
@@ -832,6 +843,7 @@ private:
                 else if(page_==5&&sub_==1)focusKey(keyFocus_+1);
                 return;
             }
+            if(k==busa_keys::deleteChar){lv_textarea_del_char(obj);lastTapKey_=-1;return;}
             if(k==0){if(numeric)lv_textarea_set_text(obj,"");else lv_textarea_del_char(obj);lastTapKey_=-1;return;}
             if(k==16||k==18){uint32_t p=lv_textarea_get_cursor_pos(obj);if(k==16&&p)lv_textarea_set_cursor_pos(obj,p-1);else if(k==18)lv_textarea_set_cursor_pos(obj,p+1);lastTapKey_=-1;return;}
             if(k==7||k==11){
@@ -952,7 +964,7 @@ private:
     lv_disp_drv_t driver_{};lv_disp_draw_buf_t drawBuffer_{};lv_indev_drv_t input_{};
     lv_obj_t *body_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
     busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1;
-    bool sectionEntered_=false;
+    bool sectionEntered_=false;int volumeResetPending_=0;uint32_t volumeResetAt_=0;
     lv_obj_t* keyEdit_=nullptr;String keyOriginal_;bool keyDropdown_=false,displaySleeping_=false;uint16_t keyOriginalChoice_=0;
     int lastTapKey_=-1,tapMode_=0;size_t tapIndex_=0;uint32_t lastTapAt_=0,lastTestSeq_=0,testUntil_=0;lv_obj_t* testOverlay_=nullptr;
     lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphNotice_=nullptr,*graphUnit_=nullptr;lv_obj_t* graphLegend_[4]={};lv_obj_t* graphPlots_[4]={};lv_obj_t* graphY_[4][4]={};bool graphDirty_=false;

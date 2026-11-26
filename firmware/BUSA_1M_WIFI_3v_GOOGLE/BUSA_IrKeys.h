@@ -9,7 +9,7 @@ constexpr uint32_t releaseMs=350,holdMs=2000,learnTimeoutMs=300000;
 struct Binding{const char* label;uint8_t code;};
 static constexpr Binding bindings[count]={
  {"1",4},{"2",5},{"3",6},{"4",8},{"5",9},{"6",10},{"7",12},{"8",13},{"9",14},{"0",17},
- {"UP",7},{"DOWN",11},{"LEFT",16},{"RIGHT",18},{"OK",19},{"*",15},{"#",0}
+ {"UP",7},{"DOWN",11},{"LEFT",16},{"RIGHT",18},{"OK",19},{"*",15},{"#",21}
 };
 inline uint64_t identity(uint8_t protocol,uint16_t address,uint16_t command){
  return protocol?(uint64_t(protocol)<<32)|(uint64_t(address)<<16)|command:0;
@@ -60,14 +60,14 @@ public:
   if(repeat){
    if(!active_||token!=token_)return;
    last_=now;
-   if(pending_!=none&&uint32_t(now-first_)>=holdMs){int p=pending_;pending_=none;emit(p==17?20:1);}
+   if(pending_!=none&&uint32_t(now-first_)>=holdMs){pending_=none;emit(20);}
    return;
   }
   if(active_&&pending_!=none){int p=pending_;pending_=none;emit(p);}
   clear();
   if(key==none)return;
   suppress(token,now);
-  if(key==17||key==0)pending_=key;else emit(key);
+  if(key==17)pending_=key;else emit(key);
  }
 private:
  bool active_=false;uint64_t token_=0;uint32_t first_=0,last_=0;int pending_=none;

@@ -60,7 +60,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainTx && BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainRx,
   "Buzzer pin conflicts with I2C, UART or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-PERF4-HW2-NAME1-TIME1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-RESET1-PERF4-HW2-NAME1-TIME1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -892,7 +892,7 @@ static void busaIrEmit(int key){
   if(key<0||!busa_display_link::keypadCapable()||tftDisplayOff||keypadLearning||irMap.learning())return;
   ++keyCount;tftDisplayActivityMs=millis();
   if(key==1){darkenTftDisplay();keyMessage="ИК: экран погашен";}
-  else {publishPhysicalKey(uint8_t(key));keyMessage="ИК: клавиша принята";}
+  else {if(key==busa_keys::deleteChar&&!busa_display_link::nav4Capable())key=0;publishPhysicalKey(uint8_t(key));keyMessage="ИК: клавиша принята";}
   tftDirty=true;
 }
 static void busaIrPoll(uint32_t now){
@@ -2583,9 +2583,9 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <section class="page" data-section="2" hidden><div class="approvedPageTitle"><svg class="uiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><strong>ВОДА И ОТБОР</strong></div>
 <article class="liquidPanel collectionPanel"><div class="liquidPanelHeading"><h2>Отбор жидкости</h2><span id="collectionAvailability">Нет данных</span></div>
 <p class="liquidRateLabel">Текущий отбор</p><div class="liquidRateGrid"><div><strong id="collectionMlMin">—</strong><small>мл/мин</small></div><div><strong id="collectionLph">—</strong><small>л/ч</small></div></div>
-<div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div></article>
+<div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div><button id="collectionResetTotal" type="button" class="full">Сбросить собрано</button><p id="collectionResetResult" class="hint"></p></article>
 <article class="liquidPanel coolingPanel"><div class="liquidPanelHeading"><h2>Охлаждение</h2><span id="coolingAvailability">Нет данных</span></div>
-<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Израсходовано</small><strong id="coolingTotal">—</strong><small>л</small></div></div></article>
+<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Израсходовано</small><strong id="coolingTotal">—</strong><small>л</small></div></div><button id="waterResetTotal" type="button" class="full">Сбросить израсходовано</button><p id="waterResetResult" class="hint"></p></article>
 </section>
 <section class="page" data-section="3" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><strong>ГРАФИКИ</strong></div>
 <div class="chartCard"><div class="chartTabs" role="tablist" aria-label="Вид графика">
@@ -3069,6 +3069,20 @@ get('collectionPplSave').onclick=async()=>{
  }catch(err){status.textContent='Ошибка: '+err.message;}
  finally{button.disabled=false;}
 };
+async function resetVolume(target,button,status){
+ if(!window.confirm(target==='water'?'Сбросить израсходованный объём воды?':'Сбросить собранный объём?'))return;
+ button.disabled=true;
+ try{
+  const response=await fetch('/api/volume/reset',{method:'POST',body:new URLSearchParams({confirm:'YES',target}),cache:'no-store'});
+  if(!response.ok)throw Error(await response.text());
+  if(!(await response.json()).ok)throw Error('Некорректный ответ');
+  if(target==='water')previousWater=null;
+  status.textContent='Объём сброшен';
+ }catch(err){status.textContent='Ошибка: '+err.message;}
+ finally{button.disabled=false;}
+}
+get('waterResetTotal').onclick=()=>resetVolume('water',get('waterResetTotal'),get('waterResetResult'));
+get('collectionResetTotal').onclick=()=>resetVolume('collection',get('collectionResetTotal'),get('collectionResetResult'));
 get('tempCalSave').onclick=async()=>{
  const button=get('tempCalSave'),data=new URLSearchParams({confirm:'YES'});
  for(let i=0;i<4;i++){
@@ -3740,6 +3754,21 @@ static void busaApi_collectionCoefficient(BusaLocalRequest& server){
   if(!saveCollectionCalibration(factor)){server.send(500,"text/plain; charset=utf-8","Ошибка сохранения");return;}
   server.send(200,"application/json",String("{\"pulses_per_ml\":")+collectionNumber(factor)+"}");
 }
+static void busaApi_resetVolume(BusaLocalRequest& server){
+  if(!server.local()||server.arg("confirm")!="YES"){server.send(403,"text/plain","Confirmation required");return;}
+  if(otaActive||busa_display_ota::busy()){server.send(409,"text/plain","Device busy");return;}
+  const String target=server.arg("target");
+  if(target=="water"){
+    portENTER_CRITICAL(&flowMux);
+    flowLastCount=pulseCounter;flowLastRejected=flowRejectedCounter;
+    portEXIT_CRITICAL(&flowMux);
+    flowCycle=millis();waterVolume=BusaWater::VolumeAccumulator();
+  }else if(target=="collection"){
+    collectionMeter.resetTotal(collectionPulses());
+  }else{server.send(400,"text/plain","Invalid target");return;}
+  busaWebRecord(target=="water"?"Сброс объёма воды":"Сброс собранного объёма");
+  server.send(200,"application/json","{\"ok\":true}");
+}
 static void busaApi_temperatureAlarms(BusaLocalRequest& server){
   const auto apClient=[&server](){return server.local();};
     if(!apClient()){server.send(403,"text/plain","BUSA local AP only");return;}
@@ -4097,6 +4126,7 @@ static void busaDispatchDisplayApi(const busa_uart::ApiRequest& request,int& cod
     switch(request.route){
       case busa_uart::ApiRoute::waterCoefficient:busaApi_waterCoefficient(local);break;
       case busa_uart::ApiRoute::collectionCoefficient:busaApi_collectionCoefficient(local);break;
+      case busa_uart::ApiRoute::resetVolume:busaApi_resetVolume(local);break;
       case busa_uart::ApiRoute::temperatureAlarms:busaApi_temperatureAlarms(local);break;
       case busa_uart::ApiRoute::wifiScan:busaApi_wifiScan(local);break;
       case busa_uart::ApiRoute::wifiDisconnect:busaApi_wifiDisconnect(local);break;
@@ -4460,6 +4490,7 @@ void setup(){
   server.on("/api/tft/theme",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_theme(request);
   });
   server.on("/api/collection/calibration",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_collectionCoefficient(request);});
+  server.on("/api/volume/reset",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_resetVolume(request);});
   server.on("/api/temperature/calibration",HTTP_POST,[]{BusaLocalRequest request(server);busaApi_calibration(request);
   });
   server.on("/api/ir/start",HTTP_POST,[]{

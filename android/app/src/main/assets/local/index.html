@@ -1102,9 +1102,9 @@ html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:r
 <section class="page" data-section="2" hidden><div class="approvedPageTitle"><svg class="uiIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2C8 8 5 11 5 15a7 7 0 0 0 14 0c0-4-3-7-7-13z"/></svg><strong>ВОДА И ОТБОР</strong></div>
 <article class="liquidPanel collectionPanel"><div class="liquidPanelHeading"><h2>Отбор жидкости</h2><span id="collectionAvailability">Нет данных</span></div>
 <p class="liquidRateLabel">Текущий отбор</p><div class="liquidRateGrid"><div><strong id="collectionMlMin">—</strong><small>мл/мин</small></div><div><strong id="collectionLph">—</strong><small>л/ч</small></div></div>
-<div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div></article>
+<div class="liquidSummary"><div><span>Собрано</span><strong id="collectionTotal">—</strong></div><div><span>Время отбора</span><strong id="collectionTime">—</strong></div></div><button id="collectionResetTotal" type="button" class="full">Сбросить собрано</button><p id="collectionResetResult" class="hint"></p></article>
 <article class="liquidPanel coolingPanel"><div class="liquidPanelHeading"><h2>Охлаждение</h2><span id="coolingAvailability">Нет данных</span></div>
-<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Израсходовано</small><strong id="coolingTotal">—</strong><small>л</small></div></div></article>
+<div class="liquidRateGrid"><div><small>Расход воды</small><strong id="coolingLph">—</strong><small>л/ч</small></div><div><small>Израсходовано</small><strong id="coolingTotal">—</strong><small>л</small></div></div><button id="waterResetTotal" type="button" class="full">Сбросить израсходовано</button><p id="waterResetResult" class="hint"></p></article>
 </section>
 <section class="page" data-section="3" hidden><div class="approvedPageTitle"><svg class="uiIcon" width="23" height="23" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M3 3v18h18"/><path d="m5 17 5-6 4 3 6-9"/></svg><strong>ГРАФИКИ</strong></div>
 <div class="chartCard"><div class="chartTabs" role="tablist" aria-label="Вид графика">
@@ -1588,6 +1588,20 @@ get('collectionPplSave').onclick=async()=>{
  }catch(err){status.textContent='Ошибка: '+err.message;}
  finally{button.disabled=false;}
 };
+async function resetVolume(target,button,status){
+ if(!window.confirm(target==='water'?'Сбросить израсходованный объём воды?':'Сбросить собранный объём?'))return;
+ button.disabled=true;
+ try{
+  const response=await fetch('/api/volume/reset',{method:'POST',body:new URLSearchParams({confirm:'YES',target}),cache:'no-store'});
+  if(!response.ok)throw Error(await response.text());
+  if(!(await response.json()).ok)throw Error('Некорректный ответ');
+  if(target==='water')previousWater=null;
+  status.textContent='Объём сброшен';
+ }catch(err){status.textContent='Ошибка: '+err.message;}
+ finally{button.disabled=false;}
+}
+get('waterResetTotal').onclick=()=>resetVolume('water',get('waterResetTotal'),get('waterResetResult'));
+get('collectionResetTotal').onclick=()=>resetVolume('collection',get('collectionResetTotal'),get('collectionResetResult'));
 get('tempCalSave').onclick=async()=>{
  const button=get('tempCalSave'),data=new URLSearchParams({confirm:'YES'});
  for(let i=0;i<4;i++){

@@ -19,7 +19,8 @@ int main(){
     assert(coll.add("confirm","YES")&&coll.add("pulses_per_ml","4.71"));
     assert(parseApiRequest(calibration,coll.size(),q)&&uint8_t(q.route)==24);
     a=findArg(q,"pulses_per_ml");assert(a&&a->valueSize==4&&!memcmp(a->value,"4.71",4));
-    assert(uint8_t(ApiRoute::waterCoefficient)==1&&uint8_t(ApiRoute::calibrationEdit)==23&&!validRoute(25));
+    assert(uint8_t(ApiRoute::waterCoefficient)==1&&uint8_t(ApiRoute::calibrationEdit)==23&&validRoute(25)&&!validRoute(26));
+    uint8_t reset[apiMaxRequest]={};ApiBuilder rb(reset,sizeof(reset),ApiRoute::resetVolume);assert(rb.add("target","water")&&rb.add("confirm","YES")&&parseApiRequest(reset,rb.size(),q)&&q.route==ApiRoute::resetVolume);
     uint8_t tiny[2];ApiBuilder small(tiny,sizeof(tiny),ApiRoute::googleTest);
     assert(!small.add("confirm","YES"));
     assert(parseApiRequest(tiny,small.size(),q)&&q.count==0);
