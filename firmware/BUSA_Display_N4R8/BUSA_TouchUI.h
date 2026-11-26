@@ -402,7 +402,7 @@ private:
             lv_obj_set_style_border_width(frame,1,0);
             lv_obj_set_style_border_color(frame,color(paper()),0);
             auto* name=at(frame,i==3?"Авария":sensor(i),4,2,&busa_font);
-            auto* reading=live_[4+i]=at(frame,"—",4,18,&busa_font_value);
+            auto* reading=live_[4+i]=at(frame,"—",4,24,&busa_font_value);
             lv_obj_set_style_text_color(reading,color(colors_[i]),0);
             if(i>=2){for(auto* item:{name,reading}){
                 lv_obj_set_width(item,102);
