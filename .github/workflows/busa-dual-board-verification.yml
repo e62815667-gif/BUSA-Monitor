@@ -1,7 +1,9 @@
 name: BUSA dual-board COLL1 and display OTA build
 on:
   push:
-    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125, fix/busa-actual-hw1-20261125, fix/busa-latency-perf4-20261125, fix/busa-guition-ui2-20261125, fix/busa-guition-ui3-20261125, fix/busa-guition-ui4-20261125, fix/busa-guition-ui5-20261125, fix/busa-guition-ui6-20261125, fix/busa-guition-ui7-20261125, fix/busa-guition-ui8-20261125, fix/busa-guition-ui9-20261125, fix/busa-guition-ui10-20261125, fix/busa-main-name1-20261126, fix/busa-ai1v-time1-20261126, fix/busa-guition-graphs5-20261126, fix/busa-guition-graph-grid-history-20261126, fix/busa-liquid-settings-20261126, fix/busa-guition-home-align-20261126, fix/busa-guition-ultra-graphics-20261126, fix/busa-guition-clean-graphics-20261126, fix/busa-ir-remote-20261126, fix/busa-guition-nav1-20261126]
+    branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125, fix/busa-actual-hw1-20261125, fix/busa-latency-perf4-20261125, fix/busa-guition-ui2-20261125, fix/busa-guition-ui3-20261125, fix/busa-guition-ui4-20261125, fix/busa-guition-ui5-20261125, fix/busa-guition-ui6-20261125, fix/busa-guition-ui7-20261125, fix/busa-guition-ui8-20261125, fix/busa-guition-ui9-20261125, fix/busa-guition-ui10-20261125, fix/busa-main-name1-20261126, fix/busa-ai1v-time1-20261126, fix/busa-guition-graphs5-20261126, fix/busa-guition-graph-grid-history-20261126, fix/busa-liquid-settings-20261126, fix/busa-guition-home-align-20261126, fix/busa-guition-ultra-graphics-20261126, fix/busa-guition-clean-graphics-20261126, fix/busa-ir-remote-20261126]
+  pull_request:
+    branches: [fix/busa-ir-remote-20261126]
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,6 +13,8 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: arduino/setup-arduino-cli@v2
         with:
           version: 1.3.1
@@ -146,6 +150,8 @@ jobs:
       CORE_VERSION: ${{ matrix.core }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
