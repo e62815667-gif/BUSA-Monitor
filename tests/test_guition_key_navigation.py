@@ -23,7 +23,7 @@ code = r'''
 #include <cstdio>
 struct lv_area_t { int x1,y1,x2,y2; };
 struct lv_obj_t { lv_area_t area; bool focused=false; };
-constexpr int LV_STATE_FOCUSED=1;
+constexpr int LV_STATE_USER_1=1;
 void lv_obj_get_coords(lv_obj_t* o,lv_area_t* a){*a=o->area;}
 void lv_obj_set_style_outline_color(lv_obj_t*,int,int){}
 void lv_obj_set_style_outline_width(lv_obj_t*,int,int){}
@@ -33,6 +33,7 @@ void lv_obj_add_state(lv_obj_t* o,int){o->focused=true;}
 struct Harness {
     static int color(int c){return c;}
     void focusStyle(lv_obj_t*,uint8_t){}
+    void syncNavFocus(){}
 ''' + focus + r'''
     KeyControl keyControls_[64]={};
     lv_obj_t controls[10]={};
@@ -82,7 +83,9 @@ int main(){
     h.key(16);assert(h.focusedId()==402);
     h.key(7);assert(h.focusedId()==400);
     h.key(18);assert(h.focusedId()==401);
-    h.key(19);assert(h.sub_==1&&h.sectionEntered_&&h.focusedId()==409);
+    h.key(19);assert(h.sub_==1&&h.sectionEntered_&&h.keyFocus_==-1);
+    for(const auto& c:h.controls)assert(!c.focused);
+    h.key(11);assert(h.focusedId()==409);
     h.key(15);assert(h.sub_==-1&&h.sectionEntered_&&h.focusedId()==401);
     h.key(15);assert(!h.sectionEntered_&&h.keyFocus_==-1);
     h.key(16);assert(h.page_==4&&!h.sectionEntered_);

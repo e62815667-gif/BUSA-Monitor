@@ -63,7 +63,7 @@ public:
         const uint32_t now=millis();lv_tick_inc(now-lastTick_);lastTick_=now;
         if(calibrating_)calibrationPoll();
         if(testOverlay_&&int32_t(now-testUntil_)>=0){lv_obj_del(testOverlay_);testOverlay_=nullptr;}
-        if(!session_.connected()){volumeResetPending_=0;keyCursor_.reset();if(touchTarget_)hideKeyboard();if(displaySleeping_){hw_.backlight(true);displaySleeping_=false;}if(keyEdit_||keyConfirm_>=0)cancelKeyEdit(true);}
+        if(!session_.connected()){scanPending_=false;volumeResetPending_=0;keyCursor_.reset();if(touchTarget_)hideKeyboard();if(displaySleeping_){hw_.backlight(true);displaySleeping_=false;}if(keyEdit_||keyConfirm_>=0)cancelKeyEdit(true);}
         int code;String body;
         if(session_.takeApiResult(code,body)){waiting_=false;handleResult(code,body);}
         if(!calibrating_){
@@ -237,6 +237,12 @@ private:
         lv_obj_set_style_border_color(o,color(on?selectionEdge():line()),0);
         lv_obj_set_style_text_color(lv_obj_get_child(o,0),color(on?0xffffff:ink()),0);
     }
+    void currentMode(lv_obj_t* o,bool on){
+        if(on)lv_obj_set_style_border_color(o,color(muted()),0);
+    }
+    void syncNavFocus(){
+        for(int i=0;i<6;++i)if(navButtons_[i])selected(navButtons_[i],!sectionEntered_&&i==page_);
+    }
     void focusStyle(lv_obj_t* o,uint8_t type){
         // LVGL 8.4 reads every transition descriptor, so nullptr is invalid.
         // Override the default theme's animated properties with a zero-duration transition.
@@ -245,13 +251,13 @@ private:
         static bool initialized=false;
         if(!initialized){lv_style_transition_dsc_init(&instant,props,lv_anim_path_linear,0,0,nullptr);initialized=true;}
         lv_obj_set_style_transition(o,&instant,LV_STATE_DEFAULT);
-        lv_obj_set_style_transition(o,&instant,LV_STATE_FOCUSED);
-        lv_obj_set_style_outline_color(o,color(selectionEdge()),LV_STATE_FOCUSED);
-        lv_obj_set_style_outline_width(o,2,LV_STATE_FOCUSED);
-        lv_obj_set_style_outline_pad(o,0,LV_STATE_FOCUSED);
-        lv_obj_set_style_border_color(o,color(selectionEdge()),LV_STATE_FOCUSED);
-        lv_obj_set_style_bg_color(o,color(theme_==0?0xcbeed7:(type==0?selectionColor():0x123b28)),LV_STATE_FOCUSED);
-        lv_obj_set_style_bg_grad_dir(o,LV_GRAD_DIR_NONE,LV_STATE_FOCUSED);
+        lv_obj_set_style_transition(o,&instant,LV_STATE_USER_1);
+        lv_obj_set_style_outline_color(o,color(selectionEdge()),LV_STATE_USER_1);
+        lv_obj_set_style_outline_width(o,2,LV_STATE_USER_1);
+        lv_obj_set_style_outline_pad(o,0,LV_STATE_USER_1);
+        lv_obj_set_style_border_color(o,color(selectionEdge()),LV_STATE_USER_1);
+        lv_obj_set_style_bg_color(o,color(theme_==0?0xcbeed7:(type==0?selectionColor():0x123b28)),LV_STATE_USER_1);
+        lv_obj_set_style_bg_grad_dir(o,LV_GRAD_DIR_NONE,LV_STATE_USER_1);
     }
     lv_obj_t* panel(lv_obj_t* parent,int width=LV_PCT(100),int height=LV_SIZE_CONTENT){
         auto* o=lv_obj_create(parent);lv_obj_set_size(o,width,height);lv_obj_set_style_bg_color(o,color(surface()),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);glass(o);
@@ -331,7 +337,7 @@ private:
         lv_obj_set_style_border_width(keyboard_,1,LV_PART_ITEMS);lv_obj_set_style_border_color(keyboard_,color(line()),LV_PART_ITEMS);
         lv_obj_add_event_cb(keyboard_,keyboardEvent,LV_EVENT_VALUE_CHANGED,this);
         auto* cancel=button(touchModal_,"Отмена",340,231,false);lv_obj_set_pos(cancel,6,205);lv_obj_set_height(cancel,32);
-        auto* ready=button(touchModal_,"Готово",341,231,false);lv_obj_set_pos(ready,243,205);lv_obj_set_height(ready,32);selected(ready,true);
+        auto* ready=button(touchModal_,"Готово",341,231,false);lv_obj_set_pos(ready,243,205);lv_obj_set_height(ready,32);
         lv_obj_add_flag(touchModal_,LV_OBJ_FLAG_HIDDEN);
     }
     void buildNavigation(lv_obj_t* root){
@@ -362,7 +368,7 @@ private:
         lv_obj_set_style_bg_color(body_,color(paper()),0);lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
         lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,GAP,0);lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
-        buildNavigation(root);lastNav_=-1;
+        buildNavigation(root);
         buildTouchModal(root);
         render();
     }
@@ -370,12 +376,8 @@ private:
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;volumeResetPending_=0;
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;}
         hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
-        wifiList_=nullptr;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& p:graphPlots_)p=nullptr;for(auto& s:series_)s=nullptr;for(auto& y:graphY_)for(auto& l:y)l=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
-        if(lastNav_!=page_){
-            if(lastNav_<0){for(int i=0;i<6;++i)selected(navButtons_[i],i==page_);}
-            else{selected(navButtons_[lastNav_],false);selected(navButtons_[page_],true);}
-            lastNav_=page_;
-        }
+        wifiList_=nullptr;networkCount_=0;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& p:graphPlots_)p=nullptr;for(auto& s:series_)s=nullptr;for(auto& y:graphY_)for(auto& l:y)l=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
+        syncNavFocus();
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
         lv_obj_set_style_pad_row(body_,page_==0?GAP:2,0);
         switch(page_){case 0:home();break;case 1:temperatures();break;case 2:water();break;case 3:graphs();break;case 4:calculator();break;case 5:settings();break;}
@@ -383,7 +385,7 @@ private:
         for(auto* fieldObj:fields_)if(fieldObj){lv_area_t a,b;lv_obj_get_coords(fieldObj,&a);lv_obj_get_coords(lv_obj_get_parent(fieldObj),&b);
             if(a.x1<b.x1||a.x2>b.x2||a.y1<b.y1||a.y2>b.y2)Serial.printf("[UI] field bounds page=%d sub=%d\n",page_,sub_);}
         orderKeys();
-        if(sectionEntered_){if(keyCount_)focusKey(0);else sectionEntered_=false;}
+        if(!keyCount_){sectionEntered_=false;syncNavFocus();}
         refresh();
         if(page_==4&&calcMode_==3&&!geometryReadAttempted_&&!waiting_&&session_.connected()){
             geometryReadAttempted_=send(Route::geometryRead,{});
@@ -433,7 +435,7 @@ private:
                 label(head,i==3?"Авария":sensor(i));live_[i]=label(head,"—");lv_obj_set_style_text_font(live_[i],&busa_font,0);lv_obj_set_style_text_color(live_[i],color(colors_[i]),0);
                 auto* fields=row(p,42);fields_[2*i]=field(fields,"ВКЛ, °C",value(doc["display_references"][i]["target"]),true,false,110);
                 fields_[2*i+1]=field(fields,"ВЫКЛ, °C",value(doc["display_references"][i]["notice"]),true,false,110);}}
-        selected(button(body_,"Сохранить пороги",200),true);
+        button(body_,"Сохранить пороги",200);
     }
     void water(){
         heading("ВОДА И ОТБОР");auto* r=row(body_,172);
@@ -488,7 +490,7 @@ private:
     void graphs(){
         auto* r=row(body_,24);
         static const char* names[]={"Температура","Отбор","Охлаждение"};
-        for(int i=0;i<3;++i){auto* b=button(r,names[i],300+i,156);lv_obj_set_height(b,24);lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);selected(b,graphKind_==i);}
+        for(int i=0;i<3;++i){auto* b=button(r,names[i],300+i,156);lv_obj_set_height(b,24);lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);currentMode(b,graphKind_==i);}
         const auto spec=busa_graph::spec(graphKind_);
         if(graphKind_==0){
             static_assert(24+2*83+2==HEIGHT-TOP-NAV-2*PAD,"Temperature graphs must fit the screen");
@@ -558,7 +560,7 @@ private:
         for(int n=0;n<2;++n){auto* r=row(tabs,20);for(int col=0;col<2;++col){int i=n*2+col;
             auto* b=button(r,calcTitle(i),320+i,234);lv_obj_set_height(b,20);
             lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);
-            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);selected(b,i==calcMode_);}}
+            auto* l=lv_obj_get_child(b,0);lv_obj_set_style_text_font(l,&busa_font_small,0);lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);currentMode(b,i==calcMode_);}}
         if(calcMode_==3){
             if(geometryExpanded_){
                 auto* controls=row(body_,26);button(controls,"Сохранить и свернуть",332,235);button(controls,"Загрузить размеры",331,235);
@@ -571,7 +573,7 @@ private:
             for(int i=0;i<counts[calcMode_];){auto* inputs=row(body_,42);const int n=calcMode_==2&&i==0?2:counts[calcMode_]-i;for(int col=0;col<n;++col,++i){fields_[i]=field(inputs,labels[calcMode_][i],calcInput_[calcMode_][i],true,false,n==2?235:153);lv_textarea_set_placeholder_text(fields_[i],"0,00");}}
         }
         auto* buttons=row(body_,22);
-        selected(button(buttons,"Рассчитать",330,153),true);button(buttons,calcMode_==3?"Очистить уровень":"Очистить",333,153);button(buttons,"Условия расчёта",334,153);
+        button(buttons,"Рассчитать",330,153);button(buttons,calcMode_==3?"Очистить уровень":"Очистить",333,153);button(buttons,"Условия расчёта",334,153);
         for(int i=0;i<3;++i){auto* b=lv_obj_get_child(buttons,i);lv_obj_set_height(b,22);
             lv_obj_set_style_pad_top(b,0,0);lv_obj_set_style_pad_bottom(b,0,0);lv_obj_set_style_text_font(lv_obj_get_child(b,0),&busa_font_small,0);}
         auto* p=panel(body_,LV_PCT(100),calcMode_==2?36:50);lv_obj_set_style_pad_all(p,calcMode_==2?0:2,0);resultLabel_=smallLabel(p,"—");lv_obj_set_width(resultLabel_,LV_PCT(100));lv_label_set_long_mode(resultLabel_,LV_LABEL_LONG_WRAP);
@@ -607,11 +609,11 @@ private:
         auto* top=row(body_,26);label(top,title[sub_]);button(top,"Все настройки",409,132);
         const auto& d=session_.snapshot();
         if(sub_==0){static const int order[]={0,2,1,3};for(int i=0;i<4;){auto* r=row(body_,42);for(int col=0;col<2;++col,++i){int k=order[i];fields_[k]=field(r,k==3?"Авария":sensor(k),value(d["calibration_offsets"][k]),true,false,235);}}button(body_,"Сохранить поправки",202);}
-        else if(sub_==1){auto* r=row(body_,26);live_[0]=smallLabel(r,"Wi-Fi —");lv_obj_set_width(live_[0],280);lv_label_set_long_mode(live_[0],LV_LABEL_LONG_DOT);button(r,"Обновить список",203,180);
-            wifiList_=lv_dropdown_create(body_);lv_obj_set_size(wifiList_,LV_PCT(100),26);lv_obj_set_style_pad_ver(wifiList_,3,LV_PART_MAIN);lv_obj_set_style_text_font(wifiList_,&busa_font,LV_PART_MAIN);lv_obj_set_style_bg_color(wifiList_,color(surface()),LV_PART_MAIN);lv_obj_set_style_text_color(wifiList_,color(ink()),LV_PART_MAIN);lv_obj_set_style_border_color(wifiList_,color(line()),LV_PART_MAIN);lv_obj_set_style_text_font(wifiList_,LV_FONT_DEFAULT,LV_PART_INDICATOR);lv_dropdown_set_options(wifiList_,"Нет сетей");registerKey(wifiList_,2,0);
-            lv_obj_add_event_cb(wifiList_,dropdownOpened,LV_EVENT_READY,this);fields_[0]=field(body_,"Пароль","",false,true);lv_textarea_set_max_length(fields_[0],63);
+        else if(sub_==1){auto* r=row(body_,26);live_[0]=smallLabel(r,"—");lv_obj_set_width(live_[0],280);lv_label_set_long_mode(live_[0],LV_LABEL_LONG_DOT);button(r,"Обновить список",203,180);
+            wifiList_=lv_dropdown_create(body_);lv_obj_set_size(wifiList_,LV_PCT(100),26);lv_obj_set_style_pad_ver(wifiList_,3,LV_PART_MAIN);lv_obj_set_style_text_font(wifiList_,&busa_font,LV_PART_MAIN);lv_obj_set_style_bg_color(wifiList_,color(surface()),LV_PART_MAIN);lv_obj_set_style_text_color(wifiList_,color(ink()),LV_PART_MAIN);lv_obj_set_style_border_color(wifiList_,color(line()),LV_PART_MAIN);lv_obj_set_style_text_font(wifiList_,LV_FONT_DEFAULT,LV_PART_INDICATOR);lv_dropdown_set_options(wifiList_,"Обновите список");registerKey(wifiList_,2,0);
+            lv_obj_add_event_cb(wifiList_,dropdownOpened,LV_EVENT_READY,this);lv_obj_add_event_cb(wifiList_,dropdownChanged,LV_EVENT_VALUE_CHANGED,this);fields_[0]=field(body_,"Пароль","",false,true);lv_textarea_set_max_length(fields_[0],63);
             auto* b=row(body_,26);button(b,"Подключить",204,235);button(b,"Отключить",205,235);}
-        else if(sub_==2){auto* r=row(body_,26);selected(button(r,"Светлая",206,235),requestedTheme_==0);selected(button(r,"Тёмная",207,235),requestedTheme_==1);selected(button(body_,"Системная · утверждённые рисунки БУСА",208),requestedTheme_==2);selected(button(body_,"Применить и сохранить тему",221),true);button(body_,"Калибровка сенсора",209);}
+        else if(sub_==2){auto* r=row(body_,26);currentMode(button(r,"Светлая",206,235),requestedTheme_==0);currentMode(button(r,"Тёмная",207,235),requestedTheme_==1);currentMode(button(body_,"Системная · утверждённые рисунки БУСА",208),requestedTheme_==2);button(body_,"Применить и сохранить тему",221);button(body_,"Калибровка сенсора",209);}
         else if(sub_==3){live_[0]=smallLabel(body_,"Google —");auto* r=row(body_,42);fields_[0]=field(r,"Адрес Apps Script (/exec)","",false,false,235);fields_[1]=field(r,"Секрет устройства","",false,true,235);
             button(body_,"Сохранить подключение Google",210);auto* b=row(body_,26);button(b,"Проверить отправку диагностики",211,235);button(b,"Отключить передачу в Google",212,235);}
         else if(sub_==4){for(int i=0;i<5;++i){live_[i]=smallLabel(body_,"—");lv_obj_set_size(live_[i],LV_PCT(100),i==0?60:16);lv_label_set_long_mode(live_[i],LV_LABEL_LONG_WRAP);}}
@@ -621,19 +623,28 @@ private:
         else if(sub_==7){auto* r=row(body_,26);button(r,"Включить сопряжение",214,235);button(r,"Отключить Bluetooth",215,235);button(body_,"Обновить состояние",216);pagedResult(60,4);}
         else if(sub_==8){auto* l=label(body_,"Обновление через локальное приложение");lv_obj_set_width(l,LV_PCT(100));lv_label_set_long_mode(l,LV_LABEL_LONG_WRAP);}
         else if(sub_==9){
-            auto* tabs=row(body_,28);selected(button(tabs,"Отбор",413,235),collectionConfig_);selected(button(tabs,"Вода",414,235),!collectionConfig_);
+            auto* tabs=row(body_,28);currentMode(button(tabs,"Отбор",413,235),collectionConfig_);currentMode(button(tabs,"Вода",414,235),!collectionConfig_);
             auto* card=panel(body_,LV_PCT(100),76);auto* title=label(card,"Коэффициент калибровки");lv_obj_set_width(title,LV_PCT(100));lv_obj_set_style_text_align(title,LV_TEXT_ALIGN_CENTER,0);
             String coefficient;
             if(collectionConfig_){auto v=d["collection"]["pulses_per_ml"];if(v.is<double>()){char s[32];snprintf(s,sizeof(s),"%.9g",v.as<double>());coefficient=s;coefficient.replace('.',',');}}
             else coefficient=value(d["water"]["pulses_per_litre"]);
             fields_[0]=field(card,collectionConfig_?"Импульсов на 1 мл":"Импульсов на 1 литр",coefficient,true);
             if(collectionConfig_)lv_textarea_set_accepted_chars(fields_[0],"0123456789.,eE+-");
-            selected(button(body_,"Сохранить коэффициент",collectionConfig_?222:201),true);
+            button(body_,"Сохранить коэффициент",collectionConfig_?222:201);
         }
         pageStatus_=statusLabel(body_,LV_PCT(100),sub_==6||sub_==7?14:24);
         if(sub_==5)send(Route::events,{{"after","0"}});
     }
-    static void dropdownOpened(lv_event_t* e){auto* list=lv_dropdown_get_list(lv_event_get_target(e));if(list){lv_obj_set_style_text_font(list,&busa_font,LV_PART_MAIN);lv_obj_set_style_text_font(list,&busa_font,LV_PART_SELECTED);}}
+    static void dropdownOpened(lv_event_t* e){
+        auto* self=static_cast<Interface*>(lv_event_get_user_data(e));auto* obj=lv_event_get_target(e);
+        self->focusObject(obj);
+        auto* list=lv_dropdown_get_list(obj);if(list){lv_obj_set_style_text_font(list,&busa_font,LV_PART_MAIN);lv_obj_set_style_text_font(list,&busa_font,LV_PART_SELECTED);}
+    }
+    static void dropdownChanged(lv_event_t* e){
+        auto* self=static_cast<Interface*>(lv_event_get_user_data(e));auto* obj=lv_event_get_target(e);
+        if(self->keyEdit_==obj&&self->keyDropdown_)self->cancelKeyEdit(false);
+        self->focusObject(obj);
+    }
     bool send(Route route,std::initializer_list<Arg> args){
         uint8_t bytes[apiMaxRequest]={};ApiBuilder b(bytes,sizeof(bytes),route);
         for(const auto& a:args)if(!b.add(a.key.c_str(),a.value.c_str())){set(pageStatus_,"Проверьте поля");return false;}
@@ -683,8 +694,13 @@ private:
             case 201:if(page_==5&&sub_==9&&!collectionConfig_&&fields_[0])send(Route::waterCoefficient,{{"confirm","YES"},{"pulses_per_litre",text(fields_[0])}});break;
             case 222:if(page_==5&&sub_==9&&collectionConfig_&&fields_[0])send(Route::collectionCoefficient,{{"confirm","YES"},{"pulses_per_ml",text(fields_[0])}});break;
             case 202:form(Route::calibration,"offset",4);break;
-            case 203:send(Route::wifiScan,{{"start","1"},{"fresh","1"}});break;
-            case 204:{unsigned i=lv_dropdown_get_selected(wifiList_);if(i<networkCount_)send(Route::wifiConnect,{{"ssid",networks_[i]},{"pass",lv_textarea_get_text(fields_[0])}});else set(pageStatus_,"Выберите сеть");break;}
+            case 203:
+                if(send(Route::wifiScan,{{"start","1"},{"fresh","1"}})){
+                    scanPending_=false;networkCount_=0;lv_dropdown_close(wifiList_);
+                    lv_dropdown_set_options(wifiList_,"Поиск сетей…");lv_dropdown_set_selected(wifiList_,0);
+                }
+                break;
+            case 204:{unsigned i=lv_dropdown_get_selected(wifiList_);if(i>0&&i<=networkCount_)send(Route::wifiConnect,{{"ssid",networks_[i-1]},{"pass",lv_textarea_get_text(fields_[0])}});else set(pageStatus_,"Выберите сеть");break;}
             case 205:send(Route::wifiDisconnect,{});break;
             case 206:case 207:case 208:requestedTheme_=id-206;render();break;
             case 221:themeSynced_=false;send(Route::theme,{{"confirm","YES"},{"mode",String(requestedTheme_)}});break;
@@ -730,7 +746,7 @@ private:
     }
     void handleResult(int code,const String& body){
         if(calibrating_||pendingPage_!=page_||pendingSub_!=sub_||pendingGeneration_!=viewGeneration_)return;
-        if(code<200||code>=300){if(pendingRoute_==Route::chartHistory){clearGraph();graphNotice(code==0?"Нет связи":"Ошибка данных графика");return;}set(pageStatus_,code==0?String("Ответ не получен; проверьте состояние"):String("Ошибка ")+code+": "+body.substring(0,100));return;}
+        if(code<200||code>=300){if(pendingRoute_==Route::wifiScan){scanPending_=false;networkCount_=0;lv_dropdown_set_options(wifiList_,"Обновите список");}if(pendingRoute_==Route::chartHistory){clearGraph();graphNotice(code==0?"Нет связи":"Ошибка данных графика");return;}set(pageStatus_,code==0?String("Ответ не получен; проверьте состояние"):String("Ошибка ")+code+": "+body.substring(0,100));return;}
         if(pendingRoute_!=Route::chartHistory)set(pageStatus_,"Выполнено");
         if(pendingRoute_==Route::geometryRead&&calcMode_==3){JsonDocument d;if(deserializeJson(d,body)){set(resultLabel_,"Ошибка загрузки размеров");return;}
             rememberCalc();for(int i=0;i<2;++i)calcInput_[3][i]=d[i?"height":"diameter"]|"";
@@ -740,11 +756,11 @@ private:
         if(pendingRoute_==Route::referenceEdit||pendingRoute_==Route::calibrationEdit){set(pageStatus_,body);return;}
         if(pendingRoute_==Route::theme){themeSynced_=true;theme_=requestedTheme_;prefs_.putUChar("theme",theme_);build();return;}
         if(pendingRoute_==Route::wifiConnect||pendingRoute_==Route::googleConfig){if(fields_[0]&&pendingRoute_==Route::wifiConnect)lv_textarea_set_text(fields_[0],"");if(fields_[1]&&pendingRoute_==Route::googleConfig)lv_textarea_set_text(fields_[1],"");}
-        if(pendingRoute_==Route::wifiScan){JsonDocument d;if(deserializeJson(d,body)){set(pageStatus_,"Ошибка списка сетей");return;}scanPending_=d["scanning"]|false;
+        if(pendingRoute_==Route::wifiScan){JsonDocument d;if(deserializeJson(d,body)){scanPending_=false;set(pageStatus_,"Ошибка списка сетей");lv_dropdown_set_options(wifiList_,"Обновите список");return;}scanPending_=d["scanning"]|false;
             if(scanPending_){set(pageStatus_,"Поиск сетей…");return;}
-            networkCount_=0;String options;
+            networkCount_=0;String options="Выберите сеть";
             for(JsonObjectConst n:d["networks"].as<JsonArrayConst>()){if(networkCount_>=32)break;const char* ssid=n["ssid"]|"";if(!*ssid)continue;networks_[networkCount_++]=ssid;String display=ssid;display.replace('\n',' ');display.replace('\r',' ');if(options.length())options+="\n";options+=display+" ("+String(n["rssi"]|0)+")";}
-            lv_dropdown_set_options(wifiList_,options.length()?options.c_str():"Нет сетей");set(pageStatus_,d["error"]|"");return;}
+            lv_dropdown_close(wifiList_);lv_dropdown_set_options(wifiList_,networkCount_?options.c_str():"Нет сетей");lv_dropdown_set_selected(wifiList_,0);set(pageStatus_,d["error"]|"");return;}
         if(pendingRoute_==Route::chartHistory&&chart_){
             JsonDocument d;busa_graph::Scale scale;
             if(deserializeJson(d,body)||!busa_graph::analyze(d.as<JsonObjectConst>(),graphKind_,graphMinutes_,scale)){
@@ -780,13 +796,12 @@ private:
     }
     void focusKey(int index){
         if(!keyCount_)return;
-        if(keyFocus_>=0&&keyFocus_<keyCount_)lv_obj_clear_state(keyControls_[keyFocus_].obj,LV_STATE_FOCUSED);
-        sectionEntered_=true;keyFocus_=(index+keyCount_)%keyCount_;
-        auto* obj=keyControls_[keyFocus_].obj;lv_obj_add_state(obj,LV_STATE_FOCUSED);
+        if(keyFocus_>=0&&keyFocus_<keyCount_)lv_obj_clear_state(keyControls_[keyFocus_].obj,LV_STATE_USER_1);
+        sectionEntered_=true;keyFocus_=(index+keyCount_)%keyCount_;syncNavFocus();
+        auto* obj=keyControls_[keyFocus_].obj;lv_obj_add_state(obj,LV_STATE_USER_1);
     }
     void focusAction(int id){
         for(int i=0;i<keyCount_;++i)if(keyControls_[i].type==0&&keyControls_[i].id==id){focusKey(i);return;}
-        focusKey(0);
     }
     void moveKeyFocus(busa_focus::Direction direction){
         if(!keyCount_)return;
@@ -800,12 +815,12 @@ private:
     int fieldIndex(lv_obj_t* obj)const{for(int i=0;i<8;++i)if(fields_[i]==obj)return i;return -1;}
     void keyHint(const String& s){set(pageStatus_?pageStatus_:resultLabel_,s);}
     void cancelKeyEdit(bool restore){
-        if(keyEdit_&&restore){if(keyDropdown_)lv_dropdown_set_selected(keyEdit_,keyOriginalChoice_);else lv_textarea_set_text(keyEdit_,keyOriginal_.c_str());}
+        if(keyEdit_){if(keyDropdown_){if(restore)lv_dropdown_set_selected(keyEdit_,keyOriginalChoice_);lv_dropdown_close(keyEdit_);}else if(restore)lv_textarea_set_text(keyEdit_,keyOriginal_.c_str());}
         keyEdit_=nullptr;keyDropdown_=false;keyOriginal_="";keyConfirm_=-1;lastTapKey_=-1;lastTapAt_=0;
     }
     void beginKeyEdit(const KeyControl& c){
         hideKeyboard();keyEdit_=c.obj;keyDropdown_=c.type==2;lastTapKey_=-1;tapMode_=0;
-        if(keyDropdown_){keyOriginalChoice_=lv_dropdown_get_selected(keyEdit_);return;}
+        if(keyDropdown_){keyOriginalChoice_=lv_dropdown_get_selected(keyEdit_);lv_dropdown_open(keyEdit_);return;}
         keyOriginal_=lv_textarea_get_text(keyEdit_);lv_textarea_set_cursor_pos(keyEdit_,LV_TEXTAREA_CURSOR_LAST);
     }
     static int keyDigit(uint8_t k){static const uint8_t map[]={17,4,5,6,8,9,10,12,13,14};for(int i=0;i<10;++i)if(map[i]==k)return i;return -1;}
@@ -864,15 +879,14 @@ private:
             auto* obj=keyEdit_;const int index=fieldIndex(obj);
             if(k==15){cancelKeyEdit(true);keyHint("Изменение отменено");return;}
             if(keyDropdown_){
-                if(k==19){cancelKeyEdit(false);focusKey(keyFocus_+1);return;}
-                unsigned n=lv_dropdown_get_option_cnt(obj);if(n&&(k==7||k==11))lv_dropdown_set_selected(obj,(lv_dropdown_get_selected(obj)+n+(k==7?n-1:1))%n);
+                if(k==19){cancelKeyEdit(false);return;}
+                unsigned n=lv_dropdown_get_option_cnt(obj);if(n>1&&(k==7||k==11)){unsigned i=lv_dropdown_get_selected(obj);if(k==7&&i>0)--i;else if(k==11&&i+1<n)++i;lv_dropdown_set_selected(obj,i);lv_dropdown_close(obj);lv_dropdown_open(obj);}
                 return;
             }
             if(k==19){
                 if(page_==1||(page_==5&&sub_==0)){if(!keySaveReference(index,false)){keyHint("Не удалось отправить значение");return;}}
                 cancelKeyEdit(false);
                 if(page_==4){calculate();}
-                else if(page_==5&&sub_==1)focusKey(keyFocus_+1);
                 return;
             }
             editTextKey(obj,k,at);return;
@@ -887,8 +901,8 @@ private:
             case Nav::nextSection:action(100+(page_+1)%6);return;
             case Nav::enter:focusKey(0);return;
             case Nav::leave:
-                if(keyFocus_>=0&&keyFocus_<keyCount_)lv_obj_clear_state(keyControls_[keyFocus_].obj,LV_STATE_FOCUSED);
-                keyFocus_=-1;sectionEntered_=false;return;
+                if(keyFocus_>=0&&keyFocus_<keyCount_)lv_obj_clear_state(keyControls_[keyFocus_].obj,LV_STATE_USER_1);
+                keyFocus_=-1;sectionEntered_=false;syncNavFocus();return;
             case Nav::backChild:{const int id=sub_==9?412:400+sub_;action(409);sectionEntered_=true;focusAction(id);return;}
             case Nav::up:moveKeyFocus(busa_focus::Direction::up);return;
             case Nav::down:moveKeyFocus(busa_focus::Direction::down);return;
@@ -958,10 +972,10 @@ private:
             set(live_[7],String("Время отбора: ")+(ok?durationText(duration):String("—")));
             set(live_[4],"Собрано: "+measured(d["collection"]["total_ml"]," мл",1));}
         else if(page_==5){
-            if(sub_==1)set(live_[0],ok?String("Wi-Fi: ")+(d["station"]["ssid"]|"—"):"Нет связи");
+            if(sub_==1)set(live_[0],ok?String(d["station"]["ssid"]|"—"):"Нет связи");
             else if(sub_==3)set(live_[0],ok?String("Google: ")+String(d["google"]["configured"].as<bool>()?"настроен":"не настроен")+" · код "+String(d["google"]["state"]|0):"Нет связи");
             else if(sub_==4){set(live_[0],ok?String(busa_presentation::firmwareLabel(d["firmware"]|"—")):"Нет связи");set(live_[1],String("Время работы: ")+(ok?durationText(d["uptime_ms"]):String("—")));
-                set(live_[2],"Wi-Fi: "+String(ok&&(d["wifi"]["sta_connected"]|false)?"подключён":"—"));set(live_[3],"RAM: "+measured(d["esp32"]["free_heap_bytes"]," байт",0));set(live_[4],"PSRAM: "+measured(d["performance"]["psram_total_bytes"]," байт",0));}
+                set(live_[2],"Сеть: "+String(ok&&(d["wifi"]["sta_connected"]|false)?(d["station"]["ssid"]|"—"):"—"));set(live_[3],"RAM: "+measured(d["esp32"]["free_heap_bytes"]," байт",0));set(live_[4],"PSRAM: "+measured(d["performance"]["psram_total_bytes"]," байт",0));}
             else if(sub_==6){set(live_[0],"UART: "+String(ok?"связь есть":"нет связи"));set(live_[1],"LCD: "+String(hw_.lcdReady()?"инициализирован":"ошибка"));set(live_[2],"Сенсор: "+String(calibrationValid_?"калиброван":"нет"));set(live_[3],"microSD: "+String(hw_.sdReady()?"доступна":"нет"));
                 set(live_[4],"GPIO15: "+String(ok?(d["diagnostics"]["water_flow"]["status"]|"—"):"—"));set(live_[5],"PCF8575: "+String(ok&&(d["modules"]["pcf8575"]|false)?"доступен":"—"));
                 set(live_[6],"I2C ошибок: "+measured(d["performance"]["i2c_errors"],"",0));set(live_[7],"Макс. цикл: "+measured(d["performance"]["loop_worst_ms"]," мс",0));
@@ -994,7 +1008,6 @@ private:
     lv_obj_t *calcNotes_=nullptr,*touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*touchTarget_=nullptr,*pageCounter_=nullptr;String pageContent_;unsigned pageOffset_=0,pageLines_=5;
     busa_touch::Transform transform_{};busa_touch::Point raw_[3]{},screen_[3]{};
     bool collectionConfig_=true;
-    int lastNav_=-1;
     bool calibrationValid_=false,calibrating_=false,held_=false,wasConnected_=false,waiting_=false,scanPending_=false,frameOpen_=false,awaitRelease_=false,formValid_=false;
     int calIndex_=0,calSamples_=0,sumX_=0,sumY_=0,page_=0,sub_=-1,pendingPage_=0,pendingSub_=-1,graphKind_=0,calcMode_=0;
     static constexpr int graphMinutes_=5;

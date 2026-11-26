@@ -9,6 +9,16 @@ import subprocess, sys, tempfile
 root=Path(__file__).resolve().parents[1]
 sketch=root/'firmware/BUSA_Display_N4R8'
 u=(sketch/'BUSA_TouchUI.h').read_text()
+# Manual discovery and a neutral unselected state are requirements, not styling guesses.
+import re
+assert len(re.findall(r'(?<![\w])selected\(',u))==2, 'green selection must only be the root navigation cursor'
+assert 'networkCount_=0;chart_=nullptr;' in u
+assert 'lv_dropdown_set_options(wifiList_,"Обновите список")' in u
+assert 'String options="Выберите сеть"' in u
+assert 'if(i>0&&i<=networkCount_)' in u and 'networks_[i-1]' in u
+assert u.count('{"start","1"},{"fresh","1"}')==1 and 'case 203:' in u
+assert 'if(scanPending_&&!waiting_' in u
+assert 'String("Wi-Fi: ")' not in u
 # Reuse exact production implementations instead of duplicating their dimensions.
 def between(a,b):
     return u[u.index(a):u.index(b,u.index(a))]
@@ -49,6 +59,7 @@ struct UiTest {
     static void keyboardEvent(lv_event_t*){}
     lv_img_dsc_t navArt_[6]{};lv_obj_t* navButtons_[6]={};
     std::vector<lv_obj_t*> controls;
+    bool sectionEntered_=false;int page_=0;
     static void event(lv_event_t*){} static void textFocus(lv_event_t*){}
     void registerKey(lv_obj_t* o,int,int){controls.push_back(o);}
     static String value(JsonStub){return {};}
@@ -68,6 +79,7 @@ struct InputTest {
     size_t tapIndex_=0;uint32_t lastTapAt_=0,viewGeneration_=0;uint16_t keyOriginalChoice_=0;
     String keyOriginal_;lv_obj_t* calcNotes_=nullptr;unsigned calculates=0;int lastAction=-1;
     void focusStyle(lv_obj_t*,uint8_t){}
+    void syncNavFocus(){}
     void keyHint(const String&){}
     void adjustCalibrationKey(lv_obj_t*,uint8_t){assert(false);}
     bool keySaveReference(int,bool){return true;}
@@ -123,6 +135,21 @@ struct InputTest {
         ir(11);ir(11);ir(1);assert(!strcmp(lv_textarea_get_text(touchEditor_),"a2"));
         busa_touch_keys::apply(keyboard_,touchEditor_,"B");ir(16);assert(!strcmp(lv_textarea_get_text(touchEditor_),"a2"));
         ir(14);assert(!strcmp(lv_textarea_get_text(fields_[0]),"a2"));
+        // A real dropdown and password field, navigated using the existing IR transport.
+        page_=5;sub_=1;keyCount_=0;keyFocus_=-1;sectionEntered_=true;
+        lv_obj_t* dropdown=lv_dropdown_create(parent);
+        lv_dropdown_set_options(dropdown,"Select network\niPhone 16\nTest AP");
+        registerKey(dropdown,2,0);registerKey(fields_[0],1,0);
+        lv_textarea_set_text(fields_[0],"");lv_textarea_set_password_mode(fields_[0],true);
+        assert(lv_dropdown_get_selected(dropdown)==0);
+        focusKey(0);deliver(19);assert(keyEdit_==dropdown&&lv_dropdown_is_open(dropdown));
+        deliver(11);assert(lv_dropdown_get_selected(dropdown)==1);
+        deliver(11);assert(lv_dropdown_get_selected(dropdown)==2);
+        deliver(15);assert(!keyEdit_&&!lv_dropdown_is_open(dropdown)&&lv_dropdown_get_selected(dropdown)==0);
+        deliver(19);deliver(11);deliver(19);assert(!keyEdit_&&lv_dropdown_get_selected(dropdown)==1&&keyFocus_==0);
+        focusKey(1);deliver(19);deliver(11);deliver(11);deliver(4);deliver(5);deliver(21);deliver(19);
+        assert(!keyEdit_&&!strcmp(lv_textarea_get_text(fields_[0]),"1")&&keyFocus_==1);
+        std::puts("PASS real dropdown manual choice/cancel and password edit via physical input");
         std::puts("PASS native mixed input: real physicalKey and modal lifecycle, 17 IR buttons, 19 matrix UART actions, F2 local separately, numeric/text/delete/cancel/commit");
     }
 };
@@ -234,12 +261,12 @@ checks=r'''
             auto* b=navButtons_[i];auto* l=lv_obj_get_child(b,0);auto* im=lv_obj_get_child(b,1);
             assertFits(b);labelFits(l);assertFits(im);assert(lv_txt_get_width(lv_label_get_text(l),strlen(lv_label_get_text(l)),lv_obj_get_style_text_font(l,0),0,LV_TEXT_FLAG_NONE)<=lv_obj_get_content_width(l));
             selected(b,true);assert(lv_obj_get_style_bg_color(b,0).full==color(0x16763e).full);
-            selected(b,false);focusStyle(b,0);lv_obj_add_state(b,LV_STATE_FOCUSED);
+            selected(b,false);focusStyle(b,0);lv_obj_add_state(b,LV_STATE_USER_1);
             // Check the actual color at the first animation/render cycle, not before LVGL processes transitions.
             lv_anim_refr_now();
             assert(lv_obj_get_style_outline_color(b,0).full==color(0x53d486).full);
             assert(lv_obj_get_style_bg_color(b,0).full==color(theme_==0?0xcbeed7:0x16763e).full);
-            lv_obj_clear_state(b,LV_STATE_FOCUSED);
+            lv_obj_clear_state(b,LV_STATE_USER_1);
             lv_anim_refr_now();assert(lv_obj_get_style_bg_color(b,0).full==color(theme_==2?0x153b4b:surface()).full);
             assert(lv_obj_get_width(im)==20&&lv_obj_get_height(im)==20);
             assert(lv_img_get_zoom(im)==LV_IMG_ZOOM_NONE);
