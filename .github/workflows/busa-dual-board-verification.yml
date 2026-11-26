@@ -3,7 +3,7 @@ on:
   push:
     branches: [lab/guition-n4r8-display-check-20261124, feat/busa-dual-ota-20261125, fix/busa-display-bootdiag1-20261125, fix/busa-performance1-20261125, fix/busa-performance2-20261125, fix/busa-performance3-20261125, fix/busa-guition-hq-20261125, fix/busa-actual-hw1-20261125, fix/busa-latency-perf4-20261125, fix/busa-guition-ui2-20261125, fix/busa-guition-ui3-20261125, fix/busa-guition-ui4-20261125, fix/busa-guition-ui5-20261125, fix/busa-guition-ui6-20261125, fix/busa-guition-ui7-20261125, fix/busa-guition-ui8-20261125, fix/busa-guition-ui9-20261125, fix/busa-guition-ui10-20261125, fix/busa-main-name1-20261126, fix/busa-ai1v-time1-20261126, fix/busa-guition-graphs5-20261126, fix/busa-guition-graph-grid-history-20261126, fix/busa-liquid-settings-20261126, fix/busa-guition-home-align-20261126, fix/busa-guition-ultra-graphics-20261126, fix/busa-guition-clean-graphics-20261126, fix/busa-ir-remote-20261126]
   pull_request:
-    branches: [fix/busa-ir-remote-20261126, fix/busa-guition-nav1-20261126]
+    branches: [fix/busa-ir-remote-20261126, fix/busa-guition-nav1-20261126, fix/busa-guition-nav2-20261126]
   workflow_dispatch:
 permissions:
   contents: read
@@ -92,6 +92,7 @@ jobs:
           arduino-cli lib install "OneWire@2.3.8"
           arduino-cli lib install "DallasTemperature@4.0.6"
           arduino-cli lib install "IRremote@4.7.1"
+          arduino-cli lib install "ArduinoJson@7.4.3"
       - name: Generate Google trust bundle
         run: python3 ci/generate_google_ca.py --output firmware/BUSA_1M_WIFI_3v_GOOGLE/BUSA_GoogleCA.h
       - name: Compile firmware for ESP32-S3 N16R8
@@ -117,7 +118,7 @@ jobs:
           assert usb.read_bytes()[0x10000:]==ota.read_bytes()
           assert b'display_diagnostics' in ota.read_bytes()
           assert b'UNRELIABLE_PULSES' in ota.read_bytes()
-          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-PERF4-HW2-NAME1-TIME1' in ota.read_bytes()
+          assert b'UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-PERF4-HW2-NAME1-TIME1' in ota.read_bytes()
           assert b'BUSA 1M AI 1v' in ota.read_bytes()
           assert b'main_uart_tx_worker_max_ms' in ota.read_bytes()
           assert b'loop_profile' in ota.read_bytes()
@@ -187,6 +188,7 @@ jobs:
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_guition_focus_order.cpp -o /tmp/busa-ui2-focus
           /tmp/busa-ui2-focus
           python3 -B tests/test_guition_key_navigation.py
+          python3 -B tests/test_nav3_compact.py "$HOME/Arduino/libraries/ArduinoJson/src"
           mkdir -p display_delivery
           python3 -m pip install --disable-pip-version-check 'Pillow==13.0.0' 'esptool==4.5.1'
           python3 -c 'import serial, bitstring, cryptography, reedsolo'
@@ -230,7 +232,7 @@ jobs:
           assert data[0]==0xe9 and data[0x10000:0x10000+len(app)]==app
           assert 60000<len(app)<=0x1c0000 and len(data)<=0x1d0000
           major='5' if os.environ['CORE_VERSION']=='3.0.0' else '4'
-          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-N2-HW2').encode() in app
+          assert ('BUSA-DISPLAY-N4R8-OTA1-BD2-I'+major+'-P1-N3-HW2').encode() in app
           assert b'[BOOT] FIRST_FRAME OK' in app
           assert b'[BOOT] PSRAM ' in app
           assert b'[BOOT] LCD GEOMETRY ' in app

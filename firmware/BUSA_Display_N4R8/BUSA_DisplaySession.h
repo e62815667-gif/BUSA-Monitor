@@ -67,7 +67,7 @@ public:
                 else {apiCode_=0;apiBody_="Display link unavailable";apiResultReady_=true;}
                 memset(queued_,0,sizeof(queued_));queuedSize_=0;
             }else if(ota_.next(now,supported,connected(),localReady,kind,expected,data,count))start(kind,data,count,expected,now);
-            else if(!requestSent_||uint32_t(now-lastRequest_)>=250){
+            else if(!requestSent_||uint32_t(now-lastRequest_)>=80){
                 lastRequest_=now;requestSent_=true;
                 start(requestStatus,nullptr,0,status,now);
             }

@@ -11,6 +11,8 @@
   must be verified on a powered-off low-voltage bench before connecting.
 */
 #include <Arduino.h>
+#include <ArduinoJson.h>
+#include <utility>
 #include <WiFi.h>
 #include <WebServer.h>
 #include <Update.h>
@@ -58,7 +60,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainTx && BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainRx,
   "Buzzer pin conflicts with I2C, UART or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-PERF4-HW2-NAME1-TIME1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-PERF4-HW2-NAME1-TIME1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -922,6 +924,29 @@ static void busaIrPoll(uint32_t now){
 }
 String busaUartStatusJSON(){
   String s=statusJSON();
+  if(busa_display_link::compactStatusCapable()){
+    JsonDocument filter, compact;
+    const char* fields[]={"device","firmware","uptime_ms","display_references","calibration_offsets","display_ota_supported","tft_theme_mode"};
+    for(const auto* field:fields)filter[field]=true;
+    filter["clock"]["datetime"]=true;
+    filter["temperatures"][0]["c"]=true;
+    filter["sound_alerts"]["channels"][0]["sound_on"]=true;
+    filter["water"]["lpm"]=true;filter["water"]["total_l_estimate"]=true;filter["water"]["pulses_per_litre"]=true;
+    filter["collection"]["ml_per_min"]=true;filter["collection"]["total_ml"]=true;filter["collection"]["pulses_per_ml"]=true;
+    filter["collection"]["duration_ms"]=true;filter["collection"]["elapsed_ms"]=true;
+    filter["station"]["connected"]=true;filter["station"]["ssid"]=true;
+    filter["network_indicators"]["internet"]=true;
+    filter["google"]["configured"]=true;filter["google"]["state"]=true;
+    filter["modules"]["pcf8575"]=true;filter["keypad"]["message"]=true;filter["keypad"]["expected"]=true;
+    filter["performance"]["i2c_errors"]=true;filter["performance"]["loop_worst_ms"]=true;filter["performance"]["psram_total_bytes"]=true;
+    filter["diagnostics"]["water_flow"]["status"]=true;
+    filter["diagnostics"]["esp32"]["free_heap_bytes"]=true;filter["diagnostics"]["wifi"]["sta_connected"]=true;
+    filter["esp32"]["free_heap_bytes"]=true;filter["wifi"]["sta_connected"]=true;
+    if(!filter.overflowed()&&!deserializeJson(compact,s,DeserializationOption::Filter(filter))&&!compact.overflowed()){
+      String shortStatus;
+      if(shortStatus.reserve(measureJson(compact)+1)&&serializeJson(compact,shortStatus)>0&&shortStatus.endsWith("}"))s=std::move(shortStatus);
+    }
+  }
   if(!busa_display_link::keypadCapable()||!s.endsWith("}"))return s;
   s.remove(s.length()-1);
   s+=",\"keypad_input\":{\"boot\":"+String(busaKeyEvents.boot())+",\"head\":"+String(busaKeyEvents.head());

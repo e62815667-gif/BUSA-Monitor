@@ -72,7 +72,7 @@ public:
                     auto mode=session_.snapshot()["tft_theme_mode"];
                     if(mode.is<uint8_t>()&&mode.as<uint8_t>()<=2){themeSynced_=true;if(mode.as<uint8_t>()!=theme_){theme_=mode.as<uint8_t>();prefs_.putUChar("theme",theme_);build();}}
                 }
-                refresh();consumeKeys(now);
+                consumeKeys(now);refresh();
             }
             if(page_==0&&now-lastAnimation_>=33){lastAnimation_=now;animate(now);}
             if(page_==3&&!waiting_&&session_.connected()&&(graphDirty_||now-lastGraph_>=2000))requestGraph();
@@ -91,11 +91,13 @@ private:
     uint32_t surface()const{return theme_==0?0xffffff:theme_==1?0x202020:0x0d2430;}
     uint32_t line()const{return theme_==0?0xb6d2df:theme_==1?0x454545:0x4d8b9e;}
     uint32_t accent()const{return theme_==0?0x007bb3:theme_==1?0xaaaaaa:0x009fde;}
+    static constexpr uint32_t selectionColor(){return 0x16763e;}
+    static constexpr uint32_t selectionEdge(){return 0x53d486;}
     uint32_t muted()const{return theme_==0?0x536e7f:theme_==1?0xb0b0b0:0x9cb4c2;}
     void glass(lv_obj_t* o,bool active=false){
         if(theme_!=2){lv_obj_set_style_bg_grad_dir(o,LV_GRAD_DIR_NONE,0);return;}
         if(!active)lv_obj_set_style_bg_color(o,color(0x153b4b),0);
-        lv_obj_set_style_bg_grad_color(o,color(active?0x0088d3:0x081822),0);
+        lv_obj_set_style_bg_grad_color(o,color(active?0x0e502d:0x081822),0);
         lv_obj_set_style_bg_grad_dir(o,LV_GRAD_DIR_VER,0);
     }
     static constexpr int TOP=30, NAV=44, PAD=3, GAP=3, SCENE=124, METRICS=32, RELAYS=30;
@@ -224,9 +226,25 @@ private:
     void setBg(lv_obj_t* o,uint32_t c){if(lv_obj_get_style_bg_color(o,0).full!=color(c).full)lv_obj_set_style_bg_color(o,color(c),0);}
     void setInk(lv_obj_t* o,uint32_t c){if(lv_obj_get_style_text_color(o,0).full!=color(c).full)lv_obj_set_style_text_color(o,color(c),0);}
     void selected(lv_obj_t* o,bool on){
-        lv_obj_set_style_bg_color(o,color(on?(theme_==0?0x007bb3:theme_==1?0x535353:0x00a9e6):surface()),0);glass(o,on);
-        lv_obj_set_style_border_color(o,color(on?accent():line()),0);
+        lv_obj_set_style_bg_color(o,color(on?selectionColor():surface()),0);glass(o,on);
+        lv_obj_set_style_border_color(o,color(on?selectionEdge():line()),0);
         lv_obj_set_style_text_color(lv_obj_get_child(o,0),color(on?0xffffff:ink()),0);
+    }
+    void focusStyle(lv_obj_t* o,uint8_t type){
+        // LVGL 8.4 reads every transition descriptor, so nullptr is invalid.
+        // Override the default theme's animated properties with a zero-duration transition.
+        static const lv_style_prop_t props[]={LV_STYLE_BG_OPA,LV_STYLE_BG_COLOR,LV_STYLE_TRANSFORM_WIDTH,LV_STYLE_TRANSFORM_HEIGHT,LV_STYLE_TRANSLATE_Y,LV_STYLE_TRANSLATE_X,LV_STYLE_TRANSFORM_ZOOM,LV_STYLE_TRANSFORM_ANGLE,LV_STYLE_COLOR_FILTER_OPA,LV_STYLE_COLOR_FILTER_DSC,static_cast<lv_style_prop_t>(0)};
+        static lv_style_transition_dsc_t instant;
+        static bool initialized=false;
+        if(!initialized){lv_style_transition_dsc_init(&instant,props,lv_anim_path_linear,0,0,nullptr);initialized=true;}
+        lv_obj_set_style_transition(o,&instant,LV_STATE_DEFAULT);
+        lv_obj_set_style_transition(o,&instant,LV_STATE_FOCUSED);
+        lv_obj_set_style_outline_color(o,color(selectionEdge()),LV_STATE_FOCUSED);
+        lv_obj_set_style_outline_width(o,2,LV_STATE_FOCUSED);
+        lv_obj_set_style_outline_pad(o,0,LV_STATE_FOCUSED);
+        lv_obj_set_style_border_color(o,color(selectionEdge()),LV_STATE_FOCUSED);
+        lv_obj_set_style_bg_color(o,color(theme_==0?0xcbeed7:(type==0?selectionColor():0x123b28)),LV_STATE_FOCUSED);
+        lv_obj_set_style_bg_grad_dir(o,LV_GRAD_DIR_NONE,LV_STATE_FOCUSED);
     }
     lv_obj_t* panel(lv_obj_t* parent,int width=LV_PCT(100),int height=LV_SIZE_CONTENT){
         auto* o=lv_obj_create(parent);lv_obj_set_size(o,width,height);lv_obj_set_style_bg_color(o,color(surface()),0);lv_obj_set_style_bg_opa(o,LV_OPA_COVER,0);glass(o);
@@ -325,13 +343,14 @@ private:
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
         auto* root=lv_scr_act();calcNotes_=nullptr;touchModal_=nullptr;touchTitle_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
         auto* top=plain(root,WIDTH,TOP);lv_obj_set_pos(top,0,0);
-        at(top,"BUSA MONITOR",6,0);clock_=at(top,"Дата и время: —",6,16,&busa_font_nav);
+        auto* title=at(top,"BUSA MONITOR",6,7);clock_=at(top,"—",0,7,&busa_font_nav);
+        lv_obj_set_width(clock_,130);lv_label_set_long_mode(clock_,LV_LABEL_LONG_DOT);
+        lv_obj_align_to(clock_,title,LV_ALIGN_OUT_RIGHT_MID,6,0);
         lv_obj_set_style_text_color(clock_,color(muted()),0);
-        for(int i=0;i<3;++i){static const char* names[]={"Wi-Fi","Google","ESP32"};auto* p=plain(top,65,18);lv_obj_set_pos(p,205+i*68,4);
+        for(int i=0;i<3;++i){static const char* names[]={"Wi-Fi","Google","ESP32"};auto* p=plain(top,65,18);lv_obj_set_pos(p,273+i*68,6);
             lv_obj_set_style_radius(p,9,0);lv_obj_set_style_border_width(p,1,0);lv_obj_set_style_border_color(p,color(line()),0);
             statusDots_[i]=plain(p,5,5);lv_obj_set_style_radius(statusDots_[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_opa(statusDots_[i],LV_OPA_COVER,0);lv_obj_set_pos(statusDots_[i],5,6);
             at(p,names[i],15,2,&busa_font_small);}
-        connection_=at(top,"UART",423,7,&busa_font_small);lv_obj_set_width(connection_,54);lv_obj_set_style_text_align(connection_,LV_TEXT_ALIGN_RIGHT,0);lv_label_set_long_mode(connection_,LV_LABEL_LONG_DOT);
         body_=lv_obj_create(root);lv_obj_set_pos(body_,0,TOP);lv_obj_set_size(body_,WIDTH,HEIGHT-TOP-NAV);
         lv_obj_set_style_bg_color(body_,color(paper()),0);lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
         lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,GAP,0);lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);
@@ -392,7 +411,8 @@ private:
         for(int i=0;i<4;++i){auto* p=plain(bar,115,RELAYS);lv_obj_set_style_radius(p,6,0);
             lv_obj_set_style_bg_color(p,color(surface()),0);lv_obj_set_style_bg_opa(p,LV_OPA_COVER,0);
             lv_obj_set_style_border_color(p,color(line()),0);lv_obj_set_style_border_width(p,1,0);
-            at(p,relayNames[i],5,0,&busa_font_small);live_[i]=at(p,"Нет связи",5,14,&busa_font_small);}
+            live_[i]=at(p,relayNames[i],0,0,&busa_font_small);
+            lv_obj_set_width(live_[i],111);lv_obj_set_style_text_align(live_[i],LV_TEXT_ALIGN_CENTER,0);lv_obj_center(live_[i]);}
     }
     lv_obj_t* statusLabel(lv_obj_t* parent,int width=LV_PCT(100),int height=26){
         auto* l=smallLabel(parent,"");lv_obj_set_size(l,width,height);lv_label_set_long_mode(l,LV_LABEL_LONG_DOT);return l;
@@ -734,9 +754,7 @@ private:
     void registerKey(lv_obj_t* obj,uint8_t type,int id){
         if(keyCount_>=int(sizeof(keyControls_)/sizeof(keyControls_[0])))return;
         keyControls_[keyCount_++]={obj,type,id};
-        lv_obj_set_style_outline_color(obj,color(accent()),LV_STATE_FOCUSED);
-        lv_obj_set_style_outline_width(obj,2,LV_STATE_FOCUSED);
-        lv_obj_set_style_outline_pad(obj,0,LV_STATE_FOCUSED);
+        focusStyle(obj,type);
     }
     void orderKeys(){
         busa_focus::Rect bounds[64];unsigned order[64];KeyControl sorted[64];
@@ -885,15 +903,12 @@ private:
         const bool settingsForm=page_==1||(page_==5&&(sub_==0||sub_==9));
         if(settingsForm&&!ok)formValid_=false;
         if(settingsForm&&ok&&!formValid_){render();return;}
-        set(connection_,ok?"UART":"Нет связи");
-        setInk(connection_,ok?accent():0xff6473);
         const bool indicators[]={ok&&(d["station"]["connected"]|false),ok&&(d["network_indicators"]["internet"]|false),ok};
         for(int i=0;i<3;++i)setBg(statusDots_[i],indicators[i]?0x53d486:0x8297a1);
-        String clock=ok?String(d["clock"]["datetime"]|"—"):String("—");set(clock_,"Дата и время: "+clock.substring(0,busa_presentation::clockLength(clock.c_str())));
+        String clock=ok?String(d["clock"]["datetime"]|"—"):String("—");set(clock_,clock.substring(0,busa_presentation::clockLength(clock.c_str())));
         if(page_==3&&chart_){if(!ok){clearGraph();graphNotice("Нет связи");}if(graphKind_==0)for(int i=0;i<4;++i){String s=i==3?"Авария":sensor(i);s+=" "+measured(d["temperatures"][i]["c"]," °C");set(graphLegend_[i],s);}}
         if(page_==0){
             for(int i=0;i<4;++i){auto v=d["sound_alerts"]["channels"][i]["sound_on"];const bool on=ok&&!v.isNull()&&v.as<bool>();
-                set(live_[i],!ok||v.isNull()?"Нет связи":on?"Вкл.":"Выкл.");
                 setBg(lv_obj_get_parent(live_[i]),on?(i==3?0x42232d:0x14382e):surface());
                 setInk(live_[i],on?(i==3?0xff6473:0x53d486):muted());
                 set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1));}
@@ -935,7 +950,7 @@ private:
     }
     Hardware& hw_;DisplaySession& session_;Preferences prefs_;
     lv_disp_drv_t driver_{};lv_disp_draw_buf_t drawBuffer_{};lv_indev_drv_t input_{};
-    lv_obj_t *connection_=nullptr,*body_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
+    lv_obj_t *body_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
     busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1;
     bool sectionEntered_=false;
     lv_obj_t* keyEdit_=nullptr;String keyOriginal_;bool keyDropdown_=false,displaySleeping_=false;uint16_t keyOriginalChoice_=0;
