@@ -101,7 +101,7 @@ private:
         lv_obj_set_style_bg_grad_color(o,color(active?0x0e502d:0x081822),0);
         lv_obj_set_style_bg_grad_dir(o,LV_GRAD_DIR_VER,0);
     }
-    static constexpr int TOP=30, NAV=44, PAD=3, GAP=3, SCENE=124, METRICS=32, RELAYS=30;
+    static constexpr int TOP=30, NAV=44, PAD=3, GAP=3, SCENE=154, METRICS=32, RELAYS=0;
     static_assert(TOP+NAV+2*PAD+SCENE+METRICS+RELAYS+2*GAP==272,"Home must fit native display");
     static void flush(lv_disp_drv_t* d,const lv_area_t* a,lv_color_t* p){
         auto* self=static_cast<Interface*>(d->user_data);
@@ -354,16 +354,17 @@ private:
     }
     void build(){
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
-        auto* root=lv_scr_act();calcNotes_=nullptr;touchModal_=nullptr;touchTitle_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
+        auto* root=lv_scr_act();homeArt_=nullptr;calcNotes_=nullptr;touchModal_=nullptr;touchTitle_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
         auto* top=plain(root,WIDTH,TOP);lv_obj_set_pos(top,0,0);
-        auto* title=at(top,"BUSA MONITOR",6,7);clock_=at(top,"—",0,7,&busa_font_nav);
-        lv_obj_set_width(clock_,130);lv_label_set_long_mode(clock_,LV_LABEL_LONG_DOT);
-        lv_obj_align_to(clock_,title,LV_ALIGN_OUT_RIGHT_MID,6,0);
+        auto* title=at(top,"BUSA MONITOR",6,0);lv_obj_set_width(title,127);
+        clock_=at(top,"—",139,6,&busa_font_nav);lv_obj_set_width(clock_,127);
+        lv_label_set_long_mode(clock_,LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_color(clock_,color(muted()),0);
-        for(int i=0;i<3;++i){static const char* names[]={"Wi-Fi","Google","ESP32"};auto* p=plain(top,65,18);lv_obj_set_pos(p,273+i*68,6);
+        for(int i=0;i<3;++i){static const char* names[]={"Wi-Fi","Google","ESP32"};auto* p=plain(top,65,18);lv_obj_set_pos(p,273+i*68,5);
             lv_obj_set_style_radius(p,9,0);lv_obj_set_style_border_width(p,1,0);lv_obj_set_style_border_color(p,color(line()),0);
-            statusDots_[i]=plain(p,5,5);lv_obj_set_style_radius(statusDots_[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_opa(statusDots_[i],LV_OPA_COVER,0);lv_obj_set_pos(statusDots_[i],5,6);
-            at(p,names[i],15,2,&busa_font_small);}
+            statusDots_[i]=plain(p,5,5);lv_obj_set_style_radius(statusDots_[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_opa(statusDots_[i],LV_OPA_COVER,0);lv_obj_set_pos(statusDots_[i],6,7);
+            auto* pillLabel=at(p,names[i],15,2,&busa_font_small);
+            lv_obj_set_width(pillLabel,46);lv_obj_set_style_text_align(pillLabel,LV_TEXT_ALIGN_CENTER,0);}
         body_=lv_obj_create(root);lv_obj_set_pos(body_,0,TOP);lv_obj_set_size(body_,WIDTH,HEIGHT-TOP-NAV);
         lv_obj_set_style_bg_color(body_,color(paper()),0);lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
         lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,GAP,0);lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);
@@ -375,7 +376,7 @@ private:
     void render(){
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;volumeResetPending_=0;
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;}
-        hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;
+        hideKeyboard();if(homeArt_){lv_obj_del(homeArt_);homeArt_=nullptr;}lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;homeAlarm_=nullptr;for(auto& p:homeTempFrames_)p=nullptr;
         wifiList_=nullptr;networkCount_=0;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& p:graphPlots_)p=nullptr;for(auto& s:series_)s=nullptr;for(auto& y:graphY_)for(auto& l:y)l=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
         syncNavFocus();
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
@@ -391,37 +392,71 @@ private:
             geometryReadAttempted_=send(Route::geometryRead,{});
         }
     }
+    // Approved DESIGN-003: no separate bottom relay bar; statuses are visual only.
     void homeTemperatures(lv_obj_t* scene){
-        static const int xs[]={10,10,318,318},ys[]={65,7,65,7};
-        static constexpr int rightWidth=WIDTH-2*PAD-318-10;
+        static const int xs[]={8,8,362,362},ys[]={61,2,61,2};
         for(int i=0;i<4;++i){
-            auto* name=at(scene,i==3?"Авария":sensor(i),xs[i],ys[i]);
-            auto* reading=live_[4+i]=at(scene,"—",xs[i],ys[i]+lv_font_get_line_height(&busa_font)+2,&busa_font_value);
+            auto* frame=homeTempFrames_[i]=plain(scene,i<2?118:110,56);
+            lv_obj_set_pos(frame,xs[i],ys[i]);
+            lv_obj_set_style_radius(frame,5,0);
+            lv_obj_set_style_bg_opa(frame,LV_OPA_TRANSP,0);
+            lv_obj_set_style_border_width(frame,1,0);
+            lv_obj_set_style_border_color(frame,color(paper()),0);
+            auto* name=at(frame,i==3?"Авария":sensor(i),4,2,&busa_font);
+            lv_obj_update_layout(name);
+            auto* reading=live_[4+i]=at(frame,"—",4,2+lv_obj_get_height(name)+3,&busa_font_value);
             lv_obj_set_style_text_color(reading,color(colors_[i]),0);
-            if(i>=2){for(auto* l:{name,reading}){lv_obj_set_width(l,rightWidth);lv_obj_set_style_text_align(l,LV_TEXT_ALIGN_RIGHT,0);}}
+            if(i>=2){for(auto* item:{name,reading}){
+                lv_obj_set_width(item,102);
+                lv_obj_set_style_text_align(item,LV_TEXT_ALIGN_RIGHT,0);
+            }}
         }
     }
     void home(){
         auto* scene=plain(body_,LV_PCT(100),SCENE);
-        auto* center=plain(scene,BUSA_ASSET_W,BUSA_ASSET_H);lv_obj_align(center,LV_ALIGN_CENTER,0,0);
-        auto* im=lv_img_create(center);lv_img_set_src(im,&art_);lv_img_set_antialias(im,true);lv_obj_center(im);
+        homeArt_=plain(lv_scr_act(),BUSA_ASSET_W,BUSA_ASSET_H);
+        lv_obj_set_pos(homeArt_,(WIDTH-BUSA_ASSET_W)/2,7);
+        lv_obj_clear_flag(homeArt_,LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_move_foreground(touchModal_);
+        auto* center=homeArt_;
+        auto* im=lv_img_create(center);
+        lv_img_set_src(im,&art_);lv_img_set_antialias(im,true);lv_obj_center(im);
         for(unsigned i=0;i<7;++i){auto* dot=plain(center,3,3);
-            lv_obj_set_style_bg_color(dot,color(i<4?0x38bdf8:0xc5fffa),0);lv_obj_set_style_bg_opa(dot,LV_OPA_COVER,0);lv_obj_set_style_radius(dot,LV_RADIUS_CIRCLE,0);motion_[i]=dot;}
+            lv_obj_set_style_bg_color(dot,color(i<4?0x38bdf8:0xc5fffa),0);
+            lv_obj_set_style_bg_opa(dot,LV_OPA_COVER,0);
+            lv_obj_set_style_radius(dot,LV_RADIUS_CIRCLE,0);motion_[i]=dot;}
         homeTemperatures(scene);
+        live_[0]=at(scene,"—",10,135,&busa_font);
+        lv_obj_set_width(live_[0],152);
+        homeAlarm_=plain(scene,106,22);
+        lv_obj_set_pos(homeAlarm_,366,110);
+        lv_obj_set_style_radius(homeAlarm_,4,0);
+        lv_obj_set_style_bg_opa(homeAlarm_,LV_OPA_TRANSP,0);
+        lv_obj_set_style_border_width(homeAlarm_,1,0);
+        lv_obj_set_style_border_color(homeAlarm_,color(0xff6473),0);
+        auto* alert=at(homeAlarm_,"АВАРИЯ",2,1,&busa_font);
+        lv_obj_set_width(alert,102);
+        lv_obj_set_style_text_color(alert,color(0xff6473),0);
+        lv_obj_set_style_text_align(alert,LV_TEXT_ALIGN_CENTER,0);
+        lv_obj_add_flag(homeAlarm_,LV_OBJ_FLAG_HIDDEN);
+        live_[1]=at(scene,"—",337,135,&busa_font);
+        lv_obj_set_width(live_[1],136);
+        lv_obj_set_style_text_align(live_[1],LV_TEXT_ALIGN_RIGHT,0);
         auto* m=plain(body_,LV_PCT(100),METRICS);
-        lv_obj_set_style_bg_color(m,color(surface()),0);lv_obj_set_style_bg_opa(m,LV_OPA_COVER,0);glass(m);
-        lv_obj_set_style_border_width(m,1,0);lv_obj_set_style_border_color(m,color(line()),0);lv_obj_set_style_radius(m,6,0);
-        static const char* headings[]={"Расход","Израсходовано","Отбор","Собрано"};
-        for(int i=0;i<4;++i){auto* l=at(m,headings[i],5+i*118,0,&busa_font_small);lv_obj_set_style_text_color(l,color(muted()),0);
-            lv_obj_set_width(l,112);lv_label_set_long_mode(l,LV_LABEL_LONG_DOT);
-            live_[8+i]=at(m,"—",5+i*118,14,&busa_font);lv_obj_set_width(live_[8+i],112);lv_label_set_long_mode(live_[8+i],LV_LABEL_LONG_DOT);}
-        auto* bar=row(body_,RELAYS);
-        static const char* relayNames[]={"ТЭН откл.","Кран закрыт","Кран открыт","Авария"};
-        for(int i=0;i<4;++i){auto* p=plain(bar,115,RELAYS);lv_obj_set_style_radius(p,6,0);
-            lv_obj_set_style_bg_color(p,color(surface()),0);lv_obj_set_style_bg_opa(p,LV_OPA_COVER,0);
-            lv_obj_set_style_border_color(p,color(line()),0);lv_obj_set_style_border_width(p,1,0);
-            live_[i]=at(p,relayNames[i],0,0,&busa_font_small);
-            lv_obj_set_width(live_[i],111);lv_obj_set_style_text_align(live_[i],LV_TEXT_ALIGN_CENTER,0);lv_obj_center(live_[i]);}
+        lv_obj_set_style_bg_color(m,color(surface()),0);
+        lv_obj_set_style_bg_opa(m,LV_OPA_COVER,0);glass(m);
+        lv_obj_set_style_border_width(m,1,0);
+        lv_obj_set_style_border_color(m,color(line()),0);
+        lv_obj_set_style_radius(m,6,0);
+        for(int i=0;i<4;++i){
+            if(i){auto* separator=plain(m,1,22);
+                lv_obj_set_pos(separator,i*118,5);
+                lv_obj_set_style_bg_color(separator,color(line()),0);
+                lv_obj_set_style_bg_opa(separator,LV_OPA_COVER,0);}
+            live_[8+i]=at(m,"—",4+i*118,7,&busa_font_small);
+            lv_obj_set_width(live_[8+i],112);
+            lv_label_set_long_mode(live_[8+i],LV_LABEL_LONG_DOT);
+        }
     }
     lv_obj_t* statusLabel(lv_obj_t* parent,int width=LV_PCT(100),int height=26){
         auto* l=smallLabel(parent,"");lv_obj_set_size(l,width,height);lv_label_set_long_mode(l,LV_LABEL_LONG_DOT);return l;
@@ -955,14 +990,40 @@ private:
         String clock=ok?String(d["clock"]["datetime"]|"—"):String("—");set(clock_,clock.substring(0,busa_presentation::clockLength(clock.c_str())));
         if(page_==3&&chart_){if(!ok){clearGraph();graphNotice("Нет связи");}if(graphKind_==0)for(int i=0;i<4;++i){String s=i==3?"Авария":sensor(i);s+=" "+measured(d["temperatures"][i]["c"]," °C");set(graphLegend_[i],s);}}
         if(page_==0){
-            for(int i=0;i<4;++i){auto v=d["sound_alerts"]["channels"][i]["sound_on"];const bool on=ok&&!v.isNull()&&v.as<bool>();
-                setBg(lv_obj_get_parent(live_[i]),on?(i==3?0x42232d:0x14382e):surface());
-                setInk(live_[i],on?(i==3?0xff6473:0x53d486):muted());
-                set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1));}
-            auto rate=d["water"]["lpm"];metric(live_[8],ok&&!rate.isNull()?fmt(rate.as<double>()*60)+" л/ч":"—");
-            metric(live_[9],measured(d["water"]["total_l_estimate"]," л",1));
-            metric(live_[10],measured(d["collection"]["ml_per_min"]," мл/мин",1));
-            metric(live_[11],measured(d["collection"]["total_ml"]," мл",1));
+            const auto sound=d["sound_alerts"];
+            const auto cube=sound["channels"][0];
+            const auto top=sound["channels"][3];
+            const auto channels=sound["channels"];
+            // K1 is the steady normal sound. K2/K3 are timed notifications; K4 is the T4 warning.
+            // These labels are monitoring indicators, never physical valve or power feedback.
+            const bool known=ok&&channels[0]["sound_on"].is<bool>()&&channels[1]["sound_on"].is<bool>()&&
+                channels[2]["sound_on"].is<bool>()&&channels[3]["sound_on"].is<bool>();
+            const bool k2=known&&(channels[1]["sound_on"]|false);
+            const bool k3=known&&(channels[2]["sound_on"]|false);
+            const bool k4=known&&(channels[3]["sound_on"]|false);
+            const bool topOn=ok&&(top["t4_condition"]|false);
+            const bool alarmOn=topOn||k4;
+            const bool triggered=k2||k3||alarmOn;
+            const bool waterAlert=ok&&(sound["buzzer"]["sensors"][0]["condition_active"]|false);
+            const bool columnAlert=ok&&(sound["buzzer"]["sensors"][1]["condition_active"]|false);
+            const bool marked[]={waterAlert,columnAlert,k3,alarmOn};
+            for(int i=0;i<4;++i){
+                if(homeTempFrames_[i])lv_obj_set_style_border_color(homeTempFrames_[i],
+                    color(marked[i]?(i==3?0xff6473:0xffc76d):paper()),0);
+                set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1));
+            }
+            if(homeAlarm_){if(alarmOn)lv_obj_clear_flag(homeAlarm_,LV_OBJ_FLAG_HIDDEN);
+                           else lv_obj_add_flag(homeAlarm_,LV_OBJ_FLAG_HIDDEN);}
+            const bool normal=known&&!triggered;
+            set(live_[0],!known?"ТЭН —":normal?"ТЭН вкл.":"ТЭН откл.");
+            set(live_[1],!known?"Кран —":normal?"Кран открыт":"Кран закрыт");
+            setInk(live_[0],!known?muted():normal?0x53d486:0xff6473);
+            setInk(live_[1],!known?muted():normal?0x53d486:0xff6473);
+            const auto rate=d["water"]["lpm"];
+            set(live_[8],String("Расход ")+(ok&&!rate.isNull()?fmt(rate.as<double>()*60)+" л/ч":"—"));
+            set(live_[9],String("Объём ")+measured(d["water"]["total_l_estimate"]," л",1));
+            set(live_[10],String("Отбор ")+measured(d["collection"]["ml_per_min"]," мл/мин",1));
+            set(live_[11],String("Собрано ")+measured(d["collection"]["total_ml"]," мл",1));
         }else if(page_==1){for(int i=0;i<4;++i)set(live_[i],measured(d["temperatures"][i]["c"]," °C",1));}
         else if(page_==2){auto rate=d["water"]["lpm"];set(live_[0],ok&&!rate.isNull()?fmt(rate.as<double>()*60)+" л/ч":"—");
             set(live_[1],measured(d["water"]["total_l_estimate"]," л",1));
@@ -997,12 +1058,12 @@ private:
     }
     Hardware& hw_;DisplaySession& session_;Preferences prefs_;
     lv_disp_drv_t driver_{};lv_disp_draw_buf_t drawBuffer_{};lv_indev_drv_t input_{};
-    lv_obj_t *body_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
+    lv_obj_t *body_=nullptr,*homeArt_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
     busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1;
     bool sectionEntered_=false;int volumeResetPending_=0;uint32_t volumeResetAt_=0;
     lv_obj_t* keyEdit_=nullptr;String keyOriginal_;bool keyDropdown_=false,displaySleeping_=false;uint16_t keyOriginalChoice_=0;
     int lastTapKey_=-1,tapMode_=0;size_t tapIndex_=0;uint32_t lastTapAt_=0,lastTestSeq_=0,testUntil_=0;lv_obj_t* testOverlay_=nullptr;
-    lv_obj_t* clock_=nullptr;lv_obj_t* statusDots_[3]={};lv_obj_t* graphNotice_=nullptr,*graphUnit_=nullptr;lv_obj_t* graphLegend_[4]={};lv_obj_t* graphPlots_[4]={};lv_obj_t* graphY_[4][4]={};bool graphDirty_=false;
+    lv_obj_t* clock_=nullptr;lv_obj_t* homeAlarm_=nullptr;lv_obj_t* homeTempFrames_[4]={};lv_obj_t* statusDots_[3]={};lv_obj_t* graphNotice_=nullptr,*graphUnit_=nullptr;lv_obj_t* graphLegend_[4]={};lv_obj_t* graphPlots_[4]={};lv_obj_t* graphY_[4][4]={};bool graphDirty_=false;
     lv_obj_t* navButtons_[6]={};lv_obj_t* fields_[8]={};lv_obj_t* live_[16]={};lv_obj_t* motion_[7]={};lv_chart_series_t* series_[4]={};
     lv_img_dsc_t art_{},navArt_[6]{};uint8_t* asset_=nullptr;
     lv_obj_t *calcNotes_=nullptr,*touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*touchTarget_=nullptr,*pageCounter_=nullptr;String pageContent_;unsigned pageOffset_=0,pageLines_=5;

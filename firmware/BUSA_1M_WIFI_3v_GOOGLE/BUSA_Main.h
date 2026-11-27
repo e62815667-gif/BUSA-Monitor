@@ -60,7 +60,7 @@ static_assert(BUSA_RESERVED_BUZZER_GPIO!=FLOW_GPIO && BUSA_RESERVED_BUZZER_GPIO!
   BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainTx && BUSA_RESERVED_BUZZER_GPIO!=busa_uart::mainRx,
   "Buzzer pin conflicts with I2C, UART or flow pins");
 static_assert(FLOW_GPIO==15 && TPIN[0]==16 && TPIN[1]==17 && TPIN[2]==18 && TPIN[3]==21 && BUS_SDA==40 && BUS_SCL==41,"GPIO changed");
-const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-RESET1-KEY1-FLOWUI1-SOUND60-PERF4-HW2-NAME1-TIME1";
+const char VERSION[]="БУСА 1М WiFi 14v9-N16R8-RM-CALC4-WIFI1-UI16-CUBE1-20261121-GEOM1-MOTION1-20261122-YFS401-PPL1-20261123-FLOWSTATE1-20261124-WATERLIVE1-UART2-COLL1-DISPLAYOTA1-P1-20261125-HIST1-LIQCFG1-IR1-FAST1-RESET1-KEY1-FLOWUI1-SOUND30-PERF4-HW2-NAME1-TIME1";
 // Diagnostic logging targets both the CH343 UART0 and native USB CDC (COM8).
 uint32_t busaBootAt=0,busaSetupDoneMs=0,busaSlowLoops=0,busaMaxLoopMs=0;
 static busa_perf::LoopProfile busaLoopProfile;
@@ -2522,6 +2522,127 @@ html:root.busaDesign section.holoHome .hasTemperature .boilerBoil>*,html:root.bu
 html:root.busaDesign section.holoHome .homeMotionPaused .waterMotion path,html:root.busaDesign section.holoHome .homeMotionPaused .boilerBoil>*,html:root.busaDesign section.holoHome .homeMotionPaused .collectionLiquid>*{animation-play-state:paused!important}
 @media(prefers-reduced-motion:reduce){html:root.busaDesign section.holoHome .waterMotion path{animation:none!important}}
 
+/* DESIGN-003 approved 27.11.2026: HOME ONLY. The existing rig image is unchanged. */
+html:root.busaDesign section.holoHome.busaApprovedHome003 .relayIndicators{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedDashboard{position:relative;padding-bottom:52px!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTempTitle{font-size:14px!important;line-height:1.15!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp strong{font-size:clamp(18px,4.7vw,24px)!important;line-height:1.15!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp{outline:1px solid transparent;outline-offset:2px;border-radius:5px}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.busaAlert{outline-color:#ffc76d}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp3.busaAlert{outline-color:#ff6473}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2{left:auto!important;right:calc(var(--scene-left) + var(--scene-w) - var(--panel-w) + 3px)!important;top:58%!important;width:var(--temp-label-width)!important;text-align:right!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempTitle{font-size:14px!important;color:var(--ink)!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp0{top:58%!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .collectedOnGlass{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003{position:absolute;bottom:7px;left:0;right:0;display:flex;justify-content:space-between;align-items:flex-end;gap:10px;pointer-events:none;color:#8cf5a9;font-size:14px;font-weight:700;line-height:1.25;z-index:6}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003 .busaStatusValve{text-align:right;margin-left:auto}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003 .busaStatusOff{color:#ff6976}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedStatus003 .busaStatusUnknown{color:var(--muted)}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedAlarm003{position:absolute;right:0;bottom:32px;border:1px solid #ff6473;border-radius:4px;color:#ff6473;font:700 14px/1.2 Arial,sans-serif;padding:3px 16px;pointer-events:none;z-index:6}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .busaApprovedAlarm003[hidden]{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetrics{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;min-height:40px;gap:0;margin-top:5px}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:4px;padding:3px 4px;min-width:0;white-space:nowrap}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span{font-size:clamp(9px,2.3vw,12px);line-height:1.1;color:#d0eaf6}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b,html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>strong{font:700 clamp(9px,2.3vw,12px)/1.1 Arial,sans-serif;color:#7de9f4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric small{font-size:inherit}
+/* DESIGN-003 mobile layout repair: keep the original apparatus image and navigation. */
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTempGrid{z-index:7!important;pointer-events:none}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp0{width:35%!important;z-index:7!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2{
+  width:35%!important;
+  top:67%!important;
+  left:auto!important;
+  z-index:7!important;
+  text-align:right!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempTitle{
+  justify-content:flex-end!important;
+  text-align:right!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetrics{
+  display:grid!important;
+  grid-template-columns:minmax(0,1.12fr) minmax(0,.92fr) minmax(0,1.12fr) minmax(0,1fr)!important;
+  padding:5px 3px!important;
+  margin-top:5px!important;
+  gap:0!important;
+  min-height:42px!important;
+  align-items:center!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric{
+  display:flex!important;
+  flex-direction:row!important;
+  justify-content:center!important;
+  align-items:center!important;
+  gap:2px!important;
+  padding:2px 2px!important;
+  min-width:0!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span{
+  flex:0 0 auto!important;
+  font:500 12px/1.1 'Arial Narrow',Arial,sans-serif!important;
+  color:#cfe9f6!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b{
+  flex:0 0 auto!important;
+  min-width:0!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  font:700 12px/1.1 'Arial Narrow',Arial,sans-serif!important;
+  white-space:nowrap!important;
+  color:#7de9f4!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b *{
+  display:inline!important;
+  font:inherit!important;
+  white-space:nowrap!important;
+}
+@media(max-width:365px){
+  html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span,
+  html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b{font-size:9.5px!important}
+}
+/* DESIGN-003: cube telemetry belongs inside the glass vessel, not beside the rig. */
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2{
+  position:absolute!important;
+  left:22%!important;
+  right:auto!important;
+  top:77%!important;
+  width:36%!important;
+  padding:0!important;
+  margin:0!important;
+  text-align:center!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:5px!important;
+  z-index:9!important;
+  pointer-events:none!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempTitle{
+  display:flex!important;
+  justify-content:center!important;
+  align-items:center!important;
+  width:100%!important;
+  font-size:clamp(10px,2.8vw,14px)!important;
+  font-weight:700!important;
+  line-height:1.15!important;
+  color:#ffed9d!important;
+  text-align:center!important;
+  text-shadow:0 1px 3px #061523,0 0 4px #061523!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempIcon{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 strong{
+  display:block!important;
+  width:100%!important;
+  margin:2px 0 0!important;
+  color:#f4c84a!important;
+  font-size:clamp(14px,4.4vw,21px)!important;
+  line-height:1.15!important;
+  letter-spacing:0!important;
+  text-align:center!important;
+  text-shadow:0 1px 4px #061523,0 0 6px #061523!important;
+}
+
 /* BUSA_DESIGN_CSS_END */
 </style><link rel="stylesheet" href="/calculator.css?v=CALC1"></head><body>
 <header class="appHeader"><div class="headerRow"><div>
@@ -3158,6 +3279,7 @@ if(s.sound_alerts?.channels?.length===4 && s.sound_alerts?.buzzer?.sensors?.leng
  temperatureThresholdsInitialized=true;
 }
 updateRelayBadges(s.sound_alerts?.channels);
+window.busaApprovedHomeUpdate?.(s);
 if(!waterPplInitialized && Number.isFinite(s.water?.pulses_per_litre)){
  get('waterPplInput').value=Number(s.water.pulses_per_litre).toFixed(1);
  waterPplInitialized=true;
@@ -3610,6 +3732,63 @@ request();
  const syncVisibility=()=>stage.classList.toggle('homeMotionPaused',document.hidden);
  document.addEventListener('visibilitychange',syncVisibility);
  syncVisibility();
+})();
+
+/* DESIGN-003: preserve the original apparatus and live telemetry IDs on Home. */
+(()=>{
+ 'use strict';
+ const home=document.querySelector('section[data-section="0"]');
+ if(!home || !home.querySelector('#rigArtStage'))return;
+ const dashboard=home.querySelector('.approvedDashboard');
+ const metrics=home.querySelector('.holoMetrics');
+ if(!dashboard || !metrics)return;
+ const existingArt=home.querySelector('#rigArtStage .approvedRigArt');
+ const originalArtSource=existingArt?.getAttribute('src');
+ home.classList.add('busaApprovedHome003');
+ const statuses=document.createElement('div');
+ statuses.className='busaApprovedStatus003';
+ const heater=document.createElement('span');heater.className='busaStatusHeater';heater.textContent='ТЭН —';
+ const valve=document.createElement('span');valve.className='busaStatusValve';valve.textContent='Кран —';
+ statuses.append(heater,valve);dashboard.append(statuses);
+ const alarm=document.createElement('span');alarm.className='busaApprovedAlarm003';alarm.textContent='АВАРИЯ';alarm.hidden=true;dashboard.append(alarm);
+ const values=[['Расход','homeCoolingRate'],['Объём','homeWaterUsed'],['Отбор','homeCollectionRate'],['Собрано','homeCollectionTotal']];
+ const readings=values.map(([,id])=>document.getElementById(id));
+ const volumeUnit=document.getElementById('homeCollectionUnit');
+ const cells=[];
+ for(const [index,[name,id]] of values.entries()){
+   const cell=document.createElement('div');cell.className='holoMetric';
+   const title=document.createElement('span');title.textContent=name;
+   const reading=document.createElement('b');
+   if(readings[index])reading.append(readings[index]);else reading.textContent='—';
+   if(id==='homeCollectionRate')reading.append(document.createTextNode(' мл/мин'));
+   if(id==='homeCollectionTotal')reading.append(document.createTextNode(' '),volumeUnit||document.createTextNode('мл'));
+   cell.append(title,reading);cells.push(cell);
+ }
+ metrics.replaceChildren(...cells);
+ window.busaApprovedHomeUpdate=function(s){
+   const sound=s?.sound_alerts;
+   const channels=Array.isArray(sound?.channels)&&sound.channels.length===4?sound.channels:null;
+   const known=!!(channels&&channels.every(channel=>typeof channel?.sound_on==='boolean'));
+   // K1 sounds continuously in normal mode. K2/K3 notify a transition, K4 reports T4 warning.
+   const k2=known&&channels[1].sound_on;
+   const k3=known&&channels[2].sound_on;
+   const k4=known&&channels[3].sound_on;
+   const alarmOn=k4||channels?.[3]?.t4_condition===true;
+   const triggered=k2||k3||alarmOn;
+   const normal=known&&!triggered;
+   const marks=[sound?.buzzer?.sensors?.[0]?.condition_active===true,
+                sound?.buzzer?.sensors?.[1]?.condition_active===true,k3,alarmOn];
+   for(let i=0;i<4;i++)home.querySelector('.approvedTemp.temp'+i)?.classList.toggle('busaAlert',marks[i]);
+   heater.textContent=!known?'ТЭН —':normal?'ТЭН вкл.':'ТЭН откл.';
+   valve.textContent=!known?'Кран —':normal?'Кран открыт':'Кран закрыт';
+   for(const label of [heater,valve]){
+     label.classList.toggle('busaStatusOff',known&&!normal);
+     label.classList.toggle('busaStatusUnknown',!known);
+   }
+   alarm.hidden=!alarmOn;
+   if(existingArt&&existingArt.getAttribute('src')!==originalArtSource)
+     console.error('[DESIGN-003] Original local apparatus image unexpectedly changed');
+ };
 })();
 
 /* BUSA_DESIGN_JS_END */

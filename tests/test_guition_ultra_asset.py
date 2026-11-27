@@ -2,8 +2,8 @@ from pathlib import Path
 from PIL import Image
 import re, subprocess, sys, tempfile
 root=Path(__file__).resolve().parents[1]
-im=Image.open(root/'web/assets/holographic-apparatus.webp').convert('RGBA')
-im.thumbnail((110,124),Image.Resampling.LANCZOS)
+im=Image.open(root/'firmware/BUSA_Display_N4R8/BUSA_Design003Art.png').convert('RGBA')
+assert im.size==(190,182), 'approved DESIGN-003 image must have full native source resolution'
 p=root/'display_delivery/microSD/busa/rig.rgb565a'
 b=p.read_bytes()
 assert len(b)==im.width*im.height*3
@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory() as tmp:
     work=Path(tmp)
     (work/'web/assets').mkdir(parents=True)
     (work/'firmware/BUSA_Display_N4R8').mkdir(parents=True)
-    Image.new('RGBA',(16,16),(21,63,85,255)).save(work/'web/assets/holographic-apparatus.webp',lossless=True)
+    Image.new('RGBA',(16,16),(21,63,85,255)).save(work/'firmware/BUSA_Display_N4R8/BUSA_Design003Art.png')
     subprocess.run([sys.executable,str(root/'ci/generate_guition_asset.py')],cwd=work,check=True)
     pixels=(work/'display_delivery/microSD/busa/rig.rgb565a').read_bytes()
     expected=(((21*31+127)//255)<<11)|(((63*63+127)//255)<<5)|((85*31+127)//255)

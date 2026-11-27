@@ -2,7 +2,7 @@
 #include <cassert>
 int main(){
     using namespace busa_uart;
-    assert(baud==115200);
+    assert(baud==1152000);
     assert(mainTxBuffer==4096);
     assert(txWriteBudget(1000,-1)==0);
     assert(txWriteBudget(1000,0)==0);

@@ -54,7 +54,7 @@ struct UiTest {
     uint8_t theme_=2; int calcMode_=0; bool geometryExpanded_=true;
     String geometrySummary()const{return "Размеры куба: 40 × 80 см · изменить";}
     lv_obj_t *body_=nullptr,*nav_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr;
-    lv_obj_t *fields_[8]={},*live_[16]={}; String calcInput_[4][5]; SessionStub session_;
+    lv_obj_t *fields_[8]={},*live_[16]={},*homeTempFrames_[4]={}; String calcInput_[4][5]; SessionStub session_;
     lv_obj_t *touchModal_=nullptr,*touchTitle_=nullptr,*touchEditor_=nullptr,*keyboard_=nullptr;
     static void keyboardEvent(lv_event_t*){}
     lv_img_dsc_t navArt_[6]{};lv_obj_t* navButtons_[6]={};
@@ -189,23 +189,29 @@ checks=r'''
         init();auto* scene=plain(body_,LV_PCT(100),SCENE);
         homeTemperatures(scene);
         lv_obj_update_layout(body_);
-        assert(lv_obj_get_child_cnt(scene)==8);
-        lv_area_t area;lv_obj_get_coords(scene,&area);
+        assert(lv_obj_get_child_cnt(scene)==4);
+        lv_area_t sceneArea;lv_obj_get_coords(scene,&sceneArea);
         for(int i=0;i<4;++i){
-            auto* name=lv_obj_get_child(scene,2*i);auto* reading=live_[4+i];
-            assert(reading==lv_obj_get_child(scene,2*i+1));
+            auto* frame=lv_obj_get_child(scene,i);
+            assert(frame==homeTempFrames_[i]);assert(lv_obj_get_child_cnt(frame)==2);
+            auto* name=lv_obj_get_child(frame,0);auto* reading=lv_obj_get_child(frame,1);
+            assert(reading==live_[4+i]);
             assert(!strcmp(lv_label_get_text(name),i==0?"Вода":i==1?"Колонна":i==2?"Куб":"Авария"));
+            lv_area_t box;lv_obj_get_coords(frame,&box);
+            assert(box.x1>=sceneArea.x1 && box.x2<=sceneArea.x2 && box.y1>=sceneArea.y1 && box.y2<=sceneArea.y2);
             for(const char* value:{"—","-55,0 °C","125,0 °C","23,9 °C"}){
                 lv_label_set_text(reading,value);lv_obj_update_layout(body_);
                 labelFits(name);labelFits(reading);
-                lv_area_t a,b;lv_obj_get_coords(name,&a);lv_obj_get_coords(reading,&b);
-                assert(a.y2<b.y1);
-                if(i>=2){assert(a.x2==area.x2-10&&b.x2==area.x2-10);
-                    assert(lv_obj_get_style_text_align(name,0)==LV_TEXT_ALIGN_RIGHT&&lv_obj_get_style_text_align(reading,0)==LV_TEXT_ALIGN_RIGHT);}
-                else assert(a.x1==area.x1+10&&b.x1==area.x1+10);
+                lv_area_t labelArea,numberArea;lv_obj_get_coords(name,&labelArea);lv_obj_get_coords(reading,&numberArea);
+                assert(labelArea.y2<numberArea.y1);
+                assert(labelArea.x1>=box.x1 && labelArea.x2<=box.x2);
+                assert(numberArea.x1>=box.x1 && numberArea.x2<=box.x2);
+                assert(numberArea.y2<=box.y2);
+                if(i>=2){assert(lv_obj_get_style_text_align(name,0)==LV_TEXT_ALIGN_RIGHT);
+                             assert(lv_obj_get_style_text_align(reading,0)==LV_TEXT_ALIGN_RIGHT);}
             }
         }
-        std::puts("PASS main temperatures: four names/readings, no thresholds, aligned right edge and full value bounds");
+        std::puts("PASS approved main temperatures: four framed names/readings, no overlap, visible values");
     }
     void verifyWater(){
         init();water();

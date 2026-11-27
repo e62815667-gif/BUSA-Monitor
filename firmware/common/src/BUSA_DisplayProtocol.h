@@ -11,7 +11,7 @@ constexpr size_t maxWire=2*maxRaw+2;
 // P1: yellow TXD -> main RX GPIO8; blue RXD <- main TX GPIO9.
 constexpr int mainTx=9, mainRx=8, displayTx=43, displayRx=44;
 // Shared software default, not a hardware pin assignment.
-constexpr uint32_t baud=115200;
+constexpr uint32_t baud=1152000;
 // Keep the wire protocol compatible with installed OTA1 receivers. A ring
 // buffer lets the hardware drain bytes even when the application loop is busy.
 constexpr size_t mainTxBuffer=4096, txReserve=128, txSlice=2048;
