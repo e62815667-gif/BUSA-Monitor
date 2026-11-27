@@ -21,3 +21,60 @@ html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric{display:fl
 html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span{font-size:clamp(9px,2.3vw,12px);line-height:1.1;color:#d0eaf6}
 html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b,html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>strong{font:700 clamp(9px,2.3vw,12px)/1.1 Arial,sans-serif;color:#7de9f4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric small{font-size:inherit}
+/* DESIGN-003 mobile layout repair: keep the original apparatus image and navigation. */
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTempGrid{z-index:7!important;pointer-events:none}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp0{width:35%!important;z-index:7!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2{
+  width:35%!important;
+  top:67%!important;
+  left:auto!important;
+  z-index:7!important;
+  text-align:right!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempTitle{
+  justify-content:flex-end!important;
+  text-align:right!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetrics{
+  display:grid!important;
+  grid-template-columns:minmax(0,1.12fr) minmax(0,.92fr) minmax(0,1.12fr) minmax(0,1fr)!important;
+  padding:5px 3px!important;
+  margin-top:5px!important;
+  gap:0!important;
+  min-height:42px!important;
+  align-items:center!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric{
+  display:flex!important;
+  flex-direction:row!important;
+  justify-content:center!important;
+  align-items:center!important;
+  gap:2px!important;
+  padding:2px 2px!important;
+  min-width:0!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span{
+  flex:0 0 auto!important;
+  font:500 12px/1.1 'Arial Narrow',Arial,sans-serif!important;
+  color:#cfe9f6!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b{
+  flex:0 0 auto!important;
+  min-width:0!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  font:700 12px/1.1 'Arial Narrow',Arial,sans-serif!important;
+  white-space:nowrap!important;
+  color:#7de9f4!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b *{
+  display:inline!important;
+  font:inherit!important;
+  white-space:nowrap!important;
+}
+@media(max-width:365px){
+  html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span,
+  html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b{font-size:9.5px!important}
+}

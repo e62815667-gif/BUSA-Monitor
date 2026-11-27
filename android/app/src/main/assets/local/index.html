@@ -1064,6 +1064,63 @@ html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric{display:fl
 html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span{font-size:clamp(9px,2.3vw,12px);line-height:1.1;color:#d0eaf6}
 html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b,html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>strong{font:700 clamp(9px,2.3vw,12px)/1.1 Arial,sans-serif;color:#7de9f4;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric small{font-size:inherit}
+/* DESIGN-003 mobile layout repair: keep the original apparatus image and navigation. */
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTempGrid{z-index:7!important;pointer-events:none}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp0{width:35%!important;z-index:7!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2{
+  width:35%!important;
+  top:67%!important;
+  left:auto!important;
+  z-index:7!important;
+  text-align:right!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempTitle{
+  justify-content:flex-end!important;
+  text-align:right!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetrics{
+  display:grid!important;
+  grid-template-columns:minmax(0,1.12fr) minmax(0,.92fr) minmax(0,1.12fr) minmax(0,1fr)!important;
+  padding:5px 3px!important;
+  margin-top:5px!important;
+  gap:0!important;
+  min-height:42px!important;
+  align-items:center!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric{
+  display:flex!important;
+  flex-direction:row!important;
+  justify-content:center!important;
+  align-items:center!important;
+  gap:2px!important;
+  padding:2px 2px!important;
+  min-width:0!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span{
+  flex:0 0 auto!important;
+  font:500 12px/1.1 'Arial Narrow',Arial,sans-serif!important;
+  color:#cfe9f6!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b{
+  flex:0 0 auto!important;
+  min-width:0!important;
+  overflow:visible!important;
+  text-overflow:clip!important;
+  font:700 12px/1.1 'Arial Narrow',Arial,sans-serif!important;
+  white-space:nowrap!important;
+  color:#7de9f4!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b *{
+  display:inline!important;
+  font:inherit!important;
+  white-space:nowrap!important;
+}
+@media(max-width:365px){
+  html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span,
+  html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b{font-size:9.5px!important}
+}
 
 /* BUSA_DESIGN_CSS_END */
 </style><link rel="stylesheet" href="/calculator.css?v=CALC1"></head><body>
@@ -2156,12 +2213,14 @@ request();
  syncVisibility();
 })();
 
-/* DESIGN-003: only compose the approved home display; all readings remain original DOM bindings. */
+/* DESIGN-003: preserve the original apparatus and live telemetry IDs on Home. */
 (()=>{
  'use strict';
  const home=document.querySelector('section[data-section="0"]');
  if(!home || !home.querySelector('#rigArtStage'))return;
  const dashboard=home.querySelector('.approvedDashboard');
+ const metrics=home.querySelector('.holoMetrics');
+ if(!dashboard || !metrics)return;
  const existingArt=home.querySelector('#rigArtStage .approvedRigArt');
  const originalArtSource=existingArt?.getAttribute('src');
  home.classList.add('busaApprovedHome003');
@@ -2171,32 +2230,30 @@ request();
  const valve=document.createElement('span');valve.className='busaStatusValve';valve.textContent='Кран —';
  statuses.append(heater,valve);dashboard.append(statuses);
  const alarm=document.createElement('span');alarm.className='busaApprovedAlarm003';alarm.textContent='АВАРИЯ';alarm.hidden=true;dashboard.append(alarm);
- const metrics=home.querySelector('.holoMetrics');
- if(metrics){
-   const values=[['Расход','homeCoolingRate'],['Объём','homeWaterUsed'],['Отбор','homeCollectionRate'],['Собрано','homeCollectionTotal']];
-   const originalReadings=values.map(([,id])=>document.getElementById(id));
-   metrics.replaceChildren();
-   for(const [index,[name,id]] of values.entries()){
-     const original=originalReadings[index];
-     const cell=document.createElement('div');cell.className='holoMetric';
-     const title=document.createElement('span');title.textContent=name;
-     const reading=document.createElement('b');
-     if(original)reading.append(original);else reading.textContent='—';
-     if(id==='homeCollectionRate')reading.append(document.createTextNode(' мл/мин'));
-     if(id==='homeCollectionTotal')reading.append(document.getElementById('homeCollectionUnit')||document.createTextNode(' мл'));
-     cell.append(title,reading);metrics.append(cell);
-   }
+ const values=[['Расход','homeCoolingRate'],['Объём','homeWaterUsed'],['Отбор','homeCollectionRate'],['Собрано','homeCollectionTotal']];
+ const readings=values.map(([,id])=>document.getElementById(id));
+ const volumeUnit=document.getElementById('homeCollectionUnit');
+ const cells=[];
+ for(const [index,[name,id]] of values.entries()){
+   const cell=document.createElement('div');cell.className='holoMetric';
+   const title=document.createElement('span');title.textContent=name;
+   const reading=document.createElement('b');
+   if(readings[index])reading.append(readings[index]);else reading.textContent='—';
+   if(id==='homeCollectionRate')reading.append(document.createTextNode(' мл/мин'));
+   if(id==='homeCollectionTotal')reading.append(document.createTextNode(' '),volumeUnit||document.createTextNode('мл'));
+   cell.append(title,reading);cells.push(cell);
  }
+ metrics.replaceChildren(...cells);
  window.busaApprovedHomeUpdate=function(s){
    const sound=s?.sound_alerts;
    const cube=sound?.channels?.[0],top=sound?.channels?.[3];
-   const cubeValid=!!(cube?.sample_valid&&typeof cube.on_c==='number'&&typeof cube.off_c==='number'&&Number.isFinite(cube.on_c)&&Number.isFinite(cube.off_c));
-   const topValid=!!(top?.sample_valid&&typeof top.on_c==='number'&&typeof top.off_c==='number'&&Number.isFinite(top.on_c)&&Number.isFinite(top.off_c));
+   const cubeValid=!!(cube?.sample_valid&&Number.isFinite(cube.on_c)&&Number.isFinite(cube.off_c));
+   const topValid=!!(top?.sample_valid&&Number.isFinite(top.on_c)&&Number.isFinite(top.off_c));
    const cubeOn=cubeValid&&cube.t3_condition===true;
    const topOn=topValid&&top.t4_condition===true;
    const known=cubeValid&&topValid;
    const normal=known&&cubeOn&&!topOn;
-   const ordinaryOff=cubeValid&&!cubeOn&&!topOn&&Number(sound?.t3_off_events)>0;
+   const ordinaryOff=known&&!cubeOn&&!topOn&&Number(sound?.t3_off_events)>0;
    const marks=[sound?.buzzer?.sensors?.[0]?.condition_active===true,
                 sound?.buzzer?.sensors?.[1]?.condition_active===true,ordinaryOff,topOn];
    for(let i=0;i<4;i++)home.querySelector('.approvedTemp.temp'+i)?.classList.toggle('busaAlert',marks[i]);
@@ -2207,9 +2264,8 @@ request();
      label.classList.toggle('busaStatusUnknown',!known);
    }
    alarm.hidden=!topOn;
-   // Never mutate, replace, redraw, or reencode the local application's original rig image.
-   if(existingArt && existingArt.getAttribute('src')!==originalArtSource)
-     console.error('[DESIGN-003] Rig artwork was changed outside home presentation');
+   if(existingArt&&existingArt.getAttribute('src')!==originalArtSource)
+     console.error('[DESIGN-003] Original local apparatus image unexpectedly changed');
  };
 })();
 
