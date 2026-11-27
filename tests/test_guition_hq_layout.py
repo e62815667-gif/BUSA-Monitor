@@ -23,3 +23,14 @@ assert 'for(int i=0;i<10;)' in u
 assert 'lv_keyboard_set_textarea(self->keyboard_,self->touchEditor_)' in u
 assert 'lv_obj_set_height(self->body_,HEIGHT-TOP-128)' not in u
 print('PASS: native 480x272 layout contract, labels, fonts, and keyboard bounds')
+
+# DESIGN-003 regression: labels follow real routed sound outputs, not configured thresholds.
+assert 'clock_=at(top,"—",139,6,&busa_font_nav)' in u, 'date must be at top, to right of BUSA MONITOR'
+assert 'lv_obj_set_width(title,127)' in u and 'lv_obj_set_width(clock_,127)' in u
+assert 'auto* pillLabel=at(p,names[i],15,2,&busa_font_small)' in u
+assert 'lv_obj_set_width(pillLabel,46);lv_obj_set_style_text_align(pillLabel,LV_TEXT_ALIGN_CENTER,0)' in u
+assert 'channels[1]["sound_on"]' in u and 'channels[2]["sound_on"]' in u and 'channels[3]["sound_on"]' in u
+assert 'const bool triggered=k2||k3||alarmOn;' in u and 'const bool normal=known&&!triggered;' in u
+assert 'const bool marked[]={waterAlert,columnAlert,k3,alarmOn};' in u
+assert 'const bool normal=known&&cubeOn&&!topOn;' not in u
+print('PASS DESIGN-003 header and sound-state contract')

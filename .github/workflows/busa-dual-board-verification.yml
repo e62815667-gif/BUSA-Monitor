@@ -30,6 +30,7 @@ jobs:
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_uart_tx_budget.cpp -o /tmp/busa-uart-budget-test
           /tmp/busa-uart-budget-test
           node tests/test_perf1_polling.cjs
+          node tests/test_busa_status_contract.cjs
           g++ -std=c++11 -Wall -Wextra -Werror tests/test_perf2.cpp -o /tmp/busa-perf2-test
           /tmp/busa-perf2-test
           g++ -std=c++11 -pthread -Wall -Wextra -Werror tests/test_uart_tx_mailbox.cpp -o /tmp/busa-mailbox-test

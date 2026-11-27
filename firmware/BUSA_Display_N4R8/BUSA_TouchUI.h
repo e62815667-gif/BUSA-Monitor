@@ -356,14 +356,15 @@ private:
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
         auto* root=lv_scr_act();homeArt_=nullptr;calcNotes_=nullptr;touchModal_=nullptr;touchTitle_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
         auto* top=plain(root,WIDTH,TOP);lv_obj_set_pos(top,0,0);
-        auto* title=at(top,"BUSA MONITOR",6,0);lv_obj_set_width(title,210);
-        clock_=at(top,"—",6,17,&busa_font_nav);lv_obj_set_width(clock_,247);
+        auto* title=at(top,"BUSA MONITOR",6,0);lv_obj_set_width(title,127);
+        clock_=at(top,"—",139,6,&busa_font_nav);lv_obj_set_width(clock_,127);
         lv_label_set_long_mode(clock_,LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_color(clock_,color(muted()),0);
-        for(int i=0;i<3;++i){static const char* names[]={"Wi-Fi","Google","ESP32"};auto* p=plain(top,65,18);lv_obj_set_pos(p,273+i*68,6);
+        for(int i=0;i<3;++i){static const char* names[]={"Wi-Fi","Google","ESP32"};auto* p=plain(top,65,18);lv_obj_set_pos(p,273+i*68,5);
             lv_obj_set_style_radius(p,9,0);lv_obj_set_style_border_width(p,1,0);lv_obj_set_style_border_color(p,color(line()),0);
-            statusDots_[i]=plain(p,5,5);lv_obj_set_style_radius(statusDots_[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_opa(statusDots_[i],LV_OPA_COVER,0);lv_obj_set_pos(statusDots_[i],5,6);
-            at(p,names[i],15,2,&busa_font_small);}
+            statusDots_[i]=plain(p,5,5);lv_obj_set_style_radius(statusDots_[i],LV_RADIUS_CIRCLE,0);lv_obj_set_style_bg_opa(statusDots_[i],LV_OPA_COVER,0);lv_obj_set_pos(statusDots_[i],6,7);
+            auto* pillLabel=at(p,names[i],15,2,&busa_font_small);
+            lv_obj_set_width(pillLabel,46);lv_obj_set_style_text_align(pillLabel,LV_TEXT_ALIGN_CENTER,0);}
         body_=lv_obj_create(root);lv_obj_set_pos(body_,0,TOP);lv_obj_set_size(body_,WIDTH,HEIGHT-TOP-NAV);
         lv_obj_set_style_bg_color(body_,color(paper()),0);lv_obj_set_style_border_width(body_,0,0);lv_obj_set_style_radius(body_,0,0);
         lv_obj_set_style_pad_all(body_,PAD,0);lv_obj_set_style_pad_row(body_,GAP,0);lv_obj_set_flex_flow(body_,LV_FLEX_FLOW_COLUMN);
@@ -992,23 +993,28 @@ private:
             const auto sound=d["sound_alerts"];
             const auto cube=sound["channels"][0];
             const auto top=sound["channels"][3];
-            const bool cubeValid=ok&&(cube["sample_valid"]|false)&&!cube["on_c"].isNull()&&!cube["off_c"].isNull();
-            const bool topValid=ok&&(top["sample_valid"]|false)&&!top["on_c"].isNull()&&!top["off_c"].isNull();
-            const bool cubeOn=cubeValid&&(cube["t3_condition"]|false);
-            const bool topOn=topValid&&(top["t4_condition"]|false);
-            const bool ordinaryOff=cubeValid&&!cubeOn&&!topOn&&(sound["t3_off_events"]|0u)>0u;
+            const auto channels=sound["channels"];
+            // K1 is the steady normal sound. K2/K3 are timed notifications; K4 is the T4 warning.
+            // These labels are monitoring indicators, never physical valve or power feedback.
+            const bool known=ok&&channels[0]["sound_on"].is<bool>()&&channels[1]["sound_on"].is<bool>()&&
+                channels[2]["sound_on"].is<bool>()&&channels[3]["sound_on"].is<bool>();
+            const bool k2=known&&(channels[1]["sound_on"]|false);
+            const bool k3=known&&(channels[2]["sound_on"]|false);
+            const bool k4=known&&(channels[3]["sound_on"]|false);
+            const bool topOn=ok&&(top["t4_condition"]|false);
+            const bool alarmOn=topOn||k4;
+            const bool triggered=k2||k3||alarmOn;
             const bool waterAlert=ok&&(sound["buzzer"]["sensors"][0]["condition_active"]|false);
             const bool columnAlert=ok&&(sound["buzzer"]["sensors"][1]["condition_active"]|false);
-            const bool marked[]={waterAlert,columnAlert,ordinaryOff,topOn};
+            const bool marked[]={waterAlert,columnAlert,k3,alarmOn};
             for(int i=0;i<4;++i){
                 if(homeTempFrames_[i])lv_obj_set_style_border_color(homeTempFrames_[i],
                     color(marked[i]?(i==3?0xff6473:0xffc76d):paper()),0);
                 set(live_[4+i],measured(d["temperatures"][i]["c"]," °C",1));
             }
-            if(homeAlarm_){if(topOn)lv_obj_clear_flag(homeAlarm_,LV_OBJ_FLAG_HIDDEN);
+            if(homeAlarm_){if(alarmOn)lv_obj_clear_flag(homeAlarm_,LV_OBJ_FLAG_HIDDEN);
                            else lv_obj_add_flag(homeAlarm_,LV_OBJ_FLAG_HIDDEN);}
-            const bool known=cubeValid&&topValid;
-            const bool normal=known&&cubeOn&&!topOn;
+            const bool normal=known&&!triggered;
             set(live_[0],!known?"ТЭН —":normal?"ТЭН вкл.":"ТЭН откл.");
             set(live_[1],!known?"Кран —":normal?"Кран открыт":"Кран закрыт");
             setInk(live_[0],!known?muted():normal?0x53d486:0xff6473);

@@ -31,16 +31,17 @@
  metrics.replaceChildren(...cells);
  window.busaApprovedHomeUpdate=function(s){
    const sound=s?.sound_alerts;
-   const cube=sound?.channels?.[0],top=sound?.channels?.[3];
-   const cubeValid=!!(cube?.sample_valid&&Number.isFinite(cube.on_c)&&Number.isFinite(cube.off_c));
-   const topValid=!!(top?.sample_valid&&Number.isFinite(top.on_c)&&Number.isFinite(top.off_c));
-   const cubeOn=cubeValid&&cube.t3_condition===true;
-   const topOn=topValid&&top.t4_condition===true;
-   const known=cubeValid&&topValid;
-   const normal=known&&cubeOn&&!topOn;
-   const ordinaryOff=known&&!cubeOn&&!topOn&&Number(sound?.t3_off_events)>0;
+   const channels=Array.isArray(sound?.channels)&&sound.channels.length===4?sound.channels:null;
+   const known=!!(channels&&channels.every(channel=>typeof channel?.sound_on==='boolean'));
+   // K1 sounds continuously in normal mode. K2/K3 notify a transition, K4 reports T4 warning.
+   const k2=known&&channels[1].sound_on;
+   const k3=known&&channels[2].sound_on;
+   const k4=known&&channels[3].sound_on;
+   const alarmOn=k4||channels?.[3]?.t4_condition===true;
+   const triggered=k2||k3||alarmOn;
+   const normal=known&&!triggered;
    const marks=[sound?.buzzer?.sensors?.[0]?.condition_active===true,
-                sound?.buzzer?.sensors?.[1]?.condition_active===true,ordinaryOff,topOn];
+                sound?.buzzer?.sensors?.[1]?.condition_active===true,k3,alarmOn];
    for(let i=0;i<4;i++)home.querySelector('.approvedTemp.temp'+i)?.classList.toggle('busaAlert',marks[i]);
    heater.textContent=!known?'ТЭН —':normal?'ТЭН вкл.':'ТЭН откл.';
    valve.textContent=!known?'Кран —':normal?'Кран открыт':'Кран закрыт';
@@ -48,7 +49,7 @@
      label.classList.toggle('busaStatusOff',known&&!normal);
      label.classList.toggle('busaStatusUnknown',!known);
    }
-   alarm.hidden=!topOn;
+   alarm.hidden=!alarmOn;
    if(existingArt&&existingArt.getAttribute('src')!==originalArtSource)
      console.error('[DESIGN-003] Original local apparatus image unexpectedly changed');
  };
