@@ -78,3 +78,43 @@ html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b *{
   html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>span,
   html:root.busaDesign section.holoHome.busaApprovedHome003 .holoMetric>b{font-size:9.5px!important}
 }
+/* DESIGN-003: cube telemetry belongs inside the glass vessel, not beside the rig. */
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2{
+  position:absolute!important;
+  left:22%!important;
+  right:auto!important;
+  top:77%!important;
+  width:36%!important;
+  padding:0!important;
+  margin:0!important;
+  text-align:center!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:5px!important;
+  z-index:9!important;
+  pointer-events:none!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempTitle{
+  display:flex!important;
+  justify-content:center!important;
+  align-items:center!important;
+  width:100%!important;
+  font-size:clamp(10px,2.8vw,14px)!important;
+  font-weight:700!important;
+  line-height:1.15!important;
+  color:#ffed9d!important;
+  text-align:center!important;
+  text-shadow:0 1px 3px #061523,0 0 4px #061523!important;
+}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 .approvedTempIcon{display:none!important}
+html:root.busaDesign section.holoHome.busaApprovedHome003 .approvedTemp.temp2 strong{
+  display:block!important;
+  width:100%!important;
+  margin:2px 0 0!important;
+  color:#f4c84a!important;
+  font-size:clamp(14px,4.4vw,21px)!important;
+  line-height:1.15!important;
+  letter-spacing:0!important;
+  text-align:center!important;
+  text-shadow:0 1px 4px #061523,0 0 6px #061523!important;
+}
