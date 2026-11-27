@@ -1,12 +1,12 @@
 from pathlib import Path
 from PIL import Image, ImageFilter
 import hashlib
-src=Path('web/assets/holographic-apparatus.webp')
+src=Path('firmware/BUSA_Display_N4R8/BUSA_Design003Art.png')
 dest=Path('firmware/BUSA_Display_N4R8')
 sd=Path('display_delivery/microSD/busa')
 sd.mkdir(parents=True,exist_ok=True)
 im=Image.open(src).convert('RGBA')
-im.thumbnail((110,124),Image.Resampling.LANCZOS)
+assert im.width<=190 and im.height<=182, 'DESIGN-003 approved art must fit 190x182'
 # Preserve approved dimensions and alpha silhouette; sharpen opaque details only.
 rgb=im.convert('RGB')
 sharp=rgb.filter(ImageFilter.UnsharpMask(radius=0.65,percent=70,threshold=3))

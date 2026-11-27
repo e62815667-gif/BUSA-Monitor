@@ -354,7 +354,7 @@ private:
     }
     void build(){
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;
-        auto* root=lv_scr_act();calcNotes_=nullptr;touchModal_=nullptr;touchTitle_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
+        auto* root=lv_scr_act();homeArt_=nullptr;calcNotes_=nullptr;touchModal_=nullptr;touchTitle_=nullptr;keyboard_=nullptr;touchEditor_=nullptr;touchTarget_=nullptr;lv_obj_clean(root);rootStyle(root);lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
         auto* top=plain(root,WIDTH,TOP);lv_obj_set_pos(top,0,0);
         auto* title=at(top,"BUSA MONITOR",6,0);lv_obj_set_width(title,210);
         clock_=at(top,"—",6,17,&busa_font_nav);lv_obj_set_width(clock_,247);
@@ -375,7 +375,7 @@ private:
     void render(){
         cancelKeyEdit(false);keyCount_=0;keyFocus_=-1;volumeResetPending_=0;
         if(calcNotes_){lv_obj_del(calcNotes_);calcNotes_=nullptr;}
-        hideKeyboard();lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;homeAlarm_=nullptr;for(auto& p:homeTempFrames_)p=nullptr;
+        hideKeyboard();if(homeArt_){lv_obj_del(homeArt_);homeArt_=nullptr;}lv_obj_clean(body_);++viewGeneration_;formValid_=session_.connected();for(auto& p:fields_)p=nullptr;for(auto& p:live_)p=nullptr;for(auto& p:motion_)p=nullptr;homeAlarm_=nullptr;for(auto& p:homeTempFrames_)p=nullptr;
         wifiList_=nullptr;networkCount_=0;chart_=nullptr;graphNotice_=nullptr;graphUnit_=nullptr;for(auto& p:graphPlots_)p=nullptr;for(auto& s:series_)s=nullptr;for(auto& y:graphY_)for(auto& l:y)l=nullptr;for(auto& l:graphLegend_)l=nullptr;resultLabel_=nullptr;pageStatus_=nullptr;pageCounter_=nullptr;pageContent_="";pageOffset_=0;scanPending_=false;
         syncNavFocus();
         lv_obj_clear_flag(body_,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scrollbar_mode(body_,LV_SCROLLBAR_MODE_OFF);
@@ -413,8 +413,11 @@ private:
     }
     void home(){
         auto* scene=plain(body_,LV_PCT(100),SCENE);
-        auto* center=plain(scene,BUSA_ASSET_W,BUSA_ASSET_H);
-        lv_obj_align(center,LV_ALIGN_CENTER,0,-3);
+        homeArt_=plain(lv_scr_act(),BUSA_ASSET_W,BUSA_ASSET_H);
+        lv_obj_set_pos(homeArt_,(WIDTH-BUSA_ASSET_W)/2,7);
+        lv_obj_clear_flag(homeArt_,LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_move_foreground(touchModal_);
+        auto* center=homeArt_;
         auto* im=lv_img_create(center);
         lv_img_set_src(im,&art_);lv_img_set_antialias(im,true);lv_obj_center(im);
         for(unsigned i=0;i<7;++i){auto* dot=plain(center,3,3);
@@ -1049,7 +1052,7 @@ private:
     }
     Hardware& hw_;DisplaySession& session_;Preferences prefs_;
     lv_disp_drv_t driver_{};lv_disp_draw_buf_t drawBuffer_{};lv_indev_drv_t input_{};
-    lv_obj_t *body_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
+    lv_obj_t *body_=nullptr,*homeArt_=nullptr,*nav_=nullptr,*keyboard_=nullptr,*pageStatus_=nullptr,*resultLabel_=nullptr,*wifiList_=nullptr,*chart_=nullptr,*calMark_=nullptr;
     busa_keys::Cursor keyCursor_;KeyControl keyControls_[64]={};int keyCount_=0,keyFocus_=-1,keyConfirm_=-1;
     bool sectionEntered_=false;int volumeResetPending_=0;uint32_t volumeResetAt_=0;
     lv_obj_t* keyEdit_=nullptr;String keyOriginal_;bool keyDropdown_=false,displaySleeping_=false;uint16_t keyOriginalChoice_=0;
